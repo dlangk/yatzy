@@ -6,6 +6,11 @@ __pycache__/
 # vi related things
 *.swp
 
+# intellij related things
+*.xml
+def next_player(state):
+
+
 # C extensions
 *.so
 

@@ -1,9 +1,10 @@
-import engine
-import brain
 import json
+import engine
+
 
 def ppj(parsed_json):
     print(json.dumps(parsed_json, indent=4, sort_keys=True))
+
 
 state = engine.initialize_game(["brain1"])
 engine.print_state(state)
@@ -21,4 +22,3 @@ while turns <= max_turns:
     ppj(options)
     engine.print_state(state)
     turns += 1
-

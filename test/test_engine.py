@@ -1,6 +1,7 @@
 from yatzy import engine
 import unittest
 
+
 class TestDiceMethods(unittest.TestCase):
 
     def test_roll(self):
