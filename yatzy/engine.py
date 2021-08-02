@@ -1,262 +1,359 @@
 import random
-import json
 from collections import Counter
 
-
-def roll_dice(dices):
-    return [random.randint(1, 6) for n in range(dices)]
-
-
-def upper_section_validator(dices, die_value, n):
-    # Any set of dices are valid for the upper section
-    return True, [die_value]
+import const
+from action import Action
+from logger import YatzyLogger
+from state import State
+from utils import combinations
 
 
-def n_kind_validator(dices, die_value, n):
-    # check if there are n of any number
-    # returns Boolean, [list of options]
-    valid = False
-    options = []
-    die_count = Counter(dices)
-    for die in die_count:
-        if die_count[die] >= n:
-            valid = True
-            options.append(die)
-    return valid, options
+class Engine:
 
-
-def two_pair_validator(dices, die_value, n):
-    pairs = 0
-    dies = []
-    die_count = Counter(dices)
-    for die in die_count:
-        if die_count[die] >= 2:
-            pairs += 1
-            dies.append(die)
-    if pairs > 1:
-        return (True, [])
-    return False, []
-
-
-def two_pair_scoring(dices, die_value=None, n=None):
-    score = 0
-    die_count = Counter(dices)
-    for die in die_count:
-        if die_count[die] >= 2:
-            score += (die * 2)
-    return score
-
-
-def small_straight_validator(dices, die_value=None, n=None):
-    return {1, 2, 3, 4, 5}.issubset(dices), []
-
-
-def large_straight_validator(dices, die_value=None, n=None):
-    return {2, 3, 4, 5, 6}.issubset(dices), []
-
-
-def full_house_validator(dices, die_value=None, n=None):
-    die_count = sorted(Counter(dices).items(), key=lambda item: item[1])
-    if len(die_count) > 1:
-        if die_count[-1][1] == 3 and die_count[-2][1] == 2:
-            return True, []
-    return False, []
-
-
-def chance_validator(dices, die_value=None, n=None):
-    return True, []
-
-
-def upper_section_scoring(dices, die_value, n):
-    # only die of the target value are counted
-    score = 0
-    for die in dices:
-        if die == die_value:
-            score += die
-    return score
-
-
-def n_kind_scoring(dices, die_value=None, n=None):
-    score = 0
-    for die in dices:
-        if die == die_value:
-            score += die
-    return score
-
-
-def yatzy_scoring(dices, die_value=None, n=None):
-    return 50
-
-
-def all_dice_scoring(dices, die_value=None, n=None):
-    return sum(dices)
-
-
-combinations = {
-    "aces": {
-        "validator": upper_section_validator,
-        "die_value": 1,
-        "scoring": upper_section_scoring,
-        "n": None
-    },
-    "twos": {
-        "validator": upper_section_validator,
-        "die_value": 2,
-        "scoring": upper_section_scoring,
-        "n": None
-    },
-    "threes": {
-        "validator": upper_section_validator,
-        "die_value": 3,
-        "scoring": upper_section_scoring,
-        "n": None
-    },
-    "fours": {
-        "validator": upper_section_validator,
-        "die_value": 4,
-        "scoring": upper_section_scoring,
-        "n": None
-    },
-    "fives": {
-        "validator": upper_section_validator,
-        "die_value": 5,
-        "scoring": upper_section_scoring,
-        "n": None
-    },
-    "sixes": {
-        "validator": upper_section_validator,
-        "die_value": 6,
-        "scoring": upper_section_scoring,
-        "n": None
-    },
-    "pair": {
-        "validator": n_kind_validator,
-        "die_value": None,
-        "scoring": n_kind_scoring,
-        "n": 2
-    },
-    "two_pair": {
-        "validator": two_pair_validator,
-        "die_value": None,
-        "scoring": two_pair_scoring,
-        "n": None
-    },
-    "three_of_a_kind": {
-        "validator": n_kind_validator,
-        "die_value": None,
-        "scoring": n_kind_scoring,
-        "n": 3
-    },
-    "four_of_a_kind": {
-        "validator": n_kind_validator,
-        "die_value": None,
-        "scoring": n_kind_scoring,
-        "n": 4
-    },
-    "small_straight": {
-        "validator": small_straight_validator,
-        "die_value": None,
-        "scoring": all_dice_scoring,
-        "n": None
-    },
-    "large_straight": {
-        "validator": large_straight_validator,
-        "die_value": None,
-        "scoring": all_dice_scoring,
-        "n": None
-    },
-    "full_house": {
-        "validator": full_house_validator,
-        "die_value": None,
-        "scoring": all_dice_scoring,
-        "n": None,
-    },
-    "chance": {
-        "validator": chance_validator,
-        "die_value": None,
-        "scoring": all_dice_scoring,
-        "n": None,
-    },
-    "yatzy": {
-        "validator": n_kind_validator,
-        "die_value": None,
-        "scoring": yatzy_scoring,
-        "n": 5
-    }
-}
-
-
-def get_options(dices):
-    options = []
-    for c in combinations:
-        comb = combinations[c]
-        comb_name = c
-        valid = comb["validator"](dices, comb["die_value"], comb["n"])
-        if valid[0]:
-            if len(valid[1]) == 0:
-                score = comb["scoring"](dices, None, comb["n"])
-                option = {
-                    "name": comb_name,
-                    "die_value": comb["die_value"],
-                    "score": score
-                }
-                options.append(option)
-            for die_value in valid[1]:
-                score = comb["scoring"](dices, die_value, comb["n"])
-                option = {
-                    "name": comb_name,
-                    "die_value": die_value,
-                    "score": score
-                }
-                options.append(option)
-    return options
-
-
-def initialize_game(players):
-    state = {"players": players, "active_player": players[0], "active_player_roll": 0, "dice_state": None}
-    for player in players:
-        state["scorecard"] = {}
-        state["scorecard"][player] = {}
-        if player == "players":
-            raise Exception("name 'players' not allowed")
-        for c in combinations:
-            state["scorecard"][player][c] = {
-                "played": False,
-                "score": None
+    def __init__(self):
+        self.logger = YatzyLogger(__name__).get_logger()
+        self.combinations = {
+            "aces": {
+                "validator": self.upper_section_validator,
+                "die_value": 1,
+                "scoring": self.upper_section_scoring,
+                "n": None
+            },
+            "twos": {
+                "validator": self.upper_section_validator,
+                "die_value": 2,
+                "scoring": self.upper_section_scoring,
+                "n": None
+            },
+            "threes": {
+                "validator": self.upper_section_validator,
+                "die_value": 3,
+                "scoring": self.upper_section_scoring,
+                "n": None
+            },
+            "fours": {
+                "validator": self.upper_section_validator,
+                "die_value": 4,
+                "scoring": self.upper_section_scoring,
+                "n": None
+            },
+            "fives": {
+                "validator": self.upper_section_validator,
+                "die_value": 5,
+                "scoring": self.upper_section_scoring,
+                "n": None
+            },
+            "sixes": {
+                "validator": self.upper_section_validator,
+                "die_value": 6,
+                "scoring": self.upper_section_scoring,
+                "n": None
+            },
+            "pair_ones": {
+                "validator": self.n_kind_validator,
+                "die_value": 1,
+                "scoring": self.n_kind_scoring,
+                "n": 2
+            },
+            "pair_twos": {
+                "validator": self.n_kind_validator,
+                "die_value": 2,
+                "scoring": self.n_kind_scoring,
+                "n": 2
+            },
+            "pair_threes": {
+                "validator": self.n_kind_validator,
+                "die_value": 3,
+                "scoring": self.n_kind_scoring,
+                "n": 2
+            },
+            "pair_fours": {
+                "validator": self.n_kind_validator,
+                "die_value": 4,
+                "scoring": self.n_kind_scoring,
+                "n": 2
+            },
+            "pair_fives": {
+                "validator": self.n_kind_validator,
+                "die_value": 5,
+                "scoring": self.n_kind_scoring,
+                "n": 2
+            },
+            "pair_sixes": {
+                "validator": self.n_kind_validator,
+                "die_value": 6,
+                "scoring": self.n_kind_scoring,
+                "n": 2
+            },
+            "two_pair": {
+                "validator": self.two_pair_validator,
+                "die_value": None,
+                "scoring": self.two_pair_scoring,
+                "n": None
+            },
+            "three_of_a_kind": {
+                "validator": self.n_kind_validator,
+                "die_value": None,
+                "scoring": self.n_kind_scoring,
+                "n": 3
+            },
+            "four_of_a_kind": {
+                "validator": self.n_kind_validator,
+                "die_value": None,
+                "scoring": self.n_kind_scoring,
+                "n": 4
+            },
+            "small_straight": {
+                "validator": self.small_straight_validator,
+                "die_value": None,
+                "scoring": self.all_dice_scoring,
+                "n": None
+            },
+            "large_straight": {
+                "validator": self.large_straight_validator,
+                "die_value": None,
+                "scoring": self.all_dice_scoring,
+                "n": None
+            },
+            "full_house": {
+                "validator": self.full_house_validator,
+                "die_value": None,
+                "scoring": self.all_dice_scoring,
+                "n": None,
+            },
+            "chance": {
+                "validator": self.chance_validator,
+                "die_value": None,
+                "scoring": self.all_dice_scoring,
+                "n": None,
+            },
+            "yatzy": {
+                "validator": self.n_kind_validator,
+                "die_value": None,
+                "scoring": self.yatzy_scoring,
+                "n": 5
             }
-    return state
+        }
 
+    @staticmethod
+    def dice_roll():
+        return random.randint(1, 6)
 
-def game_finished(state):
-    for player in state["players"]:
-        for c in combinations:
-            if not state["scorecard"][player][c]["played"]:
+    @staticmethod
+    def upper_section_validator(dices, die_value=None, n=None):
+        # Any set of dices are valid for the upper section
+        return True, [die_value]
+
+    @staticmethod
+    def n_kind_validator(dices, die_value=None, n=None):
+        # check if there are n of any number
+        # returns Boolean, [list of options]
+        valid = False
+        options = []
+        die_count = Counter(dices)
+        for die in die_count:
+            if not die_value:
+                if die_count[die] >= n:
+                    valid = True
+                    options.append(die)
+            elif die_value == die:
+                if die_count[die] >= n:
+                    valid = True
+                    options.append(die)
+
+        return valid, options
+
+    @staticmethod
+    def two_pair_validator(dices, die_value=None, n=None):
+        pairs = 0
+        dies = []
+        die_count = Counter(dices)
+        for die in die_count:
+            if die_count[die] >= 2:
+                pairs += 1
+                dies.append(die)
+        if pairs > 1:
+            return True, []
+        return False, []
+
+    @staticmethod
+    def two_pair_scoring(dices, die_value=None, n=None):
+        score = 0
+        die_count = Counter(dices)
+        for die in die_count:
+            if die_count[die] >= 2:
+                score += (die * 2)
+        return score
+
+    @staticmethod
+    def small_straight_validator(dices, die_value=None, n=None):
+        return {1, 2, 3, 4, 5}.issubset(dices), []
+
+    @staticmethod
+    def large_straight_validator(dices, die_value=None, n=None):
+        return {2, 3, 4, 5, 6}.issubset(dices), []
+
+    @staticmethod
+    def full_house_validator(dices, die_value=None, n=None):
+        die_count = sorted(Counter(dices).items(), key=lambda item: item[1])
+        if len(die_count) > 1:
+            if die_count[-1][1] == 3 and die_count[-2][1] == 2:
+                return True, []
+        return False, []
+
+    @staticmethod
+    def chance_validator(dices, die_value=None, n=None):
+        return True, []
+
+    @staticmethod
+    def upper_section_scoring(dices, die_value=None, n=None):
+        # only die of the target value are counted
+        score = 0
+        for die in dices:
+            if die == die_value:
+                score += die
+        return score
+
+    @staticmethod
+    def n_kind_scoring(dices, die_value=None, n=None):
+        times_scored = 0
+        score = 0
+        for die in dices:
+            if die == die_value:
+                if times_scored < n:
+                    score += die
+                    times_scored += 1
+        return score
+
+    @staticmethod
+    def yatzy_scoring(dices, die_value=None, n=None):
+        return 50
+
+    @staticmethod
+    def all_dice_scoring(dices, die_value=None, n=None):
+        return sum(dices)
+
+    def get_score(self, combination, dices, die_value=None):
+        if not die_value:
+            return self.combinations[combination]["scoring"](dices,
+                                                             self.combinations[combination]["die_value"],
+                                                             self.combinations[combination]["n"])
+        else:
+            return self.combinations[combination]["scoring"](dices,
+                                                             die_value,
+                                                             self.combinations[combination]["n"])
+
+    @staticmethod
+    def game_over(state: State) -> bool:
+        for c in state.scorecard:
+            if state.scorecard[c]["allowed"]:
                 return False
-    return True
+        return True
 
+    @staticmethod
+    def check_bonus(state):
+        upper_section_score = sum(state[const.STATE_SCORED_RANGE_START:const.STATE_SCORED_RANGE_START + 6])
+        if upper_section_score >= 63:
+            return 50
+        return 0
 
-def get_dice_state(state):
-    return state["dice_state"]
+    @staticmethod
+    def get_final_score(state):
+        return sum(state[const.STATE_SCORED_RANGE_START:const.STATE_SCORED_RANGE_END])
 
+    def step(self, state: State, action: Action):
+        self.logger.debug("stepping")
+        if action.reroll == 1:
+            self.logger.debug(f"rerolling some dices")
+            self.logger.debug(f"locked dices    {action.locked_dices}")
+            self.logger.debug(f"dices before    {state.dices}")
+            new_state = self.reroll(state, action.locked_dices)
+            self.logger.debug(f"dices after     {new_state.dices}")
+        else:
+            new_state = self.score(state, action)
+            new_state = self.reroll(state, action.locked_dices)
+            state.reset_rolls()
 
-def get_active_player(state):
-    return state["active_player"]
+        return new_state
 
+    def get_initial_state(self) -> State:
+        dices = [self.dice_roll() for n in range(const.DICES_COUNT)]
+        return State(rolls=1, dices=dices, combinations=combinations)
 
-def get_active_player_roll(state):
-    return state["active_player_roll"]
+    def get_options(self, dices):
+        options = [0] * const.COMBINATIONS_COUNT
+        for ix, c in enumerate(self.combinations):
+            comb = self.combinations[c]
+            comb_name = c
+            valid = comb["validator"](dices, comb["die_value"], comb["n"])
+            if valid[0]:
+                if len(valid[1]) == 0:
+                    options[ix] = 1
+                for die_value in valid[1]:
+                    options[ix] = 1
+        return options
 
+    def make_action_legal(self, action: Action, state: State):
 
-def start_turn(state):
-    dices = roll_dice(5)
-    state["dice_state"] = dices
-    state["active_player_roll"] = 1
-    return state
+        # First we check if it is allowed to reroll, otherwise we force scoring
+        reroll = round(action.reroll)
+        if state.rolls > 3:
+            reroll = 0
 
+        # Next we turn our "keep dice" decision into a one-hot encoded vector
+        locked_dices = [round(n) for n in action.locked_dices]
 
-def print_state(state):
-    print("\n")
-    print("game finished?", game_finished(state))
-    print("active player", get_active_player(state))
-    print("dice state", get_dice_state(state))
-    print("active_player_roll", get_active_player_roll(state))
+        # Next we check that we are not trying to score something
+        # that has already been scored
+        scoring_vector = action.scoring_vector
+        allowed_vector = state.get_allowed_vector()
+        not_played_yet = [a * b for a, b in zip(allowed_vector, scoring_vector)]
+        legal_options = self.get_options(state.dices)
+        legal_scoring_vector = [a * b for a, b in zip(not_played_yet, legal_options)]
+
+        # If there are no legal scoring options left, we are forced to zero score
+        if sum(legal_scoring_vector) > 0:
+            scoring_index = legal_scoring_vector.index(max(legal_scoring_vector))
+            zero_score = False
+        else:
+            self.logger.debug("no legal option, forced to zero score")
+            remaining_options_indices = state.get_index_of_remaining_options()
+            zero_score = True
+            scoring_index = random.choice(remaining_options_indices)
+
+        # zero out everything but the thing we will score
+        # if a forced zero score occurs, we send a boolean flag for that along
+        legal_scoring_vector = [1 if i == scoring_index else 0 for i in range(len(legal_scoring_vector))]
+
+        return Action(reroll, locked_dices, legal_scoring_vector, zero_score)
+
+    def score(self, state: State, action: Action):
+        self.logger.debug(f"scoring")
+        for i in range(len(action.scoring_vector)):
+            if action.scoring_vector[i] == 1:
+                combination_name = combinations[i]
+                if combination_name == 'yatzy':
+                    self.logger.info(f"yatzy dices: {state.dices}")
+                score = self.get_score(combination_name, state.dices)
+                if "pair_" in combination_name:
+                    for c in combinations:
+                        if "pair_" in c:
+                            state.scorecard[c]["allowed"] = False
+                if action.zero_score:
+                    score = 0
+                state.enter_score(combination_name, score)
+                self.logger.debug(f"force_zero  : {action.zero_score}")
+                self.logger.debug(f"combination : {combination_name}")
+                self.logger.debug(f"dices       : {state.dices}")
+                self.logger.debug(f"score       : {score}")
+        return state
+
+    def reroll(self, state: State, locked_dice) -> State:
+        self.logger.debug(f"new roll with dices")
+        for i in range(len(locked_dice)):
+            if locked_dice[i] == 0:
+                state.dices[i] = self.dice_roll()
+            else:
+                pass
+        state.rolls += 1
+        return state

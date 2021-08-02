@@ -1,24 +1,30 @@
-import json
-import engine
+from agent import Agent
+from action import Action
+from engine import Engine
+from engine import State
+from logger import YatzyLogger
+
+engine = Engine()
+agent = Agent()
+
+logger = YatzyLogger(__name__).get_logger()
 
 
-def ppj(parsed_json):
-    print(json.dumps(parsed_json, indent=4, sort_keys=True))
+def main():
+    episodes = 1
+    for turn in range(episodes):
+        state: State = engine.get_initial_state()
+        logger.info(f"starting episode {episodes}")
+        while not Engine.game_over(state):
+            logger.debug(f"state = {state}")
+            action: Action = agent.act(engine, state)
+            logger.debug(f"action = {action}")
+            new_state = engine.step(state, action)
+            state = new_state
+            logger.debug(f"scorecard = {new_state.get_simple_scorecard()}")
+        logger.info(f"game over!")
+        logger.info(f"final score = {state.get_score()}")
 
 
-state = engine.initialize_game(["brain1"])
-engine.print_state(state)
-
-turns = 0
-max_turns = 0
-while turns <= max_turns:
-    dices = engine.get_dice_state(state)
-    if engine.get_active_player_roll(state) == 0:
-        state = engine.start_turn(state)
-    # player now needs to decide what to keep
-    dices = engine.get_dice_state(state)
-    print("new dice state", dices)
-    options = engine.get_options(dices)
-    ppj(options)
-    engine.print_state(state)
-    turns += 1
+if __name__ == "__main__":
+    main()
