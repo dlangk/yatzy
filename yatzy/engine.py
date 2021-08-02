@@ -264,14 +264,12 @@ class Engine:
     def step(self, state: State, action: Action):
         score_before = state.get_score()
 
-        self.logger.debug("stepping")
         if action.reroll == 1:
-            self.logger.debug(f"rerolling some dices")
-            self.logger.debug(f"locked dices    {action.locked_dices}")
-            self.logger.debug(f"dices before    {state.dices}")
+            self.logger.debug("step -> roll dices again")
             new_state = self.reroll(state, action.locked_dices)
             self.logger.debug(f"dices after     {new_state.dices}")
         else:
+            self.logger.debug("step -> score")
             # first we create a new state by adding the score
             new_state = self.score(state, action)
             # then we reroll the dices to prepare for the next turn
@@ -283,7 +281,7 @@ class Engine:
             self.maybe_add_bonus(new_state)
 
         reward = new_state.get_score() - score_before
-        self.logger.info(f"reward    : {reward}")
+        self.logger.info(f"reward      : {reward}")
         return new_state, reward, self.game_over(state)
 
     def get_initial_state(self) -> State:
@@ -338,12 +336,9 @@ class Engine:
         return Action(reroll, locked_dices, legal_scoring_vector, zero_score)
 
     def score(self, state: State, action: Action):
-        self.logger.debug(f"scoring")
         for i in range(len(action.scoring_vector)):
             if action.scoring_vector[i] == 1:
                 combination_name = combinations[i]
-                if combination_name == 'yatzy':
-                    self.logger.info(f"yatzy dices: {state.dices}")
                 score = self.get_score(combination_name, state.dices)
                 if "pair_" in combination_name:
                     for c in combinations:
@@ -352,14 +347,12 @@ class Engine:
                 if action.zero_score:
                     score = 0
                 state.enter_score(combination_name, score)
-                self.logger.debug(f"force_zero  : {action.zero_score}")
-                self.logger.debug(f"combination : {combination_name}")
+                self.logger.debug(f"combination : {combination_name} (forced_zero={action.zero_score})")
                 self.logger.debug(f"dices       : {state.dices}")
                 self.logger.debug(f"score       : {score}")
         return state
 
     def reroll(self, state: State, locked_dice) -> State:
-        self.logger.debug(f"new roll with dices")
         for i in range(len(locked_dice)):
             if locked_dice[i] == 0:
                 state.dices[i] = self.dice_roll()
