@@ -250,12 +250,12 @@ class Engine:
                 return False
         return True
 
-    @staticmethod
-    def get_bonus(state: State) -> int:
+    def maybe_add_bonus(self, state: State):
         upper_section_score = state.get_uppersection_score()
         if upper_section_score >= 63:
-            return 50
-        return 0
+            self.logger.debug("upper section bonus scored")
+            state.scorecard["bonus"]["score"] = 50
+        self.logger.debug(f"no upper section bonus ({upper_section_score}<63)")
 
     @staticmethod
     def get_final_score(state):
@@ -265,7 +265,6 @@ class Engine:
         score_before = state.get_score()
 
         self.logger.debug("stepping")
-
         if action.reroll == 1:
             self.logger.debug(f"rerolling some dices")
             self.logger.debug(f"locked dices    {action.locked_dices}")
@@ -273,19 +272,19 @@ class Engine:
             new_state = self.reroll(state, action.locked_dices)
             self.logger.debug(f"dices after     {new_state.dices}")
         else:
+            # first we create a new state by adding the score
             new_state = self.score(state, action)
+            # then we reroll the dices to prepare for the next turn
             new_state = self.reroll(new_state, action.locked_dices)
-            state.reset_rolls()
+            # then we reset the rolls
+            new_state.reset_rolls()
 
-        game_over = self.game_over(state)
-        score_after = new_state.get_score()
-        if game_over:
-            bonus = self.get_bonus(new_state)
-            score_after += bonus
+        if self.game_over(state):
+            self.maybe_add_bonus(new_state)
 
-        reward = score_before - score_after
-
-        return new_state, reward, game_over
+        reward = new_state.get_score() - score_before
+        self.logger.info(f"reward    : {reward}")
+        return new_state, reward, self.game_over(state)
 
     def get_initial_state(self) -> State:
         dices = [self.dice_roll() for n in range(const.DICES_COUNT)]
