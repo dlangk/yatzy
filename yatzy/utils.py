@@ -8,6 +8,8 @@ combinations = ["aces", "twos", "threes", "fours", "fives", "sixes",
                 "chance",
                 "yatzy"]
 
+upper_section = ["aces", "twos", "threes", "fours", "fives", "sixes"]
+
 
 def ppj(parsed_json):
     print(json.dumps(parsed_json, indent=4, sort_keys=True))

@@ -19,8 +19,7 @@ def main():
             logger.debug(f"state = {state}")
             action: Action = agent.act(engine, state)
             logger.debug(f"action = {action}")
-            new_state = engine.step(state, action)
-            state = new_state
+            new_state, reward, game_over = engine.step(state, action)
             logger.debug(f"scorecard = {new_state.get_simple_scorecard()}")
         logger.info(f"game over!")
         logger.info(f"final score = {state.get_score()}")

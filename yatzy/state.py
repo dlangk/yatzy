@@ -1,4 +1,5 @@
 from logger import YatzyLogger
+from utils import upper_section
 
 
 class State:
@@ -19,6 +20,13 @@ class State:
 
     def get_simple_scorecard(self):
         return [(c, self.scorecard[c]["score"]) for c in self.scorecard.keys()]
+
+    def get_uppersection_score(self):
+        score = 0
+        for c in self.scorecard:
+            if c in upper_section:
+                score += self.scorecard[c]["score"]
+        return score
 
     def get_index_of_remaining_options(self):
         remaining = []

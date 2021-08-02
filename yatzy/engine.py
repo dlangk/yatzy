@@ -251,8 +251,8 @@ class Engine:
         return True
 
     @staticmethod
-    def check_bonus(state):
-        upper_section_score = sum(state[const.STATE_SCORED_RANGE_START:const.STATE_SCORED_RANGE_START + 6])
+    def get_bonus(state: State) -> int:
+        upper_section_score = state.get_uppersection_score()
         if upper_section_score >= 63:
             return 50
         return 0
@@ -262,7 +262,10 @@ class Engine:
         return sum(state[const.STATE_SCORED_RANGE_START:const.STATE_SCORED_RANGE_END])
 
     def step(self, state: State, action: Action):
+        score_before = state.get_score()
+
         self.logger.debug("stepping")
+
         if action.reroll == 1:
             self.logger.debug(f"rerolling some dices")
             self.logger.debug(f"locked dices    {action.locked_dices}")
@@ -271,10 +274,18 @@ class Engine:
             self.logger.debug(f"dices after     {new_state.dices}")
         else:
             new_state = self.score(state, action)
-            new_state = self.reroll(state, action.locked_dices)
+            new_state = self.reroll(new_state, action.locked_dices)
             state.reset_rolls()
 
-        return new_state
+        game_over = self.game_over(state)
+        score_after = new_state.get_score()
+        if game_over:
+            bonus = self.get_bonus(new_state)
+            score_after += bonus
+
+        reward = score_before - score_after
+
+        return new_state, reward, game_over
 
     def get_initial_state(self) -> State:
         dices = [self.dice_roll() for n in range(const.DICES_COUNT)]
