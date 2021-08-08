@@ -9,7 +9,7 @@ logging.basicConfig(
 class YatzyLogger:
     def __init__(self, name):
         self.logger = logging.getLogger(name)
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(logging.INFO)
 
     def get_logger(self):
         return self.logger

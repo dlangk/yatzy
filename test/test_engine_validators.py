@@ -20,6 +20,9 @@ class TestValidatorMethods(unittest.TestCase):
         dices = [2, 1, 4, 4, 5]
         self.assertFalse(engine.Engine.n_kind_validator(dices, n=5)[0])
 
+        dices = [1, 5, 5, 1, 5]
+        self.assertTrue(engine.Engine.n_kind_validator(dices, n=3)[0])
+
         dices = [1, 1, 2, 2, 3]
         self.assertEqual(engine.Engine.n_kind_validator(dices, n=2), (True, [1, 2]))
 

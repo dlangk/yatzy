@@ -265,7 +265,7 @@ class Engine:
         score_before = state.get_score()
 
         if action.reroll == 1:
-            self.logger.debug("step -> roll dices again")
+            self.logger.debug(f"step -> roll dices again ({state.rolls + 1}/3)")
             new_state = self.reroll(state, action.locked_dices)
             self.logger.debug(f"dices after     {new_state.dices}")
         else:
@@ -281,7 +281,7 @@ class Engine:
             self.maybe_add_bonus(new_state)
 
         reward = new_state.get_score() - score_before
-        self.logger.info(f"reward      : {reward}")
+        self.logger.debug(f"reward      : {reward}")
         return new_state, reward, self.game_over(state)
 
     def get_initial_state(self) -> State:
@@ -292,7 +292,6 @@ class Engine:
         options = [0] * const.COMBINATIONS_COUNT
         for ix, c in enumerate(self.combinations):
             comb = self.combinations[c]
-            comb_name = c
             valid = comb["validator"](dices, comb["die_value"], comb["n"])
             if valid[0]:
                 if len(valid[1]) == 0:
@@ -305,7 +304,8 @@ class Engine:
 
         # First we check if it is allowed to reroll, otherwise we force scoring
         reroll = round(action.reroll)
-        if state.rolls > 3:
+        if state.rolls > 2:
+            self.logger.debug(f"not allowed to roll again - {state.rolls}/3 rolls made")
             reroll = 0
 
         # Next we turn our "keep dice" decision into a one-hot encoded vector
@@ -324,9 +324,9 @@ class Engine:
             scoring_index = legal_scoring_vector.index(max(legal_scoring_vector))
             zero_score = False
         else:
-            self.logger.debug("no legal option, forced to zero score")
             remaining_options_indices = state.get_index_of_remaining_options()
             zero_score = True
+            self.logger.debug("no legal scoring option")
             scoring_index = random.choice(remaining_options_indices)
 
         # zero out everything but the thing we will score

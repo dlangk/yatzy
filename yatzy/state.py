@@ -1,3 +1,7 @@
+import torch
+
+import numpy as np
+
 from logger import YatzyLogger
 from utils import upper_section
 
@@ -9,6 +13,7 @@ class State:
         self.rolls = rolls
         self.dices = dices
         self.scorecard = {}
+        self.use_cuda = torch.cuda.is_available()
         for c in combinations:
             self.scorecard[c] = {
                 "allowed": True,
@@ -17,6 +22,21 @@ class State:
 
     def __str__(self):
         return f"rolls: {self.rolls} dices: {self.dices} score: {self.get_score()}"
+
+    def get_tensor(self):
+        rolls = round(int(self.rolls))
+        allowed = [int(self.scorecard[c]["allowed"] == True) for c in self.scorecard]
+        scored = [int(self.scorecard[c]["score"]) if self.scorecard[c]["score"] else int(0) for c in self.scorecard]
+
+        state_tensor_np = np.append(np.append(np.array(rolls), np.array(allowed)), np.array(scored))
+        state_tensor_torch = torch.Tensor(state_tensor_np)
+
+        if self.use_cuda:
+            state_tensor = torch.FloatTensor(state_tensor_torch).cuda()
+        else:
+            state_tensor = torch.FloatTensor(state_tensor_torch)
+
+        return state_tensor
 
     def get_simple_scorecard(self):
         return [(c, self.scorecard[c]["score"]) for c in self.scorecard.keys()]
