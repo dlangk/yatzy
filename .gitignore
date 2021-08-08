@@ -1,3 +1,5 @@
+yatzy/checkpoints/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -10,6 +12,9 @@ __pycache__/
 *.xml
 def next_player(state):
 
+.idea/*
+
+.DS_Store
 
 # C extensions
 *.so
