@@ -2,13 +2,13 @@ import random
 from collections import Counter
 
 import const
-from action import Action
+from playeraction import PlayerAction
 from logger import YatzyLogger
-from state import State
+from gamestate import GameState
 from utils import combinations
 
 
-class Engine:
+class GameEnvironment:
 
     def __init__(self):
         self.logger = YatzyLogger(__name__).get_logger()
@@ -17,121 +17,121 @@ class Engine:
                 "validator": self.upper_section_validator,
                 "die_value": 1,
                 "scoring": self.upper_section_scoring,
-                "n": None
+                "die_count": None
             },
             "twos": {
                 "validator": self.upper_section_validator,
                 "die_value": 2,
                 "scoring": self.upper_section_scoring,
-                "n": None
+                "die_count": None
             },
             "threes": {
                 "validator": self.upper_section_validator,
                 "die_value": 3,
                 "scoring": self.upper_section_scoring,
-                "n": None
+                "die_count": None
             },
             "fours": {
                 "validator": self.upper_section_validator,
                 "die_value": 4,
                 "scoring": self.upper_section_scoring,
-                "n": None
+                "die_count": None
             },
             "fives": {
                 "validator": self.upper_section_validator,
                 "die_value": 5,
                 "scoring": self.upper_section_scoring,
-                "n": None
+                "die_count": None
             },
             "sixes": {
                 "validator": self.upper_section_validator,
                 "die_value": 6,
                 "scoring": self.upper_section_scoring,
-                "n": None
+                "die_count": None
             },
             "pair_ones": {
                 "validator": self.n_kind_validator,
                 "die_value": 1,
                 "scoring": self.n_kind_scoring,
-                "n": 2
+                "die_count": 2
             },
             "pair_twos": {
                 "validator": self.n_kind_validator,
                 "die_value": 2,
                 "scoring": self.n_kind_scoring,
-                "n": 2
+                "die_count": 2
             },
             "pair_threes": {
                 "validator": self.n_kind_validator,
                 "die_value": 3,
                 "scoring": self.n_kind_scoring,
-                "n": 2
+                "die_count": 2
             },
             "pair_fours": {
                 "validator": self.n_kind_validator,
                 "die_value": 4,
                 "scoring": self.n_kind_scoring,
-                "n": 2
+                "die_count": 2
             },
             "pair_fives": {
                 "validator": self.n_kind_validator,
                 "die_value": 5,
                 "scoring": self.n_kind_scoring,
-                "n": 2
+                "die_count": 2
             },
             "pair_sixes": {
                 "validator": self.n_kind_validator,
                 "die_value": 6,
                 "scoring": self.n_kind_scoring,
-                "n": 2
+                "die_count": 2
             },
             "two_pair": {
                 "validator": self.two_pair_validator,
                 "die_value": None,
                 "scoring": self.two_pair_scoring,
-                "n": None
+                "die_count": None
             },
             "three_of_a_kind": {
                 "validator": self.n_kind_validator,
                 "die_value": None,
                 "scoring": self.n_kind_scoring,
-                "n": 3
+                "die_count": 3
             },
             "four_of_a_kind": {
                 "validator": self.n_kind_validator,
                 "die_value": None,
                 "scoring": self.n_kind_scoring,
-                "n": 4
+                "die_count": 4
             },
             "small_straight": {
                 "validator": self.small_straight_validator,
                 "die_value": None,
                 "scoring": self.all_dice_scoring,
-                "n": None
+                "die_count": None
             },
             "large_straight": {
                 "validator": self.large_straight_validator,
                 "die_value": None,
                 "scoring": self.all_dice_scoring,
-                "n": None
+                "die_count": None
             },
             "full_house": {
                 "validator": self.full_house_validator,
                 "die_value": None,
                 "scoring": self.all_dice_scoring,
-                "n": None,
+                "die_count": None,
             },
             "chance": {
                 "validator": self.chance_validator,
                 "die_value": None,
                 "scoring": self.all_dice_scoring,
-                "n": None,
+                "die_count": None,
             },
             "yatzy": {
                 "validator": self.n_kind_validator,
                 "die_value": None,
                 "scoring": self.yatzy_scoring,
-                "n": 5
+                "die_count": 5
             }
         }
 
@@ -237,20 +237,20 @@ class Engine:
         if not die_value:
             return self.combinations[combination]["scoring"](dices,
                                                              self.combinations[combination]["die_value"],
-                                                             self.combinations[combination]["n"])
+                                                             self.combinations[combination]["die_count"])
         else:
             return self.combinations[combination]["scoring"](dices,
                                                              die_value,
-                                                             self.combinations[combination]["n"])
+                                                             self.combinations[combination]["die_count"])
 
     @staticmethod
-    def game_over(state: State) -> bool:
+    def game_over(state: GameState) -> bool:
         for c in state.scorecard:
             if state.scorecard[c]["allowed"]:
                 return False
         return True
 
-    def maybe_add_bonus(self, state: State):
+    def maybe_add_bonus(self, state: GameState):
         upper_section_score = state.get_uppersection_score()
         if upper_section_score >= 63:
             self.logger.debug("upper section bonus scored")
@@ -261,10 +261,10 @@ class Engine:
     def get_final_score(state):
         return sum(state[const.STATE_SCORED_RANGE_START:const.STATE_SCORED_RANGE_END])
 
-    def step(self, state: State, action: Action):
+    def step(self, state: GameState, action: PlayerAction):
         score_before = state.get_score()
 
-        if action.reroll == 1:
+        if action.reroll > 0.5:
             self.logger.debug(f"step -> roll dices again ({state.rolls + 1}/3)")
             new_state = self.reroll(state, action.locked_dices)
             self.logger.debug(f"dices after     {new_state.dices}")
@@ -284,15 +284,15 @@ class Engine:
         self.logger.debug(f"reward      : {reward}")
         return new_state, reward, self.game_over(state)
 
-    def get_initial_state(self) -> State:
+    def get_initial_state(self) -> GameState:
         dices = [self.dice_roll() for n in range(const.DICES_COUNT)]
-        return State(rolls=1, dices=dices, combinations=combinations)
+        return GameState(rolls=1, dices=dices, combinations=combinations)
 
-    def get_options(self, dices):
+    def get_legal_combinations(self, dices):
         options = [0] * const.COMBINATIONS_COUNT
         for ix, c in enumerate(self.combinations):
-            comb = self.combinations[c]
-            valid = comb["validator"](dices, comb["die_value"], comb["n"])
+            combinations = self.combinations[c]
+            valid = combinations["validator"](dices, combinations["die_value"], combinations["die_count"])
             if valid[0]:
                 if len(valid[1]) == 0:
                     options[ix] = 1
@@ -300,13 +300,13 @@ class Engine:
                     options[ix] = 1
         return options
 
-    def make_action_legal(self, action: Action, state: State):
+    def make_action_legal(self, action: PlayerAction, state: GameState):
+        reroll = action.reroll
 
-        # First we check if it is allowed to reroll, otherwise we force scoring
-        reroll = round(action.reroll)
+        # First we check if it is allowed to roll dice again, otherwise we force scoring
         if state.rolls > 2:
             self.logger.debug(f"not allowed to roll again - {state.rolls}/3 rolls made")
-            reroll = 0
+            reroll = False
 
         # Next we turn our "keep dice" decision into a one-hot encoded vector
         locked_dices = [round(n) for n in action.locked_dices]
@@ -316,7 +316,7 @@ class Engine:
         scoring_vector = action.scoring_vector
         allowed_vector = state.get_allowed_vector()
         not_played_yet = [a * b for a, b in zip(allowed_vector, scoring_vector)]
-        legal_options = self.get_options(state.dices)
+        legal_options = self.get_legal_combinations(state.dices)
         legal_scoring_vector = [a * b for a, b in zip(not_played_yet, legal_options)]
 
         # If there are no legal scoring options left, we are forced to zero score
@@ -333,9 +333,9 @@ class Engine:
         # if a forced zero score occurs, we send a boolean flag for that along
         legal_scoring_vector = [1 if i == scoring_index else 0 for i in range(len(legal_scoring_vector))]
 
-        return Action(reroll, locked_dices, legal_scoring_vector, zero_score)
+        return PlayerAction(reroll, locked_dices, legal_scoring_vector, zero_score)
 
-    def score(self, state: State, action: Action):
+    def score(self, state: GameState, action: PlayerAction):
         for i in range(len(action.scoring_vector)):
             if action.scoring_vector[i] == 1:
                 combination_name = combinations[i]
@@ -352,7 +352,7 @@ class Engine:
                 self.logger.debug(f"score       : {score}")
         return state
 
-    def reroll(self, state: State, locked_dice) -> State:
+    def reroll(self, state: GameState, locked_dice) -> GameState:
         for i in range(len(locked_dice)):
             if locked_dice[i] == 0:
                 state.dices[i] = self.dice_roll()

@@ -6,14 +6,13 @@ from logger import YatzyLogger
 from utils import upper_section
 
 
-class State:
+class GameState:
     def __init__(self, rolls, dices, combinations):
         self.logger = YatzyLogger(__name__).get_logger()
         self.logger.debug("creating state")
         self.rolls = rolls
         self.dices = dices
         self.scorecard = {}
-        self.use_cuda = torch.cuda.is_available()
         for c in combinations:
             self.scorecard[c] = {
                 "allowed": True,

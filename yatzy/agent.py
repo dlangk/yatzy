@@ -3,9 +3,9 @@ import torch
 import random
 import numpy as np
 
-from action import Action
-from engine import Engine
-from engine import State
+from playeraction import PlayerAction
+from gameenvironment import GameEnvironment
+from gameenvironment import GameState
 from logger import YatzyLogger
 
 from collections import deque
@@ -13,7 +13,7 @@ from yatzy.neural import YatzyNet
 
 
 class Agent:
-    def __init__(self, state_dim, action_dim, save_dir, checkpoint=None):
+    def __init__(self, state_dim=47, action_dim=27, save_dir=None, checkpoint=None):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.memory = deque(maxlen=100000)
@@ -47,36 +47,37 @@ class Agent:
         self.loss_fn = torch.nn.SmoothL1Loss()
         self.logger = YatzyLogger(__name__).get_logger()
 
-    def act_random(self, engine: Engine, state: State):
-        self.logger.debug("agent acting")
+    def get_random_action(self, engine: GameEnvironment, state: GameState) -> PlayerAction:
+        self.logger.debug("agent acting random")
+
         reroll = round(random.uniform(0, 1), 2)
-        locked_dices = [round(random.uniform(0, 1), 2) for n in range(const.DICES_COUNT)]
-        scoring_vector = [round(random.uniform(0, 1), 2) for n in range(const.COMBINATIONS_COUNT)]
-        suggested_action = Action(reroll, locked_dices, scoring_vector)
+        locked_dices = [round(random.uniform(0, 1), 2) for n in range(const.DICES_COUNT)]  # which dice to not reroll
+        scoring_vector = [round(random.uniform(0, 1), 2) for n in range(const.COMBINATIONS_COUNT)]  # random scoring row
+
+        suggested_action = PlayerAction(reroll, locked_dices, scoring_vector)
         legal_action = engine.make_action_legal(suggested_action, state)
-        self.curr_step += 1
+
         return legal_action
 
-    def act(self, engine: Engine, state: State):
+    def act(self, engine: GameEnvironment, state: GameState):
 
         # Explore
         if random.uniform(0, 1) < self.exploration_rate:
             self.logger.debug(f"Exploring ({self.exploration_rate})")
-            action: Action = self.act_random(engine, state)
+            action: PlayerAction = self.get_random_action(engine, state)
 
         # Exploit
         else:
             self.logger.debug(f"Exploiting ({self.exploration_rate})")
-            action: Action = self.act_random(engine, state)
+            action: PlayerAction = self.get_random_action(engine, state)
 
         # Decrease exploration rate
         self.exploration_rate *= self.exploration_rate_decay
         self.exploration_rate = max(self.exploration_rate_min, self.exploration_rate)
 
-        self.curr_step += 1
         return action
 
-    def cache(self, state: State, next_state: State, action: Action, reward, done):
+    def cache(self, state: GameState, next_state: GameState, action: PlayerAction, reward, done):
         """
                 Store the experience to self.memory (replay buffer)
         """
@@ -138,7 +139,7 @@ class Agent:
     @torch.no_grad()
     def td_target(self, reward, next_state, done):
         next_state_q = self.net(next_state, model='online')
-        best_action = torch.argmax(next_state_q, axis=1)
+        best_action = torch.argmax(next_state_q)
         next_q = self.net(next_state, model='target')[np.arange(0, self.batch_size), best_action]
         return (reward + (1 - done.float()) * self.gamma * next_q).float()
 
