@@ -1,9 +1,9 @@
 import time
-import gameengine as Engine
+from yatzy.mechanics import gameengine as Engine
 
-from action import Action
+from yatzy.mechanics.action import Action
 from actors.actor_random import ActorRandom
-from gamestate import GameState
+from yatzy.mechanics.gamestate import GameState
 
 start_time = time.time()
 runs = 0

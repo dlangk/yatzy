@@ -1,6 +1,6 @@
-from yatzy import const
-from yatzy.action import Action
-from yatzy.gamestate import GameState
+from yatzy.mechanics import const
+from yatzy.mechanics.action import Action
+from yatzy.mechanics.gamestate import GameState
 
 
 def serialize_action(action: Action):
