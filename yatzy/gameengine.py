@@ -1,12 +1,13 @@
 import const
-import random
+from random import random
+from math import floor
 
 from gamestate import GameState
 from action import Action
 
 
 def dice_roll():
-    return random.randint(1, 6)
+    return floor(6*random())+1
 
 
 def create_initial_state() -> GameState:
