@@ -1,13 +1,14 @@
-import yatzy.mechanics.const as const
 from random import random
 from math import floor
 
 from yatzy.mechanics.gamestate import GameState
 from yatzy.mechanics.action import Action
 
+import yatzy.mechanics.const as const
+
 
 def dice_roll():
-    return floor(6*random())+1
+    return floor(6 * random()) + 1
 
 
 def create_initial_state() -> GameState:
