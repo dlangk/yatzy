@@ -1,4 +1,4 @@
-from const import combinations
+from yatzy.mechanics.const import combinations
 
 
 class GameState:
