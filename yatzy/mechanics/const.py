@@ -1,5 +1,5 @@
-import validators
-import scorers
+import yatzy.mechanics.validators as validators
+import yatzy.mechanics.scorers as scorers
 
 DICES_COUNT = 5
 

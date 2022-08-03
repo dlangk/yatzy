@@ -8,7 +8,8 @@ def special_counter(dices):
              2: dices.count(2),
              3: dices.count(3),
              4: dices.count(4),
-             5: dices.count(5)}
+             5: dices.count(5),
+             6: dices.count(6)}
     return count
 
 
@@ -23,12 +24,12 @@ def n_kind_validator(dices: list, die_value=None, die_count=None):
     if not die_value:
         count = special_counter(dices)
         for n in range(1, 6):
-            if count[n] > die_count:
+            if count[n] >= die_count:
                 options.append(n)
 
     if die_value:
         number_of_die = dices.count(die_value)
-        if number_of_die > die_count:
+        if number_of_die >= die_count:
             options.append(die_value)
 
     if len(options) > 0:

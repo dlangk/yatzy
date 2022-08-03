@@ -1,9 +1,9 @@
-import const
+import yatzy.mechanics.const as const
 from random import random
 from math import floor
 
-from gamestate import GameState
-from action import Action
+from yatzy.mechanics.gamestate import GameState
+from yatzy.mechanics.action import Action
 
 
 def dice_roll():
