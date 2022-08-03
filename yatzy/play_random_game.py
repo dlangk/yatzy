@@ -1,6 +1,6 @@
 import time
-
 import gameengine as Engine
+
 from action import Action
 from actors.actor_random import ActorRandom
 from gamestate import GameState
@@ -8,7 +8,7 @@ from gamestate import GameState
 start_time = time.time()
 runs = 0
 
-while runs < 10000:
+while runs < 5000:
     runs += 1
     state: GameState = Engine.create_initial_state()
     actor: ActorRandom = ActorRandom()
@@ -23,14 +23,8 @@ while runs < 10000:
             action: Action = actor.get_action(state, playable_combinations)
             valid_action = Engine.validate_action(state, action, playable_combinations)
 
-        # states.append(utilities.serialize_state(state))
-        # actions.append(utilities.serialize_action(action))
         state = Engine.step(state, action, playable_combinations)
-
     final_score = Engine.final_score(state)
 
-# states.append(utilities.serialize_state(state))
-# actions.append(utilities.serialize_action(action))
-
 total_time = (time.time() - start_time)
-print("average time: %s seconds" % (total_time / runs))
+print("average time: " + str(round((total_time / runs) * 1000, 4)))
