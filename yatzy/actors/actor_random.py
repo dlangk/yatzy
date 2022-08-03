@@ -1,7 +1,7 @@
 import random
 
-from yatzy.action import Action
-from yatzy.gamestate import GameState
+from yatzy.mechanics.action import Action
+from yatzy.mechanics.gamestate import GameState
 
 
 class ActorRandom:

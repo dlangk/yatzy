@@ -1,11 +1,12 @@
-import gameengine as Engine
-import input
-import utilities
+from yatzy.mechanics import gameengine as Engine, utilities
 
-from action import Action
-from gamestate import GameState
+from yatzy.mechanics.action import Action
+from yatzy.mechanics.gamestate import GameState
+from actors.actor_user import ActorUser
 
 state: GameState = Engine.create_initial_state()
+
+actor = ActorUser()
 
 while not Engine.game_over(state):
     valid_action = False
@@ -14,7 +15,7 @@ while not Engine.game_over(state):
     utilities.print_game_state(state, playable_combinations)
 
     while not valid_action:
-        action: Action = input.get_user_action()
+        action: Action = actor.get_action(state, playable_combinations)
         valid_action = Engine.validate_action(state, action, playable_combinations)
         print("valid action?", valid_action)
 

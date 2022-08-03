@@ -1,7 +1,7 @@
-DICES_COUNT = 5
-
 import validators
 import scorers
+
+DICES_COUNT = 5
 
 combinations = {
     "aces": {
