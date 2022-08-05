@@ -27,6 +27,9 @@ class TestValidatorMethods(unittest.TestCase):
         dices = [1, 1, 2, 2, 3]
         self.assertEqual(validators.n_kind_validator(dices, die_count=2), {'playable': True, 'die': [1, 2]})
 
+        dices = [6, 6, 6, 6, 6]
+        self.assertEqual(validators.n_kind_validator(dices, die_count=5), {'playable': True, 'die': [6]})
+
     def test_two_pair_validator(self):
         dices = [1, 1, 2, 2, 3]
         self.assertTrue(validators.two_pairs_validator(dices, die_count=12)["playable"])

@@ -3,6 +3,8 @@ import yatzy.mechanics.scorers as scorers
 
 DICES_COUNT = 5
 
+upper_combinations = ["aces", "twos", "threes", "fours", "fives", "sixes"]
+
 combinations = {
     "aces": {
         "validator": validators.upper_section_validator,

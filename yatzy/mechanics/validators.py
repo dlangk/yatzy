@@ -3,7 +3,7 @@ def upper_section_validator(dices, die_value=None, die_count=None):
     return {"playable": True, "die": [die_value]}
 
 
-def special_counter(dices):
+def fast_counter(dices):
     count = {1: dices.count(1),
              2: dices.count(2),
              3: dices.count(3),
@@ -22,8 +22,8 @@ def n_kind_validator(dices: list, die_value=None, die_count=None):
     options = []
 
     if not die_value:
-        count = special_counter(dices)
-        for n in range(1, 6):
+        count = fast_counter(dices)
+        for n in range(1, 7):
             if count[n] >= die_count:
                 options.append(n)
 
@@ -41,7 +41,7 @@ def n_kind_validator(dices: list, die_value=None, die_count=None):
 def two_pairs_validator(dices, die_value=None, die_count=None):
     pairs = 0
     dies = []
-    die_count = special_counter(dices)
+    die_count = fast_counter(dices)
     for die in die_count:
         if die_count[die] >= 2:
             pairs += 1
@@ -60,7 +60,7 @@ def large_straight_validator(dices, die_value=None, die_count=None):
 
 
 def full_house_validator(dices, die_value=None, die_count=None):
-    die_count = special_counter(dices)
+    die_count = fast_counter(dices)
     for die1 in die_count:
         if die_count[die1] == 3:
             for die2 in die_count:
