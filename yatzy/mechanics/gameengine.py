@@ -77,14 +77,20 @@ def validate_action(state: GameState, action: Action, playable_combinations):
     return True
 
 
+def reroll_dices(dices, locked_dices):
+    new_dices = dices.copy()
+    for ix, dice_lock in enumerate(locked_dices):
+        if dice_lock == 0:
+            new_dices[ix] = dice_roll()
+    return new_dices
+
+
 def step(state: GameState, action: Action, playable_combinations) -> GameState:
     rolls = state.rolls
     dices = state.dices
 
     if not action.score:  # Either we roll some dices without scoring
-        for ix, dice_lock in enumerate(action.locked_dices):
-            if dice_lock == 0:
-                dices[ix] = dice_roll()
+        dices = reroll_dices(dices, action.locked_dices)
         return GameState(rolls=rolls + 1, dices=dices, scorecard=state.scorecard)
     else:  # or we score, in which case we roll all dices and reset rolls counter
         new_scorecard = apply_score(state.scorecard,

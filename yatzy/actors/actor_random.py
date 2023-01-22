@@ -9,7 +9,8 @@ class ActorRandom:
     def __init__(self):
         pass
 
-    def get_action(self, state: GameState, playable_combinations) -> Action:
+    @staticmethod
+    def get_action(state: GameState, playable_combinations) -> Action:
         playable_combinations = list(playable_combinations.keys())
         score = random.randint(0, 1)
         if state.rolls > 2:

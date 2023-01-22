@@ -1,9 +1,16 @@
-from collections import Counter
+def fast_counter(dices):
+    count = {1: dices.count(1),
+             2: dices.count(2),
+             3: dices.count(3),
+             4: dices.count(4),
+             5: dices.count(5),
+             6: dices.count(6)}
+    return count
 
 
 def two_pairs_scorer(dices, die_value=None, die_count=None):
     score = 0
-    die_count = Counter(dices)
+    die_count = fast_counter(dices)
     for die in die_count:
         if die_count[die] >= 2:
             score += (die * 2)
@@ -22,11 +29,17 @@ def upper_section_scorer(dices, die_value=None, die_count=None):
 def n_kind_scorer(dices, die_value=None, die_count=None):
     times_scored = 0
     score = 0
-    for die in dices:
-        if die == die_value:
-            if times_scored < die_count:
-                score += die
-                times_scored += 1
+    if die_value is None:
+        counted_die = fast_counter(dices)
+        for die in counted_die:
+            if counted_die[die] >= die_count:
+                score = (die_count * die)
+    else:
+        for die in dices:
+            if die == die_value:
+                if times_scored < die_count:
+                    score += die
+                    times_scored += 1
     return score
 
 

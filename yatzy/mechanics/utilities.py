@@ -4,8 +4,7 @@ from yatzy.mechanics.gamestate import GameState
 
 
 def serialize_action(action: Action):
-    vector = []
-    vector.append(int(action.score))
+    vector = [int(action.score)]
     for lock in action.locked_dices:
         vector.append(lock)
     for combination in const.combinations:
@@ -17,8 +16,7 @@ def serialize_action(action: Action):
 
 
 def serialize_state(state: GameState):
-    vector = []
-    vector.append(state.rolls)
+    vector = [state.rolls]
     for die in state.dices:
         vector.append(die)
     for combination in state.scorecard:

@@ -1,6 +1,6 @@
 import time
-from yatzy.mechanics import gameengine as Engine
 
+from yatzy.mechanics import gameengine as Engine
 from yatzy.mechanics.action import Action
 from actors.actor_random import ActorRandom
 from yatzy.mechanics.gamestate import GameState
@@ -16,14 +16,15 @@ while runs < 5000:
     playable_combinations = None
 
     while not Engine.game_over(state):
-        valid_action = False
         playable_combinations = Engine.score_combinations(state)
 
+        valid_action = False
         while not valid_action:
             action: Action = actor.get_action(state, playable_combinations)
             valid_action = Engine.validate_action(state, action, playable_combinations)
 
         state = Engine.step(state, action, playable_combinations)
+
     final_score = Engine.final_score(state)
 
 total_time = (time.time() - start_time)

@@ -1,8 +1,3 @@
-def upper_section_validator(dices, die_value=None, die_count=None):
-    # Any set of dices are valid for the upper section
-    return {"playable": True, "die": [die_value]}
-
-
 def fast_counter(dices):
     count = {1: dices.count(1),
              2: dices.count(2),
@@ -11,6 +6,11 @@ def fast_counter(dices):
              5: dices.count(5),
              6: dices.count(6)}
     return count
+
+
+def upper_section_validator(dices, die_value=None, die_count=None):
+    # Any set of dices are valid for the upper section
+    return {"playable": True, "die": [die_value]}
 
 
 def n_kind_validator(dices: list, die_value=None, die_count=None):
