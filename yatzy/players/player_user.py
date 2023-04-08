@@ -2,7 +2,7 @@ from yatzy.mechanics.gamestate import GameState
 from yatzy.mechanics.action import Action
 
 
-class ActorUser:
+class PlayerUser:
 
     def __init__(self):
         pass

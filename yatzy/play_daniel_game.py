@@ -2,12 +2,12 @@
 from yatzy.mechanics import gameengine as Engine
 
 from yatzy.mechanics.action import Action
-from actors.actor_daniel import ActorDaniel
+from players.player_daniel import Daniel
 from yatzy.mechanics.gamestate import GameState
 
 
 state: GameState = Engine.create_initial_state()
-actor: ActorDaniel = ActorDaniel()
+actor: Daniel = Daniel()
 action: Action = Action(False)
 playable_combinations = None
 

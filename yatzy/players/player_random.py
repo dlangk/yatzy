@@ -2,9 +2,10 @@ import random
 
 from yatzy.mechanics.action import Action
 from yatzy.mechanics.gamestate import GameState
+from yatzy.players.player import Player
 
 
-class ActorRandom:
+class PlayerRandom(Player):
 
     def __init__(self):
         pass

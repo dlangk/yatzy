@@ -2,11 +2,11 @@ from yatzy.mechanics import gameengine as Engine, utilities
 
 from yatzy.mechanics.action import Action
 from yatzy.mechanics.gamestate import GameState
-from actors.actor_user import ActorUser
+from players.player_user import PlayerUser
 
 state: GameState = Engine.create_initial_state()
 
-actor = ActorUser()
+actor = PlayerUser()
 
 while not Engine.game_over(state):
     valid_action = False

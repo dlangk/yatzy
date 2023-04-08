@@ -1,10 +1,11 @@
+from yatzy.players.player import Player
 from yatzy.mechanics.action import Action
 from yatzy.mechanics.gamestate import GameState
 
 import yatzy.mechanics.const as const
 
 
-class ActorDaniel:
+class Daniel(Player):
 
     def __init__(self):
         pass
