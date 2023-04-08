@@ -1,4 +1,4 @@
 from yatzy.evaluate.evaluator import evaluate
-from yatzy.players.player_random import PlayerRandom
+from yatzy.players.player_random import Random
 
-evaluate(PlayerRandom, 100000)
+evaluate(Random, 10000)

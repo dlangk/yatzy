@@ -1,13 +1,13 @@
+import yatzy.mechanics.gameengine as Engine
+
 from yatzy.mechanics.gamestate import GameState
 from yatzy.mechanics.action import Action
+from yatzy.players.player import Player
 
 
-class PlayerUser:
+class User(Player):
 
-    def __init__(self):
-        pass
-
-    def get_action(self, state: GameState, playable_combinations) -> Action:
+    def get_action(self, state: GameState) -> Action:
         score_input = input("Do you want to score? (y/n)\n")
         score = (score_input == "y")
         locked_dices = None
@@ -23,7 +23,15 @@ class PlayerUser:
                 locked_dices_text = input("Which dices do you want to lock?\n").split()
                 locked_dices = [int(x) for x in locked_dices_text]
 
-        return Action(score, locked_dices=locked_dices, scored_combination=scored_combination)
+        unplayed_combinations = state.scorecard.get_unplayed_combinations()
+        legal_combinations = Engine.get_legal_combinations(state)
+        playable_combinations = [c for c in unplayed_combinations if c in legal_combinations]
+
+        if scored_combination in playable_combinations:
+            return Action(score, locked_dices=locked_dices, scored_combination=scored_combination)
+        else:
+            forced = True
+            return Action(score, forced, locked_dices=locked_dices, scored_combination=scored_combination)
 
     @staticmethod
     def acceptable_locked_dices(locked_dices):

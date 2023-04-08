@@ -17,8 +17,6 @@ def evaluate(player: Type[Player], eval_runs: int):
         "times": [],
         "player": player.__name__,
         "eval_runs": eval_runs,
-        "average_score": None,
-        "average_time": None,
     }
     runs = 0
 
@@ -28,22 +26,30 @@ def evaluate(player: Type[Player], eval_runs: int):
         action: Action = Action(False)
 
         while not Engine.game_over(state):
-            playable_combinations = Engine.score_combinations(state)
-
             valid_action = False
             while not valid_action:
-                action: Action = player.get_action(state, playable_combinations)
-                valid_action = Engine.validate_action(state, action, playable_combinations)
+                action: Action = player.get_action(state)
+                valid_action = Engine.validate_action(state, action)
 
-            state = Engine.step(state, action, playable_combinations)
+            state = Engine.step(state, action)
 
         result["final_scores"].append(Engine.final_score(state))
         result["times"].append(time.time() - start_time)
 
     total_time = (time.time() - start_time)
-    result["average_time"] = (total_time / runs) * 1000
-    result["average_score"] = sum_all_values_in_key(result) / len(result["final_scores"])
+    result["time_total"] = round(total_time * 1000, 4)
+    result["time_average"] = round((total_time / runs) * 1000, 4)
+
+    result["score_max"] = max(result["final_scores"])
+    result["score_min"] = min(result["final_scores"])
+    result["score_average"] = sum_all_values_in_key(result) / len(result["final_scores"])
+    result["score_median"] = sorted(result["final_scores"])[len(result["final_scores"]) // 2]
     result["standard_deviation"] = standard_deviation_of_values_in_key(result)
+
+    # remove times and final_scores from result
+    del result["times"]
+    del result["final_scores"]
+
     print(json.dumps(result, indent=4))
 
 

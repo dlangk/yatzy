@@ -1,18 +1,8 @@
-from yatzy.mechanics.const import combinations
+from yatzy.mechanics.scorecard import Scorecard
 
 
 class GameState:
-    def __init__(self, rolls, dices, scorecard=None):
+    def __init__(self, rolls, dices, scorecard: Scorecard = None):
         self.rolls = rolls
         self.dices = dices
-
-        # Either build a scorecard or accept one as input
-        if not scorecard:
-            self.scorecard = {}
-            for c in combinations:
-                self.scorecard[c] = {
-                    "played": False,
-                    "score": None
-                }
-        else:
-            self.scorecard = scorecard
+        self.scorecard = scorecard if scorecard else Scorecard()

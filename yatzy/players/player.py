@@ -8,5 +8,5 @@ class Player:
 
     @staticmethod
     @abstractmethod
-    def get_action(state: GameState, playable_combinations) -> Action:
+    def get_action(state: GameState) -> Action:
         pass

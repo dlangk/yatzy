@@ -10,7 +10,7 @@ def fast_counter(dices):
 
 def upper_section_validator(dices, die_value=None, die_count=None):
     # Any set of dices are valid for the upper section
-    return {"playable": True, "die": [die_value]}
+    return True
 
 
 def n_kind_validator(dices: list, die_value=None, die_count=None):
@@ -35,7 +35,7 @@ def n_kind_validator(dices: list, die_value=None, die_count=None):
     if len(options) > 0:
         valid = True
 
-    return {"playable": valid, "die": options}
+    return valid
 
 
 def two_pairs_validator(dices, die_value=None, die_count=None):
@@ -47,16 +47,16 @@ def two_pairs_validator(dices, die_value=None, die_count=None):
             pairs += 1
             dies.append(die)
     if pairs > 1:
-        return {"playable": True, "die": []}
-    return {"playable": False, "die": []}
+        return True
+    return False
 
 
 def small_straight_validator(dices, die_value=None, die_count=None):
-    return {"playable": {1, 2, 3, 4, 5}.issubset(dices), "die": []}
+    return {1, 2, 3, 4, 5}.issubset(dices)
 
 
 def large_straight_validator(dices, die_value=None, die_count=None):
-    return {"playable": {2, 3, 4, 5, 6}.issubset(dices), "die": []}
+    return {2, 3, 4, 5, 6}.issubset(dices)
 
 
 def full_house_validator(dices, die_value=None, die_count=None):
@@ -65,9 +65,9 @@ def full_house_validator(dices, die_value=None, die_count=None):
         if die_count[die1] == 3:
             for die2 in die_count:
                 if die_count[die2] == 2:
-                    return {"playable": True, "die": []}
-    return {"playable": False, "die": []}
+                    return True
+    return False
 
 
 def chance_validator(dices, die_value=None, die_count=None):
-    return {"playable": True, "die": []}
+    return True

@@ -11,7 +11,6 @@ __pycache__/
 
 # intellij related things
 *.xml
-def next_player(state):
 
 .idea/*
 

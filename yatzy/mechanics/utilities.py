@@ -1,6 +1,7 @@
 from yatzy.mechanics import const
 from yatzy.mechanics.action import Action
 from yatzy.mechanics.gamestate import GameState
+import yatzy.mechanics.gameengine as Engine
 
 
 def serialize_action(action: Action):
@@ -19,25 +20,30 @@ def serialize_state(state: GameState):
     vector = [state.rolls]
     for die in state.dices:
         vector.append(die)
-    for combination in state.scorecard:
-        vector.append(int(state.scorecard[combination]["played"]))
-        vector.append(state.scorecard[combination]["score"]
-                      if state.scorecard[combination]["score"] else 0)
+    for combination in const.combinations:
+        vector.append(int(state.scorecard.scorecard[combination]["played"]))
+        vector.append(state.scorecard.scorecard[combination]["score"]
+                      if state.scorecard.scorecard[combination]["score"] else 0)
     return vector
 
 
-def print_game_state(state: GameState, playable_combinations):
+def print_game_state(state: GameState):
+    unplayed_combinations = state.scorecard.get_unplayed_combinations()
+    legal_combinations = Engine.get_legal_combinations(state)
+    playable_combinations = [c for c in unplayed_combinations if c in legal_combinations]
+
     print("###########################")
     total_score = 0
+    for c in const.combinations:
+        total_score += state.scorecard.scorecard[c]["score"] if state.scorecard.scorecard[c]["score"] else 0
 
-    for c in state.scorecard:
-        total_score += state.scorecard[c]["score"] if state.scorecard[c]["score"] else 0
-
-        if state.scorecard[c]["played"]:
-            print("{:<17}".format(c) + str(state.scorecard[c]["score"]))
+        if state.scorecard.scorecard[c]["played"]:
+            score = state.scorecard.scorecard[c]["score"]
+            if score > 0:
+                print("{:<17}".format(c) + str(score))
         else:
             if c in playable_combinations:
-                print("{:<17}".format(c) + "[] -> " + str(playable_combinations[c]))
+                print("{:<17}".format(c) + "[] -> Playable")
             else:
                 print("{:<17}".format(c) + "[]")
     print("---------------------------")
