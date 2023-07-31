@@ -7,6 +7,11 @@ class Scorecard:
         self.scorecard = None
         self.create_scorecard()
 
+    def copy(self):
+        scorecard = Scorecard()
+        scorecard.scorecard = self.scorecard.copy()
+        return scorecard
+
     def get_unplayed_combinations(self):
         playable_combinations = []
         for c in const.combinations:
@@ -18,7 +23,10 @@ class Scorecard:
         upper_score = 0
         for c in const.combinations:
             if const.combinations[c]["upper_section"]:
-                upper_score += self.scorecard[c]["score"]
+                if self.scorecard[c]["score"]:
+                    upper_score += self.scorecard[c]["score"]
+                else:
+                    upper_score += 0
         return upper_score
 
     def get_bonus(self):
@@ -33,7 +41,8 @@ class Scorecard:
         return final_score
 
     def get_score(self, combination) -> int:
-        return self.scorecard[combination]["score"]
+        # return 0 if none
+        return self.scorecard[combination]["score"] if self.scorecard[combination]["score"] else 0
 
     def is_played(self, combination) -> bool:
         return self.scorecard[combination]["played"]

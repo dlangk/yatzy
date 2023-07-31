@@ -1,4 +1,5 @@
 from yatzy.mechanics.scorecard import Scorecard
+from copy import deepcopy
 
 
 class GameState:
@@ -6,3 +7,9 @@ class GameState:
         self.rolls = rolls
         self.dices = dices
         self.scorecard = scorecard if scorecard else Scorecard()
+
+    def set_dices(self, dices):
+        self.dices = dices
+
+    def copy(self):
+        return deepcopy(self)

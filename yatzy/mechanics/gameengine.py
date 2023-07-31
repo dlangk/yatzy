@@ -15,6 +15,10 @@ def create_initial_state() -> GameState:
     return GameState(rolls=1, dices=dices)
 
 
+def roll_dices():
+    return [dice_roll() for n in range(const.DICES_COUNT)]
+
+
 def game_over(state: GameState) -> bool:
     return state.scorecard.game_over()
 
@@ -75,14 +79,22 @@ def get_score(state, scored_combination):
                             die_count=const.combinations[scored_combination]["required_die_count"])
 
 
+# this method returns a new state, not a modified one
 def update_scorecard(state: GameState, action: Action):
-    if action.scored_combination in state.scorecard.get_unplayed_combinations():
+    old_state = state
+    new_state = state.copy()
+    if action.scored_combination in old_state.scorecard.get_unplayed_combinations():
         if action.forced:
-            state.scorecard.score(action.scored_combination, 0)
+            new_state.scorecard.score(action.scored_combination, 0)
+            return new_state
         else:
+            legal_combinations = get_legal_combinations(state)
+            if action.scored_combination not in legal_combinations:
+                new_state.scorecard.score(action.scored_combination, 0)
+                return new_state
             score = get_score(state, action.scored_combination)
-            state.scorecard.score(action.scored_combination, score)
-        return state.scorecard
+            new_state.scorecard.score(action.scored_combination, score)
+            return new_state
     else:
         raise Exception("You tried to score an invalid combination")
 

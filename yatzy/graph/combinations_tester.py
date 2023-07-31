@@ -65,8 +65,15 @@ def get_all_possible_dices():
             for d3 in range(1, 7):
                 for d4 in range(1, 7):
                     for d5 in range(1, 7):
-                        dices.append([d1, d2, d3, d4, d5])
+                        array_of_numbers = [d1, d2, d3, d4, d5]
+                        dices.append(sorted(array_of_numbers, key=abs, reverse=True))
     return dices
+
+
+def get_bag_of_dices():
+    set_of_dices = set(tuple(i) for i in get_all_possible_dices())
+    list_of_dices = [list(elem) for elem in set_of_dices]
+    return list_of_dices
 
 
 def get_all_possible_locks():
