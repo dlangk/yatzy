@@ -1,94 +1,237 @@
 import itertools
-from collections import Counter
-from math import factorial, comb
-
 import yatzy.mechanics.const as const
 
-EXPECTED_STATE_SCORE = {}
+from collections import Counter
+from math import factorial, comb
+from itertools import product
 
 
 def build_graph():
     print("\n******* building graph *******\n")
-    edges = {}
 
-    start_states = generate_start_states()
+    print("Generating all dice sets")
+    all_dice_sets = generate_all_dice_sets()
+
+    print("Generating all start states")
+    all_start_states = generate_start_states()
+
+    print("Generating all reroll masks")
+    all_reroll_masks = generate_all_reroll_masks(num_dices=5)
+
+    print("Generating all reroll probabilities")
+    all_reroll_probabilities = compute_all_reroll_probabilities(all_dice_sets, all_reroll_masks)
+
+    print("Generating all dice set probabilities")
+    all_dice_set_probabilities = generate_all_dice_set_probabilities(all_dice_sets)
+
+    print("Generating all reroll edges")
+    all_reroll_masks_by_filter = generate_reroll_masks(all_dice_sets)
+
+    expected_state_scores = {}
 
     for i in range(0, 13):
-        print("checking states for round " + str(13 - i))
-        states = get_states(start_states, i)
-
-        # We start by building out the end of the graph
-        for state in states:
+        start_states = filter_states(all_start_states, i)
+        for state in start_states:
             upper_score, scored_categories = decode_state_integer(state)
-            print("checking state " + str(state))
-            print("upper_score: " + str(upper_score))
-            print("scored_categories: " + str(scored_categories))
-            score = get_expected_score(state)
-            print("expected score: " + str(score))
+            score = get_expected_score(state,
+                                       upper_score,
+                                       scored_categories,
+                                       all_dice_sets,
+                                       all_dice_set_probabilities,
+                                       expected_state_scores,
+                                       all_reroll_probabilities,
+                                       all_reroll_masks_by_filter)
+
+            expected_state_scores[state] = score
+            print("State={} E(S)={} Upper={} Score={}".format(state, round(score, 4), upper_score, scored_categories))
 
 
-def get_expected_score(state):
-    # We are building a cache of all expected state scores, and first check if this state is already in there
-    if EXPECTED_STATE_SCORE.get(state) is not None:
-        return EXPECTED_STATE_SCORE.get(state)
-
-    upper_score, scored_categories = decode_state_integer(state)
-    # If all categories are already scored, we check for bonus and return the total
+def get_expected_score(state,
+                       upper_score,
+                       scored_categories,
+                       all_dice_sets,
+                       all_dice_set_probabilities,
+                       expected_state_scores,
+                       all_reroll_probabilities,
+                       all_reroll_masks):
+    # We start by checking if the game is already over
+    # This should only happen for the 63 * 13 cases when all categories are scored.
+    # It should return 0 for all cases except when the upper score is at or above the threshold
+    # Then it returns the upper bonus
     game_over = check_all_ones(scored_categories)
     if game_over:
-        return get_expected_exit_score(state, None)
+        new_upper_score, expected_score, new_scored_categories = \
+            get_max_exit_score(state, upper_score, scored_categories, dice_set=None, game_over=game_over)
+        expected_state_scores[state] = expected_score
+        return expected_score
 
-    # If not, then we start examining the most likely state score
+    # We will now proceed to calculate all the internal states to this node
+    all_exit_scores = get_all_exit_scores(state, upper_score, scored_categories, all_dice_sets, game_over)
+
+    # We then start by calculating the expected score of each of the possible initial dice sets we can roll
     expected_score = 0
+    rerolls_remaining = 2
 
-    # First of all, there are 252 possible dice sets after the first roll
-    dice_sets = generate_dice_states(dices=[1, 1, 1, 1, 1], num_dices_reroll=5)
-
-    # We want to start by determining the expected value of all 252 possible end-states
-    # I.e. assume we are ready to score, and have dice_set, what do we get?
-    for dice_set in dice_sets:
-        exit_score = get_expected_exit_score(state, dice_set)
-        print("dice_set: " + str(dice_set) + ", exit_score: " + str(exit_score))
-
-    counter = 0
-    for dice_set in dice_sets:
-
-        # Each of these have a probability of occurring
-        p_dice_set = get_probability_of_dice_set(dice_set)
-
+    for dice_set in all_dice_sets:
+        dice_str = "".join(map(str, dice_set))
         reroll_filter = get_reroll_filter(dice_set)
-        reroll_masks = generate_reroll_edges_from_dice_set(dice_set)[reroll_filter]
+        # The expected score of a state is the sum of the probability of the dice set
+        # times the expected score of the state that dice set takes us to
+        expected_score += \
+            all_dice_set_probabilities[dice_str] * \
+            get_expected_score_reroll(state, dice_set, rerolls_remaining, upper_score, scored_categories, reroll_filter,
+                                      all_dice_sets, all_reroll_masks, all_reroll_probabilities, all_exit_scores,
+                                      expected_state_scores, game_over)
+    return expected_score
 
-        for reroll_mask in reroll_masks:
-            for dice_set_inner in dice_sets:
-                p_r_rp = get_reroll_probability(dice_set, reroll_mask, dice_set_inner)
-                if p_r_rp > 0:
-                    print("d1: " + str(dice_set) +
-                          ", m: " + str(reroll_mask) +
-                          ", d2: " + str(dice_set_inner) +
-                          ", p: " + str(p_r_rp))
-                counter += 1
-            pass
-        print(counter)
-        print("checking dice set " + str(dice_set) + " for state " + str(state))
-        print("p_dice_set: " + str(p_dice_set))
-        print(len(reroll_masks))
-        print(len(dice_sets))
-        print(len(dice_sets) * len(reroll_masks))
 
-    # There are 462 ways of rerolling 5 dices (keep either 5,4,3,2,1)
-    # Keep 5 gives 1 possible outcome, keep 4 gives 6 possible outcomes, etc.
-    # We need to know what the probability for each of these outcomes is given
-    # An initial dice set (r), a reroll mask (m) and a target outcome (r')
+def get_expected_score_reroll(state,
+                              dice_set,
+                              rerolls_remaining,
+                              upper_score,
+                              scored_categories,
+                              reroll_filter,
+                              all_dice_sets,
+                              all_reroll_masks,
+                              all_reroll_probabilities,
+                              all_exit_scores,
+                              expected_state_scores,
+                              game_over):
 
-    # for reroll_edge in reroll_edges:
-    #     # For every edge we need to determine what possible dice sets we can get from it
-    #     print("checking reroll edge " + str(reroll_edge))
-    #     mask = reroll_edges[reroll_edge]
-    #     pass
-    # expected_score += p_dice_set * get_expected_reroll_score(state, dice_set, 2)
+    dice_str = "".join(map(str, dice_set))
+    # The reroll expected score is the maximum expected score of all possible reroll options
+
+    # If we do not have any rerolls remaining, we stop
+    if rerolls_remaining == 0:
+        new_upper_score, best_additional_score, new_scored_categories = all_exit_scores[dice_str]
+        next_state = generate_state_integer(new_upper_score, new_scored_categories)
+        next_state_potential = expected_state_scores[next_state]
+        reroll_state_expected_score = best_additional_score + next_state_potential
+        return reroll_state_expected_score
+
+    # Otherwise, we deduct one reroll and calculate the expected score for all reroll options
+    max_expected_score = 0
+    reroll_masks = all_reroll_masks[reroll_filter]
+    for reroll_mask in reroll_masks:
+        expected_reroll_state_score = get_expected_score_reroll_mask(state,
+                                                                     dice_set,
+                                                                     reroll_mask,
+                                                                     rerolls_remaining - 1,
+                                                                     upper_score,
+                                                                     scored_categories,
+                                                                     reroll_filter,
+                                                                     all_dice_sets,
+                                                                     all_reroll_masks,
+                                                                     all_reroll_probabilities,
+                                                                     all_exit_scores,
+                                                                     expected_state_scores,
+                                                                     game_over)
+        if expected_reroll_state_score >= max_expected_score:
+            max_expected_score = expected_reroll_state_score
+
+    return max_expected_score
+
+
+def get_expected_score_reroll_mask(state,
+                                   dice_set,
+                                   reroll_mask,
+                                   rerolls_remaining,
+                                   upper_score,
+                                   scored_categories,
+                                   reroll_filter,
+                                   all_dice_sets,
+                                   all_reroll_masks,
+                                   all_reroll_probabilities,
+                                   all_exit_scores,
+                                   expected_state_scores,
+                                   game_over):
+    # The expected score of a reroll mask is the sum of the probability of getting a dice set from the reroll mask
+    # times the expected score of the state that dice set takes us to
+    expected_score = 0
+    remaining_remaining_decreased = rerolls_remaining - 1
+
+    for dice_set_target in all_dice_sets:
+        # This is equivalent to P(r' -> r)
+        reroll_probability_key = str(dice_set) + str(list(reroll_mask)) + str(dice_set_target)
+        reroll_mask_target_prob = all_reroll_probabilities[reroll_probability_key]
+
+        # This is E(S, r, n-1)
+        expected_score_target = get_expected_score_reroll(state,
+                                                          dice_set,
+                                                          remaining_remaining_decreased,
+                                                          upper_score,
+                                                          scored_categories,
+                                                          reroll_filter,
+                                                          all_dice_sets,
+                                                          all_reroll_masks,
+                                                          all_reroll_probabilities,
+                                                          all_exit_scores,
+                                                          expected_state_scores,
+                                                          game_over)
+
+        # This is Sum(P(r' -> r) * E(S, r, n-1))
+        expected_score += (reroll_mask_target_prob * expected_score_target)
 
     return expected_score
+
+
+def generate_state_integer(upper_score, scored_categories):
+    if upper_score >= 63:
+        upper_score = 63
+    return encode_state_integer(upper_score, scored_categories)
+
+
+def generate_all_dice_set_probabilities(all_dice_sets):
+    all_dice_set_probabilities = {}
+    for dice_set in all_dice_sets:
+        dice_str = "".join(map(str, dice_set))
+        probability_of_dice_set = get_probability_of_dice_set(dice_set)
+        all_dice_set_probabilities[dice_str] = probability_of_dice_set
+    return all_dice_set_probabilities
+
+
+def get_probability_of_dice_set(dice_set):
+    counts = count_dice_faces(dice_set)
+    probability = probability_of_dice_set_by_counts(counts)
+    return probability
+
+
+def generate_all_dice_sets():
+    dices = [1, 1, 1, 1, 1]
+    dice_faces = [1, 2, 3, 4, 5, 6]
+    num_dices_reroll = 5
+    outcome = [dices[:-num_dices_reroll] + list(comb) for comb in
+               itertools.combinations_with_replacement(dice_faces, num_dices_reroll)]
+    return outcome
+
+
+def generate_dice_states(dices, num_dices_reroll):
+    dice_faces = [1, 2, 3, 4, 5, 6]
+    if num_dices_reroll == 0:
+        return [dices]
+    outcome = [dices[:-num_dices_reroll] + list(comb) for comb in
+               itertools.combinations_with_replacement(dice_faces, num_dices_reroll)]
+    return outcome
+
+
+def get_all_exit_scores(state, upper_score, scored_categories, all_dice_sets, game_over):
+    exit_scores = {}
+    for dice_set in all_dice_sets:
+        dice_str = "".join(map(str, dice_set))
+        new_upper_score, best_additional_score, new_scored_categories = get_max_exit_score(state,
+                                                                                           upper_score,
+                                                                                           scored_categories,
+                                                                                           dice_set,
+                                                                                           game_over)
+        exit_scores[dice_str] = new_upper_score, best_additional_score, new_scored_categories
+    return exit_scores
+
+
+def encode_state_integer(new_upper, new_cat):
+    upper_score_binary = bin(new_upper)[2:].zfill(6)
+    score_category_int = int(new_cat, 2)
+    scored_categories_bin = bin(score_category_int)[2:].zfill(13)
+    return int(upper_score_binary + scored_categories_bin, 2)
 
 
 def get_reroll_probability(dice_set, reroll_mask, target_outcome):
@@ -155,56 +298,83 @@ def possible_reroll_mask(kept_dices, outcome):
     return True
 
 
-def get_expected_exit_score(state, dice_set):
+def all_scored_categories():
+    return "1111111111111"
+
+
+def get_max_exit_score(state, upper_score, scored_categories, dice_set, game_over):
     # At the end of a turn, the expected score is given as the maximum of the unused categories
     # plus the potential of the next state
-    upper_score, scored_categories = decode_state_integer(state)
     # If all categories are already scored, we check for bonus and return the total
-    game_over = check_all_ones(scored_categories)
     if game_over:
         if upper_score >= const.UPPER_BONUS_THRESHOLD:
-            return const.UPPER_BONUS
+            new_upper_score = upper_score
+            best_additional_score = const.UPPER_BONUS
+            return new_upper_score, best_additional_score, scored_categories
         else:
-            return 0
+            new_upper_score = upper_score
+            best_additional_score = 0
+            return new_upper_score, best_additional_score, scored_categories
 
-    max_score = 0
-    max_score_category = None
+    # If the game is not over, we iterate over all possible categories and check if it is still open for scoring
+    # If it is, we check if the available dices are valid for that category, and what the score would be.
+    # If it is not valid, we can still score 0, so we return zero for all invalid categories.
+    best_additional_score = 0
+    new_upper_score = upper_score
+    best_category_name = None
+    not_scored_yet = '0'
+
     keys = list(const.combinations.keys())
 
     for ix, category in enumerate(scored_categories):
         category_name = keys[ix]
-        if category == '0':
-            valid = const.combinations[category_name]["validator"](dice_set)
+        if category == not_scored_yet:
+            valid = is_dice_set_valid(category_name, dice_set)
             if valid:
-                score = const.combinations[category_name]["scorer"] \
-                    (dices=dice_set,
-                     die_value=const.combinations[category_name]["required_die_value"],
-                     die_count=const.combinations[category_name]["required_die_count"])
-                if score >= max_score:
-                    max_score = score
-                    max_score_category = category_name
+                score = get_score(category_name, dice_set)
+                if score >= best_additional_score:
+                    best_additional_score = score
+                    best_category_name = category_name
             else:
                 score = 0
-                if score >= max_score:
-                    max_score = score
-                    max_score_category = category_name
+                if score >= best_additional_score:
+                    best_additional_score = score
+                    best_category_name = category_name
 
-    index_of_max_score_category = list(const.combinations.keys()).index(max_score_category)
-    new_scored_categories = scored_categories[:index_of_max_score_category] + \
-                            "1" + scored_categories[index_of_max_score_category + 1:]
-    if const.combinations[max_score_category]["upper_section"]:
-        upper_score += max_score
+    new_scored_categories = update_scored_categories(scored_categories, best_category_name)
 
-    return upper_score, max_score, new_scored_categories
+    if is_upper_section(best_category_name):
+        new_upper_score += best_additional_score
+
+    return new_upper_score, best_additional_score, new_scored_categories
+
+
+def is_upper_section(category_name):
+    return const.combinations[category_name]["upper_section"]
+
+
+def update_scored_categories(scored_categories, scored_category):
+    index_of_max_score_category = list(const.combinations.keys()).index(scored_category)
+    return scored_categories[:index_of_max_score_category] + \
+        "1" + scored_categories[index_of_max_score_category + 1:]
+
+
+def get_score(category_name, dice_set):
+    return const.combinations[category_name]["scorer"] \
+        (dices=dice_set,
+         die_value=const.combinations[category_name]["required_die_value"],
+         die_count=const.combinations[category_name]["required_die_count"])
+
+
+def is_dice_set_valid(category_name, dice_set):
+    return const.combinations[category_name]["validator"] \
+        (dices=dice_set,
+         die_value=const.combinations[category_name]["required_die_value"],
+         die_count=const.combinations[category_name]["required_die_count"])
 
 
 def check_all_ones(string):
     return all(char == '1' for char in string)
-
-
-def get_probability_of_dice_set(dice_set):
-    counts = count_dice_faces(dice_set)
-    return probability_of_dice_set_by_counts(counts)
 
 
 def permutations(counts):
@@ -237,7 +407,7 @@ def count_ones(s):
     return num_ones
 
 
-def get_states(states, remaining_to_score):
+def filter_states(states, remaining_to_score):
     filtered_states = []
     for start_state in states:
         upper_score, scored_categories = decode_state_integer(start_state)
@@ -248,68 +418,6 @@ def get_states(states, remaining_to_score):
 
 def is_remaining_to_score(s, num_categories):
     return num_categories == len(s) - s.count('1')
-
-
-def size_graph():
-    # First we will generate all start states. A start state consists of:
-    # - scored categories (13 bits)
-    # - upper score (0-63 or 64+, 6 bits)
-    # We store each state as a 19-bit integer for later decoding.
-    start_states = generate_start_states()
-    # We can reduce the number of start states since for example
-    # you cannot have a total score of 4 if you have only scored 3s.
-    reduced_start_states = reduce_start_states(start_states)
-    print("There are " + str(len(reduced_start_states)) + " states at the beginning.")
-
-    print("There are 252 edges from the entry state to the first state of the dices.")
-
-    # There are 252 ways you can roll five dices with six faces assuming order does not matter.
-    first_dice_states = generate_dice_states(dices=[1, 1, 1, 1, 1], num_dices_reroll=5)
-    print("There are " + str(len(first_dice_states)) + " states since we roll five 6-sided dices.")
-
-    # There are 4368 edges out from the set of dices
-    first_reroll_edges = generate_reroll_edges(first_dice_states)
-    total_first_edges = sum(len(lst) for lst in first_reroll_edges.values())
-    print("There are " + str(total_first_edges) + " edges out from the first set of dices.")
-
-    # There are 462 distinct outcomes from to rerolling a specific set of 5 6-sided dices.
-    reroll_states = generate_reroll_states(first_dice_states[0])
-    print("There are " + str(len(reroll_states)) + " states possible when rerolling a specific set of 5 6-sided dices.")
-
-    # There are 4368 edges out from the second set of dices
-    first_reroll_edges = generate_reroll_edges(first_dice_states)
-    total_first_edges = sum(len(lst) for lst in first_reroll_edges.values())
-    print("There are " + str(total_first_edges) + " edges out from the second set of dices.")
-
-    # There are 252 new ways the dices can be configured after the first reroll
-    second_dice_states = generate_dice_states(dices=[1, 1, 1, 1, 1], num_dices_reroll=5)
-    print("There are " + str(len(second_dice_states)) + " states since we roll five 6-sided dices.")
-
-    # There are 4368 edges out from the set of dices
-    first_reroll_edges = generate_reroll_edges(first_dice_states)
-    total_first_edges = sum(len(lst) for lst in first_reroll_edges.values())
-    print("There are " + str(total_first_edges) + " edges out from the first set of dices.")
-
-    # There are 462 distinct ways to choose how many dices to keep, i.e. 5,4,3,2,1 and 0 dices.
-    print("There are 462 states representing possible choices of which dices to keep.")
-
-    # There are 4368 edges out from the first roll
-    second_reroll_edges = generate_reroll_edges(second_dice_states)
-    total_second_edges = sum(len(lst) for lst in second_reroll_edges.values())
-    print("There are " + str(total_second_edges) + " edges out from the second set of dices.")
-
-    # Finally, there are 252 ways the dices can be configured when the player is done
-    third_dice_states = generate_dice_states(dices=[1, 1, 1, 1, 1], num_dices_reroll=5)
-    print("There are " + str(len(third_dice_states)) + " states since we roll five 6-sided dices.")
-
-    print("There are 3276 edges since there are 13 ways to score each of the 252 dice sets.")
-
-    print("")
-    print("Nodes: There are " + str(len(reduced_start_states)) + " nodes in total.")
-    print("States: There are 1 + 3 * 252 + 2 * 462 = 1681 states in total for each node.")
-    print("Edges: There are 252 + 4 * 4368 + 3276 = 21000 edges in total for each node.")
-    total_edges = len(reduced_start_states) * 21000
-    print("There are " + str(total_edges) + " edges in total.")
 
 
 def generate_reroll_states(dices):
@@ -329,7 +437,7 @@ def generate_reroll_states(dices):
         raise Exception("There should be 462 distinct outcomes from to rerolling a specific set of 5 6-sided dices.")
 
 
-def generate_reroll_edges(dice_sets):
+def generate_reroll_masks(dice_sets):
     # There are 32 ways to partially reroll the first dice set.
     # If the dice set is [1,1,2,3,4] re-rolling the first and second dice is the same. Therefor we can reduce edges.
     # If each dice face is different on the first roll, then there are 32 ways to reroll the dice.
@@ -348,12 +456,15 @@ def generate_reroll_edges(dice_sets):
 
     for dice_set in dice_sets:
         reroll_filter = get_reroll_filter(dice_set)
-        dice_set_edges = generate_reroll_edges_from_dice_set(dice_set)
-        edges[reroll_filter].extend(dice_set_edges[reroll_filter])
+        if len(edges[reroll_filter]) == 0:
+            dice_set_edges = generate_reroll_edges_from_dice_set(dice_set)
+            edges[reroll_filter].extend(dice_set_edges[reroll_filter])
     return edges
 
 
 def generate_reroll_edges_from_dice_set(dice_set):
+    dice_str = "".join(map(str, dice_set))
+
     abcde = "abcde"  # case 5 unique faces => 32 ways to reroll
     aabcd = "aabcd"  # case 4 unique faces => 24 ways to reroll
     aabbc = "aabbc"  # case 3 unique faces and max 2 of same face => 18 ways to reroll
@@ -531,16 +642,7 @@ def check_all_zeros(binary_string):
     return all(char == '0' for char in binary_string)
 
 
-def generate_dice_states(dices, num_dices_reroll):
-    dice_faces = [1, 2, 3, 4, 5, 6]
-    if num_dices_reroll == 0:
-        return [dices]
-    return [dices[:-num_dices_reroll] + list(comb) for comb in
-            itertools.combinations_with_replacement(dice_faces, num_dices_reroll)]
-
-
 def generate_start_states():
-    """Generate all possible start states."""
     start_states = []
 
     # There are 2^6 = 64 possible states for the upper score
@@ -566,7 +668,24 @@ def decode_state_integer(start_state_integer):
     return upper_score, scored_categories
 
 
-if __name__ == "__main__":
-    # size_graph()
+def generate_all_reroll_masks(num_dices):
+    return list(product([0, 1], repeat=num_dices))
 
+
+def compute_all_reroll_probabilities(dice_sets, reroll_masks):
+    # Initialize a map to store probabilities
+    probabilities = {}
+
+    # Loop over all dice sets, reroll masks, and target outcomes
+    for dice_set in dice_sets:
+        for reroll_mask in reroll_masks:
+            for target_outcome in dice_sets:
+                # Compute the probability
+                probability = get_reroll_probability(dice_set, reroll_mask, target_outcome)
+                # Store the probability in the map
+                probabilities[str(dice_set) + str(list(reroll_mask)) + str(target_outcome)] = probability
+    return probabilities
+
+
+if __name__ == "__main__":
     build_graph()
