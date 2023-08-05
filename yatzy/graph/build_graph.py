@@ -1,6 +1,10 @@
 import itertools
 import yatzy.mechanics.const as const
+import os
+import pickle
+import gzip
 
+from tqdm import tqdm
 from collections import Counter
 from math import factorial, comb
 from itertools import product
@@ -13,7 +17,7 @@ def build_graph():
     all_dice_sets = generate_all_dice_sets()
 
     print("Generating all start states")
-    all_start_states = generate_start_states()
+    all_start_states = reduce_start_states(generate_start_states())
 
     print("Generating all reroll masks")
     all_reroll_masks = generate_all_reroll_masks(num_dices=5)
@@ -27,23 +31,48 @@ def build_graph():
     print("Generating all reroll edges")
     all_reroll_masks_by_filter = generate_reroll_masks(all_dice_sets)
 
-    expected_state_scores = {}
+    state_score_file = "/Users/langkilde/IdeaProjects/yatzy/data/state_scores.pkl.gz"
+    expected_state_scores = load_or_create_state_score_file(state_score_file)
 
     for i in range(0, 13):
         start_states = filter_states(all_start_states, i)
-        for state in start_states:
-            upper_score, scored_categories = decode_state_integer(state)
-            score = get_expected_score(state,
-                                       upper_score,
-                                       scored_categories,
-                                       all_dice_sets,
-                                       all_dice_set_probabilities,
-                                       expected_state_scores,
-                                       all_reroll_probabilities,
-                                       all_reroll_masks_by_filter)
+        for state in tqdm(start_states, desc="State Loop"):
+            if state not in expected_state_scores:
+                upper_score, scored_categories = decode_state_integer(state)
+                score = get_expected_score(state,
+                                           upper_score,
+                                           scored_categories,
+                                           all_dice_sets,
+                                           all_dice_set_probabilities,
+                                           expected_state_scores,
+                                           all_reroll_probabilities,
+                                           all_reroll_masks_by_filter)
+                expected_state_scores[state] = score
 
-            expected_state_scores[state] = score
-            print("State={} E(S)={} Upper={} Score={}".format(state, round(score, 4), upper_score, scored_categories))
+                # Save scores to a compressed pickle file after each iteration
+                with gzip.open(state_score_file, 'wb') as f:
+                    pickle.dump(expected_state_scores, f)
+
+                print("\nCalculated S={} with E(S)={}".format(state,
+                                                              expected_state_scores[state]))
+
+            else:
+                print("\nLoaded     S={} with E(S)={}".format(state,
+                                                              expected_state_scores[state]))
+
+
+def load_or_create_state_score_file(score_filename):
+    # Check if the file already exists
+    if os.path.isfile(score_filename):
+        print("Loading existing state scores")
+        # Load the scores from the existing file
+        with gzip.open(score_filename, 'rb') as f:
+            expected_state_scores = pickle.load(f)
+    else:
+        # Initialize a dictionary to store scores
+        expected_state_scores = {}
+
+    return expected_state_scores
 
 
 def get_expected_score(state,
@@ -97,7 +126,6 @@ def get_expected_score_reroll(state,
                               all_exit_scores,
                               expected_state_scores,
                               game_over):
-
     dice_str = "".join(map(str, dice_set))
     # The reroll expected score is the maximum expected score of all possible reroll options
 
@@ -673,17 +701,32 @@ def generate_all_reroll_masks(num_dices):
 
 
 def compute_all_reroll_probabilities(dice_sets, reroll_masks):
-    # Initialize a map to store probabilities
-    probabilities = {}
+    filename = '/Users/langkilde/IdeaProjects/yatzy/data/reroll_probabilities.pkl.gz'
 
-    # Loop over all dice sets, reroll masks, and target outcomes
-    for dice_set in dice_sets:
-        for reroll_mask in reroll_masks:
-            for target_outcome in dice_sets:
-                # Compute the probability
-                probability = get_reroll_probability(dice_set, reroll_mask, target_outcome)
-                # Store the probability in the map
-                probabilities[str(dice_set) + str(list(reroll_mask)) + str(target_outcome)] = probability
+    # Check if the file already exists
+    if os.path.isfile(filename):
+        print("Loading probabilities from file: " + filename)
+        # Load the probabilities from the existing file
+        with gzip.open(filename, 'rb') as f:
+            probabilities = pickle.load(f)
+    else:
+        print("Computing probabilities and saving to file: " + filename)
+        # Initialize a map to store probabilities
+        probabilities = {}
+
+        # Loop over all dice sets, reroll masks, and target outcomes
+        for dice_set in dice_sets:
+            for reroll_mask in reroll_masks:
+                for target_outcome in dice_sets:
+                    # Compute the probability
+                    probability = get_reroll_probability(dice_set, reroll_mask, target_outcome)
+                    # Store the probability in the map
+                    probabilities[str(dice_set) + str(list(reroll_mask)) + str(target_outcome)] = probability
+
+        # Save probabilities to a compressed pickle file
+        with gzip.open(filename, 'wb') as f:
+            pickle.dump(probabilities, f)
+
     return probabilities
 
 
