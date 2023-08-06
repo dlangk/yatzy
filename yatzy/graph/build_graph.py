@@ -28,6 +28,9 @@ def build_graph():
     print("Generating all dice set probabilities")
     all_dice_set_probabilities = generate_all_dice_set_probabilities(all_dice_sets)
 
+    print("Generate all state integers")
+    all_state_integers = generate_all_state_integers()
+
     print("Generating all reroll edges")
     all_reroll_masks_by_filter = generate_reroll_masks(all_dice_sets)
 
@@ -46,7 +49,8 @@ def build_graph():
                                            all_dice_set_probabilities,
                                            expected_state_scores,
                                            all_reroll_probabilities,
-                                           all_reroll_masks_by_filter)
+                                           all_reroll_masks_by_filter,
+                                           all_state_integers)
                 expected_state_scores[state] = score
 
                 # Save scores to a compressed pickle file after each iteration
@@ -61,20 +65,6 @@ def build_graph():
                                                               expected_state_scores[state]))
 
 
-def load_or_create_state_score_file(score_filename):
-    # Check if the file already exists
-    if os.path.isfile(score_filename):
-        print("Loading existing state scores")
-        # Load the scores from the existing file
-        with gzip.open(score_filename, 'rb') as f:
-            expected_state_scores = pickle.load(f)
-    else:
-        # Initialize a dictionary to store scores
-        expected_state_scores = {}
-
-    return expected_state_scores
-
-
 def get_expected_score(state,
                        upper_score,
                        scored_categories,
@@ -82,7 +72,8 @@ def get_expected_score(state,
                        all_dice_set_probabilities,
                        expected_state_scores,
                        all_reroll_probabilities,
-                       all_reroll_masks):
+                       all_reroll_masks,
+                       all_state_integers):
     # We start by checking if the game is already over
     # This should only happen for the 63 * 13 cases when all categories are scored.
     # It should return 0 for all cases except when the upper score is at or above the threshold
@@ -110,7 +101,7 @@ def get_expected_score(state,
             all_dice_set_probabilities[dice_str] * \
             get_expected_score_reroll(state, dice_set, rerolls_remaining, upper_score, scored_categories, reroll_filter,
                                       all_dice_sets, all_reroll_masks, all_reroll_probabilities, all_exit_scores,
-                                      expected_state_scores, game_over)
+                                      expected_state_scores, game_over, all_state_integers)
     return expected_score
 
 
@@ -125,14 +116,17 @@ def get_expected_score_reroll(state,
                               all_reroll_probabilities,
                               all_exit_scores,
                               expected_state_scores,
-                              game_over):
+                              game_over,
+                              all_state_integers):
     dice_str = "".join(map(str, dice_set))
     # The reroll expected score is the maximum expected score of all possible reroll options
 
     # If we do not have any rerolls remaining, we stop
     if rerolls_remaining == 0:
         new_upper_score, best_additional_score, new_scored_categories = all_exit_scores[dice_str]
-        next_state = generate_state_integer(new_upper_score, new_scored_categories)
+        if new_upper_score >= const.UPPER_BONUS_THRESHOLD:
+            new_upper_score = const.UPPER_BONUS_THRESHOLD
+        next_state = all_state_integers[str(new_upper_score) + str(new_scored_categories)]
         next_state_potential = expected_state_scores[next_state]
         reroll_state_expected_score = best_additional_score + next_state_potential
         return reroll_state_expected_score
@@ -153,7 +147,8 @@ def get_expected_score_reroll(state,
                                                                      all_reroll_probabilities,
                                                                      all_exit_scores,
                                                                      expected_state_scores,
-                                                                     game_over)
+                                                                     game_over,
+                                                                     all_state_integers)
         if expected_reroll_state_score >= max_expected_score:
             max_expected_score = expected_reroll_state_score
 
@@ -172,7 +167,8 @@ def get_expected_score_reroll_mask(state,
                                    all_reroll_probabilities,
                                    all_exit_scores,
                                    expected_state_scores,
-                                   game_over):
+                                   game_over,
+                                   all_state_integers):
     # The expected score of a reroll mask is the sum of the probability of getting a dice set from the reroll mask
     # times the expected score of the state that dice set takes us to
     expected_score = 0
@@ -195,12 +191,44 @@ def get_expected_score_reroll_mask(state,
                                                           all_reroll_probabilities,
                                                           all_exit_scores,
                                                           expected_state_scores,
-                                                          game_over)
+                                                          game_over,
+                                                          all_state_integers)
 
         # This is Sum(P(r' -> r) * E(S, r, n-1))
         expected_score += (reroll_mask_target_prob * expected_score_target)
 
     return expected_score
+
+
+def load_or_create_state_score_file(score_filename):
+    # Check if the file already exists
+    if os.path.isfile(score_filename):
+        print("Loading existing state scores")
+        # Load the scores from the existing file
+        with gzip.open(score_filename, 'rb') as f:
+            expected_state_scores = pickle.load(f)
+    else:
+        # Initialize a dictionary to store scores
+        expected_state_scores = {}
+
+    return expected_state_scores
+
+
+def generate_all_state_integers():
+    state_integers = {}
+    for upper_score in range(0, 64):
+        upper_score_binary = bin(upper_score)[2:].zfill(6)
+
+    # There are 2^13 = 8192 possible states for the scored categories
+        for scored_categories in range(8192):
+            scored_categories_binary = bin(scored_categories)[2:].zfill(13)
+
+            # We can now store each start-state as a 19-bit integer for later decoding.
+            # Note that the fact that Yatzy is tri-state means not all integers will be used.
+            start_state_integer = int(upper_score_binary + scored_categories_binary, 2)
+            key = str(str(upper_score) + str(scored_categories_binary))
+            state_integers[key] = start_state_integer
+    return state_integers
 
 
 def generate_state_integer(upper_score, scored_categories):
