@@ -1,13 +1,18 @@
-import itertools
-import yatzy.mechanics.const as const
+import gzip
+import json
 import os
 import pickle
-import gzip
 
-from tqdm import tqdm
 from collections import Counter
-from math import factorial, comb
-from itertools import product
+from itertools import combinations, product, combinations_with_replacement
+from math import factorial
+
+from pyspark import SparkConf
+from pyspark.sql import SparkSession, Window
+from pyspark.sql.functions import col, concat_ws, udf, row_number, desc
+from pyspark.sql.types import BooleanType
+
+import yatzy.mechanics.const as const
 
 
 def build_graph():
@@ -23,7 +28,7 @@ def build_graph():
     all_reroll_masks = generate_all_reroll_masks(num_dices=5)
 
     print("Generating all reroll probabilities")
-    all_reroll_probabilities = compute_all_reroll_probabilities(all_dice_sets, all_reroll_masks)
+    all_reroll_probs = compute_all_reroll_probabilities(all_dice_sets, all_reroll_masks)
 
     print("Generating all dice set probabilities")
     all_dice_set_probabilities = generate_all_dice_set_probabilities(all_dice_sets)
@@ -34,35 +39,229 @@ def build_graph():
     print("Generating all reroll edges")
     all_reroll_masks_by_filter = generate_reroll_masks(all_dice_sets)
 
-    state_score_file = "/Users/langkilde/IdeaProjects/yatzy/data/state_scores.pkl.gz"
-    expected_state_scores = load_or_create_state_score_file(state_score_file)
+    print("Generate all possible reroll masks")
+    all_possible_reroll_masks = generate_all_possible_reroll_masks(all_dice_sets, all_reroll_masks_by_filter)
 
-    for i in range(0, 13):
-        start_states = filter_states(all_start_states, i)
-        for state in tqdm(start_states, desc="State Loop"):
-            if state not in expected_state_scores:
-                upper_score, scored_categories = decode_state_integer(state)
-                score = get_expected_score(state,
-                                           upper_score,
-                                           scored_categories,
-                                           all_dice_sets,
-                                           all_dice_set_probabilities,
-                                           expected_state_scores,
-                                           all_reroll_probabilities,
-                                           all_reroll_masks_by_filter,
-                                           all_state_integers)
-                expected_state_scores[state] = score
+    spark = setup_spark()
+    PARTITION_NUM = 60
 
-                # Save scores to a compressed pickle file after each iteration
-                with gzip.open(state_score_file, 'wb') as f:
-                    pickle.dump(expected_state_scores, f)
+    expected_state_scores = {}
+    expected_state_scores = set_exit_state_values(spark, all_start_states, expected_state_scores)
 
-                print("\nCalculated S={} with E(S)={}".format(state,
-                                                              expected_state_scores[state]))
+    print("Depth 0 state scores: " + str(list(expected_state_scores.keys())))
+    print("Number of Depth 0 state scores: " + str(len(expected_state_scores.keys())))
 
-            else:
-                print("\nLoaded     S={} with E(S)={}".format(state,
-                                                              expected_state_scores[state]))
+    DATA_DIR_PATH = "/Users/langkilde/IdeaProjects/yatzy/data/"
+    DATA_FILE = "data.json"
+    FULL_PATH = DATA_DIR_PATH + DATA_FILE
+    if os.path.exists(FULL_PATH):
+        # Open the file and load the JSON data
+        with open(FULL_PATH, 'r') as file:
+            data = json.load(file)
+            for state in data:
+                expected_state_scores[state] = data[state]
+        print("Data loaded successfully")
+
+    print("Updated state scores: " + str(list(expected_state_scores.keys())))
+    print("Number of updated state scores: " + str(len(expected_state_scores.keys())))
+
+    all_unfinished_start_states = filter_states_by_unfinished(all_start_states, list(expected_state_scores.keys()))
+    print(len(all_unfinished_start_states))
+
+
+    # We then prepare all dice transition probabilities
+    dice_transitions_rdd = spark.sparkContext.parallelize(all_dice_sets) \
+        .map(lambda dice_set: (dice_set, get_reroll_filter(dice_set))) \
+        .flatMap(lambda row: expand_by_reroll_masks(row[0], row[1], all_reroll_masks_by_filter)) \
+        .flatMap(lambda row: expand_by_target_dice_set(row[0], row[1], all_dice_sets)) \
+        .map(lambda row: (row[0], row[1], row[2], get_reroll_prob_from_map(all_reroll_probs, row[0], row[1], row[2]))) \
+        .filter(lambda row: row[3] > 0).repartition(PARTITION_NUM)
+
+    # Next, we start working our way through all possible game states, starting from the end
+    for i in range(1, 13):
+        print("Starting with depth: " + str(i))
+        states_with_same_depth = filter_states_by_depth(all_unfinished_start_states, i)
+        print("Number of states with depth " + str(i) + ": " + str(len(states_with_same_depth)))
+
+        BATCH_SIZE = 1000
+
+        for j in range(0, len(states_with_same_depth), BATCH_SIZE):
+            print("Starting batch: " + str(j))
+            filtered_states = states_with_same_depth[j: j + BATCH_SIZE]
+            print("Number of batched states:" + str(len(filtered_states)))
+            states_rdd = spark.sparkContext.parallelize(filtered_states)
+
+            enriched_states_rdd = states_rdd.map(lambda state: (state, decode_state_integer(state))) \
+                .map(lambda row: (row[0], row[1][0], row[1][1])) \
+                .flatMap(lambda row: expand_by_all_dice_sets(row[0], row[1], row[2], all_dice_sets)) \
+                .map(lambda row:
+                     (row[0], row[1], row[2], row[3], get_max_exit_score(row[0], row[1], row[2], row[3], False))) \
+                .map(lambda row: (row[0], row[1], row[2], row[3], row[4][0], row[4][1], row[4][2])) \
+                .map(lambda row:
+                     (row[0], row[1], row[2], row[3], row[4], row[5], row[6], encode_state_integer(row[4], row[6]))) \
+                .map(lambda row:
+                     (row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], expected_state_scores[row[7]])) \
+                .map(lambda row:
+                     (row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[5] + row[8]))
+
+            enriched_states_df = enriched_states_rdd \
+                .toDF(['state',
+                       'upper_score',
+                       'scored_categories',
+                       'exit_dice_set',
+                       'new_upper_score',
+                       'max_additional_score',
+                       'new_scored_categories',
+                       'next_state',
+                       'next_state_potential',
+                       'exit_dice_set_value']) \
+                .withColumn('exit_dice_set', concat_ws('', 'exit_dice_set')).repartition(PARTITION_NUM)
+
+            dice_transitions_df = dice_transitions_rdd.toDF(['r_start', 'r_prim', 'r_target', 'prob']) \
+                .withColumn('r_start', concat_ws('', 'r_start')) \
+                .withColumn('r_prim', concat_ws('', 'r_prim')) \
+                .withColumn('r_target', concat_ws('', 'r_target'))
+
+            joined_df = dice_transitions_df \
+                .join(enriched_states_df, col('exit_dice_set') == col('r_target'), 'left') \
+                .repartition(PARTITION_NUM)
+
+            second_reroll_df = joined_df.repartition(PARTITION_NUM) \
+                .withColumn('target_dice_set_potential', (col('prob') * col('exit_dice_set_value')).cast('float')) \
+                .select('state', 'r_start', 'r_prim', 'target_dice_set_potential') \
+                .groupBy("state", "r_start", "r_prim") \
+                .sum("target_dice_set_potential")
+            second_reroll_df = second_reroll_df.repartition(PARTITION_NUM)
+
+            windowSpec = Window.partitionBy("state", "r_start") \
+                .orderBy(desc("sum(target_dice_set_potential)"))
+            df_with_rownum = second_reroll_df.repartition(PARTITION_NUM) \
+                .withColumn("row_num", row_number().over(windowSpec))
+            second_reroll_dice_set_values_df = df_with_rownum.filter(df_with_rownum["row_num"] == 1).drop("row_num")
+            second_reroll_dice_set_values_df = second_reroll_dice_set_values_df \
+                .select('state', 'r_start', 'sum(target_dice_set_potential)') \
+                .withColumnRenamed("r_start", "dice_set") \
+                .withColumnRenamed("sum(target_dice_set_potential)", "dice_set_value")
+            second_reroll_dice_set_values_df = second_reroll_dice_set_values_df.repartition(PARTITION_NUM)
+
+            joined_df = dice_transitions_df \
+                .join(second_reroll_dice_set_values_df,
+                      dice_transitions_df['r_target'] == second_reroll_dice_set_values_df['dice_set'],
+                      how='inner') \
+                .withColumn('target_dice_set_potential', (col('prob') * col('dice_set_value')).cast('float')) \
+                .groupBy("state", "r_start", "r_prim") \
+                .sum("target_dice_set_potential") \
+                .alias("reroll_mask_potential")
+
+            windowSpec = Window.partitionBy("state", "r_start") \
+                .orderBy(desc("sum(target_dice_set_potential)"))
+            df_with_rownum = joined_df.repartition(PARTITION_NUM) \
+                .withColumn("row_num", row_number().over(windowSpec))
+            joined_df = df_with_rownum.filter(df_with_rownum["row_num"] == 1).drop("row_num")
+
+            final_df = joined_df.rdd \
+                .map(lambda row: (row['state'],
+                                  decode_state_integer(row['state']),
+                                  row['r_start'],
+                                  row['sum(target_dice_set_potential)'] *
+                                  all_dice_set_probabilities["".join(map(str, row['r_start']))])) \
+                .toDF(["state", "upper+cat", "dice_set", "value"])
+
+            state_values_df = final_df.groupBy("state").sum("value").sort("sum(value)", ascending=False)
+            state_values_list = state_values_df.rdd.collect()
+
+            for state_value in state_values_list:
+                print(state_value)
+                expected_state_scores[state_value[0]] = state_value[1]
+
+            print("writing file to disk")
+            with open(DATA_DIR_PATH + 'data.json', 'w') as file:
+                json.dump(expected_state_scores, file)
+
+
+def setup_spark():
+    master = 'local[8]'
+    appName = 'Yatzy'
+    conf = SparkConf()
+    # Set the executor memory
+    conf.setMaster("local[8]")  # Adjust as needed
+    conf.set("spark.executor.memory", "50g")
+    conf.set("spark.driver.memory", "4g")
+    spark = SparkSession.builder.config(conf=conf).appName(appName).master(master).getOrCreate()
+    return spark
+
+
+def calculate_exit_state_values(spark, start_states):
+    states = spark.sparkContext.parallelize(start_states)
+    # Then we first calculate the expected value of each possible end-state for the game
+    exit_states_df = ((states
+                       .map(lambda state: (state, decode_state_integer(state)))
+                       .map(lambda state: (state[0], state[1][0], state[1][1]))
+                       .map(lambda state: (state[0], state[1], state[2], check_all_ones(state[2]))))
+                      .map(lambda state: game_over_check(state[0], state[1], state[2], state[3])))
+    return exit_states_df
+
+
+def set_exit_state_values(spark, all_start_states, expected_state_scores):
+    start_states = filter_states_by_depth(all_start_states, 0)
+    exit_state_values = calculate_exit_state_values(spark, start_states).collect()
+
+    for r in exit_state_values:
+        state_int = r[0]
+        state_value = r[2]
+        expected_state_scores[state_int] = state_value
+    return expected_state_scores
+
+
+def is_string(value):
+    return isinstance(value, str)
+
+
+def number_to_list(num):
+    return [int(digit) for digit in str(num)]
+
+
+is_string_udf = udf(is_string, BooleanType())
+
+
+def expand_by_reroll_masks(dice_set, reroll_filter, all_reroll_masks_by_filter):
+    # For each reroll_filter in all_reroll_masks_by_filter, create a new row combined with the current row's dice_set
+    return [(dice_set, reroll_mask) for reroll_mask in all_reroll_masks_by_filter[reroll_filter]]
+
+
+def expand_by_target_dice_set(dice_set, reroll_mask, all_dice_sets):
+    # For each dice_set in all_dice_sets, create a new row combined with the current row's reroll_mask
+    return [(dice_set, reroll_mask, target_dice_set) for target_dice_set in all_dice_sets]
+
+
+def expand_by_all_dice_sets(state, upper_score, scored_categories, all_dice_sets):
+    # For each dice_set in all_dice_sets, create a new row combined with the current row's reroll_mask
+    return [(state, upper_score, scored_categories, dice_set) for dice_set in all_dice_sets]
+
+
+def game_over_check(state, upper_score, scored_categories, game_over):
+    if game_over:
+        new_upper_score, expected_score, new_scored_categories = \
+            get_max_exit_score(state, upper_score, scored_categories, dice_set=None, game_over=game_over)
+        return state, new_upper_score, expected_score, new_scored_categories
+
+
+def get_possible_reroll_outcomes(all_dice_sets, dice_set, reroll_mask):
+    possible_outcomes = []
+    for check_dice_set in all_dice_sets:
+        for i in range(0, 6):  # we will check every dice position
+            if reroll_mask[0] == 0:  # if we are not rerolling this dice
+                if dice_set[0] == check_dice_set[0]:  # the it needs to be the same in this position to be possible
+                    possible_outcomes.append(check_dice_set)
+    return possible_outcomes
+
+
+def get_reroll_prob_from_map(all_reroll_probabilities, dice_set, reroll_mask, target_dice_set):
+    key = str(dice_set) + str(list(reroll_mask)) + str(target_dice_set)
+    if key not in all_reroll_probabilities:
+        return 0
+    else:
+        return all_reroll_probabilities[key]
 
 
 def get_expected_score(state,
@@ -78,15 +277,8 @@ def get_expected_score(state,
     # This should only happen for the 63 * 13 cases when all categories are scored.
     # It should return 0 for all cases except when the upper score is at or above the threshold
     # Then it returns the upper bonus
-    game_over = check_all_ones(scored_categories)
-    if game_over:
-        new_upper_score, expected_score, new_scored_categories = \
-            get_max_exit_score(state, upper_score, scored_categories, dice_set=None, game_over=game_over)
-        expected_state_scores[state] = expected_score
-        return expected_score
 
     # We will now proceed to calculate all the internal states to this node
-    all_exit_scores = get_all_exit_scores(state, upper_score, scored_categories, all_dice_sets, game_over)
 
     # We then start by calculating the expected score of each of the possible initial dice sets we can roll
     expected_score = 0
@@ -200,6 +392,15 @@ def get_expected_score_reroll_mask(state,
     return expected_score
 
 
+def generate_all_possible_reroll_masks(all_dice_sets, all_reroll_masks_by_filter):
+    all_possible_reroll_masks = []
+    for dice in all_dice_sets:
+        reroll_filter = get_reroll_filter(dice)
+        masks = all_reroll_masks_by_filter[reroll_filter]
+        all_possible_reroll_masks.extend(masks)
+    return all_possible_reroll_masks
+
+
 def load_or_create_state_score_file(score_filename):
     # Check if the file already exists
     if os.path.isfile(score_filename):
@@ -219,7 +420,7 @@ def generate_all_state_integers():
     for upper_score in range(0, 64):
         upper_score_binary = bin(upper_score)[2:].zfill(6)
 
-    # There are 2^13 = 8192 possible states for the scored categories
+        # There are 2^13 = 8192 possible states for the scored categories
         for scored_categories in range(8192):
             scored_categories_binary = bin(scored_categories)[2:].zfill(13)
 
@@ -257,7 +458,7 @@ def generate_all_dice_sets():
     dice_faces = [1, 2, 3, 4, 5, 6]
     num_dices_reroll = 5
     outcome = [dices[:-num_dices_reroll] + list(comb) for comb in
-               itertools.combinations_with_replacement(dice_faces, num_dices_reroll)]
+               combinations_with_replacement(dice_faces, num_dices_reroll)]
     return outcome
 
 
@@ -266,11 +467,11 @@ def generate_dice_states(dices, num_dices_reroll):
     if num_dices_reroll == 0:
         return [dices]
     outcome = [dices[:-num_dices_reroll] + list(comb) for comb in
-               itertools.combinations_with_replacement(dice_faces, num_dices_reroll)]
+               combinations_with_replacement(dice_faces, num_dices_reroll)]
     return outcome
 
 
-def get_all_exit_scores(state, upper_score, scored_categories, all_dice_sets, game_over):
+def get_all_exit_scores(state, upper_score, scored_categories, all_dice_sets, game_over, expected_state_scores):
     exit_scores = {}
     for dice_set in all_dice_sets:
         dice_str = "".join(map(str, dice_set))
@@ -279,11 +480,15 @@ def get_all_exit_scores(state, upper_score, scored_categories, all_dice_sets, ga
                                                                                            scored_categories,
                                                                                            dice_set,
                                                                                            game_over)
-        exit_scores[dice_str] = new_upper_score, best_additional_score, new_scored_categories
+        next_state_integer = encode_state_integer(new_upper_score, new_scored_categories)
+        next_state_score = expected_state_scores[next_state_integer]
+        exit_scores[dice_str] = best_additional_score + next_state_score
     return exit_scores
 
 
 def encode_state_integer(new_upper, new_cat):
+    if new_upper > const.UPPER_BONUS_THRESHOLD:
+        new_upper = const.UPPER_BONUS_THRESHOLD
     upper_score_binary = bin(new_upper)[2:].zfill(6)
     score_category_int = int(new_cat, 2)
     scored_categories_bin = bin(score_category_int)[2:].zfill(13)
@@ -314,10 +519,6 @@ def remove_list_from_list(list_to_remove, original_list):
             result.remove(element)
 
     return result
-
-
-def combinations(n, r):
-    return factorial(n) / (factorial(r) * factorial(n - r))
 
 
 def get_probability_of_specific_roll(num_faces, num_dice, face_counts):
@@ -463,7 +664,15 @@ def count_ones(s):
     return num_ones
 
 
-def filter_states(states, remaining_to_score):
+def filter_states_by_unfinished(states, finished):
+    unfinished_states = []
+    for state in states:
+        if state not in finished:
+            unfinished_states.append(state)
+    return unfinished_states
+
+
+def filter_states_by_depth(states, remaining_to_score):
     filtered_states = []
     for start_state in states:
         upper_score, scored_categories = decode_state_integer(start_state)
@@ -589,7 +798,7 @@ def get_reroll_filter(dices):
 
 def generate_reroll_mask(num_dices, filter=None):
     # Generate all possible keep/roll combinations for 5 dice
-    masks = list(itertools.product([0, 1], repeat=num_dices))
+    masks = list(product([0, 1], repeat=num_dices))
 
     if filter == "abcde":
         if len(masks) == 32:
@@ -748,8 +957,10 @@ def compute_all_reroll_probabilities(dice_sets, reroll_masks):
                 for target_outcome in dice_sets:
                     # Compute the probability
                     probability = get_reroll_probability(dice_set, reroll_mask, target_outcome)
+                    rounded_probability = round(probability, 6)
                     # Store the probability in the map
-                    probabilities[str(dice_set) + str(list(reroll_mask)) + str(target_outcome)] = probability
+                    if probability > 0:
+                        probabilities[str(dice_set) + str(list(reroll_mask)) + str(target_outcome)] = probability
 
         # Save probabilities to a compressed pickle file
         with gzip.open(filename, 'wb') as f:
