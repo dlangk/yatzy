@@ -1,26 +1,27 @@
-import itertools
-import yatzy.mechanics.const as const
-import os
-import time
-import pickle
 import gzip
-import numpy as np
-
-from functools import lru_cache
+import itertools
+import os
+import pickle
+import time
 from collections import Counter
-from math import factorial, comb
+from functools import lru_cache
 from itertools import product
+from math import factorial
+
 from tqdm import tqdm
+
+import yatzy.mechanics.const as const
 
 
 def build_graph():
-    print("\n******* building graph *******\n")
+    print("\n******* building optimal_policy *******\n")
 
     print("Generating all dice sets")
     all_dice_sets = generate_all_dice_sets()
 
     print("Generating all start states")
-    all_start_states = reduce_start_states(generate_start_states())
+    all_start_states = generate_start_states()
+    start_states = reduce_start_states(all_start_states)
 
     print("Generating all reroll probabilities")
     transition_probabilities = compute_transition_probabilities(all_dice_sets)
@@ -38,7 +39,7 @@ def build_graph():
     expected_state_scores = load_or_create_state_score_file(state_score_file)
 
     for i in range(0, 13):
-        start_states = filter_states(all_start_states, i)
+        start_states = filter_states(start_states, i)
         for state in start_states:
             depth = 0
 

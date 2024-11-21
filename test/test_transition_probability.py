@@ -1,6 +1,6 @@
 import unittest
 
-from yatzy.graph.build_graph import get_transition_probability
+from yatzy.optimal_policy.build_graph import get_transition_probability
 
 
 class TestTransitionProbabilityMethods(unittest.TestCase):

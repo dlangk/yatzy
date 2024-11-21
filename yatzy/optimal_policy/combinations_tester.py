@@ -1,5 +1,4 @@
 import math
-from random import random
 from fractions import Fraction
 
 import yatzy.mechanics.const as const
@@ -20,8 +19,8 @@ def binomial(num_dice, num_successes, p_success):
     # nCr = number of combinations (n choose r)
     # p = number of sides on the die (e.g. 1/6)
     return combinations(num_dice, num_successes) * \
-           math.pow(p_success, num_successes) * \
-           math.pow(1 - p_success, num_dice - num_successes)
+        math.pow(p_success, num_successes) * \
+        math.pow(1 - p_success, num_dice - num_successes)
 
 
 def get_score_distribution(target_combination, dices, locked):

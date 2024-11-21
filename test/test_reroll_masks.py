@@ -1,6 +1,6 @@
 import unittest
 
-import yatzy.graph.build_graph as build_graph
+import yatzy.optimal_policy.build_graph as build_graph
 
 
 class TestRerollMasks(unittest.TestCase):
