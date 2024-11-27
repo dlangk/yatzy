@@ -1,193 +1,15 @@
-import gzip
 import os
-import pickle
 import time
 from collections import Counter
-from functools import lru_cache
-from itertools import combinations_with_replacement
-from itertools import product
-from math import factorial
+from itertools import combinations
 
 import numpy as np
+from math import factorial
 
-import yatzy.mechanics.const as const
+from yatzy.mechanics import const
+from yatzy.probabilities.probability_calculator import ProbabilityCalculator
 
-# Constants
-NUM_DICE_COMBINATIONS = 252  # Total unique dice combinations
-NUM_REROLL_VECTORS = 6  # Total unique reroll vectors
-
-
-# Precompute unique dice combinations and reroll vectors with their indices
-def precompute_indices():
-    dice_combinations = list(combinations_with_replacement(range(1, 7), 5))  # All unique dice combinations
-    reroll_vectors = [(r, 5 - r) for r in range(6)]  # (rerolled, locked)
-
-    # Create dictionaries that map each combination to a unique index
-    dice_to_index = {comb: i for i, comb in enumerate(dice_combinations)}
-    reroll_to_index = {rv: i for i, rv in enumerate(reroll_vectors)}
-
-    return dice_combinations, dice_to_index, reroll_to_index
-
-
-# Calculate the probability based on reroll vector
-def calculate_probability(initial_dice, target_dice, reroll_vector):
-    DICE_PROB = 1 / 6
-    reroll_prob = 1.0
-    locked_prob = 1.0
-
-    for i in range(5):
-        if reroll_vector[i] == 1:  # Rerolled dice
-            reroll_prob *= DICE_PROB
-        else:  # Locked dice
-            locked_prob *= 1 if initial_dice[i] == target_dice[i] else 0
-
-    return reroll_prob * locked_prob
-
-
-# Precompute transition probabilities
-def precompute_transition_probabilities(dice_to_index, reroll_to_index, V):
-    P1 = np.zeros((NUM_DICE_COMBINATIONS, NUM_DICE_COMBINATIONS))
-    P2 = np.zeros((NUM_DICE_COMBINATIONS, NUM_DICE_COMBINATIONS))
-
-    for initial_dice in combinations_with_replacement(range(1, 7), 5):
-        for target_dice in combinations_with_replacement(range(1, 7), 5):
-            for rerolled_count, locked_count in reroll_to_index.keys():
-                # Simulate probabilities
-                reroll_vector = [1] * rerolled_count + [0] * locked_count
-                prob = calculate_probability(initial_dice, target_dice, reroll_vector)
-
-                initial_index = dice_to_index[tuple(sorted(initial_dice))]
-                target_index = dice_to_index[tuple(sorted(target_dice))]
-
-                # Update P1 for the first transition
-                P1[initial_index, target_index] += prob
-
-                # Update P2 for the second transition
-                P2[initial_index, target_index] += prob
-
-    # Apply the fix to P2: Zero-out transitions leading to invalid `dice_set_3` states
-    P2[:, V == 0] = 0
-
-    # Normalize rows while handling zero rows correctly for P2
-    row_sums_p2 = P2.sum(axis=1, keepdims=True)
-    non_zero_rows_p2 = row_sums_p2.ravel() != 0
-    P2[non_zero_rows_p2] /= row_sums_p2[non_zero_rows_p2, :]
-    P2[~non_zero_rows_p2] = 0
-
-    # Identify invalid dice_set_2 states in P2
-    invalid_states = row_sums_p2.ravel() == 0
-
-    # Zero-out invalid rows in P1
-    P1[invalid_states, :] = 0
-
-    # Normalize rows for valid states in P1 only
-    row_sums_p1 = P1.sum(axis=1, keepdims=True)
-    valid_rows_p1 = ~invalid_states  # Mask for valid rows
-    P1[valid_rows_p1] /= row_sums_p1[valid_rows_p1, :]
-    P1[~valid_rows_p1] = 0  # Ensure invalid rows remain zero
-
-    return P1, P2
-
-
-def calculate_expected_value(P1, P2, V):
-    """
-    Compute the expected value for all dice_set_1 configurations.
-    """
-    # Zero out invalid transitions in P2
-    P2_fixed = P2.copy()
-    P2_fixed[:, V == 0] = 0  # Remove transitions to invalid dice_set_3 states
-
-    # Normalize P2 rows
-    row_sums = P2_fixed.sum(axis=1, keepdims=True)
-    non_zero_rows = row_sums.ravel() != 0
-    P2_fixed[non_zero_rows] /= row_sums[non_zero_rows, :]
-    P2_fixed[~non_zero_rows] = 0  # Ensure rows with zero sums remain zero
-
-    # Compute intermediate weighted values for dice_set_2
-    weighted_values = P2_fixed @ V
-
-    # Zero out invalid transitions in P1
-    P1_fixed = P1.copy()
-    invalid_dice_set_2 = (weighted_values == 0)  # Mark invalid dice_set_2 states
-    P1_fixed[:, invalid_dice_set_2] = 0  # Remove transitions to invalid dice_set_2 states
-
-    # Normalize P1 rows
-    row_sums_p1 = P1_fixed.sum(axis=1, keepdims=True)
-    non_zero_rows_p1 = row_sums_p1.ravel() != 0
-    P1_fixed[non_zero_rows_p1] /= row_sums_p1[non_zero_rows_p1, :]
-    P1_fixed[~non_zero_rows_p1] = 0  # Ensure rows with zero sums remain zero
-
-    # Compute final expected values for dice_set_1
-    expected_values = P1_fixed @ weighted_values
-
-    # Ensure expected values for invalid dice_set_3 states are zero
-    expected_values[V == 0] = 0
-
-    return expected_values
-
-
-def build_graph():
-    print("\n******* building optimal_policy *******\n")
-
-    print("Generating all start states")
-    all_states = generate_all_states()
-
-    expected_state_scores = {}
-
-    for i in range(0, 13):
-        print(f"Calculating expected scores for {i} remaining categories")
-        current_states = filter_states(all_states, i)
-        print("Number of states: ", len(current_states))
-        if i > 1:
-            break
-        for state in current_states:
-            upper_score, scored_categories = decode_state_integer(state)
-            print("\nProcessing state: ", state)
-            print(f"{upper_score:06b} = ", upper_score)
-            print(f"{scored_categories:013b}")
-            # First we check if this state means the game is over
-            game_over = (state & 0x1FFF) == 0x1FFF
-            if game_over:
-                additional_score = const.UPPER_BONUS if upper_score >= const.UPPER_BONUS_THRESHOLD else 0
-                expected_state_scores[state] = additional_score
-            else:
-                start_time = time.time()
-
-                # Decode state integer
-                step_start = time.time()
-                upper_score, scored_categories = decode_state_integer(state)
-                print(f"Time to decode state integer: {time.time() - step_start:.4f} seconds")
-
-                # Precompute indices
-                step_start = time.time()
-                dice_combinations, dice_to_index, reroll_to_index = precompute_indices()
-                print(f"Time to precompute indices: {time.time() - step_start:.4f} seconds")
-
-                # Calculate rewards
-                step_start = time.time()
-                V = calculate_rewards(dice_combinations, scored_categories, upper_score)
-                print(f"Time to calculate rewards: {time.time() - step_start:.4f} seconds")
-
-                # Precompute transition probabilities
-                step_start = time.time()
-                P1, P2 = precompute_transition_probabilities(dice_to_index, reroll_to_index, V)
-                print(f"Time to precompute transition probabilities: {time.time() - step_start:.4f} seconds")
-
-                # Calculate expected values
-                step_start = time.time()
-                expected_values = calculate_expected_value(P1, P2, V)
-                print(f"Time to calculate expected values: {time.time() - step_start:.4f} seconds")
-
-                # Determine the best expected value
-                step_start = time.time()
-                best_expected_value = np.max(expected_values)
-                print(f"Time to find best expected value: {time.time() - step_start:.4f} seconds")
-
-                # Output the best expected value
-                print("Best expected value: ", best_expected_value)
-
-                # Total elapsed time
-                print(f"Total time elapsed: {time.time() - start_time:.4f} seconds")
+DATA_DIR = os.path.join(os.path.dirname(__file__), "../probabilities/data")
 
 
 def calculate_rewards(dice_combinations, scored_categories, upper_score):
@@ -201,7 +23,7 @@ def calculate_rewards(dice_combinations, scored_categories, upper_score):
     Returns:
         rewards: NumPy array of rewards for each `dice_set_3`.
     """
-    rewards = np.zeros(len(dice_combinations), dtype=np.float32)
+    rewards = np.zeros(len(dice_combinations))
 
     for dice_index, exit_dice in enumerate(dice_combinations):
         best_additional_score = 0
@@ -227,8 +49,8 @@ def calculate_rewards(dice_combinations, scored_categories, upper_score):
         # If the best category is in the upper section, add `best_additional_score` to `new_upper_score`
         if is_upper_section(best_category_name):
             new_upper_score += best_additional_score
-
-        # Store the reward for this `dice_set_3`
+        best_category_index = keys.index(best_category_name)
+        new_scored_categories = scored_categories | (1 << (12 - best_category_index))
         rewards[dice_index] = best_additional_score
 
     return rewards
@@ -252,39 +74,47 @@ def is_dice_set_valid(category_name, dice_set):
          die_count=const.combinations[category_name]["required_die_count"])
 
 
-def filter_states(states, remaining_to_score):
-    filtered_states = []
-    for start_state in states:
-        upper_score, scored_categories = decode_state_integer(start_state)
-        if is_remaining_to_score(scored_categories, remaining_to_score):
-            filtered_states.append(start_state)
-    return filtered_states
 
 
-def is_remaining_to_score(scored_categories, num_categories):
-    return num_categories == (13 - scored_categories.bit_count())
 
-
-def generate_all_states():
-    start_states = []
-
-    # Generate all possible states as binary numbers (integers)
-    for upper_score in range(64):  # 2^6 possible states for upper_score
-        for scored_categories in range(8192):  # 2^13 possible states for scored_categories
-            # Combine upper_score and scored_categories into a single 19-bit integer
-            start_state_integer = (upper_score << 13) | scored_categories
-            start_states.append(start_state_integer)
-
-    return start_states
-
-
-def decode_state_integer(start_state):
-    # Extract the upper_score (first 6 bits)
-    upper_score = start_state >> 13
-    # Extract the scored_categories (last 13 bits)
-    scored_categories = start_state & 0x1FFF  # Mask with 13 bits of 1s (0x1FFF)
-    return upper_score, scored_categories
+def compute_expectation(dice_set,
+                        scored_categories,
+                        upper_score,
+                        calculator,
+                        rewards,
+                        n):
+    p = calculator.dice_probability(dice_set)
+    best_reroll_vector, max_expectation = calculator.get_best_reroll_vector(dice_set, rewards)
 
 
 if __name__ == "__main__":
-    build_graph()
+    calculator = ProbabilityCalculator()
+    E = {}
+    count = 0
+    print("Iterating over all states...")
+    for num_ones in range(13, -1, -1):  # From 13 ones to 0 ones
+        for positions in combinations(range(13), num_ones):  # Choose positions for the ones
+            scored_categories = sum(1 << pos for pos in positions)
+            # Iterate over all possible values of upper_score
+            for upper_score in range(64):
+                if count > 0:
+                    break
+                S = (scored_categories << 6) | upper_score
+
+                game_over = bin(scored_categories).count('1') == 13
+                if game_over:
+                    E[S] = const.UPPER_BONUS if upper_score >= const.UPPER_BONUS_THRESHOLD else 0
+                else:
+                    print(f"US: {upper_score} C: {scored_categories:013b}")
+                    # Calculate rewards for this state
+                    start_time = time.time()
+                    rewards = calculate_rewards(calculator.unique_dice_combinations, scored_categories, upper_score)
+
+                    for dice_set_1 in calculator.unique_dice_combinations:
+                        p = calculator.get_dice_set_probability(dice_set_1)
+                        reroll_vector, max_ev = calculator.get_best_reroll_vector(dice_set_1, rewards)
+                        print("DS: ", dice_set_1, "RV: ", reroll_vector, "MEV: ", max_ev)
+
+                    stop_time = time.time()
+                    print("Time:", stop_time - start_time)
+                    count += 1
