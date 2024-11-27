@@ -18,6 +18,16 @@ class YatzyState:
         self.upper_score = min(max(upper_score, 0), 63)
         self.scored_categories = scored_categories
 
+    def get_state_id(self) -> int:
+        """
+        Generates a unique state ID by combining upper_score and scored_categories.
+
+        :return: An integer representing the unique state ID.
+        """
+        # Shift upper_score by 15 bits to the left and combine with scored_categories
+        state_id = (self.upper_score << 15) | (self.scored_categories & 0x7FFF)
+        return state_id
+
     def is_category_scored(self, category: Category) -> bool:
         """
         Checks if a category has already been scored.
@@ -43,6 +53,44 @@ class YatzyState:
         :return: Dictionary mapping Category to its potential score.
         """
         return {category: self.calculate_score(category, dice_set) for category in self.get_allowed_categories()}
+
+    def get_next_state_id(self, category: Category, dice_set: List[int]) -> int:
+        """
+        Determines the next state ID if scoring in the specified category with the given dice set.
+
+        :param category: The category to score.
+        :param dice_set: List of five integers representing the dice.
+        :return: The new unique state ID after scoring.
+        :raises ValueError: If the category has already been scored.
+        """
+        if self.is_category_scored(category):
+            raise ValueError(f"Category {category.name} has already been scored.")
+
+        # Calculate the score for the chosen category
+        score = self.calculate_score(category, list(dice_set))
+
+        # Update the upper score if the category is in the upper section
+        upper_section_categories = {
+            Category.ONES,
+            Category.TWOS,
+            Category.THREES,
+            Category.FOURS,
+            Category.FIVES,
+            Category.SIXES
+        }
+        if category in upper_section_categories:
+            new_upper_score = min(self.upper_score + score, 63)
+        else:
+            new_upper_score = self.upper_score
+
+        # Update the scored_categories bitmask by setting the bit for the chosen category
+        new_scored_categories = self.scored_categories | (1 << category.value)
+
+        # Create a new YatzyState instance with updated values
+        new_state = YatzyState(new_upper_score, new_scored_categories)
+
+        # Return the unique state ID of the new state
+        return new_state.get_state_id()
 
     def get_best_category(self, dice_set: List[int]) -> Optional[Category]:
         """
@@ -104,8 +152,8 @@ class YatzyState:
         return self.scored_categories == (1 << len(Category)) - 1  # 0b111111111111111
 
     def get_best_scores_array(
-        self,
-        unique_dice_combinations: List[Tuple[int, ...]]
+            self,
+            unique_dice_combinations: List[Tuple[int, ...]]
     ) -> np.ndarray:
         """
         For each unique dice set, determine the best possible score based on the current state.

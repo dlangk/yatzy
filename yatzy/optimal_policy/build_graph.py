@@ -1,12 +1,8 @@
 import os
-import time
-from itertools import combinations
-from typing import List
 
 import numpy as np
 
 from yatzy.mechanics.categories import Category
-from yatzy.mechanics.yatzy_scorer import YatzyScorer
 from yatzy.mechanics.yatzy_state import YatzyState
 from yatzy.probabilities.probability_calculator import ProbabilityCalculator
 
@@ -62,37 +58,68 @@ def calculate_category_scores(
 
 
 if __name__ == "__main__":
+    E = {}
     calculator = ProbabilityCalculator()
-    scored_categories = (1 << len(Category)) - 1 - (1 << Category.ONES.value)  # 32767 - 16384 = 16383
-    state = YatzyState(upper_score=0, scored_categories=16383)
-
+    scored_categories = (1 << len(Category)) - 1 - (1 << Category.ONES.value)
+    state = YatzyState(upper_score=5, scored_categories=16383)
     if state.is_game_over():
         bonus = state.get_upper_bonus()
-        print(bonus)
     else:
 
+
+        def precompute_best_options(calculator, state, rewards):
+            num_combinations = len(calculator.unique_dice_combinations)
+
+            # Initialize arrays
+            best_reroll_vectors = np.zeros((num_combinations, 5), dtype=np.uint8)
+            best_categories = np.empty(num_combinations, dtype=object)
+
+            for idx, dice_set in enumerate(calculator.unique_dice_combinations):
+                best_reroll_vector, _ = calculator.get_best_reroll_vector(dice_set, rewards)
+                best_reroll_vectors[idx] = best_reroll_vector
+                best_categories[idx] = state.get_best_category(list(dice_set))
+
+            return best_reroll_vectors, best_categories
+
+
         rewards = state.get_best_scores_array(calculator.unique_dice_combinations)
+        best_reroll_vectors, best_categories = precompute_best_options(calculator, state, rewards)
+        unique_combinations = calculator.unique_dice_combinations
+        num_combinations = len(unique_combinations)
 
-        # Corrected nested loop
-        for ix, dice_set_1 in enumerate(calculator.unique_dice_combinations):
-            prob_1 = calculator.get_dice_set_probability(dice_set_1)
-            best_reroll_vector_1, max_ev_1 = calculator.get_best_reroll_vector(dice_set_1, rewards)
+        for ix1 in range(num_combinations):
+            dice_set_1 = unique_combinations[ix1]
+            print(dice_set_1)
+            best_reroll_vector_1 = best_reroll_vectors[ix1]
             p_dict_1 = calculator.get_dice_set_probabilities(dice_set_1, best_reroll_vector_1)
-            print(f"{ix}:-> ds={dice_set_1} p={prob_1} brv={best_reroll_vector_1} rv={max_ev_1}")
 
-            for dice_set_2, prob_2 in p_dict_1.items():
-                best_reroll_vector_2, max_ev_2 = calculator.get_best_reroll_vector(dice_set_2, rewards)
-                print(f"{ix}:->-> ds={dice_set_2} p={prob_2} brv={best_reroll_vector_2} ev={max_ev_2}")
+            # Convert p_dict_1 to arrays for vectorization
+            dice_sets_2 = np.array(list(p_dict_1.keys()))
+            probs_2 = np.array(list(p_dict_1.values()))
 
-                # Corrected to use dice_set_2 and best_reroll_vector_2
+            # Precompute best reroll vectors and categories for dice_sets_2
+            indices_2 = [calculator.combination_to_index[tuple(sorted(dice_set_2))] for dice_set_2 in dice_sets_2]
+            best_reroll_vectors_2 = best_reroll_vectors[indices_2]
+            best_categories_2 = best_categories[indices_2]
+
+            # print(f"{ix1}:- > ds={dice_set_1} brv={best_reroll_vector_1}")
+
+            for ix2, dice_set_2 in enumerate(dice_sets_2):
+                prob_2 = probs_2[ix2]
+                best_reroll_vector_2 = best_reroll_vectors_2[ix2]
                 p_dict_2 = calculator.get_dice_set_probabilities(dice_set_2, best_reroll_vector_2)
 
-                for dice_set_3, prob_3 in p_dict_2.items():
-                    combination_key = tuple(sorted(map(int, dice_set_3)))
-                    index = calculator.combination_to_index.get(combination_key, None)
+                # Vectorize the innermost loop
+                dice_sets_3 = np.array(list(p_dict_2.keys()))
+                probs_3 = np.array(list(p_dict_2.values()))
+                combination_keys = [tuple(sorted(map(int, dice_set_3))) for dice_set_3 in dice_sets_3]
+                indices_3 = [calculator.combination_to_index.get(key, None) for key in combination_keys]
+
+                for ix3, index in enumerate(indices_3):
                     if index is not None:
                         reward = rewards[index]
-                        print(
-                            f"{ix}:->->-> ds={dice_set_3} p={prob_3} brv={best_reroll_vector_2} reward={reward}")
-                    else:
-                        print(f"Combination {combination_key} not found in combination_to_index.")
+                        best_category = best_categories[index]
+
+                        if best_category is not None:
+                            new_state_id = state.get_next_state_id(best_category, dice_sets_3[ix3])
+                            # print(new_state_id)
