@@ -270,6 +270,43 @@ class ProbabilityCalculator:
         ]
         return probability
 
+    def get_dice_set_probabilities(
+            self,
+            dice_set_1: np.ndarray,
+            reroll_vector: np.ndarray,
+    ) -> Dict[Tuple[int, ...], float]:
+        """
+        Returns the probabilities of reaching any of the 252 unique dice combinations
+        starting from dice_set_1 and using the given reroll_vector.
+
+        Parameters:
+        - dice_set_1: The initial dice set as a NumPy array.
+        - reroll_vector: The reroll vector as a NumPy array.
+
+        Returns:
+        - probabilities_dict: A dictionary mapping each reachable dice combination (as a tuple) to its probability.
+        """
+        # Convert the initial dice set to a sorted tuple to match the combination keys
+        combination_key_1 = tuple(sorted(dice_set_1))
+        dice_combination_index_1 = self.combination_to_index[combination_key_1]
+
+        # Find the index of the reroll vector
+        reroll_vector_index = np.where(
+            (self.unique_reroll_vectors == reroll_vector).all(axis=1)
+        )[0][0]
+
+        # Retrieve the probability distribution for the given initial combination and reroll vector
+        probabilities = self.probabilities[dice_combination_index_1, reroll_vector_index, :]
+
+        # Create a dictionary mapping combinations to their probabilities
+        probabilities_dict = {}
+        for idx, prob in enumerate(probabilities):
+            if prob > 0:
+                combination = self.index_to_combination[idx]
+                probabilities_dict[tuple(map(int, combination))] = prob
+
+        return probabilities_dict
+
     def get_best_reroll_vector(
             self,
             dice_set: np.ndarray,

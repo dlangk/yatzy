@@ -1,120 +1,98 @@
 import os
 import time
-from collections import Counter
 from itertools import combinations
+from typing import List
 
 import numpy as np
-from math import factorial
 
-from yatzy.mechanics import const
+from yatzy.mechanics.categories import Category
+from yatzy.mechanics.yatzy_scorer import YatzyScorer
+from yatzy.mechanics.yatzy_state import YatzyState
 from yatzy.probabilities.probability_calculator import ProbabilityCalculator
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "../probabilities/data")
 
 
-def calculate_rewards(dice_combinations, scored_categories, upper_score):
+def calculate_category_scores(
+        dice_set: np.ndarray,
+        scored_categories: int,
+        upper_score: int,
+        combinations: dict
+) -> np.ndarray:
     """
-    Calculate the reward for each `dice_set_3` based on the scoring logic provided.
-    Args:
-        dice_combinations: List of all unique `dice_set_3` configurations.
-        scored_categories: Bitmask of already scored categories.
-        upper_score: Current score in the upper section.
+    Calculates the additional score for each Yatzy category based on the current dice_set.
+
+    Parameters:
+    - dice_set (np.ndarray): The rolled dice set (length 5).
+    - scored_categories (int): A binary representation of which categories have been scored.
+    - upper_score (int): The current score for the upper section.
+    - combinations (dict): The category metadata for validation and scoring.
 
     Returns:
-        rewards: NumPy array of rewards for each `dice_set_3`.
+    - np.ndarray: An array of length 13, where each entry represents the score for a category (0 if already scored).
     """
-    rewards = np.zeros(len(dice_combinations))
+    if len(dice_set) != 5:
+        raise ValueError("dice_set must contain exactly 5 dice.")
 
-    for dice_index, exit_dice in enumerate(dice_combinations):
-        best_additional_score = 0
-        new_upper_score = upper_score
-        keys = list(const.combinations.keys())  # List of scoring categories
-        best_category_name = None
+    # Initialize scores for all 13 categories
+    scores = np.zeros(len(combinations), dtype=int)
 
-        for ix, category_name in enumerate(keys):
-            # Check if the bit at position `ix` is 0
-            if (scored_categories & (1 << (12 - ix))) == 0:
-                valid = is_dice_set_valid(category_name, exit_dice)
-                if valid:
-                    score = get_score(category_name, exit_dice)
-                    if score >= best_additional_score:
-                        best_additional_score = score
-                        best_category_name = category_name
-                else:
-                    score = 0
-                    if score >= best_additional_score:
-                        best_additional_score = score
-                        best_category_name = category_name
+    for idx, (category, meta) in enumerate(combinations.items()):
+        if scored_categories & (1 << idx):  # Skip already scored categories
+            continue
 
-        # If the best category is in the upper section, add `best_additional_score` to `new_upper_score`
-        if is_upper_section(best_category_name):
-            new_upper_score += best_additional_score
-        best_category_index = keys.index(best_category_name)
-        new_scored_categories = scored_categories | (1 << (12 - best_category_index))
-        rewards[dice_index] = best_additional_score
+        # Extract validator, scorer, and required parameters
+        validator = meta["validator"]
+        scorer = meta["scorer"]
+        required_die_value = meta.get("required_die_value")
+        required_die_count = meta.get("required_die_count")
+        is_upper_section = meta["upper_section"]
 
-    return rewards
+        # Validate and score
+        if validator(dice_set, die_value=required_die_value, die_count=required_die_count):
+            scores[idx] = scorer(
+                dice_set, die_value=required_die_value, die_count=required_die_count
+            )
 
+    # Add the bonus for upper section if applicable
+    if upper_score + scores[:6].sum() >= 63:
+        scores[:6] += 35  # Apply bonus points to upper section categories
 
-def is_upper_section(category_name):
-    return const.combinations[category_name]["upper_section"]
-
-
-def get_score(category_name, dice_set):
-    return const.combinations[category_name]["scorer"] \
-        (dices=dice_set,
-         die_value=const.combinations[category_name]["required_die_value"],
-         die_count=const.combinations[category_name]["required_die_count"])
-
-
-def is_dice_set_valid(category_name, dice_set):
-    return const.combinations[category_name]["validator"] \
-        (dices=dice_set,
-         die_value=const.combinations[category_name]["required_die_value"],
-         die_count=const.combinations[category_name]["required_die_count"])
-
-
-
-
-
-def compute_expectation(dice_set,
-                        scored_categories,
-                        upper_score,
-                        calculator,
-                        rewards,
-                        n):
-    p = calculator.dice_probability(dice_set)
-    best_reroll_vector, max_expectation = calculator.get_best_reroll_vector(dice_set, rewards)
+    return scores
 
 
 if __name__ == "__main__":
     calculator = ProbabilityCalculator()
-    E = {}
-    count = 0
-    print("Iterating over all states...")
-    for num_ones in range(13, -1, -1):  # From 13 ones to 0 ones
-        for positions in combinations(range(13), num_ones):  # Choose positions for the ones
-            scored_categories = sum(1 << pos for pos in positions)
-            # Iterate over all possible values of upper_score
-            for upper_score in range(64):
-                if count > 0:
-                    break
-                S = (scored_categories << 6) | upper_score
+    scored_categories = (1 << len(Category)) - 1 - (1 << Category.ONES.value)  # 32767 - 16384 = 16383
+    state = YatzyState(upper_score=0, scored_categories=16383)
 
-                game_over = bin(scored_categories).count('1') == 13
-                if game_over:
-                    E[S] = const.UPPER_BONUS if upper_score >= const.UPPER_BONUS_THRESHOLD else 0
-                else:
-                    print(f"US: {upper_score} C: {scored_categories:013b}")
-                    # Calculate rewards for this state
-                    start_time = time.time()
-                    rewards = calculate_rewards(calculator.unique_dice_combinations, scored_categories, upper_score)
+    if state.is_game_over():
+        bonus = state.get_upper_bonus()
+        print(bonus)
+    else:
 
-                    for dice_set_1 in calculator.unique_dice_combinations:
-                        p = calculator.get_dice_set_probability(dice_set_1)
-                        reroll_vector, max_ev = calculator.get_best_reroll_vector(dice_set_1, rewards)
-                        print("DS: ", dice_set_1, "RV: ", reroll_vector, "MEV: ", max_ev)
+        rewards = state.get_best_scores_array(calculator.unique_dice_combinations)
 
-                    stop_time = time.time()
-                    print("Time:", stop_time - start_time)
-                    count += 1
+        # Corrected nested loop
+        for ix, dice_set_1 in enumerate(calculator.unique_dice_combinations):
+            prob_1 = calculator.get_dice_set_probability(dice_set_1)
+            best_reroll_vector_1, max_ev_1 = calculator.get_best_reroll_vector(dice_set_1, rewards)
+            p_dict_1 = calculator.get_dice_set_probabilities(dice_set_1, best_reroll_vector_1)
+            print(f"{ix}:-> ds={dice_set_1} p={prob_1} brv={best_reroll_vector_1} rv={max_ev_1}")
+
+            for dice_set_2, prob_2 in p_dict_1.items():
+                best_reroll_vector_2, max_ev_2 = calculator.get_best_reroll_vector(dice_set_2, rewards)
+                print(f"{ix}:->-> ds={dice_set_2} p={prob_2} brv={best_reroll_vector_2} ev={max_ev_2}")
+
+                # Corrected to use dice_set_2 and best_reroll_vector_2
+                p_dict_2 = calculator.get_dice_set_probabilities(dice_set_2, best_reroll_vector_2)
+
+                for dice_set_3, prob_3 in p_dict_2.items():
+                    combination_key = tuple(sorted(map(int, dice_set_3)))
+                    index = calculator.combination_to_index.get(combination_key, None)
+                    if index is not None:
+                        reward = rewards[index]
+                        print(
+                            f"{ix}:->->-> ds={dice_set_3} p={prob_3} brv={best_reroll_vector_2} reward={reward}")
+                    else:
+                        print(f"Combination {combination_key} not found in combination_to_index.")
