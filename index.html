@@ -36,14 +36,12 @@
     .column {
       flex: 0 0 500px;
     }
-
     .right-column {
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 10px;
     }
-
     h1 {
       margin-bottom: 10px;
     }
@@ -70,12 +68,15 @@
     th,
     td {
       border: 1px solid #ccc;
-      padding: 4px 5px;
+      padding: 4px 5px;e
       text-align: center;
     }
     th {
       background: #e0e0e0;
       border: 2px solid #000;
+    }
+    tr {
+      border: 2px solid #ccc;
     }
 
     button {
@@ -329,11 +330,10 @@
 
     #toggle_optimal_action_button {
       display: block;
-      margin-bottom: 10px;
       background: #ccc;
       border: 1px solid #999;
       border-radius: 3px;
-      padding: 5px 10px;
+      padding: 5px 5px;
       cursor: pointer;
     }
     #toggle_optimal_action_button:hover {
@@ -348,11 +348,22 @@
     /**************************************************
      * Debug Box - Hidden by default with .hidden
      **************************************************/
+
+    #toggle_debug_button {
+      display: block;
+      background: #ccc;
+      border: 1px solid #999;
+      border-radius: 3px;
+      padding: 5px 5px;
+      cursor: pointer;
+    }
+
     #debug_box {
       border: 1px solid #ccc;
       border-radius: 5px;
       background: #fafafa;
       padding: 10px;
+      margin-top: 10px;
     }
     #debug_box textarea {
       width: 100%;
@@ -363,15 +374,7 @@
       border-radius: 3px;
       padding: 5px;
     }
-    #toggle_debug_button {
-      display: block;
-      margin-top: 10px;
-      background: #ccc;
-      border: 1px solid #999;
-      border-radius: 3px;
-      padding: 5px 10px;
-      cursor: pointer;
-    }
+
     #toggle_debug_button:hover {
       background: #bbb;
     }
@@ -438,7 +441,6 @@
     <!-- User Action Evaluation -->
     <div class="right-section">
       <h2>User Evaluation</h2>
-      <textarea id="user_action" readonly></textarea>
       <div id="user_action_evaluation"></div>
     </div>
 
@@ -458,6 +460,7 @@
 
         <h2>Sorted Dice</h2>
         <div class="sorted-dice-container" id="sorted_dice_container"></div>
+        <p>Yellow dices should be rerolled.</p>
       </div>
     </div>
 
@@ -468,6 +471,7 @@
         <h2>Debug Info</h2>
         <textarea id="raw_optimal_action" readonly></textarea>
         <textarea id="raw_evaluate_action" readonly></textarea>
+        <textarea id="user_action" readonly></textarea>
       </div>
     </div>
   </div>

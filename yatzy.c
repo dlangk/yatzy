@@ -509,6 +509,28 @@ static int LoadStateValuesForCount(YatzyContext *ctx, int scored_count, const ch
     return 1;
 }
 
+typedef struct {
+    double ev; // The expected value if the resulting dice set is ds2_i
+    double probability; // Probability that ds2_i occurs given ds_index + reroll mask
+    int ds2_index; // (Optional) the index of ds2_i, in case you need it
+} EVProbabilityPair;
+
+void ComputeDistributionForRerollMask(const YatzyContext *ctx,
+                                      int ds_index,
+                                      const double E_ds_for_masks[252],
+                                      int mask,
+                                      EVProbabilityPair out_distribution[252]) {
+    // Probability array for going from ds_index -> ds2_i under 'mask'
+    const double *prob_row = ctx->transition_table[ds_index][mask];
+
+    // Fill out the distribution
+    for (int ds2_i = 0; ds2_i < 252; ds2_i++) {
+        out_distribution[ds2_i].ev = E_ds_for_masks[ds2_i];
+        out_distribution[ds2_i].probability = prob_row[ds2_i];
+        out_distribution[ds2_i].ds2_index = ds2_i;
+    }
+}
+
 static void ComputeAllStateValues(YatzyContext *ctx) {
     for (int scored_count = 15; scored_count >= 0; scored_count--) {
         if (scored_count == 15) {
@@ -1078,7 +1100,7 @@ static void handle_evaluate_actions(YatzyContext *ctx, struct MHD_Connection *co
     if (!upper_obj || !scored_obj || !dice_arr || !rerolls_obj) {
         const char *err = "{\"error\":\"Missing required fields\"}";
         struct MHD_Response *resp = MHD_create_response_from_buffer(strlen(err), (void *) err, MHD_RESPMEM_PERSISTENT);
-        MHD_queue_response(connection,MHD_HTTP_BAD_REQUEST, resp);
+        MHD_queue_response(connection, MHD_HTTP_BAD_REQUEST, resp);
         MHD_destroy_response(resp);
         return;
     }
@@ -1090,7 +1112,7 @@ static void handle_evaluate_actions(YatzyContext *ctx, struct MHD_Connection *co
     if (rerolls <= 0) {
         const char *err = "{\"error\":\"rerolls_remaining must be > 0\"}";
         struct MHD_Response *resp = MHD_create_response_from_buffer(strlen(err), (void *) err, MHD_RESPMEM_PERSISTENT);
-        MHD_queue_response(connection,MHD_HTTP_BAD_REQUEST, resp);
+        MHD_queue_response(connection, MHD_HTTP_BAD_REQUEST, resp);
         MHD_destroy_response(resp);
         return;
     }
@@ -1111,11 +1133,11 @@ static void handle_evaluate_actions(YatzyContext *ctx, struct MHD_Connection *co
     SortDiceSet(dice);
 
     // Compute E_ds_0 for no rerolls scenario
-    double E_ds_0[252]; {
+    double E_ds_0[252];
+    {
         YatzyState state = {upper_score, scored_categories};
 #pragma omp parallel for
         for (int ds_i = 0; ds_i < 252; ds_i++) {
-            // Compute best immediate category EV for each dice set (no rerolls)
             double best_val = -INFINITY;
             for (int c = 0; c < CATEGORY_COUNT; c++) {
                 if (!IS_CATEGORY_SCORED(scored_categories, c)) {
@@ -1132,7 +1154,6 @@ static void handle_evaluate_actions(YatzyContext *ctx, struct MHD_Connection *co
 
     // If rerolls=2, we need E_ds_1 for one reroll scenario
     double E_ds_1[252];
-    int dummy_mask[252];
     if (rerolls == 2) {
 #pragma omp parallel for
         for (int ds_i = 0; ds_i < 252; ds_i++) {
@@ -1140,7 +1161,9 @@ static void handle_evaluate_actions(YatzyContext *ctx, struct MHD_Connection *co
             const double (*row)[252] = ctx->transition_table[ds_i];
             for (int mask = 0; mask < 32; mask++) {
                 double ev = 0.0;
-                for (int ds2_i = 0; ds2_i < 252; ds2_i++) ev += row[mask][ds2_i] * E_ds_0[ds2_i];
+                for (int ds2_i = 0; ds2_i < 252; ds2_i++) {
+                    ev += row[mask][ds2_i] * E_ds_0[ds2_i];
+                }
                 if (ev > best_val) best_val = ev;
             }
             E_ds_1[ds_i] = best_val;
@@ -1156,23 +1179,40 @@ static void handle_evaluate_actions(YatzyContext *ctx, struct MHD_Connection *co
 
     struct json_object *resp = json_object_new_object();
     struct json_object *arr = json_object_new_array();
-    const double (*row)[252] = ctx->transition_table[ds_index];
     for (int mask = 0; mask < 32; mask++) {
+        EVProbabilityPair distribution[252];
+        ComputeDistributionForRerollMask(ctx, ds_index, E_ds_for_masks, mask, distribution);
+
         double ev = 0.0;
-        for (int ds2_i = 0; ds2_i < 252; ds2_i++) ev += row[mask][ds2_i] * E_ds_for_masks[ds2_i];
+        struct json_object *dist_arr = json_object_new_array();
+        for (int ds2_i = 0; ds2_i < 252; ds2_i++) {
+            if (distribution[ds2_i].probability > 0.0) {
+                ev += distribution[ds2_i].ev * distribution[ds2_i].probability;
+
+                struct json_object *entry = json_object_new_object();
+                json_object_object_add(entry, "ds2_index", json_object_new_int(distribution[ds2_i].ds2_index));
+                json_object_object_add(entry, "ev", json_object_new_double(distribution[ds2_i].ev));
+                json_object_object_add(entry, "probability", json_object_new_double(distribution[ds2_i].probability));
+                json_object_array_add(dist_arr, entry);
+            }
+        }
+
         struct json_object *o = json_object_new_object();
         json_object_object_add(o, "mask", json_object_new_int(mask));
         char bin_str[6] = {0};
         for (int i = 0; i < 5; i++) bin_str[i] = (mask & (1 << i)) ? '1' : '0';
         json_object_object_add(o, "binary", json_object_new_string(bin_str));
         json_object_object_add(o, "expected_value", json_object_new_double(ev));
+        json_object_object_add(o, "distribution", dist_arr);
+
         json_object_array_add(arr, o);
     }
     json_object_object_add(resp, "actions", arr);
+
     const char *response_str = json_object_to_json_string(resp);
     struct MHD_Response *mhd_response = MHD_create_response_from_buffer(strlen(response_str), (void *) response_str,
                                                                         MHD_RESPMEM_MUST_COPY);
-    MHD_queue_response(connection,MHD_HTTP_OK, mhd_response);
+    MHD_queue_response(connection, MHD_HTTP_OK, mhd_response);
     MHD_destroy_response(mhd_response);
     json_object_put(resp);
 }
@@ -1522,16 +1562,20 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
 }
 
 int main(int argc, char *argv[]) {
+    printf("starting yatzy api...\n");
     srand((unsigned int) time(NULL));
+    printf("creating context...\n");
     YatzyContext *ctx = CreateYatzyContext();
+    printf("computing all state values...\n");
     ComputeAllStateValues(ctx);
-    printf("All state values computed.\n");
+    printf("starting api server...\n");
 
     struct MHD_Daemon *daemon = MHD_start_daemon(MHD_USE_INTERNAL_POLLING_THREAD,
                                                  8080,
                                                  NULL, NULL,
                                                  &answer_to_connection, ctx,
                                                  MHD_OPTION_END);
+    printf("running!\n");
     if (NULL == daemon) return 1;
 
     getchar();
