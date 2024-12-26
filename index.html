@@ -1,0 +1,1653 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Delta Yatzy</title>
+  <style>
+    /**************************************************
+     * Flash-of-Unstyled-Content Prevention
+     **************************************************/
+    body {
+      margin: 0;
+      padding: 0;
+      opacity: 0; /* Hide initially */
+    }
+    body.loaded {
+      opacity: 1; /* Show everything once loaded */
+    }
+
+    /**************************************************
+     * Basic Page Layout
+     **************************************************/
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+      color: #333;
+      margin: 20px;
+    }
+
+    .container {
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+    }
+
+    /* Fixed width on the left to prevent resizing */
+    .column {
+      flex: 0 0 500px;
+    }
+
+    .right-column {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+    h2 {
+      margin-bottom: 5px;
+      font-size: 1.1em;
+      color: #555;
+    }
+    h3 {
+      margin-bottom: 2px;
+      font-size: 1em;
+      color: #555;
+    }
+
+    /**************************************************
+     * Scorecard Table
+     **************************************************/
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+      background: #fff;
+    }
+    th,
+    td {
+      border: 1px solid #ccc;
+      padding: 4px 5px;
+      text-align: center;
+    }
+    th {
+      background: #e0e0e0;
+      border: 2px solid #000;
+    }
+
+    button {
+      cursor: pointer; /* Changes cursor to pointer */
+    }
+
+    /* Row Colors */
+    tr.scored-category {
+      background-color: #d4edda; /* Light green for scored rows */
+    }
+    tr.available-category {
+      background-color: #ffffff; /* Default white for available rows */
+    }
+    tr.invalid-category {
+      background-color: #d1d1d1; /* Light gray for unavailable rows */
+      color: #6c757d; /* Muted text color */
+    }
+    .bonus-row,
+    .total-row {
+      border-top: 2px solid #000 !important;
+      border-bottom: 2px solid #000 !important;
+    }
+
+    /* Locked Best Score */
+    .best-score-cell.locked {
+      font-weight: bold;
+      color: #333;
+    }
+    .best-score-cell {
+      width: 50px;
+      text-align: center;
+      font-weight: bold;
+    }
+    .optimal-category {
+      border: 2px solid #555 !important;
+    }
+
+    .evaluate-button {
+      background: #6d88b3; /* Green background */
+      color: white; /* White text */
+      border: none; /* No border */
+      border-radius: 5px; /* Rounded corners */
+      padding: 5px 10px; /* Padding */
+      cursor: pointer; /* Pointer cursor */
+      font-size: 0.9em; /* Slightly smaller font size */
+    }
+
+    .evaluate-button:disabled {
+      background: #ccc; /* Gray background when disabled */
+      color: #666; /* Dimmed text color */
+      cursor: not-allowed; /* Show not-allowed cursor */
+    }
+
+    .scored-check {
+      cursor: pointer; /* Changes cursor to pointer */
+    }
+
+    .evaluate-button:hover {
+      background: #53688a; /* Darker green on hover */
+    }
+
+    /**************************************************
+     * Right Sections
+     **************************************************/
+    .right-section {
+      width: 700px;
+      border: 1px solid #ccc;
+      background: #fff;
+      border-radius: 5px;
+      padding: 10px;
+    }
+
+    /**************************************************
+     * Dice & Rerolls
+     **************************************************/
+    .dice-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-bottom: 30px;
+      align-items: flex-start;
+    }
+
+    #randomizeDiceButton {
+      margin-bottom: 10px;
+    }
+    .die {
+      display: flex; /* Flexbox for dynamic layout */
+      flex-direction: column; /* Stack elements vertically */
+      align-items: center; /* Center-align content */
+      justify-content: space-between;
+      width: 100px; /* Increased width from 80px */
+      height: 120px; /* Slightly taller to accommodate */
+      border: 2px solid #999;
+      border-radius: 5px;
+      background: #fff;
+      padding: 5px;
+      box-sizing: border-box;
+      position: relative;
+    }
+    .die-value {
+      font-size: 1.2em;
+      margin: 3px 0;
+      border: 1px solid #333;
+      width: 44px;
+      height: 44px;
+      line-height: 44px;
+      text-align: center;
+      background: #fafafa;
+    }
+    .die button {
+      background: #ccc;
+      border: 1px solid #999;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 0.8em;
+      color: #333;
+      width: 44px;
+      height: 24px;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Red border for locked dice */
+    .die.locked {
+      border-color: red;
+    }
+
+    /* Green border for dice to be rerolled */
+    .die.reroll {
+      border-color: green;
+    }
+
+    .dice-reroll-button {
+      width: 90%;
+      max-width: 120px;
+      margin-top: 8px;
+      border: 1px solid #999;
+      border-radius: 3px;
+      font-size: 0.9em;
+      cursor: pointer;
+      padding: 5px;
+      text-align: center;
+      background: #ccc;
+      color: #333;
+    }
+
+    /* Adjust button styles to match border colors */
+    .dice-reroll-button.locked {
+      background: red;
+      color: white;
+    }
+
+    .dice-reroll-button.reroll {
+      background: green;
+      color: white;
+    }
+
+    .dice-note {
+      font-size: 0.9em;
+      color: #555;
+      margin-bottom: 10px;
+    }
+    .rerolls-container {
+      margin-top: 10px;
+      margin-bottom: 10px;
+      text-align: left;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .rerolls-container span {
+      font-weight: bold;
+    }
+    #rerolls_remaining {
+      width: 50px;
+      text-align: center;
+      border: 1px solid #999;
+      border-radius: 3px;
+      background: #fff;
+    }
+    .arrow-button {
+      background: #ccc;
+      border: 1px solid #999;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 0.8em;
+      color: #333;
+      width: 36px;
+      height: 24px;
+      padding: 0;
+    }
+    .arrow-button:hover {
+      background: #bbb;
+    }
+
+    /**************************************************
+     * User Action & Evaluation
+     **************************************************/
+    #user_action {
+      height: 100px;
+      border: 1px solid #999;
+      border-radius: 5px;
+      background: #f9f9f9;
+      margin-bottom: 5px;
+      padding: 5px;
+      width: 500px;
+    }
+    #user_action_evaluation {
+      border: 1px solid #ccc;
+      padding: 10px;
+      min-height: 50px;
+      border-radius: 5px;
+      background: #f9f9f9;
+    }
+
+    /**************************************************
+     * Difference Box
+     **************************************************/
+    #difference_box {
+      display: block;
+      padding: 10px;
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    #difference_content {
+      font-weight: bold;
+      min-height: 20px;
+    }
+
+    /**************************************************
+     * Optimal Action Box (Collapsible)
+     **************************************************/
+    #optimal_action_box {
+      display: block;
+      overflow: hidden;
+      max-height: 0; /* collapsed by default */
+      margin-top: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 5px;
+      background: #f9f9f9;
+    }
+    #optimal_action_box.show {
+      max-height: 500px; /* expand */
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid #ccc;
+    }
+
+    #toggle_optimal_action_button {
+      display: block;
+      margin-bottom: 10px;
+      background: #ccc;
+      border: 1px solid #999;
+      border-radius: 3px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    #toggle_optimal_action_button:hover {
+      background: #bbb;
+    }
+    .sorted-dice-container {
+      display: flex;
+      flex-direction: row;
+      gap: 10px;
+    }
+
+    /**************************************************
+     * Debug Box - Hidden by default with .hidden
+     **************************************************/
+    #debug_box {
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      background: #fafafa;
+      padding: 10px;
+    }
+    #debug_box textarea {
+      width: 100%;
+      height: 150px;
+      background: #fff;
+      margin-bottom: 10px;
+      border: 1px solid #999;
+      border-radius: 3px;
+      padding: 5px;
+    }
+    #toggle_debug_button {
+      display: block;
+      margin-top: 10px;
+      background: #ccc;
+      border: 1px solid #999;
+      border-radius: 3px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    #toggle_debug_button:hover {
+      background: #bbb;
+    }
+    .hidden {
+      display: none !important;
+    }
+
+    /**************************************************
+     * Reroll highlight
+     **************************************************/
+    .reroll-highlight {
+      background-color: yellow;
+    }
+  </style>
+</head>
+<body>
+
+<h1>&Delta; Yatzy</h1>
+<div class="container">
+  <!-- Player Selection -->
+  
+
+  <!-- Scorecard Column -->
+  <div class="scorecard">
+    <h2>Scorecard</h2>
+    <table id="scorecard">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Scored</th>
+          <th>Score</th>
+          <th>User Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Right Column -->
+  <div class="right-column">
+    <div class="player-selection">
+    <label for="playerSelect">Select Player:</label>
+    <select id="playerSelect"></select>
+    <button id="addPlayerButton">Add Player</button>
+    <button id="resetGameButton">Reset Game</button> <!-- Reset Button -->
+  </div>
+    <!-- Dice & Rerolls -->
+    <div class="right-section">
+      <h2>Dice</h2>
+      <button id="randomizeDiceButton">Randomize Dice</button>
+      <div class="dice-container" id="dice_container"></div>
+      <div class="dice-note">Click "Locked" to toggle to reroll</div>
+
+      <button id="rerollDiceButton">Reroll Dice</button>
+      
+      <div class="rerolls-container">
+        <span>Rerolls Remaining:</span>
+        <input type="number" id="rerolls_remaining" value="2" readonly>
+        <button class="arrow-button" id="reroll_down">▼</button>
+        <button class="arrow-button" id="reroll_up">▲</button>
+      </div>
+    </div>
+
+    <!-- User Action Evaluation -->
+    <div class="right-section">
+      <h2>User Evaluation</h2>
+      <textarea id="user_action" readonly></textarea>
+      <div id="user_action_evaluation"></div>
+    </div>
+
+    <!-- The difference box (always visible, but can show "Not available yet") -->
+    <div class="right-section" id="difference_box">
+      <div id="difference_content"></div>
+    </div>
+
+    <div id="game_status"></div>
+
+    <!-- Optimal Action box with one toggle button -->
+    <div class="right-section">
+      <button id="toggle_optimal_action_button">Show Optimal Action</button>
+      <div id="optimal_action_box">
+        <h2>Optimal Action</h2>
+        <div id="optimal_action_content" style="min-height:50px; margin-top:10px;"></div>
+
+        <h2>Sorted Dice</h2>
+        <div class="sorted-dice-container" id="sorted_dice_container"></div>
+      </div>
+    </div>
+
+    <!-- Debug Info (hidden by default) -->
+    <div class="right-section">
+      <button id="toggle_debug_button">Show Debug Info</button>
+      <div id="debug_box" class="hidden">
+        <h2>Debug Info</h2>
+        <textarea id="raw_optimal_action" readonly></textarea>
+        <textarea id="raw_evaluate_action" readonly></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/****************************************************************
+  Single-File Yatzy UI with Multiplayer Support Integrated
+****************************************************************/
+
+/* Configuration */
+const YAHTZEE_CATEGORIES = [
+  "Ones","Twos","Threes","Fours","Fives","Sixes",
+  "One Pair","Two Pairs","Three of a Kind","Four of a Kind",
+  "Small Straight","Large Straight","Full House","Chance","Yatzy"
+];
+const TOTAL_DICE = 5;
+const API_BASE_URL = "http://localhost:8080";
+const URL_AVAILABLE_CATEGORIES = `${API_BASE_URL}/available_categories`;
+const URL_SUGGEST_OPTIMAL_ACTION = `${API_BASE_URL}/suggest_optimal_action`;
+const URL_EVALUATE_USER_ACTION = `${API_BASE_URL}/evaluate_user_action`;
+
+/* --- Multiplayer State --- */
+let players = [];
+let activePlayerIndex = 0;
+
+/* Instead of global single diceValues etc., each player will have their own state. 
+   We'll provide helper functions to read/write from the active player's state. */
+function getActivePlayer() {
+  return players[activePlayerIndex];
+}
+
+/* DOM References */
+const playerSelect = document.getElementById("playerSelect");
+const addPlayerButton = document.getElementById("addPlayerButton");
+const scorecardBodyElement = document.querySelector("#scorecard tbody");
+const diceContainerElement = document.getElementById("dice_container");
+const rerollCountInput = document.getElementById("rerolls_remaining");
+const differenceBoxContent = document.getElementById("difference_content");
+const optimalActionContainer = document.getElementById("optimal_action_box");
+const optimalActionContentElement = document.getElementById("optimal_action_content");
+const toggleOptimalButton = document.getElementById("toggle_optimal_action_button");
+const debugInfoBox = document.getElementById("debug_box");
+const toggleDebugButtonElement = document.getElementById("toggle_debug_button");
+const rawOptimalActionTextArea = document.getElementById("raw_optimal_action");
+const rawEvaluateActionTextArea = document.getElementById("raw_evaluate_action");
+const userActionTextArea = document.getElementById("user_action");
+const userActionEvaluationArea = document.getElementById("user_action_evaluation");
+
+/* Dice UI */
+function createDiceUI() {
+  diceContainerElement.innerHTML = ""; // Clear existing dice
+  const currentPlayer = getActivePlayer();
+
+  currentPlayer.diceValues.forEach((value, index) => {
+    const dieDiv = document.createElement("div");
+    dieDiv.classList.add("die", "locked");
+    dieDiv.innerHTML = `
+      <button data-action="increment" data-index="${index}">▲</button>
+      <div class="die-value">${value}</div>
+      <button data-action="decrement" data-index="${index}">▼</button>
+      <button data-action="toggle" data-index="${index}" class="dice-reroll-button locked">Locked</button>
+    `;
+    diceContainerElement.appendChild(dieDiv);
+  });
+}
+
+/* Reusable fetch helper */
+async function sendJSONPostRequest(url, data) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+  if (!response.ok) {
+    throw new Error(`Server responded with ${response.status}`);
+  }
+  return response.text();
+}
+
+function attachDiceEventHandlers() {
+  diceContainerElement.addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+    if (!button) return; // Ignore clicks outside buttons
+
+    const index = parseInt(button.dataset.index, 10);
+    const action = button.dataset.action;
+
+    if (action === "toggle") {
+      toggleDieState(index, button);
+    } else if (action === "increment") {
+      getActivePlayer().diceValues[index] = Math.min(6, getActivePlayer().diceValues[index] + 1);
+    } else if (action === "decrement") {
+      getActivePlayer().diceValues[index] = Math.max(1, getActivePlayer().diceValues[index] - 1);
+    }
+
+    // Update die face
+    const dieValueElement = diceContainerElement.querySelector(`.die:nth-child(${index + 1}) .die-value`);
+    if (dieValueElement) {
+      dieValueElement.textContent = getActivePlayer().diceValues[index];
+    }
+
+    // Refresh UI
+    refreshUserActionJSON();
+    refreshAvailableCategories();
+    refreshUI();
+  });
+}
+
+/* --- Player Management Logic --- */
+
+/** Create an initial default player. */
+function createDefaultPlayer(name) {
+  return {
+    name: name || `Player ${players.length + 1}`,
+    diceValues: Array(TOTAL_DICE).fill(1),
+    rerollsRemaining: 2,
+    optimalRerollMask: Array(TOTAL_DICE).fill("0"), // Initialize all dice as locked
+    scorecard: [] // Initialize as an empty array
+  };
+}
+
+/** Add a new player to the list. */
+function addPlayer() {
+  players.push(createDefaultPlayer(`Player ${players.length + 1}`));
+  updatePlayerDropdown();
+}
+
+/** Update the <select> element for players. */
+function updatePlayerDropdown() {
+  playerSelect.innerHTML = players
+    .map((p, index) => `<option value="${index}">${p.name}</option>`)
+    .join("");
+}
+
+/** Save the current player's state from UI controls. */
+function savePlayerState() {
+  const currentPlayer = getActivePlayer();
+
+  // Save dice values
+  const dieValueDivs = diceContainerElement.querySelectorAll(".die-value");
+  currentPlayer.diceValues = Array.from(dieValueDivs).map(div => parseInt(div.textContent, 10));
+
+  // Save rerolls
+  currentPlayer.rerollsRemaining = parseInt(rerollCountInput.value, 10);
+
+  // Save scored categories
+  currentPlayer.scorecard = Array.from(document.querySelectorAll(".scored-check")).map(chk => {
+    const catId = parseInt(chk.dataset.catId, 10);
+    const isChecked = chk.checked;
+    const scoreCell = document.querySelector(`.best-score-cell[data-cat-id="${catId}"]`);
+    const score = isChecked ? parseInt(scoreCell.textContent, 10) || 0 : 0;
+
+    return { catId, isChecked, score };
+  });
+}
+
+/** Load the active player's state into the UI. */
+function loadPlayerState() {
+  const currentPlayer = getActivePlayer();
+
+  // Ensure scorecard is defined
+  if (!currentPlayer.scorecard) {
+    currentPlayer.scorecard = [];
+  }
+
+  // Load dice values
+  rerollCountInput.value = currentPlayer.rerollsRemaining;
+  rebuildDice();
+
+  // Load scored categories
+  document.querySelectorAll(".scored-check").forEach(chk => {
+    const catId = parseInt(chk.dataset.catId, 10);
+    const scoreCell = document.querySelector(`.best-score-cell[data-cat-id="${catId}"]`);
+    const scoreData = currentPlayer.scorecard.find(item => item.catId === catId) || {};
+
+    if (scoreData.isChecked) {
+      chk.checked = true;
+      scoreCell.textContent = scoreData.score || "0";
+      const row = chk.closest("tr");
+      row.classList.add("scored-category");
+      row.classList.remove("available-category", "invalid-category");
+      scoreCell.classList.add("locked");
+    } else {
+      chk.checked = false;
+      scoreCell.textContent = "0";
+      const row = chk.closest("tr");
+      row.classList.remove("scored-category");
+      scoreCell.classList.remove("locked");
+    }
+  });
+
+  refreshUI();
+}
+
+/** Rebuild the dice UI from the active player's dice values. */
+function rebuildDiceUIFromPlayer() {
+  diceContainerElement.innerHTML = "";
+  const currentPlayer = getActivePlayer();
+
+  // Recreate the dice elements
+  for (let i = 0; i < TOTAL_DICE; i++) {
+    const val = currentPlayer.diceValues[i];
+    const dieDiv = document.createElement("div");
+    dieDiv.classList.add("die", "locked");
+    dieDiv.innerHTML = `
+      <button>▲</button>
+      <div class="die-value">1</div>
+      <button>▼</button>
+      <button class="dice-reroll-button locked">Locked</button>
+    `;
+    diceContainerElement.appendChild(dieDiv);
+  }
+
+  // Reattach events to the new dice
+  const diceDivs = document.querySelectorAll(".die");
+  diceDivs.forEach((dieDiv, i) => {
+    const upBtn = dieDiv.querySelector("button:nth-child(1)");
+    const valDiv = dieDiv.querySelector(".die-value");
+    const downBtn = dieDiv.querySelector("button:nth-child(3)");
+    const rerollBtn = dieDiv.querySelector(".dice-reroll-button");
+
+    upBtn.addEventListener("click", () => {
+      getActivePlayer().diceValues[i] = Math.min(6, getActivePlayer().diceValues[i] + 1);
+      valDiv.textContent = getActivePlayer().diceValues[i];
+      refreshUserActionJSON();
+      refreshAvailableCategories();
+      refreshUI();
+    });
+
+    downBtn.addEventListener("click", () => {
+      getActivePlayer().diceValues[i] = Math.max(1, getActivePlayer().diceValues[i] - 1);
+      valDiv.textContent = getActivePlayer().diceValues[i];
+      refreshUserActionJSON();
+      refreshAvailableCategories();
+      refreshUI();
+    });
+    
+    rerollBtn.addEventListener("click", () => {
+      toggleDieState(i, rerollBtn);
+    });
+  });
+}
+
+/* Create Scorecard */
+function createScorecard() {
+  YAHTZEE_CATEGORIES.forEach((category, i) => {
+    const tr = document.createElement("tr");
+    tr.dataset.catId = i;
+    tr.innerHTML = `
+      <td>${category}</td>
+      <td>
+        <input type="checkbox" class="scored-check" data-cat-id="${i}">
+      </td>
+      <td class="best-score-cell" data-cat-id="${i}">0</td>
+      <td>
+        <button class="evaluate-button" data-cat-id="${i}">Evaluate</button>
+      </td>
+    `;
+    scorecardBodyElement.appendChild(tr);
+  });
+
+  // Bonus row
+  const bonusTr = document.createElement("tr");
+  bonusTr.classList.add("bonus-row");
+  bonusTr.innerHTML = `
+    <td>Upper Bonus</td>
+    <td></td>
+    <td class="best-score-cell bonus-best-score">0</td>
+    <td></td>
+  `;
+  scorecardBodyElement.insertBefore(bonusTr, scorecardBodyElement.children[6]);
+
+  // Total row
+  const totalTr = document.createElement("tr");
+  totalTr.classList.add("total-row");
+  totalTr.innerHTML = `
+    <td>Total Score</td>
+    <td></td>
+    <td class="best-score-cell total-best-score">0</td>
+    <td></td>
+  `;
+  scorecardBodyElement.appendChild(totalTr);
+}
+
+/* For backward compatibility, keep diceValues in sync with the active player's state. */
+let diceValues = [2,2,2,5,5];
+let optimalRerollMask = [];
+let lastOptimalExpectedValue = null;
+let lastUserExpectedValue = null;
+let currentOptimalCategoryID = null;
+
+/* Attach Event Handlers */
+function attachEventHandlers() {
+  // Scorecard events
+  document.querySelectorAll(".scored-check").forEach(chk => {
+    chk.addEventListener("change", handleScoreCheckboxChange);
+  });
+  document.querySelectorAll(".evaluate-button").forEach(button => {
+    button.addEventListener("click", handleUserActionCategoryClick);
+  });
+
+  // Player selection
+  playerSelect.addEventListener("change", () => {
+    // Save current player's state from UI
+    savePlayerState();
+    activePlayerIndex = parseInt(playerSelect.value, 10);
+    // Load the new player's state
+    loadPlayerState();
+  });
+
+  // "Add Player" button
+  addPlayerButton.addEventListener("click", () => {
+    // Save the current player's state before adding a new one
+    savePlayerState();
+    addPlayer();
+    updatePlayerDropdown();
+    // Switch to the newly added player
+    activePlayerIndex = players.length - 1;
+    playerSelect.value = activePlayerIndex;
+    loadPlayerState();
+  });
+
+    // Reset Button
+  resetGameButton.addEventListener("click", resetGame);
+
+  // The rest of the logic is already in your existing code, see below...
+  const diceDivs = document.querySelectorAll(".die");
+  diceDivs.forEach((dieDiv, i) => {
+    const upBtn = dieDiv.querySelector("button:nth-child(1)");
+    const valDiv = dieDiv.querySelector(".die-value");
+    const downBtn = dieDiv.querySelector("button:nth-child(3)");
+    const rerollBtn = dieDiv.querySelector(".dice-reroll-button"); // Correct
+
+    // Increase die value
+    upBtn.addEventListener("click", () => {
+      getActivePlayer().diceValues[i] = Math.min(6, getActivePlayer().diceValues[i] + 1);
+      diceValues[i] = getActivePlayer().diceValues[i]; // sync
+      valDiv.textContent = diceValues[i];
+      refreshAvailableCategories();
+      refreshUI();
+    });
+
+    // Decrease die value
+    downBtn.addEventListener("click", () => {
+      getActivePlayer().diceValues[i] = Math.max(1, getActivePlayer().diceValues[i] - 1);
+      diceValues[i] = getActivePlayer().diceValues[i]; // sync
+      valDiv.textContent = diceValues[i];
+      refreshAvailableCategories();
+      refreshUI();
+    });
+
+    // Toggle locked/reroll
+    rerollBtn.addEventListener("click", () => {
+      toggleDieState(i, rerollBtn);
+    });
+  });
+
+  // Reroll Up/Down
+  document.getElementById("reroll_down").addEventListener("click", () => {
+    const currentPlayer = getActivePlayer();
+    currentPlayer.rerollsRemaining = Math.max(0, currentPlayer.rerollsRemaining - 1);
+    rerollCountInput.value = currentPlayer.rerollsRemaining;
+    refreshAvailableCategories();
+    refreshUI();
+  });
+  document.getElementById("reroll_up").addEventListener("click", () => {
+    const currentPlayer = getActivePlayer();
+    currentPlayer.rerollsRemaining = Math.min(2, currentPlayer.rerollsRemaining + 1);
+    rerollCountInput.value = currentPlayer.rerollsRemaining;
+    refreshAvailableCategories();
+    refreshUI();
+  });
+
+  // Reroll button
+  document.getElementById("rerollDiceButton").addEventListener("click", () => {
+    const currentPlayer = getActivePlayer();
+    const r = currentPlayer.rerollsRemaining;
+    if (r > 0) {
+      const diceDivs = document.querySelectorAll(".die");
+      diceDivs.forEach((div, idx) => {
+        const rerollBtn = div.querySelector(".dice-reroll-button");
+        if (rerollBtn.classList.contains("reroll")) {
+          const newVal = Math.floor(Math.random() * 6) + 1;
+          getActivePlayer().diceValues[idx] = newVal; // update player's dice
+          diceValues[idx] = newVal; // sync
+          div.querySelector(".die-value").textContent = newVal;
+        }
+      });
+      currentPlayer.rerollsRemaining = r - 1;
+      rerollCountInput.value = currentPlayer.rerollsRemaining;
+      refreshAvailableCategories();
+      refreshUI();
+    }
+  });
+
+  // Randomize dice
+  document.getElementById("randomizeDiceButton").addEventListener("click", () => {
+    const currentPlayer = getActivePlayer();
+    const diceDivs = document.querySelectorAll(".die");
+    for (let i = 0; i < TOTAL_DICE; i++) {
+      const newVal = Math.floor(Math.random() * 6) + 1;
+      currentPlayer.diceValues[i] = newVal;
+      diceValues[i] = newVal; // sync
+      diceDivs[i].querySelector(".die-value").textContent = newVal;
+
+      // Reset dice to Locked state
+      const rerollBtn = diceDivs[i].querySelector(".dice-reroll-button");
+      rerollBtn.classList.remove("reroll");
+      rerollBtn.classList.add("locked");
+      rerollBtn.textContent = "Locked";
+
+      diceDivs[i].classList.remove("reroll");
+      diceDivs[i].classList.add("locked");
+    }
+
+    // Reset rerolls remaining to 2
+    currentPlayer.rerollsRemaining = 2;
+    rerollCountInput.value = currentPlayer.rerollsRemaining;
+
+    // Keep scored rows if they're checked, but update others
+    document.querySelectorAll(".scored-check").forEach(chk => {
+      const row = chk.closest("tr");
+      const scoreCell = row.querySelector(".best-score-cell");
+      if (chk.checked) {
+        row.classList.add("scored-category");
+        row.classList.remove("available-category", "invalid-category");
+        scoreCell.classList.add("locked");
+      } else {
+        row.classList.remove("scored-category");
+        scoreCell.classList.remove("locked");
+      }
+    });
+
+    refreshAvailableCategories();
+    refreshUI();
+  });
+
+  // Toggle Optimal Action
+  toggleOptimalButton.addEventListener("click", () => {
+    if (optimalActionContainer.classList.contains("show")) {
+      // Hide
+      optimalActionContainer.classList.remove("show");
+      toggleOptimalButton.textContent = "Show Optimal Action";
+      document.querySelectorAll(".optimal-category").forEach(row => {
+        row.classList.remove("optimal-category");
+      });
+    } else {
+      // Show
+      optimalActionContainer.classList.add("show");
+      toggleOptimalButton.textContent = "Hide Optimal Action";
+      let info = optimalActionContainer.dataset.info || "None";
+      optimalActionContentElement.innerHTML = info;
+      if (currentOptimalCategoryID != null) {
+        document.querySelector(`tr[data-cat-id='${currentOptimalCategoryID}']`)
+          .classList.add("optimal-category");
+      }
+      displaySortedDice();
+    }
+  });
+
+  // Toggle Debug Info
+  toggleDebugButtonElement.addEventListener("click", () => {
+    if (debugInfoBox.classList.contains("hidden")) {
+      debugInfoBox.classList.remove("hidden");
+      toggleDebugButtonElement.textContent = "Hide Debug Info";
+    } else {
+      debugInfoBox.classList.add("hidden");
+      toggleDebugButtonElement.textContent = "Show Debug Info";
+    }
+  });
+}
+
+/* Reset Game Logic */
+function resetGame() {
+  // Reset to a single default player
+  players = [createDefaultPlayer("Player 1")];
+  activePlayerIndex = 0;
+
+  // Clear all scored categories and reset scores
+  scorecardBodyElement.innerHTML = "";
+  createScorecard();
+
+  // Reset dice and rerolls
+  rerollCountInput.value = 2;
+  rebuildDice();
+
+  // Clear localStorage
+  localStorage.removeItem("yatzyGameState");
+
+  // Update the UI
+  updatePlayerDropdown();
+  playerSelect.value = 0; // Set the first player as active
+  refreshUI();
+}
+
+/** Toggle locked/reroll state. */
+function toggleDieState(index, buttonElement) {
+  const currentPlayer = getActivePlayer();
+  const dieContainer = buttonElement.closest(".die");
+
+  // Toggle the reroll/locked state
+  if (buttonElement.classList.contains("locked")) {
+    buttonElement.classList.remove("locked");
+    buttonElement.classList.add("reroll");
+    buttonElement.textContent = "Reroll";
+    dieContainer.classList.remove("locked");
+    dieContainer.classList.add("reroll");
+    currentPlayer.optimalRerollMask[index] = "1"; // Mark for reroll
+  } else {
+    buttonElement.classList.remove("reroll");
+    buttonElement.classList.add("locked");
+    buttonElement.textContent = "Locked";
+    dieContainer.classList.remove("reroll");
+    dieContainer.classList.add("locked");
+    currentPlayer.optimalRerollMask[index] = "0"; // Lock the die
+  }
+
+  // Update user action and refresh the UI
+  refreshUserActionJSON();
+  refreshAvailableCategories();
+  refreshUI();
+}
+
+/* Handle "Scored" checkbox toggling */
+function handleScoreCheckboxChange() {
+  const catId = parseInt(this.dataset.catId, 10);
+  const scoreCell = document.querySelector(`.best-score-cell[data-cat-id="${catId}"]`);
+  const row = this.closest("tr");
+
+  if (this.checked) {
+    // Lock the Best Score value for this category
+    const bestScoreValue = parseInt(scoreCell.textContent, 10) || 0;
+    scoreCell.textContent = bestScoreValue; // Retain the score
+    scoreCell.classList.add("locked");
+    row.classList.add("scored-category");
+    row.classList.remove("available-category", "invalid-category");
+
+    // Reset rerolls remaining to 2 (for the active player)
+    getActivePlayer().rerollsRemaining = 2;
+    rerollCountInput.value = getActivePlayer().rerollsRemaining;
+
+    // Update User Evaluation
+    userActionTextArea.value = JSON.stringify(
+      {
+        action: "scored",
+        category: { id: catId, name: YAHTZEE_CATEGORIES[catId] },
+        score: bestScoreValue,
+      },
+      null,
+      2
+    );
+  } else {
+    row.classList.remove("scored-category");
+    row.classList.add("available-category");
+    scoreCell.classList.remove("locked");
+
+    userActionTextArea.value = JSON.stringify(
+      {
+        action: "unscored",
+        category: { id: catId, name: YAHTZEE_CATEGORIES[catId] },
+      },
+      null,
+      2
+    );
+  }
+
+  recalculateScores();
+  refreshAvailableCategories();
+  refreshUI();
+}
+
+/* Handle "Evaluate" button or category click */
+function handleUserActionCategoryClick() {
+  if (checkIfGameIsOver()) return; // Do nothing if the game is finished
+
+  const rerollsRemaining = parseInt(rerollCountInput.value, 10);
+  if (rerollsRemaining !== 0) return; // Do not allow evaluation if rerolls are still available
+
+  const categoryId = parseInt(this.dataset.catId, 10);
+  const categoryRow = document.querySelector(`tr[data-cat-id="${categoryId}"]`);
+
+  if (categoryRow.classList.contains("invalid-category")) return; // Skip invalid categories
+
+  userActionTextArea.value = JSON.stringify(
+    {
+      best_category: { id: categoryId, name: YAHTZEE_CATEGORIES[categoryId] },
+    },
+    null,
+    2
+  );
+
+  refreshUI();
+}
+
+/* Main UI refresh function */
+async function refreshUI() {
+  if (checkIfGameIsOver()) {
+    const totalScore = calculateFinalScore();
+    document.getElementById("game_status").innerHTML = `
+      <h2>Game Finished!</h2>
+      <p>Total Score: <strong>${totalScore}</strong></p>
+    `;
+    localStorage.removeItem("yatzyGameState");
+    return; // Stop further updates
+  }
+
+  recalculateScores();
+  refreshUserActionJSON();
+  await refreshAvailableCategories();
+  await refreshOptimalAction();
+  await evaluateUserActionSelection();
+  displaySortedDice();
+  refreshRerollButton();
+  refreshDifferenceBox();
+
+  // Enable/Disable Evaluate buttons based on rerolls
+  const r = getActivePlayer().rerollsRemaining;
+  document.querySelectorAll(".evaluate-button").forEach((button) => {
+    button.disabled = r !== 0;
+  });
+
+  // Save the current state to localStorage
+  const gameState = getGameStateAsJSON();
+  localStorage.setItem("yatzyGameState", JSON.stringify(gameState));
+}
+
+function calculateFinalScore() {
+  let totalScore = 0;
+  let upperScoreSum = 0;
+
+  document.querySelectorAll(".scored-check:checked").forEach((checkbox) => {
+    const catId = parseInt(checkbox.dataset.catId, 10);
+    const scoreCell = document.querySelector(`.best-score-cell[data-cat-id="${catId}"]`);
+    const scoreValue = parseInt(scoreCell.textContent, 10) || 0;
+    totalScore += scoreValue;
+
+    if (catId <= 5) {
+      upperScoreSum += scoreValue;
+    }
+  });
+
+  if (upperScoreSum >= 63) {
+    totalScore += 50;
+  }
+
+  return totalScore;
+}
+
+/* Recalculate total scores, reading from .best-score-cell for "scored" categories */
+function recalculateScores() {
+  let totalScore = 0;
+  let upperScoreSum = 0;
+
+  document.querySelectorAll(".scored-check").forEach((checkbox) => {
+    if (checkbox.checked) {
+      const catId = parseInt(checkbox.dataset.catId, 10);
+      const scoreCell = document.querySelector(`.best-score-cell[data-cat-id="${catId}"]`);
+      const scoreValue = parseInt(scoreCell.textContent, 10) || 0;
+
+      totalScore += scoreValue;
+      if (catId <= 5) {
+        upperScoreSum += scoreValue;
+      }
+    }
+  });
+
+  const bonus = upperScoreSum >= 63 ? 50 : 0;
+
+  const bonusCell = document.querySelector(".bonus-best-score");
+  if (bonusCell) bonusCell.textContent = upperScoreSum;
+
+  const totalCell = document.querySelector(".total-best-score");
+  if (totalCell) totalCell.textContent = totalScore + bonus;
+}
+
+/* Update the user_action JSON in #user_action */
+function refreshUserActionJSON() {
+  const r = getActivePlayer().rerollsRemaining;
+  let ua = {};
+  try {
+    ua = JSON.parse(userActionTextArea.value) || {};
+  } catch (e) {
+    ua = {};
+  }
+
+  if (r > 0) {
+    let mask = "";
+    const diceDivs = document.querySelectorAll(".die");
+    diceDivs.forEach((div) => {
+      const btn = div.querySelector(".dice-reroll-button");
+      mask += btn.classList.contains("reroll") ? "1" : "0";
+    });
+    ua = { best_reroll: { mask_binary: mask } };
+  } else if (!ua.best_category) {
+    ua = {};
+  }
+  userActionTextArea.value = JSON.stringify(ua, null, 2);
+}
+
+/* Return current game state for server calls */
+function getCurrentGameData() {
+  let bitmask = 0;
+  let upperSum = 0;
+  let total = 0;
+
+  document.querySelectorAll(".scored-check").forEach((c) => {
+    if (c.checked) {
+      const i = parseInt(c.dataset.catId, 10);
+      const scoreCell = document.querySelector(`.best-score-cell[data-cat-id='${i}']`);
+      const val = scoreCell ? parseInt(scoreCell.textContent, 10) || 0 : 0;
+      bitmask |= 1 << i;
+      total += val;
+      if (i <= 5) upperSum += val;
+    }
+  });
+
+  const bonus = upperSum >= 63 ? 50 : 0;
+  return {
+    upper_score: upperSum + bonus,
+    scored_categories: bitmask,
+    dice: [...getActivePlayer().diceValues],
+    rerolls_remaining: getActivePlayer().rerollsRemaining,
+  };
+}
+
+/* Show sorted dice & highlight any to reroll based on optimal action */
+function displaySortedDice() {
+  const container = document.getElementById("sorted_dice_container");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  // Sort the dice ascending
+  let arr = getActivePlayer().diceValues
+    .map((v, i) => ({ v, i }))
+    .sort((a, b) => a.v - b.v);
+  const r = getActivePlayer().rerollsRemaining;
+
+  arr.forEach((d, sortedIndex) => {
+    const dv = document.createElement("div");
+    dv.classList.add("die-value");
+    dv.textContent = d.v;
+
+    if (
+      optimalActionContainer.classList.contains("show") &&
+      getActivePlayer().optimalRerollMask[sortedIndex] === "1" &&
+      r > 0
+    ) {
+      dv.classList.add("reroll-highlight");
+    }
+    container.appendChild(dv);
+  });
+}
+
+/* Convert mask string to numeric ID */
+function convertMaskToId(m) {
+  let v = 0;
+  for (let i = 0; i < TOTAL_DICE; i++) {
+    if (m[i] === "1") v |= 1 << i;
+  }
+  return v;
+}
+
+/* Refresh available categories from server */
+async function refreshAvailableCategories() {
+  const currentData = getCurrentGameData();
+  try {
+    const raw = await sendJSONPostRequest(URL_AVAILABLE_CATEGORIES, currentData);
+    const data = JSON.parse(raw);
+
+    data.categories.forEach((c) => {
+      const catId = c.id;
+      const row = document.querySelector(`tr[data-cat-id="${catId}"]`);
+      const chk = document.querySelector(`.scored-check[data-cat-id="${catId}"]`);
+      const scoreCell = document.querySelector(`.best-score-cell[data-cat-id="${catId}"]`);
+
+      if (chk.checked) {
+        row.classList.add("scored-category");
+        row.classList.remove("available-category", "invalid-category");
+        scoreCell.classList.add("locked");
+      } else if (c.valid) {
+        row.classList.add("available-category");
+        row.classList.remove("scored-category", "invalid-category");
+        scoreCell.classList.remove("locked");
+        scoreCell.textContent = c.score; // from server
+      } else {
+        row.classList.add("invalid-category");
+        row.classList.remove("scored-category", "available-category");
+        scoreCell.classList.remove("locked");
+        scoreCell.textContent = "0";
+      }
+    });
+  } catch (e) {
+    console.error("Error updating available categories:", e);
+  }
+}
+
+/* Refresh suggested optimal action from server */
+async function refreshOptimalAction() {
+  // Clear previous optimal category highlights
+  document
+    .querySelectorAll(".optimal-category")
+    .forEach((row) => row.classList.remove("optimal-category"));
+  getActivePlayer().optimalRerollMask = [];
+  getActivePlayer().lastOptimalExpectedValue = null;
+  getActivePlayer().lastUserExpectedValue = null;
+  getActivePlayer().currentOptimalCategoryID = null;
+
+  lastOptimalExpectedValue = null;
+  lastUserExpectedValue = null;
+  currentOptimalCategoryID = null;
+  optimalRerollMask = [];
+
+  const s = getCurrentGameData();
+
+  try {
+    const raw = await sendJSONPostRequest(URL_SUGGEST_OPTIMAL_ACTION, s);
+    const data = JSON.parse(raw);
+
+    rawOptimalActionTextArea.value = JSON.stringify(data, null, 2);
+
+    if (data.expected_value != null) {
+      lastOptimalExpectedValue = parseFloat(data.expected_value);
+      getActivePlayer().lastOptimalExpectedValue = lastOptimalExpectedValue;
+    }
+
+    let info = "None";
+
+    if (s.rerolls_remaining > 0 && data.best_reroll) {
+      info = `Reroll mask: ${data.best_reroll.mask_binary}<br>Expected Score: ${data.expected_value.toFixed(3)}`;
+      optimalRerollMask = data.best_reroll.mask_binary.split("");
+      getActivePlayer().optimalRerollMask = [...optimalRerollMask];
+    } else if (s.rerolls_remaining === 0 && data.best_category) {
+      info = `
+        <p>Optimal Category: <strong>${data.best_category.name}</strong></p>
+        <p>Expected Value: ${data.expected_value.toFixed(3)}</p>
+      `;
+      currentOptimalCategoryID = data.best_category.id;
+      getActivePlayer().currentOptimalCategoryID = currentOptimalCategoryID;
+    }
+
+    optimalActionContainer.dataset.info = info;
+    if (
+      optimalActionContainer.classList.contains("show") &&
+      currentOptimalCategoryID != null
+    ) {
+      document
+        .querySelector(`tr[data-cat-id='${currentOptimalCategoryID}']`)
+        .classList.add("optimal-category");
+    }
+
+    optimalActionContentElement.innerHTML = info;
+  } catch (e) {
+    rawOptimalActionTextArea.value = `Error: ${e.message}`;
+  }
+}
+
+/* Evaluate user action selection */
+async function evaluateUserActionSelection() {
+  const s = getCurrentGameData();
+  let ua = {};
+
+  try {
+    ua = JSON.parse(userActionTextArea.value);
+  } catch (e) {
+    userActionEvaluationArea.textContent = "No user action chosen or invalid JSON.";
+    rawEvaluateActionTextArea.value = "No user action chosen or invalid JSON.";
+    lastUserExpectedValue = null;
+    getActivePlayer().lastUserExpectedValue = null;
+    return;
+  }
+
+  if (!ua || Object.keys(ua).length === 0) {
+    userActionEvaluationArea.textContent = "No user action chosen.";
+    rawEvaluateActionTextArea.value = "No user action chosen.";
+    lastUserExpectedValue = null;
+    getActivePlayer().lastUserExpectedValue = null;
+    return;
+  }
+
+  let diceToSend = [...getActivePlayer().diceValues];
+  let newUA = JSON.parse(JSON.stringify(ua));
+
+  if (s.rerolls_remaining > 0 && newUA.best_reroll && newUA.best_reroll.mask_binary) {
+    const { dice: sortedDice, mask: newMask } = reorderDiceAndMask(
+      diceToSend,
+      newUA.best_reroll.mask_binary
+    );
+    diceToSend = sortedDice;
+    newUA.best_reroll.mask_binary = newMask;
+    newUA.best_reroll.id = convertMaskToId(newMask);
+  }
+
+  const s2 = { ...s, dice: diceToSend };
+
+  try {
+    const raw = await sendJSONPostRequest(URL_EVALUATE_USER_ACTION, {
+      ...s2,
+      user_action: newUA,
+    });
+    const data = JSON.parse(raw);
+
+    rawEvaluateActionTextArea.value = JSON.stringify(data, null, 2);
+
+    if (data.expected_value != null) {
+      lastUserExpectedValue = parseFloat(data.expected_value);
+      getActivePlayer().lastUserExpectedValue = lastUserExpectedValue;
+
+      // Calculate current total score
+      let currentScore = 0;
+      document.querySelectorAll(".scored-check:checked").forEach((checkbox) => {
+        const catId = parseInt(checkbox.dataset.catId, 10);
+        const scoreCell = document.querySelector(`.best-score-cell[data-cat-id="${catId}"]`);
+        currentScore += parseInt(scoreCell.textContent, 10) || 0;
+      });
+
+      userActionEvaluationArea.innerHTML = `
+        <p><b>Expected Total Score = </b> ${(currentScore + lastUserExpectedValue).toFixed(
+          3
+        )}</p>
+      `;
+    } else {
+      userActionEvaluationArea.textContent = "No user action chosen.";
+      lastUserExpectedValue = null;
+      getActivePlayer().lastUserExpectedValue = null;
+    }
+  } catch (e) {
+    rawEvaluateActionTextArea.value = `Error: ${e.message}`;
+    userActionEvaluationArea.textContent = `Error evaluating user action: ${e.message}`;
+    lastUserExpectedValue = null;
+    getActivePlayer().lastUserExpectedValue = null;
+  }
+}
+
+/* Reorder dice (ascending) and remap the mask accordingly */
+function reorderDiceAndMask(originalDice, originalMask) {
+  const pairedArray = originalDice.map((v, i) => ({ value: v, index: i }));
+  pairedArray.sort((a, b) => a.value - b.value);
+
+  const sortedDice = pairedArray.map((item) => item.value);
+  const remappedMask = pairedArray.map((item) => originalMask[item.index]).join("");
+
+  return { dice: sortedDice, mask: remappedMask };
+}
+
+/* Refresh the difference box */
+function refreshDifferenceBox() {
+  if (lastOptimalExpectedValue == null || lastUserExpectedValue == null) {
+    differenceBoxContent.innerHTML = "Not available yet";
+  } else {
+    const diff = (lastOptimalExpectedValue - lastUserExpectedValue).toFixed(3);
+    differenceBoxContent.innerHTML = "&Delta; = " + diff;
+  }
+}
+
+/* Enable/disable the Reroll Dice button */
+function refreshRerollButton() {
+  const r = getActivePlayer().rerollsRemaining;
+  document.getElementById("rerollDiceButton").disabled = r === 0;
+}
+
+/* Gather the game state as a JSON object for saving */
+function getGameStateAsJSON() {
+  // We'll maintain the existing approach for storing "global" dice, but
+  // we also need to keep track of the full players array for multiplayer.
+  // For simplicity, we can store all players' data in localStorage. 
+  // Below is a minimal approach that captures the existing logic
+  // plus the entire `players` array.
+
+  const allPlayersState = players.map((p) => ({
+    name: p.name,
+    diceValues: [...p.diceValues],
+    optimalRerollMask: [...p.optimalRerollMask],
+    lastOptimalExpectedValue: p.lastOptimalExpectedValue,
+    lastUserExpectedValue: p.lastUserExpectedValue,
+    currentOptimalCategoryID: p.currentOptimalCategoryID,
+    rerollsRemaining: p.rerollsRemaining
+  }));
+
+  return {
+    // The existing single-player logic
+    dice: [...diceValues],
+    rerolls_remaining: parseInt(rerollCountInput.value, 10),
+    scored_categories: collectScoredCategoriesBitmask(),
+    scored_category_scores: collectScoredCategoryScores(),
+    upper_score: computeUpperScore(),
+    total_score: computeTotalScore(),
+    optimal_best_reroll_mask: optimalRerollMask,
+    lastOptimalEV: lastOptimalExpectedValue,
+    lastUserEV: lastUserExpectedValue,
+    currentOptimalCategoryId: currentOptimalCategoryID,
+
+    // Multiplayer addition
+    players: allPlayersState,
+    activePlayerIndex
+  };
+}
+
+function collectScoredCategoriesBitmask() {
+  let bitmask = 0;
+  document.querySelectorAll(".scored-check").forEach((checkbox) => {
+    if (checkbox.checked) {
+      const catId = parseInt(checkbox.dataset.catId, 10);
+      bitmask |= 1 << catId;
+    }
+  });
+  return bitmask;
+}
+
+function collectScoredCategoryScores() {
+  const scores = {};
+  document.querySelectorAll(".scored-check").forEach((checkbox) => {
+    if (checkbox.checked) {
+      const catId = parseInt(checkbox.dataset.catId, 10);
+      const scoreCell = document.querySelector(`.best-score-cell[data-cat-id='${catId}']`);
+      scores[catId] = scoreCell ? parseInt(scoreCell.textContent, 10) || 0 : 0;
+    }
+  });
+  return scores;
+}
+
+function computeUpperScore() {
+  let upperSum = 0;
+  document.querySelectorAll(".scored-check:checked").forEach((checkbox) => {
+    const catId = parseInt(checkbox.dataset.catId, 10);
+    const scoreCell = document.querySelector(`.best-score-cell[data-cat-id='${catId}']`);
+    const val = scoreCell ? parseInt(scoreCell.textContent, 10) || 0 : 0;
+    if (catId <= 5) upperSum += val;
+  });
+  if (upperSum >= 63) return upperSum + 50;
+  return upperSum;
+}
+
+function computeTotalScore() {
+  let totalScore = 0;
+  document.querySelectorAll(".scored-check:checked").forEach((checkbox) => {
+    const catId = parseInt(checkbox.dataset.catId, 10);
+    const scoreCell = document.querySelector(`.best-score-cell[data-cat-id='${catId}']`);
+    const val = scoreCell ? parseInt(scoreCell.textContent, 10) || 0 : 0;
+    totalScore += val;
+  });
+  // check if upper sum triggers bonus
+  let upperSum = 0;
+  document.querySelectorAll(".scored-check:checked").forEach((checkbox) => {
+    const catId = parseInt(checkbox.dataset.catId, 10);
+    const scoreCell = document.querySelector(`.best-score-cell[data-cat-id='${catId}']`);
+    const val = scoreCell ? parseInt(scoreCell.textContent, 10) || 0 : 0;
+    if (catId <= 5) upperSum += val;
+  });
+  if (upperSum >= 63) totalScore += 50;
+  return totalScore;
+}
+
+/* Restore state from JSON (localStorage or given object) */
+function restoreGameFromState(input) {
+  try {
+    const state = typeof input === "string" ? JSON.parse(input) : input;
+
+    // Multiplayer: restore players array if it exists
+    if (state.players && Array.isArray(state.players)) {
+      players = [];
+      state.players.forEach((p) => {
+        players.push({
+          name: p.name,
+          diceValues: [...p.diceValues],
+          optimalRerollMask: [...p.optimalRerollMask],
+          lastOptimalExpectedValue: p.lastOptimalExpectedValue,
+          lastUserExpectedValue: p.lastUserExpectedValue,
+          currentOptimalCategoryID: p.currentOptimalCategoryID,
+          rerollsRemaining: p.rerollsRemaining
+        });
+      });
+      activePlayerIndex = state.activePlayerIndex || 0;
+    } else {
+      // If no players array, create default
+      players = [createDefaultPlayer("Player 1")];
+      activePlayerIndex = 0;
+    }
+
+    // Single-player legacy fields
+    diceValues = [...(state.dice || [2,2,2,5,5])];
+    optimalRerollMask = state.optimal_best_reroll_mask || [];
+    lastOptimalExpectedValue = state.lastOptimalEV || null;
+    lastUserExpectedValue = state.lastUserEV || null;
+    currentOptimalCategoryID = state.currentOptimalCategoryId || null;
+
+    // Rebuild the table checks from state.scored_categories
+    const bitmask = state.scored_categories || 0;
+    const scoredCategoryScores = state.scored_category_scores || {};
+    document.querySelectorAll(".scored-check").forEach((checkbox) => {
+      const catId = parseInt(checkbox.dataset.catId, 10);
+      const isChecked = (bitmask & (1 << catId)) !== 0;
+      checkbox.checked = isChecked;
+
+      const scoreCell = document.querySelector(`.best-score-cell[data-cat-id='${catId}']`);
+      const score = scoredCategoryScores[catId] || 0;
+
+      if (isChecked) {
+        const row = checkbox.closest("tr");
+        row.classList.add("scored-category");
+        scoreCell.classList.add("locked");
+        scoreCell.textContent = score;
+      } else {
+        const row = checkbox.closest("tr");
+        row.classList.remove("scored-category");
+        scoreCell.classList.remove("locked");
+        scoreCell.textContent = "0";
+      }
+    });
+
+    // Rebuild the UI for players
+    updatePlayerDropdown();
+    playerSelect.value = activePlayerIndex;
+
+    // Load the active player
+    loadPlayerState();
+
+    recalculateScores();
+    refreshAvailableCategories();
+    refreshUI();
+    console.log("Game state loaded successfully!");
+  } catch (error) {
+    console.error("Failed to load state from JSON:", error);
+    // If fails, fallback to default single-player
+    players = [createDefaultPlayer("Player 1")];
+    activePlayerIndex = 0;
+    updatePlayerDropdown();
+    playerSelect.value = 0;
+  }
+}
+
+function rebuildDice() {
+  createDiceUI();  // Create the dice elements
+  attachDiceEventHandlers();  // Attach event listeners immediately after
+}
+
+/* Check if the game is finished */
+function checkIfGameIsOver() {
+  const scoredCount = document.querySelectorAll(".scored-check:checked").length;
+  return scoredCount === YAHTZEE_CATEGORIES.length; // All categories scored
+}
+
+/* Reset the game by removing saved state and reloading */
+function resetGame() {
+  localStorage.removeItem("yatzyGameState");
+  location.reload();
+}
+
+/* Init function */
+function init() {
+  // Initialize with a single default player if none exist
+  players = [createDefaultPlayer("Player 1")];
+  activePlayerIndex = 0;
+
+  createScorecard(); // Build the scorecard
+  createDiceUI(); // Build the dice UI
+  attachEventHandlers(); // Attach all event listeners
+
+  updatePlayerDropdown();
+  playerSelect.value = 0; // Start with the first player
+
+  // Check for a saved state in localStorage
+  const savedState = localStorage.getItem("yatzyGameState");
+  if (savedState) {
+    console.log("Loading saved game state...");
+    restoreGameFromState(savedState);
+  } else {
+    // No saved state, so randomize the dice for the default player
+    document.getElementById("randomizeDiceButton").click();
+  }
+
+  refreshUI(); // Ensure everything is updated
+}
+
+/* Reveal the page after DOM is ready */
+document.addEventListener("DOMContentLoaded", () => {
+  init();
+  document.body.classList.add("loaded");
+});
+</script>
+</body>
+</html>
