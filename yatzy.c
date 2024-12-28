@@ -71,8 +71,10 @@ struct RequestContext {
 // Add a helper function to set CORS headers on every response
 static void AddCORSHeaders(struct MHD_Response *response) {
     MHD_add_response_header(response, "Access-Control-Allow-Origin", "*");
-    MHD_add_response_header(response, "Access-Control-Allow-Methods", ALLOWED_METHODS);
-    MHD_add_response_header(response, "Access-Control-Allow-Headers", ALLOWED_HEADERS);
+    MHD_add_response_header(response, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    MHD_add_response_header(response, "Access-Control-Allow-Headers",
+                            "Content-Type, Authorization, X-Requested-With, sec-ch-ua, sec-ch-ua-mobile, sec-ch-ua-platform");
+    MHD_add_response_header(response, "Access-Control-Max-Age", "86400");
 }
 
 #define MAX_LINE_LENGTH 1024
@@ -964,8 +966,8 @@ static void handle_get_score_histogram(YatzyContext *ctx, struct MHD_Connection 
     const int min_ev = 100;
     const int max_ev = 380;
     const int bin_count = 56;
-    const double bin_width = (max_ev - min_ev) / (double)bin_count;
-    int bins[56] = {0};  // Initialize all bins to 0
+    const double bin_width = (max_ev - min_ev) / (double) bin_count;
+    int bins[56] = {0}; // Initialize all bins to 0
 
     char line[MAX_LINE_LENGTH];
     // Skip header if present
@@ -978,7 +980,7 @@ static void handle_get_score_histogram(YatzyContext *ctx, struct MHD_Connection 
         line[strcspn(line, "\n")] = 0;
         int score = atoi(line);
         if (score >= min_ev && score <= max_ev) {
-            int bin_index = (int)((score - min_ev) / bin_width);
+            int bin_index = (int) ((score - min_ev) / bin_width);
             if (bin_index >= 0 && bin_index < bin_count) {
                 bins[bin_index]++;
             }
@@ -1003,7 +1005,7 @@ static void handle_get_score_histogram(YatzyContext *ctx, struct MHD_Connection 
     const char *response_str = json_object_to_json_string(resp);
     struct MHD_Response *mhd_response = MHD_create_response_from_buffer(
         strlen(response_str),
-        (void *)response_str,
+        (void *) response_str,
         MHD_RESPMEM_MUST_COPY
     );
     AddCORSHeaders(mhd_response);
@@ -1604,6 +1606,7 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
 
     // Handle OPTIONS preflight requests
     if (strcmp(method, "OPTIONS") == 0) {
+        printf("OPTIONS request received for URL: %s\n", url);
         struct MHD_Response *options_response = MHD_create_response_from_buffer(0, "", MHD_RESPMEM_PERSISTENT);
         AddCORSHeaders(options_response);
         MHD_add_response_header(options_response, "Access-Control-Max-Age", "86400");
@@ -1622,6 +1625,10 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
         if (*upload_data_size != 0) {
             size_t new_size = req_ctx->post_size + *upload_data_size;
             req_ctx->post_data = (char *) realloc(req_ctx->post_data, new_size + 1);
+            if (!req_ctx->post_data) {
+                return respond_with_error(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, "Memory allocation error",
+                                          req_ctx);
+            }
             memcpy(req_ctx->post_data + req_ctx->post_size, upload_data, *upload_data_size);
             req_ctx->post_size = new_size;
             req_ctx->post_data[req_ctx->post_size] = '\0';
@@ -1631,12 +1638,33 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
 
         // Process full POST data
         if (!req_ctx->post_data) {
-            return respond_with_error(connection, MHD_HTTP_BAD_REQUEST, "No data received", req_ctx);
+            struct MHD_Response *response = MHD_create_response_from_buffer(
+                strlen("No data received"),
+                (void *) "No data received",
+                MHD_RESPMEM_PERSISTENT
+            );
+            AddCORSHeaders(response);
+            MHD_queue_response(connection, MHD_HTTP_BAD_REQUEST, response);
+            MHD_destroy_response(response);
+            free(req_ctx);
+            *con_cls = NULL;
+            return MHD_YES;
         }
 
         struct json_object *parsed = json_tokener_parse(req_ctx->post_data);
         if (!parsed) {
-            return respond_with_error(connection, MHD_HTTP_BAD_REQUEST, "Invalid JSON", req_ctx);
+            struct MHD_Response *response = MHD_create_response_from_buffer(
+                strlen("Invalid JSON"),
+                (void *) "Invalid JSON",
+                MHD_RESPMEM_PERSISTENT
+            );
+            AddCORSHeaders(response);
+            MHD_queue_response(connection, MHD_HTTP_BAD_REQUEST, response);
+            MHD_destroy_response(response);
+            free(req_ctx->post_data);
+            free(req_ctx);
+            *con_cls = NULL;
+            return MHD_YES;
         }
 
         // Route the POST request
@@ -1653,8 +1681,19 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
         } else if (strcmp(url, "/evaluate_user_action") == 0) {
             handle_evaluate_user_action(ctx, connection, parsed);
         } else {
+            struct MHD_Response *response = MHD_create_response_from_buffer(
+                strlen("Unknown endpoint"),
+                (void *) "Unknown endpoint",
+                MHD_RESPMEM_PERSISTENT
+            );
+            AddCORSHeaders(response);
+            MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, response);
+            MHD_destroy_response(response);
             json_object_put(parsed);
-            return respond_with_error(connection, MHD_HTTP_NOT_FOUND, "Unknown endpoint", req_ctx);
+            free(req_ctx->post_data);
+            free(req_ctx);
+            *con_cls = NULL;
+            return MHD_YES;
         }
 
         json_object_put(parsed);

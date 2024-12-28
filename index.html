@@ -418,7 +418,6 @@
          * Histogram
          **************************************************/
         #histogramContainer {
-            margin-top: 20px;
             background: #fff;
             border: 1px solid #ccc;
             border-radius: 5px;
@@ -430,8 +429,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-
-<h1>&Delta; Yatzy</h1>
 <div class="container">
     <!-- Scorecard Column -->
     <div class="scorecard">
@@ -447,7 +444,9 @@
             </thead>
             <tbody></tbody>
         </table>
+        <h1>&Delta; Yatzy</h1>
     </div>
+
 
     <!-- Right Column -->
     <div class="right-column">
@@ -861,7 +860,12 @@
             // Handle other buttons by ID
             switch (button.id) {
                 case "resetGameButton":
-                    resetGame();
+                    const confirmReset = window.confirm("Are you sure you want to reset the game? This will erase all progress for all players.");
+                    if (confirmReset) {
+                        resetGame();
+                    } else {
+                        console.log("Game reset canceled.");
+                    }
                     break;
                 case "rerollDiceButton":
                     const currentPlayer = getActivePlayer();
@@ -994,12 +998,13 @@
     }
 
     /* Score handling */
-    function handleScoreCheckboxChange() {
-        const catId = parseInt(this.dataset.catId, 10);
+    function handleScoreCheckboxChange(event) {
+        const checkbox = event.target; // Get the event target (the checkbox element)
+        const catId = parseInt(checkbox.dataset.catId, 10); // Extract the category ID
         const scoreCell = document.querySelector(`.best-score-cell[data-cat-id="${catId}"]`);
-        const row = this.closest("tr");
+        const row = checkbox.closest("tr");
 
-        if (this.checked) {
+        if (checkbox.checked) {
             const bestScoreValue = parseInt(scoreCell.textContent, 10) || 0;
             scoreCell.textContent = bestScoreValue;
             scoreCell.classList.add("locked");
@@ -1012,7 +1017,7 @@
             userActionTextArea.value = JSON.stringify(
                 {
                     action: "scored",
-                    category: {id: catId, name: YAHTZEE_CATEGORIES[catId]},
+                    category: { id: catId, name: YAHTZEE_CATEGORIES[catId] },
                     score: bestScoreValue,
                 },
                 null,
@@ -1027,7 +1032,7 @@
             userActionTextArea.value = JSON.stringify(
                 {
                     action: "unscored",
-                    category: {id: catId, name: YAHTZEE_CATEGORIES[catId]},
+                    category: { id: catId, name: YAHTZEE_CATEGORIES[catId] },
                 },
                 null,
                 2
@@ -1040,8 +1045,7 @@
         saveGameState(); // Save state after scoring
     }
 
-    function handleUserActionCategoryClick(categoryId) {
-        // Ensure categoryId is a valid number
+    async function handleUserActionCategoryClick(categoryId) {
         const numericCategoryId = parseInt(categoryId, 10);
         if (isNaN(numericCategoryId)) {
             console.error("Invalid categoryId passed:", categoryId);
@@ -1051,11 +1055,6 @@
         const currentPlayer = getActivePlayer();
         if (!currentPlayer) {
             console.error("No active player available.");
-            return;
-        }
-
-        if (checkIfGameIsOver()) {
-            console.warn("Game is over. Cannot evaluate category.");
             return;
         }
 
@@ -1072,22 +1071,49 @@
             return;
         }
 
-        // Update the user action text area with the selected category
-        userActionTextArea.value = JSON.stringify(
-            {
+        // Prepare the payload for evaluation
+        const payload = {
+            upper_score: computeUpperScore(),
+            scored_categories: collectScoredCategoriesBitmask(),
+            dice: [...currentPlayer.diceValues],
+            rerolls_remaining: rerollsRemaining,
+            user_action: {
                 best_category: {
                     id: numericCategoryId,
                     name: YAHTZEE_CATEGORIES[numericCategoryId],
                 },
             },
-            null,
-            2
-        );
+        };
 
-        console.log(userActionTextArea.value);
+        try {
+            // Call the evaluate_user_action endpoint
+            const response = await sendJSONPostRequest(URL_EVALUATE_USER_ACTION, payload);
+            const data = JSON.parse(response);
 
-        // Refresh UI after the category evaluation
-        refreshUI();
+            console.log(`Evaluation result for category ${numericCategoryId}:`, data);
+
+            // Update the UI with evaluation results
+            userActionTextArea.value = JSON.stringify(data, null, 2);
+            userActionEvaluationArea.innerHTML = `
+            <p><b>Expected Total Score</b> for ${YAHTZEE_CATEGORIES[numericCategoryId]} = ${data.expected_value.toFixed(3)}</p>
+        `;
+
+            // Calculate the delta with the optimal score
+            const optimalScore = currentPlayer.lastOptimalExpectedValue || 0; // Default to 0 if not available
+            const delta = Math.abs(data.expected_value - optimalScore).toFixed(3);
+
+            // Update the #differenceContent element
+            const differenceContent = document.getElementById("differenceContent");
+            differenceContent.innerHTML = `&Delta; = ${delta}`;
+
+            // Optionally highlight the category row
+            categoryRow.classList.add("evaluated-category");
+        } catch (error) {
+            console.error("Failed to evaluate user action:", error);
+            userActionEvaluationArea.innerHTML = `
+            <p>Error evaluating category: ${error.message}</p>
+        `;
+        }
     }
 
     /* UI Refresh / Lifecycle */
