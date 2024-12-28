@@ -795,6 +795,7 @@
 
         refreshUserActionJSON();
         refreshAvailableCategories();
+        updateHistogram();
         refreshUI();
     }
 
@@ -1579,11 +1580,24 @@
             }
 
             const responseData = JSON.parse(actionResponse);
+
             const allEvs = [];
+            const currentMaskEvs = [];
+            // Compute the current reroll mask based on the UI state of the dice
+            const currentRerollMask = Array.from(document.querySelectorAll(".dice-reroll-button"))
+                .map(button => button.classList.contains("reroll") ? "1" : "0")
+                .join("");
+
             responseData.actions.forEach((action) => {
                 if (action.distribution) {
                     action.distribution.forEach((dist) => {
-                        allEvs.push(dist.ev + currentData.total_score);
+                        const ev = dist.ev + currentData.total_score_no_bonus;
+                        allEvs.push(ev);
+
+                        // Match EVs for the current reroll mask
+                        if (action.binary === currentRerollMask) {
+                            currentMaskEvs.push(ev);
+                        }
                     });
                 }
             });
@@ -1602,13 +1616,33 @@
             const binCount = 56;
             const binWidth = (maxEV - minEV) / binCount;
             const currentBins = Array(binCount).fill(0);
+            const currentMaskBins = Array(binCount).fill(0);
 
+            // Populate bins
             allEvs.forEach((val) => {
                 const index = Math.min(Math.floor((val - minEV) / binWidth), binCount - 1);
                 if (index >= 0) currentBins[index]++;
             });
 
-            const labels = Array.from({length: binCount}, (_, i) => {
+            currentMaskEvs.forEach((val) => {
+                const index = Math.min(Math.floor((val - minEV) / binWidth), binCount - 1);
+                if (index >= 0) {
+                    currentMaskBins[index] += 10;
+                }
+            });
+
+            console.log(currentMaskBins);
+
+            // Calculate reverse cumulative probability for the "10k Optimal" dataset
+            const totalOptimal = histogramResponse.bins.reduce((sum, val) => sum + val, 0);
+            const reverseCumulativeBins = [];
+            histogramResponse.bins.reduceRight((acc, val) => {
+                const reverseCumulativeValue = acc + val;
+                reverseCumulativeBins.unshift(reverseCumulativeValue / totalOptimal); // Normalize to [0, 1]
+                return reverseCumulativeValue;
+            }, 0);
+
+            const labels = Array.from({ length: binCount }, (_, i) => {
                 const start = Math.round(minEV + i * binWidth);
                 const end = Math.round(start + binWidth);
                 return `${start.toFixed(0)} - ${end.toFixed(0)}`;
@@ -1626,11 +1660,14 @@
                     labels: labels,
                     datasets: [
                         {
-                            label: "10k Optimal",
-                            data: histogramResponse.bins,
+                            type: "line", // Cumulative probability line
+                            label: "10k Optimal (Cumulative Probability)",
+                            data: reverseCumulativeBins,
                             backgroundColor: "rgba(40, 150, 250, 0.1)",
-                            borderColor: "rgba(40, 150, 250, 0.3)",
+                            borderColor: "rgba(40, 150, 250, 1)",
                             borderWidth: 1,
+                            tension: 0.4,
+                            yAxisID: "y1",
                         },
                         {
                             label: "Current Expected Values",
@@ -1638,28 +1675,45 @@
                             backgroundColor: "rgba(255, 100, 40, 0.9)",
                             borderColor: "rgba(255, 100, 40, 1)",
                             borderWidth: 1,
-                        }
-                    ]
+                            yAxisID: "y",
+                        },
+                        {
+                            label: "EVs for Current Reroll Mask",
+                            data: currentMaskBins,
+                            backgroundColor: "rgba(50, 205, 50, 0.9)", // Distinct color
+                            borderColor: "rgba(50, 205, 50, 1)",
+                            borderWidth: 1,
+                            yAxisID: "y",
+                        },
+                    ],
                 },
                 options: {
                     responsive: true,
                     animation: false,
                     transitions: {
                         active: {
-                            animation: {duration: 0}
-                        }
+                            animation: { duration: 0 },
+                        },
                     },
                     scales: {
                         x: {
-                            title: {display: true, text: "Expected Value Range"}
+                            title: { display: true, text: "Expected Value Range" },
                         },
                         y: {
-                            title: {display: true, text: "Frequency"},
+                            title: { display: true, text: "Frequency" },
                             min: 0,
-                            max: 1000
-                        }
-                    }
-                }
+                            max: 1000,
+                            position: "left",
+                        },
+                        y1: {
+                            title: { display: true, text: "Cumulative Probability" },
+                            min: 0,
+                            max: 1,
+                            position: "right",
+                            grid: { drawOnChartArea: false },
+                        },
+                    },
+                },
             };
 
             if (!histogramChart) {
@@ -1754,13 +1808,18 @@
 
         const bonus = upperSum >= 63 ? 50 : 0;
 
-        return {
-            upper_score: upperSum + bonus,
+
+        let currentGameData = {
+            upper_score: upperSum,
             scored_categories: bitmask,
             dice: [...currentPlayer.diceValues],
             rerolls_remaining: currentPlayer.rerollsRemaining,
-            total_score: total + bonus
+            bonus: bonus,
+            total_score_no_bonus: total,
+            total_score: total + bonus,
         };
+        console.log("Current Game Data:", currentGameData);
+        return currentGameData;
     }
 
     function convertMaskToId(mask) {
