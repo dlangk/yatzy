@@ -25,7 +25,7 @@ void AddCORSHeaders(struct MHD_Response *response) {
 
 
 void handle_get_score_histogram(YatzyContext *ctx, struct MHD_Connection *connection) {
-    FILE *file = fopen("/Users/langkilde/IdeaProjects/yatzy/score_histogram.csv", "r");
+    FILE *file = fopen("backend/data/score_histogram.csv", "r");
     if (file == NULL) {
         const char *err = "{\"error\":\"Could not open score histogram file\"}";
         struct MHD_Response *resp = MHD_create_response_from_buffer(
