@@ -371,7 +371,6 @@
         /**************************************************
          * Debug Box - Hidden by default with .hidden
          **************************************************/
-
         #toggleDebugButton {
             display: block;
             background: #ccc;
@@ -423,12 +422,48 @@
             border-radius: 5px;
             padding: 10px;
         }
+
+        /**************************************************
+         * Loading Overlay
+         **************************************************/
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .loading-overlay .spinner {
+            width: 60px;
+            height: 60px;
+            border: 8px solid #ddd;
+            border-top: 8px solid #333;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-overlay.hidden {
+            display: none;
+        }
     </style>
 
     <!-- (1) Include Chart.js from a CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+
 <div class="container">
     <!-- Scorecard Column -->
     <div class="scorecard">
@@ -516,6 +551,70 @@
 
 <script>
     /****************************************************************
+     * Loading Overlay Controls
+     ****************************************************************/
+    function showLoading() {
+        const overlay = document.getElementById("loadingOverlay");
+        if (overlay) {
+            overlay.classList.remove("hidden");
+        }
+    }
+
+    function hideLoading() {
+        const overlay = document.getElementById("loadingOverlay");
+        if (overlay) {
+            overlay.classList.add("hidden");
+        }
+    }
+
+    /****************************************************************
+     * Dice Mapping Helpers (NEW)
+     ****************************************************************/
+    /**
+     * Creates a mapping for sorted dice: returns { sortedDice, mapping }.
+     * The mapping array elements look like { sortedIndex, originalIndex }.
+     */
+    function createMappingForSortedDice(diceValues) {
+        // Pair dice values with their original indices
+        const pairedDice = diceValues.map((value, index) => ({ value, index }));
+        // Sort by dice value
+        pairedDice.sort((a, b) => a.value - b.value);
+
+        // Create the mapping from originalIndex -> sortedIndex
+        const mapping = pairedDice.map((pair, sortedIndex) => ({
+            sortedIndex,
+            originalIndex: pair.index
+        }));
+
+        // Create the array of sorted dice values
+        const sortedDice = pairedDice.map(pair => pair.value);
+
+        return { sortedDice, mapping };
+    }
+
+    /**
+     * Apply the mapping to a mask string (e.g., "01001"), reordering the bits.
+     */
+    function applyMappingToRerollMask(mask, mapping) {
+        const reorderedMask = new Array(mask.length);
+        mapping.forEach(({ sortedIndex, originalIndex }) => {
+            reorderedMask[sortedIndex] = mask[originalIndex];
+        });
+        return reorderedMask.join("");
+    }
+
+    /**
+     * Reverse a mapped mask back to the original dice order.
+     */
+    function reverseMapping(mask, mapping) {
+        const originalMask = new Array(mask.length);
+        mapping.forEach(({ sortedIndex, originalIndex }) => {
+            originalMask[originalIndex] = mask[sortedIndex];
+        });
+        return originalMask.join("");
+    }
+
+    /****************************************************************
      Single-File Yatzy UI with Multiplayer Support Integrated
      ****************************************************************/
     /* Configuration */
@@ -566,8 +665,8 @@
        We'll keep it in sync with the active player's dice state. */
     let diceValues = [2, 2, 2, 5, 5];
     let optimalRerollMask = [];
-    let lastOptimalExpectedValue = null;
-    let lastUserExpectedValue = null;
+    let currentOptimalExpectedValue = null;
+    let currentUserExpectedValue = null;
     let currentOptimalCategoryID = null;
 
     /****************************************************************
@@ -727,7 +826,7 @@
         }
 
         // Clear the dice container and rebuild the dice elements
-        diceContainerElement.innerHTML = ""; // No need to clone/replace
+        diceContainerElement.innerHTML = "";
 
         currentPlayer.diceValues.forEach((value, index) => {
             const dieDiv = document.createElement("div");
@@ -793,9 +892,22 @@
             currentPlayer.optimalRerollMask[index] = "0";
         }
 
+        // 1. Update the JSON representation of the user action
         refreshUserActionJSON();
+
+        // 2. Fetch the optimal action based on the current state
+        refreshOptimalAction();
+
+        // 3. Evaluate the user action with the latest optimal action in mind
+        evaluateUserActionSelection();
+
+        // 4. Update the UI for valid scoring categories
         refreshAvailableCategories();
+
+        // 5. Update the histogram to reflect the latest state
         updateHistogram();
+
+        // 6. Perform a final UI refresh
         refreshUI();
     }
 
@@ -826,7 +938,7 @@
                     default:
                         console.warn(`Unhandled dice action: ${action}`);
                 }
-                return; // Avoid further processing
+                return;
             }
 
             // Handle Reroll actions
@@ -869,6 +981,7 @@
                     }
                     break;
                 case "rerollDiceButton":
+                {
                     const currentPlayer = getActivePlayer();
                     if (!currentPlayer) return;
                     const r = currentPlayer.rerollsRemaining;
@@ -886,8 +999,10 @@
                         refreshAvailableCategories();
                         refreshUI();
                     }
+                }
                     break;
                 case "randomizeDiceButton":
+                {
                     const player = getActivePlayer();
                     if (!player) return;
 
@@ -910,6 +1025,7 @@
 
                     refreshAvailableCategories();
                     refreshUI();
+                }
                     break;
                 case "toggleOptimalActionButton":
                     handleOptimalActionToggle();
@@ -956,8 +1072,8 @@
         activePlayerIndex = 0;
         diceValues = Array(TOTAL_DICE).fill(1);
         optimalRerollMask = [];
-        lastOptimalExpectedValue = null;
-        lastUserExpectedValue = null;
+        currentOptimalExpectedValue = null;
+        currentUserExpectedValue = null;
         currentOptimalCategoryID = null;
 
         // Clear and rebuild UI
@@ -1018,7 +1134,7 @@
             userActionTextArea.value = JSON.stringify(
                 {
                     action: "scored",
-                    category: { id: catId, name: YAHTZEE_CATEGORIES[catId] },
+                    category: {id: catId, name: YAHTZEE_CATEGORIES[catId]},
                     score: bestScoreValue,
                 },
                 null,
@@ -1033,7 +1149,7 @@
             userActionTextArea.value = JSON.stringify(
                 {
                     action: "unscored",
-                    category: { id: catId, name: YAHTZEE_CATEGORIES[catId] },
+                    category: {id: catId, name: YAHTZEE_CATEGORIES[catId]},
                 },
                 null,
                 2
@@ -1043,7 +1159,7 @@
         recalculateScores();
         refreshAvailableCategories();
         refreshUI();
-        saveGameState(); // Save state after scoring
+        saveGameState();
     }
 
     async function handleUserActionCategoryClick(categoryId) {
@@ -1089,36 +1205,216 @@
         try {
             // Call the evaluate_user_action endpoint
             const response = await sendJSONPostRequest(URL_EVALUATE_USER_ACTION, payload);
-            const data = JSON.parse(response);
+            if (!response) return;
 
+            const data = response;
             console.log(`Evaluation result for category ${numericCategoryId}:`, data);
 
             // Update the UI with evaluation results
             userActionTextArea.value = JSON.stringify(data, null, 2);
             userActionEvaluationArea.innerHTML = `
-            <p><b>Expected Total Score</b> for ${YAHTZEE_CATEGORIES[numericCategoryId]} = ${data.expected_value.toFixed(3)}</p>
-        `;
+                <p><b>Expected Total Score</b> for ${YAHTZEE_CATEGORIES[numericCategoryId]} = ${data.expected_value.toFixed(3)}</p>
+            `;
 
-            // Calculate the delta with the optimal score
-            const optimalScore = currentPlayer.lastOptimalExpectedValue || 0; // Default to 0 if not available
-            const delta = Math.abs(data.expected_value - optimalScore).toFixed(3);
-
-            // Update the #differenceContent element
-            const differenceContent = document.getElementById("differenceContent");
-            differenceContent.innerHTML = `&Delta; = ${delta}`;
+            await refreshUI();
 
             // Optionally highlight the category row
             categoryRow.classList.add("evaluated-category");
         } catch (error) {
             console.error("Failed to evaluate user action:", error);
             userActionEvaluationArea.innerHTML = `
-            <p>Error evaluating category: ${error.message}</p>
-        `;
+                <p>Error evaluating category: ${error.message}</p>
+            `;
         }
     }
 
-    /* UI Refresh / Lifecycle */
+    /********************** NO DEBOUNCE BELOW **********************/
+
+    /* refreshAvailableCategories (direct call) */
+    async function refreshAvailableCategories() {
+        const currentData = getCurrentGameData();
+        if (!currentData) return;
+
+        try {
+            const raw = await sendJSONPostRequest(URL_AVAILABLE_CATEGORIES, currentData);
+            if (!raw || !raw.categories) return;
+            const data = raw;
+
+            data.categories.forEach((c) => {
+                const catId = c.id;
+                const row = document.querySelector(`tr[data-cat-id="${catId}"]`);
+                const chk = document.querySelector(`.scored-check[data-cat-id="${catId}"]`);
+                const scoreCell = document.querySelector(`.best-score-cell[data-cat-id="${catId}"]`);
+
+                if (chk.checked) {
+                    row.classList.add("scored-category");
+                    row.classList.remove("available-category", "invalid-category");
+                    scoreCell.classList.add("locked");
+                } else if (c.valid) {
+                    row.classList.add("available-category");
+                    row.classList.remove("scored-category", "invalid-category");
+                    scoreCell.classList.remove("locked");
+                    scoreCell.textContent = c.score;
+                } else {
+                    row.classList.add("invalid-category");
+                    row.classList.remove("scored-category", "available-category");
+                    scoreCell.classList.remove("locked");
+                    scoreCell.textContent = "0";
+                }
+            });
+        } catch (e) {
+            console.error("Error updating available categories:", e);
+        }
+    }
+
+    /* refreshOptimalAction (direct call) */
+    async function refreshOptimalAction() {
+        console.log("Refreshing optimal action...");
+        document.querySelectorAll(".optimal-category").forEach((row) => row.classList.remove("optimal-category"));
+
+        const currentPlayer = getActivePlayer();
+        let s = getCurrentGameData();
+        if (!s) return;
+
+        // **IMPORTANT**: Sort dice before sending to the API
+        const { sortedDice, mapping } = createMappingForSortedDice(s.dice);
+        // Replace the original dice in 's' with sorted dice
+        s.dice = sortedDice;
+
+        try {
+            const data = await sendJSONPostRequest(URL_SUGGEST_OPTIMAL_ACTION, s);
+            if (!data) return;
+
+            rawOptimalActionTextArea.value = JSON.stringify(data, null, 2);
+
+            if (data.expected_value != null) {
+                currentOptimalExpectedValue = parseFloat(data.expected_value);
+                if (currentPlayer) {
+                    currentPlayer.lastOptimalExpectedValue = currentOptimalExpectedValue;
+                }
+            }
+
+            let info = "None";
+            if (s.rerolls_remaining > 0 && data.best_reroll) {
+                // The mask returned is in sorted order; let's reverse it back to original
+                const reversedMask = reverseMapping(data.best_reroll.mask_binary, mapping);
+
+                info = `Reroll mask (sorted): ${data.best_reroll.mask_binary}<br>
+                        Reroll mask (original): ${reversedMask}<br>
+                        Expected Score: ${data.expected_value.toFixed(3)}`;
+                optimalRerollMask = reversedMask.split("");
+
+                if (currentPlayer) {
+                    currentPlayer.optimalRerollMask = [...optimalRerollMask];
+                }
+            } else if (s.rerolls_remaining === 0 && data.best_category) {
+                info = `
+                    <p>Optimal Category: <strong>${data.best_category.name}</strong></p>
+                    <p>Expected Value: ${data.expected_value.toFixed(3)}</p>
+                `;
+                currentOptimalCategoryID = data.best_category.id;
+                if (currentPlayer) {
+                    currentPlayer.currentOptimalCategoryID = currentOptimalCategoryID;
+                }
+            }
+
+            optimalActionContainer.dataset.info = info;
+            if (optimalActionContainer.classList.contains("show") && currentOptimalCategoryID != null) {
+                const optimalRow = document.querySelector(`tr[data-cat-id='${currentOptimalCategoryID}']`);
+                if (optimalRow) {
+                    optimalRow.classList.add("optimal-category");
+                }
+            }
+            optimalActionContentElement.innerHTML = info;
+        } catch (e) {
+            rawOptimalActionTextArea.value = `Error: ${e.message}`;
+        }
+    }
+
+    /* evaluateUserActionSelection (direct call) */
+    async function evaluateUserActionSelection() {
+        const s = getCurrentGameData();
+        if (!s) return;
+        let ua = {};
+
+        try {
+            ua = JSON.parse(userActionTextArea.value);
+        } catch (e) {
+            userActionEvaluationArea.textContent = "No user action chosen or invalid JSON.";
+            rawEvaluateActionTextArea.value = "No user action chosen or invalid JSON.";
+            currentUserExpectedValue = null;
+            if (getActivePlayer()) getActivePlayer().lastUserExpectedValue = null;
+            return;
+        }
+
+        if (!ua || Object.keys(ua).length === 0) {
+            userActionEvaluationArea.textContent = "No user action chosen.";
+            rawEvaluateActionTextArea.value = "No user action chosen.";
+            currentUserExpectedValue = null;
+            if (getActivePlayer()) getActivePlayer().lastUserExpectedValue = null;
+            return;
+        }
+
+        const currentPlayer = getActivePlayer();
+        if (!currentPlayer) return;
+        let diceToSend = [...currentPlayer.diceValues];
+        let newUA = JSON.parse(JSON.stringify(ua));
+
+        // If the user action includes a best_reroll AND rerolls > 0, we must send sorted dice
+        // and reorder the mask accordingly
+        if (s.rerolls_remaining > 0 && newUA.best_reroll && newUA.best_reroll.mask_binary) {
+            const { sortedDice, mapping } = createMappingForSortedDice(diceToSend);
+            const newMask = applyMappingToRerollMask(newUA.best_reroll.mask_binary, mapping);
+
+            diceToSend = sortedDice;
+            newUA.best_reroll.mask_binary = newMask;
+            newUA.best_reroll.id = convertMaskToId(newMask);
+        }
+
+        // Replace the dice in s with the (possibly) sorted diceToSend
+        const s2 = {...s, dice: diceToSend};
+
+        try {
+            const data = await sendJSONPostRequest(URL_EVALUATE_USER_ACTION, {
+                ...s2,
+                user_action: newUA,
+            });
+            if (!data) return;
+
+            rawEvaluateActionTextArea.value = JSON.stringify(data, null, 2);
+
+            if (data.expected_value != null) {
+                currentUserExpectedValue = parseFloat(data.expected_value);
+                const currentPlayer = getActivePlayer();
+                if (currentPlayer) currentPlayer.lastUserExpectedValue = currentUserExpectedValue; // Optional
+
+                let currentScore = 0;
+                document.querySelectorAll(".scored-check:checked").forEach((checkbox) => {
+                    const catId = parseInt(checkbox.dataset.catId, 10);
+                    const scoreCell = document.querySelector(`.best-score-cell[data-cat-id="${catId}"]`);
+                    currentScore += parseInt(scoreCell.textContent, 10) || 0;
+                });
+
+                userActionEvaluationArea.innerHTML = `
+                    <p><b>Expected Total Score = </b> ${(currentScore + currentUserExpectedValue).toFixed(3)}</p>
+                `;
+            } else {
+                userActionEvaluationArea.textContent = "No user action chosen.";
+                currentUserExpectedValue = null;
+                if (currentPlayer) currentPlayer.lastUserExpectedValue = null;
+            }
+        } catch (e) {
+            rawEvaluateActionTextArea.value = `Error: ${e.message}`;
+            userActionEvaluationArea.textContent = `Error evaluating user action: ${e.message}`;
+            currentUserExpectedValue = null;
+            if (currentPlayer) currentPlayer.lastUserExpectedValue = null;
+        } finally {
+            await updateHistogram();
+        }
+    }
+
     async function refreshUI() {
+        console.log("Refreshing UI...");
         if (checkIfGameIsOver()) {
             const totalScore = calculateFinalScore();
             document.getElementById("game_status").innerHTML = `
@@ -1131,9 +1427,10 @@
 
         recalculateScores();
         refreshUserActionJSON();
-        await refreshAvailableCategories();
         await refreshOptimalAction();
+        await refreshAvailableCategories();
         await evaluateUserActionSelection();
+
         displaySortedDice();
         refreshRerollButton();
         refreshDifferenceBox();
@@ -1141,7 +1438,7 @@
         // Enable/Disable Evaluate buttons
         const r = getActivePlayer().rerollsRemaining;
         document.querySelectorAll(".evaluate-button").forEach((button) => {
-            button.disabled = r !== 0;
+            button.disabled = (r !== 0);
         });
 
         // Save state after every UI update
@@ -1169,6 +1466,7 @@
     }
 
     function recalculateScores() {
+        console.log("Recalculating scores...");
         let totalScore = 0;
         let upperScoreSum = 0;
 
@@ -1193,6 +1491,7 @@
     }
 
     function refreshUserActionJSON() {
+        console.log("Refreshing user action JSON...");
         const r = getActivePlayer().rerollsRemaining;
         let ua = {};
         try {
@@ -1208,10 +1507,11 @@
                 const btn = div.querySelector(".dice-reroll-button");
                 mask += btn.classList.contains("reroll") ? "1" : "0";
             });
-            ua = {best_reroll: {mask_binary: mask}};
+            ua = { best_reroll: { mask_binary: mask } };
         } else if (!ua.best_category) {
             ua = {};
         }
+
         userActionTextArea.value = JSON.stringify(ua, null, 2);
     }
 
@@ -1221,10 +1521,10 @@
     }
 
     function refreshDifferenceBox() {
-        if (lastOptimalExpectedValue == null || lastUserExpectedValue == null) {
+        if (currentOptimalExpectedValue == null || currentUserExpectedValue == null) {
             differenceBoxContent.innerHTML = "Not available yet";
         } else {
-            const diff = (lastOptimalExpectedValue - lastUserExpectedValue).toFixed(3);
+            const diff = (currentOptimalExpectedValue - currentUserExpectedValue).toFixed(3);
             differenceBoxContent.innerHTML = "&Delta; = " + diff;
         }
     }
@@ -1257,8 +1557,8 @@
             upper_score: computeUpperScore(),
             total_score: computeTotalScore(),
             optimal_best_reroll_mask: optimalRerollMask,
-            lastOptimalEV: lastOptimalExpectedValue,
-            lastUserEV: lastUserExpectedValue,
+            lastOptimalEV: currentOptimalExpectedValue,
+            lastUserEV: currentUserExpectedValue,
             currentOptimalCategoryId: currentOptimalCategoryID,
             players: allPlayersState,
             activePlayerIndex
@@ -1363,182 +1663,27 @@
 
     /* Category / Reroll / Optimal */
     async function sendJSONPostRequest(url, data) {
-        const response = await fetch(url, {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(data)
-        });
-        if (!response.ok) {
-            throw new Error(`Server responded with ${response.status}`);
-        }
-        return response.text();
-    }
-
-    async function refreshAvailableCategories() {
-        const currentData = getCurrentGameData();
+        showLoading();
+        console.log("Sending POST request to:", url, data);
         try {
-            const raw = await sendJSONPostRequest(URL_AVAILABLE_CATEGORIES, currentData);
-            const data = JSON.parse(raw);
-
-            data.categories.forEach((c) => {
-                const catId = c.id;
-                const row = document.querySelector(`tr[data-cat-id="${catId}"]`);
-                const chk = document.querySelector(`.scored-check[data-cat-id="${catId}"]`);
-                const scoreCell = document.querySelector(`.best-score-cell[data-cat-id="${catId}"]`);
-
-                if (chk.checked) {
-                    row.classList.add("scored-category");
-                    row.classList.remove("available-category", "invalid-category");
-                    scoreCell.classList.add("locked");
-                } else if (c.valid) {
-                    row.classList.add("available-category");
-                    row.classList.remove("scored-category", "invalid-category");
-                    scoreCell.classList.remove("locked");
-                    scoreCell.textContent = c.score;
-                } else {
-                    row.classList.add("invalid-category");
-                    row.classList.remove("scored-category", "available-category");
-                    scoreCell.classList.remove("locked");
-                    scoreCell.textContent = "0";
-                }
+            const response = await fetch(url, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(data)
             });
-        } catch (e) {
-            console.error("Error updating available categories:", e);
-        }
-    }
-
-    async function refreshOptimalAction() {
-        document.querySelectorAll(".optimal-category").forEach((row) => row.classList.remove("optimal-category"));
-
-        const currentPlayer = getActivePlayer();
-        if (currentPlayer) {
-            currentPlayer.optimalRerollMask = [];
-            currentPlayer.lastOptimalExpectedValue = null;
-            currentPlayer.lastUserExpectedValue = null;
-            currentPlayer.currentOptimalCategoryID = null;
-        }
-
-        lastOptimalExpectedValue = null;
-        lastUserExpectedValue = null;
-        currentOptimalCategoryID = null;
-        optimalRerollMask = [];
-
-        const s = getCurrentGameData();
-
-        try {
-            const raw = await sendJSONPostRequest(URL_SUGGEST_OPTIMAL_ACTION, s);
-            const data = JSON.parse(raw);
-            rawOptimalActionTextArea.value = JSON.stringify(data, null, 2);
-
-            if (data.expected_value != null) {
-                lastOptimalExpectedValue = parseFloat(data.expected_value);
-                if (currentPlayer) {
-                    currentPlayer.lastOptimalExpectedValue = lastOptimalExpectedValue;
-                }
+            if (!response.ok) {
+                throw new Error(`Server responded with ${response.status}`);
             }
-
-            let info = "None";
-            if (s.rerolls_remaining > 0 && data.best_reroll) {
-                info = `Reroll mask: ${data.best_reroll.mask_binary}<br>Expected Score: ${data.expected_value.toFixed(3)}`;
-                optimalRerollMask = data.best_reroll.mask_binary.split("");
-                if (currentPlayer) {
-                    currentPlayer.optimalRerollMask = [...optimalRerollMask];
-                }
-            } else if (s.rerolls_remaining === 0 && data.best_category) {
-                info = `
-                    <p>Optimal Category: <strong>${data.best_category.name}</strong></p>
-                    <p>Expected Value: ${data.expected_value.toFixed(3)}</p>
-                `;
-                currentOptimalCategoryID = data.best_category.id;
-                if (currentPlayer) {
-                    currentPlayer.currentOptimalCategoryID = currentOptimalCategoryID;
-                }
-            }
-
-            optimalActionContainer.dataset.info = info;
-            if (optimalActionContainer.classList.contains("show") && currentOptimalCategoryID != null) {
-                const optimalRow = document.querySelector(`tr[data-cat-id='${currentOptimalCategoryID}']`);
-                if (optimalRow) {
-                    optimalRow.classList.add("optimal-category");
-                }
-            }
-            optimalActionContentElement.innerHTML = info;
-        } catch (e) {
-            rawOptimalActionTextArea.value = `Error: ${e.message}`;
-        }
-    }
-
-    async function evaluateUserActionSelection() {
-        const s = getCurrentGameData();
-        let ua = {};
-
-        try {
-            ua = JSON.parse(userActionTextArea.value);
-        } catch (e) {
-            userActionEvaluationArea.textContent = "No user action chosen or invalid JSON.";
-            rawEvaluateActionTextArea.value = "No user action chosen or invalid JSON.";
-            lastUserExpectedValue = null;
-            if (getActivePlayer()) getActivePlayer().lastUserExpectedValue = null;
-            return;
-        }
-
-        if (!ua || Object.keys(ua).length === 0) {
-            userActionEvaluationArea.textContent = "No user action chosen.";
-            rawEvaluateActionTextArea.value = "No user action chosen.";
-            lastUserExpectedValue = null;
-            if (getActivePlayer()) getActivePlayer().lastUserExpectedValue = null;
-            return;
-        }
-
-        let diceToSend = [...getActivePlayer().diceValues];
-        let newUA = JSON.parse(JSON.stringify(ua));
-
-        if (s.rerolls_remaining > 0 && newUA.best_reroll && newUA.best_reroll.mask_binary) {
-            const {dice: sortedDice, mask: newMask} = reorderDiceAndMask(diceToSend, newUA.best_reroll.mask_binary);
-            diceToSend = sortedDice;
-            newUA.best_reroll.mask_binary = newMask;
-            newUA.best_reroll.id = convertMaskToId(newMask);
-        }
-        const s2 = {...s, dice: diceToSend};
-
-        try {
-            const raw = await sendJSONPostRequest(URL_EVALUATE_USER_ACTION, {
-                ...s2,
-                user_action: newUA,
-            });
-            const data = JSON.parse(raw);
-            rawEvaluateActionTextArea.value = JSON.stringify(data, null, 2);
-
-            if (data.expected_value != null) {
-                lastUserExpectedValue = parseFloat(data.expected_value);
-                if (getActivePlayer()) getActivePlayer().lastUserExpectedValue = lastUserExpectedValue;
-
-                let currentScore = 0;
-                document.querySelectorAll(".scored-check:checked").forEach((checkbox) => {
-                    const catId = parseInt(checkbox.dataset.catId, 10);
-                    const scoreCell = document.querySelector(`.best-score-cell[data-cat-id="${catId}"]`);
-                    currentScore += parseInt(scoreCell.textContent, 10) || 0;
-                });
-
-                userActionEvaluationArea.innerHTML = `
-                    <p><b>Expected Total Score = </b> ${(currentScore + lastUserExpectedValue).toFixed(3)}</p>
-                `;
-            } else {
-                userActionEvaluationArea.textContent = "No user action chosen.";
-                lastUserExpectedValue = null;
-                if (getActivePlayer()) getActivePlayer().lastUserExpectedValue = null;
-            }
-        } catch (e) {
-            rawEvaluateActionTextArea.value = `Error: ${e.message}`;
-            userActionEvaluationArea.textContent = `Error evaluating user action: ${e.message}`;
-            lastUserExpectedValue = null;
-            if (getActivePlayer()) getActivePlayer().lastUserExpectedValue = null;
+            return await response.json();
+        } catch (error) {
+            console.error("API call failed:", error);
+            alert("An error occurred. Please try again later.\n" + error.message);
+            return null;
         } finally {
-            await updateHistogram();
+            hideLoading();
         }
     }
 
-    /* Histogram & Chart.js */
     let histogramChart = null;
 
     async function getCachedHistogramData() {
@@ -1554,6 +1699,9 @@
                 }
             }
             const response = await fetch('http://localhost:8080/score_histogram');
+            if (!response.ok) {
+                throw new Error(`Histogram endpoint responded with ${response.status}`);
+            }
             const data = await response.json();
             localStorage.setItem(CACHE_KEY, JSON.stringify({
                 timestamp: Date.now(),
@@ -1568,18 +1716,26 @@
 
     async function updateHistogram() {
         const currentData = getCurrentGameData();
+        if (!currentData) return;
+
+        // Skip updating if rerolls_remaining is 0
+        if (currentData.rerolls_remaining === 0) {
+            console.log("Skipping histogram update as rerolls_remaining is 0.");
+            return; // Exit early, keeping the existing histogram
+        }
+
         try {
             const [actionResponse, histogramResponse] = await Promise.all([
                 sendJSONPostRequest(URL_EVALUATE_ACTIONS, currentData),
                 getCachedHistogramData()
             ]);
 
-            if (!histogramResponse) {
-                console.warn("No histogram data available");
+            if (!actionResponse || !actionResponse.actions || !histogramResponse) {
+                console.warn("No histogram data or invalid response from evaluate_actions");
                 return;
             }
 
-            const responseData = JSON.parse(actionResponse);
+            const responseData = actionResponse;
 
             const allEvs = [];
             const currentMaskEvs = [];
@@ -1627,22 +1783,21 @@
             currentMaskEvs.forEach((val) => {
                 const index = Math.min(Math.floor((val - minEV) / binWidth), binCount - 1);
                 if (index >= 0) {
-                    currentMaskBins[index] += 10;
+                    // Arbitrarily scale these bins so they show up distinctly
+                    currentMaskBins[index] += 2;
                 }
             });
-
-            console.log(currentMaskBins);
 
             // Calculate reverse cumulative probability for the "10k Optimal" dataset
             const totalOptimal = histogramResponse.bins.reduce((sum, val) => sum + val, 0);
             const reverseCumulativeBins = [];
             histogramResponse.bins.reduceRight((acc, val) => {
                 const reverseCumulativeValue = acc + val;
-                reverseCumulativeBins.unshift(reverseCumulativeValue / totalOptimal); // Normalize to [0, 1]
+                reverseCumulativeBins.unshift(reverseCumulativeValue / totalOptimal);
                 return reverseCumulativeValue;
             }, 0);
 
-            const labels = Array.from({ length: binCount }, (_, i) => {
+            const labels = Array.from({length: binCount}, (_, i) => {
                 const start = Math.round(minEV + i * binWidth);
                 const end = Math.round(start + binWidth);
                 return `${start.toFixed(0)} - ${end.toFixed(0)}`;
@@ -1660,57 +1815,60 @@
                     labels: labels,
                     datasets: [
                         {
-                            type: "line", // Cumulative probability line
-                            label: "10k Optimal (Cumulative Probability)",
+                            type: "line",
+                            label: "10k Optimal",
                             data: reverseCumulativeBins,
                             backgroundColor: "rgba(40, 150, 250, 0.1)",
                             borderColor: "rgba(40, 150, 250, 1)",
                             borderWidth: 1,
                             tension: 0.4,
                             yAxisID: "y1",
+                            animation: false,
                         },
                         {
-                            label: "Current Expected Values",
+                            label: "Expected Scores Possible",
                             data: currentBins,
                             backgroundColor: "rgba(255, 100, 40, 0.9)",
                             borderColor: "rgba(255, 100, 40, 1)",
                             borderWidth: 1,
                             yAxisID: "y",
+                            animation: false,
                         },
                         {
-                            label: "EVs for Current Reroll Mask",
+                            label: "Current Reroll Mask",
                             data: currentMaskBins,
-                            backgroundColor: "rgba(50, 205, 50, 0.9)", // Distinct color
+                            backgroundColor: "rgba(50, 205, 50, 0.9)",
                             borderColor: "rgba(50, 205, 50, 1)",
                             borderWidth: 1,
                             yAxisID: "y",
+                            animation: true,
                         },
                     ],
                 },
                 options: {
                     responsive: true,
-                    animation: false,
-                    transitions: {
-                        active: {
-                            animation: { duration: 0 },
-                        },
+                    animation: {
+                        duration: 200,
                     },
                     scales: {
                         x: {
-                            title: { display: true, text: "Expected Value Range" },
+                            title: { display: true, text: "Expected Scores" },
+                            grid: { display: true },
                         },
                         y: {
-                            title: { display: true, text: "Frequency" },
-                            min: 0,
+                            type: "logarithmic",
+                            title: { display: true, text: "Frequency (Log Scale)" },
+                            min: 1,
                             max: 1000,
                             position: "left",
+                            grid: { display: false },
                         },
                         y1: {
-                            title: { display: true, text: "Cumulative Probability" },
+                            title: { display: true, text: "Reverse Cumulative Probability" },
                             min: 0,
                             max: 1,
                             position: "right",
-                            grid: { drawOnChartArea: false },
+                            grid: { drawOnChartArea: true },
                         },
                     },
                 },
@@ -1727,14 +1885,84 @@
         }
     }
 
-    /* Dice Reordering */
-    function reorderDiceAndMask(originalDice, originalMask) {
-        const pairedArray = originalDice.map((v, i) => ({value: v, index: i}));
-        pairedArray.sort((a, b) => a.value - b.value);
+    function getCurrentGameData() {
+        const currentPlayer = getActivePlayer();
+        if (!currentPlayer) {
+            console.warn("No active player. Cannot retrieve game data.");
+            return null;
+        }
 
-        const sortedDice = pairedArray.map((item) => item.value);
-        const remappedMask = pairedArray.map((item) => originalMask[item.index]).join("");
-        return {dice: sortedDice, mask: remappedMask};
+        // Calculate scored categories as a bitmask
+        let bitmask = 0;
+        let total = 0;
+        let upperSum = 0;
+
+        document.querySelectorAll(".scored-check").forEach((checkbox) => {
+            if (checkbox.checked) {
+                const catId = parseInt(checkbox.dataset.catId, 10);
+                const scoreCell = document.querySelector(`.best-score-cell[data-cat-id='${catId}']`);
+                const value = scoreCell ? parseInt(scoreCell.textContent, 10) || 0 : 0;
+                bitmask |= 1 << catId;
+                total += value;
+                if (catId <= 5) {
+                    upperSum += value;
+                }
+            }
+        });
+
+        const bonus = upperSum >= 63 ? 50 : 0;
+
+        return {
+            upper_score: upperSum,
+            scored_categories: bitmask,
+            dice: [...currentPlayer.diceValues],
+            rerolls_remaining: currentPlayer.rerollsRemaining,
+            bonus: bonus,
+            total_score_no_bonus: total,
+            total_score: total + bonus,
+        };
+    }
+
+    function convertMaskToId(mask) {
+        let id = 0;
+        for (let i = 0; i < mask.length; i++) {
+            if (mask[i] === "1") {
+                id |= 1 << i;
+            }
+        }
+        return id;
+    }
+
+    function displaySortedDice() {
+        const currentPlayer = getActivePlayer();
+        const container = document.getElementById("sorted_dice_container");
+        if (!currentPlayer || !container) {
+            console.warn("No active player or container found.");
+            return;
+        }
+
+        container.innerHTML = "";
+
+        // Get dice values and the reroll mask
+        const diceValues = [...currentPlayer.diceValues];
+        const rerollMask = currentPlayer.optimalRerollMask || [];
+
+        // Create an array of dice with their original indices
+        const sortedDice = diceValues.map((value, index) => ({value, index})).sort((a, b) => a.value - b.value);
+
+        // Add sorted dice to the container
+        sortedDice.forEach(({value, index}) => {
+            const diceDiv = document.createElement("div");
+            diceDiv.classList.add("die-value");
+            diceDiv.textContent = value;
+
+            // Highlight dice to be rerolled
+            if (rerollMask[index] === "1") {
+                diceDiv.classList.add("reroll-highlight");
+            }
+
+            container.appendChild(diceDiv);
+        });
     }
 
     function handleOptimalActionToggle() {
@@ -1781,91 +2009,6 @@
         }
     }
 
-    function getCurrentGameData() {
-        const currentPlayer = getActivePlayer();
-        if (!currentPlayer) {
-            console.warn("No active player. Cannot retrieve game data.");
-            return null;
-        }
-
-        // Calculate scored categories as a bitmask
-        let bitmask = 0;
-        let total = 0;
-        let upperSum = 0;
-
-        document.querySelectorAll(".scored-check").forEach((checkbox) => {
-            if (checkbox.checked) {
-                const catId = parseInt(checkbox.dataset.catId, 10);
-                const scoreCell = document.querySelector(`.best-score-cell[data-cat-id='${catId}']`);
-                const value = scoreCell ? parseInt(scoreCell.textContent, 10) || 0 : 0;
-                bitmask |= 1 << catId;
-                total += value;
-                if (catId <= 5) {
-                    upperSum += value;
-                }
-            }
-        });
-
-        const bonus = upperSum >= 63 ? 50 : 0;
-
-
-        let currentGameData = {
-            upper_score: upperSum,
-            scored_categories: bitmask,
-            dice: [...currentPlayer.diceValues],
-            rerolls_remaining: currentPlayer.rerollsRemaining,
-            bonus: bonus,
-            total_score_no_bonus: total,
-            total_score: total + bonus,
-        };
-        console.log("Current Game Data:", currentGameData);
-        return currentGameData;
-    }
-
-    function convertMaskToId(mask) {
-        let id = 0;
-        for (let i = 0; i < mask.length; i++) {
-            if (mask[i] === "1") {
-                id |= 1 << i; // Set the bit at position i
-            }
-        }
-        return id;
-    }
-
-    function displaySortedDice() {
-        const currentPlayer = getActivePlayer();
-        const container = document.getElementById("sorted_dice_container");
-        if (!currentPlayer || !container) {
-            console.warn("No active player or container found.");
-            return;
-        }
-
-        // Clear the container before displaying new dice
-        container.innerHTML = "";
-
-        // Get dice values and the reroll mask
-        const diceValues = [...currentPlayer.diceValues];
-        const rerollMask = currentPlayer.optimalRerollMask || [];
-
-        // Create an array of dice with their original indices
-        const sortedDice = diceValues.map((value, index) => ({value, index})).sort((a, b) => a.value - b.value);
-
-        // Add sorted dice to the container
-        sortedDice.forEach(({value, index}) => {
-            const diceDiv = document.createElement("div");
-            diceDiv.classList.add("die-value");
-            diceDiv.textContent = value;
-
-            // Highlight dice to be rerolled (if reroll mask indicates so)
-            if (rerollMask[index] === "1") {
-                diceDiv.classList.add("reroll-highlight");
-            }
-
-            container.appendChild(diceDiv);
-        });
-    }
-
-    /* Lifecycle: init */
     function init() {
         // Ensure at least one default player
         if (players.length === 0) {
