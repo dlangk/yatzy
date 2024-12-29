@@ -1,0 +1,453 @@
+/**************************************************
+ * Flash-of-Unstyled-Content Prevention
+ **************************************************/
+body {
+    margin: 0;
+    padding: 0;
+    opacity: 0; /* Hide initially */
+}
+
+body.loaded {
+    opacity: 1; /* Show everything once loaded */
+}
+
+/**************************************************
+ * Basic Page Layout
+ **************************************************/
+body {
+    font-family: Arial, sans-serif;
+    background: #f2f2f2;
+    color: #333;
+    margin: 20px;
+}
+
+.container {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+/* Fixed width on the left to prevent resizing */
+.column {
+    flex: 0 0 500px;
+}
+
+.right-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+h1 {
+    margin-bottom: 10px;
+}
+
+h2 {
+    margin-bottom: 5px;
+    font-size: 1.1em;
+    color: #555;
+}
+
+h3 {
+    margin-bottom: 2px;
+    font-size: 1em;
+    color: #555;
+}
+
+/**************************************************
+ * Scorecard Table
+ **************************************************/
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+    background: #fff;
+}
+
+th,
+td {
+    border: 1px solid #ccc;
+    padding: 4px 5px;
+    text-align: center;
+}
+
+th {
+    background: #e0e0e0;
+    border: 2px solid #000;
+}
+
+tr {
+    border: 2px solid #ccc;
+}
+
+button {
+    cursor: pointer; /* Changes cursor to pointer */
+}
+
+/* Row Colors */
+tr.scored-category {
+    background-color: #d4edda; /* Light green for scored rows */
+}
+
+tr.available-category {
+    background-color: #ffffff; /* Default white for available rows */
+}
+
+tr.invalid-category {
+    background-color: #d1d1d1; /* Light gray for unavailable rows */
+    color: #6c757d; /* Muted text color */
+}
+
+.bonus-row,
+.total-row {
+    border-top: 2px solid #000 !important;
+    border-bottom: 2px solid #000 !important;
+}
+
+/* Locked Best Score */
+.best-score-cell.locked {
+    font-weight: bold;
+    color: #333;
+}
+
+.best-score-cell {
+    width: 50px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.optimal-category {
+    border: 2px solid #555 !important;
+}
+
+.evaluate-button {
+    background: #6d88b3;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.evaluate-button:disabled {
+    background: #ccc;
+    color: #666;
+    cursor: not-allowed;
+}
+
+.scored-check {
+    cursor: pointer; /* Changes cursor to pointer */
+}
+
+.evaluate-button:hover {
+    background: #53688a;
+}
+
+/**************************************************
+ * Right Sections
+ **************************************************/
+.right-section {
+    width: 700px;
+    border: 1px solid #ccc;
+    background: #fff;
+    border-radius: 5px;
+    padding: 10px;
+}
+
+/**************************************************
+ * Dice & Rerolls
+ **************************************************/
+.dice-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 5px;
+    align-items: flex-start;
+}
+
+#randomizeDiceButton {
+    margin-bottom: 10px;
+}
+
+.die {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    width: 100px;
+    height: 120px;
+    border: 2px solid #999;
+    border-radius: 5px;
+    background: #fff;
+    padding: 5px;
+    box-sizing: border-box;
+    position: relative;
+}
+
+.die-value {
+    font-size: 1.2em;
+    margin: 3px 0;
+    border: 1px solid #333;
+    width: 44px;
+    height: 44px;
+    line-height: 44px;
+    text-align: center;
+    background: #fafafa;
+}
+
+.die button {
+    background: #ccc;
+    border: 1px solid #999;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.8em;
+    color: #333;
+    width: 44px;
+    height: 24px;
+    margin: 0;
+    padding: 0;
+}
+
+.die.locked {
+    border-color: red;
+}
+
+.die.reroll {
+    border-color: green;
+}
+
+.dice-reroll-button {
+    width: 90%;
+    max-width: 120px;
+    margin-top: 8px;
+    border: 1px solid #999;
+    border-radius: 3px;
+    font-size: 0.9em;
+    cursor: pointer;
+    padding: 5px;
+    text-align: center;
+    background: #ccc;
+    color: #333;
+}
+
+.dice-reroll-button.locked {
+    background: red;
+    color: white;
+}
+
+.dice-reroll-button.reroll {
+    background: green;
+    color: white;
+}
+
+.dice-note {
+    font-size: 0.9em;
+    color: #555;
+    margin-bottom: 10px;
+}
+
+.rerolls-container {
+    margin-top: 10px;
+    margin-bottom: 10px;
+    text-align: left;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.rerolls-container span {
+    font-weight: bold;
+}
+
+#rerollsRemaining {
+    width: 50px;
+    text-align: center;
+    border: 1px solid #999;
+    border-radius: 3px;
+    background: #fff;
+}
+
+.arrow-button {
+    background: #ccc;
+    border: 1px solid #999;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.8em;
+    color: #333;
+    width: 36px;
+    height: 24px;
+    padding: 0;
+}
+
+.arrow-button:hover {
+    background: #bbb;
+}
+
+/**************************************************
+ * User Action & Evaluation
+ **************************************************/
+#user_action {
+    height: 100px;
+    border: 1px solid #999;
+    border-radius: 5px;
+    background: #f9f9f9;
+    margin-bottom: 5px;
+    padding: 5px;
+    width: 500px;
+}
+
+#user_action_evaluation {
+    border: 1px solid #ccc;
+    padding: 10px;
+    min-height: 50px;
+    border-radius: 5px;
+    background: #f9f9f9;
+}
+
+/**************************************************
+ * Difference Box
+ **************************************************/
+#difference_box {
+    display: block;
+    padding: 10px;
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+#differenceContent {
+    font-weight: bold;
+    min-height: 20px;
+}
+
+/**************************************************
+ * Optimal Action Box (Collapsible)
+ **************************************************/
+#optimalActionBox {
+    display: block;
+    overflow: hidden;
+    max-height: 0; /* collapsed by default */
+    margin-top: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: #f9f9f9;
+}
+
+#optimalActionBox.show {
+    max-height: 500px; /* expand */
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid #ccc;
+}
+
+#toggleOptimalActionButton {
+    display: block;
+    background: #ccc;
+    border: 1px solid #999;
+    border-radius: 3px;
+    padding: 5px 5px;
+    cursor: pointer;
+}
+
+#toggleOptimalActionButton:hover {
+    background: #bbb;
+}
+
+.sorted-dice-container {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+}
+
+/**************************************************
+ * Debug Box - Hidden by default with .hidden
+ **************************************************/
+#toggleDebugButton {
+    display: block;
+    background: #ccc;
+    border: 1px solid #999;
+    border-radius: 3px;
+    padding: 5px 5px;
+    cursor: pointer;
+}
+
+#debugBox {
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background: #fafafa;
+    padding: 10px;
+    margin-top: 10px;
+}
+
+#debugBox textarea {
+    width: 100%;
+    height: 150px;
+    background: #fff;
+    margin-bottom: 10px;
+    border: 1px solid #999;
+    border-radius: 3px;
+    padding: 5px;
+}
+
+#toggleDebugButton:hover {
+    background: #bbb;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/**************************************************
+ * Reroll highlight
+ **************************************************/
+.reroll-highlight {
+    background-color: yellow;
+}
+
+/**************************************************
+ * Histogram
+ **************************************************/
+#histogramContainer {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+}
+
+/**************************************************
+ * Loading Overlay
+ **************************************************/
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.loading-overlay .spinner {
+    width: 60px;
+    height: 60px;
+    border: 8px solid #ddd;
+    border-top: 8px solid #333;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-overlay.hidden {
+    display: none;
+}

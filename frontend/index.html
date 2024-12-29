@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Delta Yatzy</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="container">
+    <!-- Scorecard Column -->
+    <div class="scorecard">
+        <h2>Scorecard</h2>
+        <table id="scorecard">
+            <thead>
+            <tr>
+                <th>Category</th>
+                <th>Scored</th>
+                <th>Score</th>
+                <th>User Action</th>
+            </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <h1>&Delta; Yatzy</h1>
+    </div>
+
+    <!-- Right Column -->
+    <div class="right-column">
+        <div class="player-selection">
+            <label for="playerSelect">Select Player:</label>
+            <select id="playerSelect"></select>
+            <button id="addPlayerButton">Add Player</button>
+            <button id="resetGameButton">Reset Game</button>
+        </div>
+
+        <!-- Dice Container -->
+        <div class="right-section">
+            <button id="randomizeDiceButton">Randomize Dice</button>
+            <div class="dice-container" id="diceContainer"></div>
+            <button id="rerollDiceButton">Reroll Dice</button>
+
+            <div class="rerolls-container">
+                <span>Rerolls Remaining:</span>
+                <input type="number" id="rerollsRemaining" value="2" readonly>
+                <button class="arrow-button" id="reroll_down">▼</button>
+                <button class="arrow-button" id="reroll_up">▲</button>
+            </div>
+        </div>
+
+        <!-- User Action Evaluation -->
+        <div class="right-section">
+            <div id="user_action_evaluation"></div>
+        </div>
+
+        <!-- The difference box (always visible, but can show "Not available yet") -->
+        <div class="right-section" id="difference_box">
+            <div id="differenceContent"></div>
+        </div>
+
+        <!-- Container + canvas for the histogram -->
+        <div class="right-section" id="histogramContainer">
+            <canvas id="histogramChart" width="600" height="300"></canvas>
+        </div>
+
+        <div id="game_status"></div>
+
+        <!-- Optimal Action box with one toggle button -->
+        <div class="right-section">
+            <button id="toggleOptimalActionButton">Show Optimal Action</button>
+            <div id="optimalActionBox">
+                <h2>Optimal Action</h2>
+                <div id="optimalActionContent" style="min-height:50px; margin-top:10px;"></div>
+
+                <h2>Sorted Dice</h2>
+                <div class="sorted-dice-container" id="sorted_dice_container"></div>
+                <p>Yellow dice should be rerolled.</p>
+            </div>
+        </div>
+
+        <!-- Debug Info with one toggle button -->
+        <div class="right-section">
+            <button id="toggleDebugButton">Show Debug Info</button>
+            <div id="debugBox" class="hidden">
+                <h2>Debug Info</h2>
+                <textarea id="rawOptimalAction" readonly></textarea>
+                <textarea id="rawEvaluateAction" readonly></textarea>
+                <textarea id="user_action" readonly></textarea>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="interface.js"></script>
+</body>
+</html>
