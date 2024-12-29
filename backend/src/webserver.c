@@ -9,11 +9,6 @@
 
 #include "file_utilities.h"
 
-struct RequestContext {
-    char *post_data;
-    size_t post_size;
-};
-
 // Add a helper function to set CORS headers on every response
 void AddCORSHeaders(struct MHD_Response *response) {
     MHD_add_response_header(response, "Access-Control-Allow-Origin", "*");
