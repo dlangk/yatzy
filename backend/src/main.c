@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <signal.h>
 #include "webserver.h"           // Declares answer_to_connection
 #include "yatzy.h"               // Declares CreateYatzyContext and FreeYatzyContext
 
