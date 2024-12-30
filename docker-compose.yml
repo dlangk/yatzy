@@ -1,0 +1,46 @@
+version: "3.8"
+
+services:
+  yatzy-frontend:
+    build: ./frontend
+    container_name: yatzy-frontend
+    restart: always
+    networks:
+      - shared_network
+    ports:
+      - "8090:8090"  # Map frontend port to host
+    expose:
+      - 8090
+    environment:
+      - BACKEND_URL=http://yatzy-backend:9000  # Communicate with backend by service name
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - ./frontend/logs:/app/logs  # Optional volume for logs
+
+  yatzy-backend:
+    build: ./backend
+    container_name: yatzy-backend
+    restart: always
+    ports:
+      - "9000:9000"
+    networks:
+      - shared_network
+    volumes:
+      - ./backend/data:/app/data  # Mount the data directory as a volume
+    expose:
+      - 9000
+    environment:
+      - API_PORT=9000  # Environment variable for backend port
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  shared_network:
+    external: true

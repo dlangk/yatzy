@@ -11,6 +11,7 @@ typedef struct {
 } EVProbabilityPair;
 
 // Precomputation functions
+
 void PrecomputeCategoryScores(YatzyContext *ctx);
 void PrecomputeRerollTransitionProbabilities(YatzyContext *ctx);
 void PrecomputeFactorials(YatzyContext *ctx);

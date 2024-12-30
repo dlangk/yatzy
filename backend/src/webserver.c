@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <json-c/json.h>
 
 #include "yatzy.h"
@@ -20,7 +21,7 @@ void AddCORSHeaders(struct MHD_Response *response) {
 
 
 void handle_get_score_histogram(YatzyContext *ctx, struct MHD_Connection *connection) {
-    FILE *file = fopen("backend/data/score_histogram.csv", "r");
+    FILE *file = fopen("data/score_histogram.csv", "r");
     if (file == NULL) {
         const char *err = "{\"error\":\"Could not open score histogram file\"}";
         struct MHD_Response *resp = MHD_create_response_from_buffer(
@@ -119,7 +120,7 @@ void handle_get_state_value(YatzyContext *ctx, struct MHD_Connection *connection
 }
 
 void handle_evaluate_category_score(YatzyContext *ctx, struct MHD_Connection *connection,
-                                           struct json_object *parsed) {
+                                    struct json_object *parsed) {
     struct json_object *dice_arr = json_object_object_get(parsed, "dice");
     struct json_object *cat_obj = json_object_object_get(parsed, "category_id");
     if (!dice_arr || !cat_obj) {
@@ -153,7 +154,7 @@ void handle_evaluate_category_score(YatzyContext *ctx, struct MHD_Connection *co
 }
 
 void handle_available_categories(YatzyContext *ctx, struct MHD_Connection *connection,
-                                        struct json_object *parsed) {
+                                 struct json_object *parsed) {
     struct json_object *upper_obj = json_object_object_get(parsed, "upper_score");
     struct json_object *scored_obj = json_object_object_get(parsed, "scored_categories");
     struct json_object *dice_arr = json_object_object_get(parsed, "dice");
@@ -221,7 +222,7 @@ void handle_available_categories(YatzyContext *ctx, struct MHD_Connection *conne
 }
 
 void handle_evaluate_all_categories(YatzyContext *ctx, struct MHD_Connection *connection,
-                                           struct json_object *parsed) {
+                                    struct json_object *parsed) {
     struct json_object *upper_obj = json_object_object_get(parsed, "upper_score");
     struct json_object *scored_obj = json_object_object_get(parsed, "scored_categories");
     struct json_object *dice_arr = json_object_object_get(parsed, "dice");
@@ -420,7 +421,7 @@ void handle_evaluate_actions(YatzyContext *ctx, struct MHD_Connection *connectio
 }
 
 void handle_suggest_optimal_action(YatzyContext *ctx, struct MHD_Connection *connection,
-                                          struct json_object *parsed) {
+                                   struct json_object *parsed) {
     struct json_object *upper_score_obj = json_object_object_get(parsed, "upper_score");
     struct json_object *scored_categories_obj = json_object_object_get(parsed, "scored_categories");
     struct json_object *dice_arr = json_object_object_get(parsed, "dice");
@@ -521,7 +522,7 @@ void handle_suggest_optimal_action(YatzyContext *ctx, struct MHD_Connection *con
 }
 
 void handle_evaluate_user_action(YatzyContext *ctx, struct MHD_Connection *connection,
-                                        struct json_object *parsed) {
+                                 struct json_object *parsed) {
     struct json_object *upper_score_obj = json_object_object_get(parsed, "upper_score");
     struct json_object *scored_categories_obj = json_object_object_get(parsed, "scored_categories");
     struct json_object *dice_arr = json_object_object_get(parsed, "dice");
@@ -643,7 +644,7 @@ void handle_evaluate_user_action(YatzyContext *ctx, struct MHD_Connection *conne
 
 // Utility function to send an error response with CORS headers
 enum MHD_Result respond_with_error(struct MHD_Connection *connection, int status_code,
-                                          const char *error_message, struct RequestContext *req_ctx) {
+                                   const char *error_message, struct RequestContext *req_ctx) {
     struct MHD_Response *response = MHD_create_response_from_buffer(strlen(error_message),
                                                                     (void *) error_message,
                                                                     MHD_RESPMEM_PERSISTENT);
@@ -660,17 +661,40 @@ enum MHD_Result respond_with_error(struct MHD_Connection *connection, int status
 
 // Main request handler:
 enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *connection,
-                                            const char *url, const char *method,
-                                            const char *version, const char *upload_data,
-                                            size_t *upload_data_size, void **con_cls) {
+                                     const char *url, const char *method,
+                                     const char *version, const char *upload_data,
+                                     size_t *upload_data_size, void **con_cls) {
     YatzyContext *ctx = (YatzyContext *) cls; // Server context
 
-    // Initialize request context if not already done
+    // Declare reusable variables for logging
+    time_t now = time(NULL);
+    struct tm *local_time = localtime(&now);
+    char time_buf[20] = {0}; // Initialize buffer
+
+    // Check if localtime is valid
+    if (!local_time) {
+        strncpy(time_buf, "UNKNOWN_TIME", sizeof(time_buf));
+    } else {
+        // Use strftime and check for errors
+        if (strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", local_time) == 0) {
+            strncpy(time_buf, "UNKNOWN_TIME", sizeof(time_buf)); // Fallback if strftime fails
+        }
+    }
+
+    // First call: Initialize request context and log request details
     if (*con_cls == NULL) {
         struct RequestContext *req_ctx = (struct RequestContext *) calloc(1, sizeof(struct RequestContext));
         req_ctx->post_data = NULL;
         req_ctx->post_size = 0;
         *con_cls = req_ctx;
+
+        // Get current time and log the request
+        now = time(NULL);
+        local_time = localtime(&now);
+        strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", local_time);
+        printf("[%s] Received request: Method = %s, URL = %s, Version = %s\n",
+               time_buf, method, url, version);
+
         return MHD_YES;
     }
 
@@ -678,7 +702,7 @@ enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *connectio
 
     // Handle OPTIONS preflight requests
     if (strcmp(method, "OPTIONS") == 0) {
-        printf("OPTIONS request received for URL: %s\n", url);
+        printf("[%s] OPTIONS request received for URL: %s\n", time_buf, url);
         struct MHD_Response *options_response = MHD_create_response_from_buffer(0, "", MHD_RESPMEM_PERSISTENT);
         AddCORSHeaders(options_response);
         MHD_add_response_header(options_response, "Access-Control-Max-Age", "86400");
@@ -698,6 +722,7 @@ enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *connectio
             size_t new_size = req_ctx->post_size + *upload_data_size;
             req_ctx->post_data = (char *) realloc(req_ctx->post_data, new_size + 1);
             if (!req_ctx->post_data) {
+                printf("[%s] Error: Memory allocation failed while processing POST data.\n", time_buf);
                 return respond_with_error(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, "Memory allocation error",
                                           req_ctx);
             }
@@ -708,8 +733,12 @@ enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *connectio
             return MHD_YES;
         }
 
+        // Log the collected POST data
+        printf("[%s] POST request received for URL: %s with data: %s\n", time_buf, url, req_ctx->post_data);
+
         // Process full POST data
         if (!req_ctx->post_data) {
+            printf("[%s] Error: No POST data received for URL: %s\n", time_buf, url);
             struct MHD_Response *response = MHD_create_response_from_buffer(
                 strlen("No data received"),
                 (void *) "No data received",
@@ -725,6 +754,7 @@ enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *connectio
 
         struct json_object *parsed = json_tokener_parse(req_ctx->post_data);
         if (!parsed) {
+            printf("[%s] Error: Invalid JSON received for URL: %s\n", time_buf, url);
             struct MHD_Response *response = MHD_create_response_from_buffer(
                 strlen("Invalid JSON"),
                 (void *) "Invalid JSON",
@@ -738,6 +768,9 @@ enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *connectio
             *con_cls = NULL;
             return MHD_YES;
         }
+
+        // Log routing information
+        printf("[%s] Routing POST request to URL: %s\n", time_buf, url);
 
         // Route the POST request
         if (strcmp(url, "/evaluate_category_score") == 0) {
@@ -753,6 +786,7 @@ enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *connectio
         } else if (strcmp(url, "/evaluate_user_action") == 0) {
             handle_evaluate_user_action(ctx, connection, parsed);
         } else {
+            printf("[%s] Error: Unknown endpoint %s\n", time_buf, url);
             struct MHD_Response *response = MHD_create_response_from_buffer(
                 strlen("Unknown endpoint"),
                 (void *) "Unknown endpoint",
@@ -777,11 +811,13 @@ enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *connectio
 
     // Handle GET requests
     if (strcmp(method, "GET") == 0) {
+        printf("[%s] GET request received for URL: %s\n", time_buf, url);
         if (strncmp(url, "/state_value", 12) == 0) {
             handle_get_state_value(ctx, connection);
         } else if (strcmp(url, "/score_histogram") == 0) {
             handle_get_score_histogram(ctx, connection);
         } else {
+            printf("[%s] Error: Unknown endpoint %s\n", time_buf, url);
             return respond_with_error(connection, MHD_HTTP_NOT_FOUND, "Unknown endpoint", req_ctx);
         }
 
@@ -791,6 +827,8 @@ enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *connectio
         return MHD_YES;
     }
 
-    // Unsupported methods
+    // Log unsupported methods
+    printf("[%s] Error: Unsupported HTTP method %s for URL: %s\n", time_buf, method, url);
+
     return respond_with_error(connection, MHD_HTTP_METHOD_NOT_ALLOWED, "Only POST and GET supported", req_ctx);
 }

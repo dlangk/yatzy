@@ -1,5 +1,5 @@
 # Minimum required version of CMake
-cmake_minimum_required(VERSION 3.30.5)
+cmake_minimum_required(VERSION 3.22.1)
 
 # Project name and version
 project(Yatzy VERSION 1.0 LANGUAGES C)

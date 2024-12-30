@@ -72,11 +72,14 @@ const YAHTZEE_CATEGORIES = [
     "Small Straight", "Large Straight", "Full House", "Chance", "Yatzy"
 ];
 const TOTAL_DICE = 5;
-const API_BASE_URL = "http://localhost:8080";
+
+// Use the dynamically injected API_BASE_URL
+const API_BASE_URL = window.API_BASE_URL || "http://localhost:9000"; // Default to localhost if not set
 const URL_AVAILABLE_CATEGORIES = `${API_BASE_URL}/available_categories`;
 const URL_SUGGEST_OPTIMAL_ACTION = `${API_BASE_URL}/suggest_optimal_action`;
 const URL_EVALUATE_USER_ACTION = `${API_BASE_URL}/evaluate_user_action`;
 const URL_EVALUATE_ACTIONS = `${API_BASE_URL}/evaluate_actions`;
+const URL_GET_HISTOGRAM = `${API_BASE_URL}/score_histogram`;
 
 /* --- Multiplayer State --- */
 let players = [];
@@ -1122,8 +1125,7 @@ async function sendJSONPostRequest(url, data) {
         }
         return await response.json();
     } catch (error) {
-        console.error("API call failed:", error);
-        alert("An error occurred. Please try again later.\n" + error.message);
+        console.warn("API call failed:", error);
         return null;
     } finally {
         hideLoading();
@@ -1144,7 +1146,7 @@ async function getCachedHistogramData() {
                 return data;
             }
         }
-        const response = await fetch('http://localhost:8080/score_histogram');
+        const response = await fetch(URL_GET_HISTOGRAM);
         if (!response.ok) {
             throw new Error(`Histogram endpoint responded with ${response.status}`);
         }

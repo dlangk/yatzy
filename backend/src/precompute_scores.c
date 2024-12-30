@@ -2,6 +2,8 @@
 #include <file_utilities.h>
 #include <webserver.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <limits.h>
 
 void PrecomputeCategoryScores(YatzyContext *ctx) {
 #pragma omp parallel for schedule(static)
@@ -203,23 +205,50 @@ void ComputeDistributionForRerollMask(const YatzyContext *ctx,
     }
 }
 
+void check_file_existence(int scored_count) {
+    char filepath[128];
+    snprintf(filepath, sizeof(filepath), "data/states_%d.bin", scored_count);
+
+    FILE *file = fopen(filepath, "r");
+    if (file) {
+        printf("File found: %s\n", filepath);
+        fclose(file);
+    } else {
+        printf("File not found: %s\n", filepath);
+    }
+}
+
+char cwd[PATH_MAX];
+
 void ComputeAllStateValues(YatzyContext *ctx) {
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        printf("Current working directory: %s\n", cwd);
+    } else {
+        perror("getcwd failed");
+    }
     for (int scored_count = 15; scored_count >= 0; scored_count--) {
         if (scored_count == 15) {
-            char filename[64];
-            snprintf(filename, sizeof(filename), "states_%d.bin", scored_count);
+            char filepath[128]; // Adjust size based on your file path requirements
 
-            if (!LoadStateValuesForCount(ctx, scored_count, filename)) {
-                SaveStateValuesForCount(ctx, scored_count, filename);
+            snprintf(filepath, sizeof(filepath), "data/states_%d.bin", scored_count);
+
+            if (LoadStateValuesForCount(ctx, scored_count, filepath)) {
+                printf("Successfully loaded state values from: %s\n", filepath);
+            } else {
+                printf("Failed to load state values or file not found: %s\n", filepath);
+                SaveStateValuesForCount(ctx, scored_count, filepath); // Compute and save if loading fails
             }
+
             continue;
         }
         char filename[64];
-        snprintf(filename, sizeof(filename), "states_%d.bin", scored_count);
+        snprintf(filename, sizeof(filename), "data/states_%d.bin", scored_count);
 
         if (LoadStateValuesForCount(ctx, scored_count, filename)) {
+            printf("Successfully loaded state values from: %s\n", filename);
             continue;
         }
+        printf("Computing state values for %d scored categories...\n", scored_count);
 
         int needed_count = 0;
         for (int scored = 0; scored < (1 << CATEGORY_COUNT); scored++) {
