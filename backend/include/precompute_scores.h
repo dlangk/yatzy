@@ -11,14 +11,10 @@ typedef struct {
 } EVProbabilityPair;
 
 // Precomputation functions
-
-void PrecomputeCategoryScores(YatzyContext *ctx);
+void PrecomputeCategoryScores(YatzyContext *ctx); // Ensure this function is included here
 void PrecomputeRerollTransitionProbabilities(YatzyContext *ctx);
 void PrecomputeFactorials(YatzyContext *ctx);
 void PrecomputeDiceSetProbabilities(YatzyContext *ctx);
-void ComputeDistributionForRerollMask(const YatzyContext *ctx, int ds_index,
-                                      const double E_ds_for_masks[252], int mask,
-                                      EVProbabilityPair out_distribution[252]);
 void InitializeFinalStates(YatzyContext *ctx);
 
 // Utility functions for state computation

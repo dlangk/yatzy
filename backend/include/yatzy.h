@@ -28,6 +28,11 @@ typedef struct YatzyContext {
 
 // --------------------------- Function Declarations ---------------------------
 
+void PrecomputeCategoryScores(YatzyContext *ctx);
+void PrecomputeRerollTransitionProbabilities(YatzyContext *ctx);
+void PrecomputeDiceSetProbabilities(YatzyContext *ctx);
+void InitializeFinalStates(YatzyContext *ctx);
+
 // Category and Scoring Functions
 int categoryToIndex(const char *category_name);
 int CalculateCategoryScore(const int dice[5], int category);

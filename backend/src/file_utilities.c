@@ -65,12 +65,15 @@ int FileExists(const char *filename) {
 }
 
 void SaveStateValuesForCount(YatzyContext *ctx, int scored_count, const char *filename) {
+    printf("Saving state values to file: %s for scored_count = %d\n", filename, scored_count);
+
     FILE *f = fopen(filename, "wb");
     if (!f) {
         fprintf(stderr, "Error: Could not open file for writing: %s\n", filename);
         return;
     }
 
+    // Step 1: Count the number of states
     int count = 0;
     for (int scored = 0; scored < (1 << CATEGORY_COUNT); scored++) {
         if (ctx->scored_category_count_cache[scored] == scored_count) {
@@ -79,9 +82,13 @@ void SaveStateValuesForCount(YatzyContext *ctx, int scored_count, const char *fi
             }
         }
     }
+    printf("Total states to save for scored_count = %d: %d\n", scored_count, count);
 
+    // Write the count to the file
     fwrite(&count, sizeof(int), 1, f);
+    printf("Wrote state count (%d) to file: %s\n", count, filename);
 
+    // Step 2: Write state values
     for (int scored = 0; scored < (1 << CATEGORY_COUNT); scored++) {
         if (ctx->scored_category_count_cache[scored] == scored_count) {
             for (int up = 0; up <= 63; up++) {
@@ -89,15 +96,21 @@ void SaveStateValuesForCount(YatzyContext *ctx, int scored_count, const char *fi
                 fwrite(&up, sizeof(int), 1, f);
                 fwrite(&scored, sizeof(int), 1, f);
                 fwrite(&val, sizeof(double), 1, f);
+                printf("Saved state_values[%d] = %f (up = %d, scored = %04x) to file: %s\n",
+                       STATE_INDEX(up, scored), val, up, scored, filename);
             }
         }
     }
 
     fclose(f);
+    printf("Successfully saved state values for scored_count = %d to file: %s\n", scored_count, filename);
 }
 
 int LoadStateValuesForCount(YatzyContext *ctx, int scored_count, const char *filename) {
+    printf("Attempting to load state values from file: %s for scored_count = %d\n", filename, scored_count);
+
     if (!FileExists(filename)) {
+        printf("File does not exist: %s\n", filename);
         return 0; // File not found
     }
 
@@ -107,27 +120,42 @@ int LoadStateValuesForCount(YatzyContext *ctx, int scored_count, const char *fil
         return 0;
     }
 
+    // Step 1: Read the count of states
     int count;
     if (fread(&count, sizeof(int), 1, f) != 1) {
-        fprintf(stderr, "Warning: Could not read count from %s\n", filename);
+        fprintf(stderr, "Warning: Could not read count from file %s\n", filename);
         fclose(f);
         return 0;
     }
+    printf("File %s contains %d states for scored_count = %d\n", filename, count, scored_count);
 
+    // Step 2: Load state values
     for (int i = 0; i < count; i++) {
         int up, scored;
         double val;
+
+        // Read the state values
         if (fread(&up, sizeof(int), 1, f) != 1 ||
             fread(&scored, sizeof(int), 1, f) != 1 ||
             fread(&val, sizeof(double), 1, f) != 1) {
-            fprintf(stderr, "Warning: Unexpected end of file reading %s\n", filename);
+            fprintf(stderr, "Warning: Unexpected end of file while reading %s (state %d)\n", filename, i);
             fclose(f);
             return 0;
         }
 
-        ctx->state_values[STATE_INDEX(up, scored)] = val;
+        // Calculate the index and store the value
+        int index = STATE_INDEX(up, scored);
+        if (index < 0 || index >= NUM_STATES) {
+            fprintf(stderr, "Error: Invalid index %d for up = %d, scored = %04x in file %s\n", index, up, scored, filename);
+            fclose(f);
+            return 0;
+        }
+
+        ctx->state_values[index] = val;
+        printf("Loaded state_values[%d] = %f (up = %d, scored = %04x) from file: %s\n", index, val, up, scored, filename);
     }
 
     fclose(f);
+    printf("Successfully loaded state values for scored_count = %d from file: %s\n", scored_count, filename);
     return 1;
 }

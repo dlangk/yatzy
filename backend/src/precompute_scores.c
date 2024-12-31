@@ -6,7 +6,7 @@
 #include <limits.h>
 
 void PrecomputeCategoryScores(YatzyContext *ctx) {
-#pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static)
     for (int i = 0; i < 252; i++) {
         int *dice = ctx->all_dice_sets[i];
         for (int cat = 0; cat < CATEGORY_COUNT; cat++) {
@@ -16,7 +16,7 @@ void PrecomputeCategoryScores(YatzyContext *ctx) {
 }
 
 void PrecomputeRerollTransitionProbabilities(YatzyContext *ctx) {
-#pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(dynamic)
     for (int ds1_i = 0; ds1_i < 252; ds1_i++) {
         int *ds1 = ctx->all_dice_sets[ds1_i];
         for (int reroll_mask = 0; reroll_mask < 32; reroll_mask++) {
@@ -93,7 +93,7 @@ double ComputeProbabilityOfDiceSetOnce(const YatzyContext *ctx,
 }
 
 void PrecomputeDiceSetProbabilities(YatzyContext *ctx) {
-#pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static)
     for (int ds_i = 0; ds_i < 252; ds_i++) {
         ctx->dice_set_probabilities[ds_i] = ComputeProbabilityOfDiceSetOnce(ctx, ctx->all_dice_sets[ds_i]);
     }
@@ -141,7 +141,7 @@ void ComputeExpectedValuesForNRerolls(
     double E_ds_current[252],
     int best_mask_for_n[252]
 ) {
-#pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static)
     for (int ds_i = 0; ds_i < 252; ds_i++) {
         double best_val = -INFINITY;
         int best_mask = 0;
@@ -162,24 +162,33 @@ void ComputeExpectedValuesForNRerolls(
     }
 }
 
-double ComputeExpectedStateValue(const YatzyContext *ctx,
-                                        const YatzyState *S) {
+double ComputeExpectedStateValue(const YatzyContext *ctx, const YatzyState *S) {
+    printf("Computing value for up = %d, scored = %d\n", S->upper_score, S->scored_categories);
+
     double E_ds_0[252], E_ds_1[252], E_ds_2[252];
     int best_mask_1[252], best_mask_2[252];
 
-#pragma omp parallel for schedule(static)
+    // Step 1: Compute Best Scoring Value for Each Dice Set
+    #pragma omp parallel for schedule(static)
     for (int ds_i = 0; ds_i < 252; ds_i++) {
         E_ds_0[ds_i] = ComputeBestScoringValueForDiceSet(ctx, S, ctx->all_dice_sets[ds_i]);
     }
 
+    // Step 2: Compute Expected Values for 1 Reroll
     ComputeExpectedValuesForNRerolls(ctx, 1, E_ds_0, E_ds_1, best_mask_1);
+
+    // Step 3: Compute Expected Values for 2 Rerolls
     ComputeExpectedValuesForNRerolls(ctx, 2, E_ds_1, E_ds_2, best_mask_2);
 
+    // Step 4: Accumulate Final Expected Value
     double E_S = 0.0;
     for (int ds_i = 0; ds_i < 252; ds_i++) {
+        if (ctx->dice_set_probabilities[ds_i] != 0) {
+        }
         E_S += ctx->dice_set_probabilities[ds_i] * E_ds_2[ds_i];
     }
 
+    printf("Computed Expected Value E_S = %f\n", E_S);
     return E_S;
 }
 
@@ -221,34 +230,22 @@ void check_file_existence(int scored_count) {
 char cwd[PATH_MAX];
 
 void ComputeAllStateValues(YatzyContext *ctx) {
-    if (getcwd(cwd, sizeof(cwd)) != NULL) {
-        printf("Current working directory: %s\n", cwd);
-    } else {
-        perror("getcwd failed");
-    }
     for (int scored_count = 15; scored_count >= 0; scored_count--) {
         if (scored_count == 15) {
-            char filepath[128]; // Adjust size based on your file path requirements
+            char filename[64];
+            snprintf(filename, sizeof(filename), "data/states_%d.bin", scored_count);
 
-            snprintf(filepath, sizeof(filepath), "data/states_%d.bin", scored_count);
-
-            if (LoadStateValuesForCount(ctx, scored_count, filepath)) {
-                printf("Successfully loaded state values from: %s\n", filepath);
-            } else {
-                printf("Failed to load state values or file not found: %s\n", filepath);
-                SaveStateValuesForCount(ctx, scored_count, filepath); // Compute and save if loading fails
+            if (!LoadStateValuesForCount(ctx, scored_count, filename)) {
+                SaveStateValuesForCount(ctx, scored_count, filename);
             }
-
             continue;
         }
         char filename[64];
         snprintf(filename, sizeof(filename), "data/states_%d.bin", scored_count);
 
         if (LoadStateValuesForCount(ctx, scored_count, filename)) {
-            printf("Successfully loaded state values from: %s\n", filename);
             continue;
         }
-        printf("Computing state values for %d scored categories...\n", scored_count);
 
         int needed_count = 0;
         for (int scored = 0; scored < (1 << CATEGORY_COUNT); scored++) {
@@ -269,7 +266,7 @@ void ComputeAllStateValues(YatzyContext *ctx) {
             }
         }
 
-#pragma omp parallel for schedule(dynamic)
+        #pragma omp parallel for schedule(dynamic)
         for (int i = 0; i < idx; i++) {
             int up = states[i][0];
             int scored = states[i][1];
@@ -288,7 +285,8 @@ void ComputeEDs0ForState(const YatzyContext *ctx,
                                 int scored_categories,
                                 double E_ds_0[252]) {
     YatzyState state = {upper_score, scored_categories};
-#pragma omp parallel for
+
+    #pragma omp parallel for
     for (int ds_i = 0; ds_i < 252; ds_i++) {
         E_ds_0[ds_i] = ComputeBestScoringValueForDiceSet(ctx, &state, ctx->all_dice_sets[ds_i]);
     }

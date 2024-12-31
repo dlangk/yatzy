@@ -37,9 +37,11 @@ int main() {
     }
 
     printf("Starting yatzy API server...\n");
+
     printf("Initializing context...\n");
     YatzyContext *ctx = CreateYatzyContext();
     printf("Context created!\n");
+
     printf("Precomputing all state values...\n");
     ComputeAllStateValues(ctx);
     printf("State values computed!\n");
