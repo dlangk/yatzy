@@ -621,17 +621,15 @@ void ComputeDistributionForRerollMask(const YatzyContext *ctx,
 
 static void ComputeAllStateValues(YatzyContext *ctx) {
     for (int scored_count = 15; scored_count >= 0; scored_count--) {
-        if (scored_count == 15) {
-            char filename[64];
-            snprintf(filename, sizeof(filename), "states_%d.bin", scored_count);
+        char filename[64];
+        snprintf(filename, sizeof(filename), "data/states_%d.bin", scored_count);
 
+        if (scored_count == 15) {
             if (!LoadStateValuesForCount(ctx, scored_count, filename)) {
                 SaveStateValuesForCount(ctx, scored_count, filename);
             }
             continue;
         }
-        char filename[64];
-        snprintf(filename, sizeof(filename), "states_%d.bin", scored_count);
 
         if (LoadStateValuesForCount(ctx, scored_count, filename)) {
             continue;
@@ -976,7 +974,7 @@ static int MaskFromBinaryString(const char *action_str) {
 // Endpoint handlers (copied from previous integrated code, but now they receive a ctx pointer):
 
 static void handle_get_score_histogram(YatzyContext *ctx, struct MHD_Connection *connection) {
-    FILE *file = fopen("score_histogram.csv", "r");
+    FILE *file = fopen("data/score_histogram.csv", "r");
     if (file == NULL) {
         const char *err = "{\"error\":\"Could not open score histogram file\"}";
         struct MHD_Response *resp = MHD_create_response_from_buffer(
@@ -1615,6 +1613,14 @@ static enum MHD_Result respond_with_error(struct MHD_Connection *connection, int
 }
 
 // Main request handler:
+// Function to log details of requests and responses
+void log_request(const char *method, const char *url, const char *payload, int status_code, const char *message) {
+    printf("Request: Method=%s, URL=%s, Payload=%s\n", method, url, payload ? payload : "(none)");
+    if (status_code > 0) {
+        printf("Response: Status=%d, Message=%s\n", status_code, message ? message : "(none)");
+    }
+}
+
 static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *connection,
                                             const char *url, const char *method,
                                             const char *version, const char *upload_data,
@@ -1634,6 +1640,7 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
 
     // Handle OPTIONS preflight requests
     if (strcmp(method, "OPTIONS") == 0) {
+        log_request(method, url, NULL, 0, NULL);
         struct MHD_Response *options_response = MHD_create_response_from_buffer(0, "", MHD_RESPMEM_PERSISTENT);
         AddCORSHeaders(options_response);
         MHD_add_response_header(options_response, "Access-Control-Max-Age", "86400");
@@ -1661,13 +1668,17 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
 
         // Process full POST data
         if (!req_ctx->post_data) {
+            log_request(method, url, NULL, MHD_HTTP_BAD_REQUEST, "No data received");
             return respond_with_error(connection, MHD_HTTP_BAD_REQUEST, "No data received", req_ctx);
         }
 
         struct json_object *parsed = json_tokener_parse(req_ctx->post_data);
         if (!parsed) {
+            log_request(method, url, req_ctx->post_data, MHD_HTTP_BAD_REQUEST, "Invalid JSON");
             return respond_with_error(connection, MHD_HTTP_BAD_REQUEST, "Invalid JSON", req_ctx);
         }
+
+        log_request(method, url, req_ctx->post_data, 0, NULL);
 
         // Route the POST request
         if (strcmp(url, "/evaluate_category_score") == 0) {
@@ -1684,6 +1695,7 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
             handle_evaluate_user_action(ctx, connection, parsed);
         } else {
             json_object_put(parsed);
+            log_request(method, url, req_ctx->post_data, MHD_HTTP_NOT_FOUND, "Unknown endpoint");
             return respond_with_error(connection, MHD_HTTP_NOT_FOUND, "Unknown endpoint", req_ctx);
         }
 
@@ -1696,11 +1708,13 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
 
     // Handle GET requests
     if (strcmp(method, "GET") == 0) {
+        log_request(method, url, NULL, 0, NULL);
         if (strncmp(url, "/state_value", 12) == 0) {
             handle_get_state_value(ctx, connection);
         } else if (strcmp(url, "/score_histogram") == 0) {
             handle_get_score_histogram(ctx, connection);
         } else {
+            log_request(method, url, NULL, MHD_HTTP_NOT_FOUND, "Unknown endpoint");
             return respond_with_error(connection, MHD_HTTP_NOT_FOUND, "Unknown endpoint", req_ctx);
         }
 
@@ -1711,6 +1725,7 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
     }
 
     // Unsupported methods
+    log_request(method, url, NULL, MHD_HTTP_METHOD_NOT_ALLOWED, "Only POST and GET supported");
     return respond_with_error(connection, MHD_HTTP_METHOD_NOT_ALLOWED, "Only POST and GET supported", req_ctx);
 }
 

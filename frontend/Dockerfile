@@ -1,16 +1,17 @@
-# Use a lightweight Python base image
+# Use a lightweight Python image as the base
 FROM python:3.10-slim
 
-# Set the working directory inside the container
+# Set the working directory
 WORKDIR /app
 
-# Copy all necessary files from the host to the container
-COPY ./index.html /app/
-COPY ./css /app/css
-COPY ./js /app/js
+# Copy the application files into the container
+COPY . /app
 
-# Expose the port the Python HTTP server will run on
+# Ensure the entrypoint script is executable
+RUN chmod +x /app/entrypoint.sh
+
+# Expose the port for the Python HTTP server
 EXPOSE 8090
 
-# Command to start the Python HTTP server
-CMD ["python3", "-m", "http.server", "8090"]
+# Set the entrypoint script
+ENTRYPOINT ["/app/entrypoint.sh"]

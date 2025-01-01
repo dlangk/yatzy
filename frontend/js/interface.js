@@ -75,6 +75,7 @@ const TOTAL_DICE = 5;
 
 // Use the dynamically injected API_BASE_URL
 const API_BASE_URL = window.API_BASE_URL || "http://localhost:9000"; // Default to localhost if not set
+console.log(API_BASE_URL);
 const URL_AVAILABLE_CATEGORIES = `${API_BASE_URL}/available_categories`;
 const URL_SUGGEST_OPTIMAL_ACTION = `${API_BASE_URL}/suggest_optimal_action`;
 const URL_EVALUATE_USER_ACTION = `${API_BASE_URL}/evaluate_user_action`;
