@@ -8,22 +8,28 @@
 </head>
 <body>
 <div class="container">
-    <!-- Scorecard Column -->
-    <div class="scorecard">
-        <h2>Scorecard</h2>
-        <table id="scorecard">
-            <thead>
-            <tr>
-                <th>Category</th>
-                <th>Scored</th>
-                <th>Score</th>
-                <th>User Action</th>
-            </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+
+    <!-- Left Column -->
+    <div class="left-column">
+        <!-- Scorecard -->
+        <div class="scorecard">
+            <h2>Scorecard</h2>
+            <table id="scorecard">
+                <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Scored</th>
+                    <th>Score</th>
+                    <th>User Action</th>
+                </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
         <h1>&Delta; Yatzy</h1>
     </div>
+
 
     <!-- Right Column -->
     <div class="right-column">
@@ -75,6 +81,25 @@
                 <h2>Sorted Dice</h2>
                 <div class="sorted-dice-container" id="sorted_dice_container"></div>
                 <p>Yellow dice should be rerolled.</p>
+            </div>
+        </div>
+
+        <div class="right-section">
+            <button id="toggleInstructionsButton">Show Instructions</button>
+            <div id="instructionsBox" class="hidden">
+                <h2>Welcome to Delta Yatzy!</h2>
+                <p>Learn how to play Optimal Yatzy!</p>
+                <p>The UI is deliberately very free form. It's not forcing you to do things in a particular order, but rather focus on letting you examine various states. The central part of the UI showing you how your actions deviate from <b>Optimal Yatzy</b> by showing you the <b>Delta</b> measured as <b>difference in expected total score</b>.
+                <ul>
+                    <li>Start by clicking <b>Reset Game</b> to be sure it's a clean start.</li>
+                    <li> It's now your job to decide which dices to set as <b>Locked</b> or <b>Reroll</b>. Once you have toggled each dice, you can see the Delta for that <b>Reroll Mask</b>.</li>
+                    <li>Clicking <b>Reroll Dice</b> will randomize the dices marked for reroll.</li>
+                    <li>Once <b>Rerolls Remaining</b> hits zero, you can test various categories to score by clicking <b>Evaluate</b>. That updates the Delta. Once you decided, you click the <b>Checkbox in the Scored column</b> to score the category.</li>
+                    <li>To start the next turn, just click <b>Randomize Dice</b> again. That will reset the Rerolls Remaining counter.</li>
+                    <li>If you want to understand what the optimal reroll mask is click <b>Show Optimal Action</b>.</li>
+                    <li>The <b>Expected Total Score</b> is the average score you will get by playing optimally from the current state of the game. This is updated every time you toggle the reroll mask, score a category or change the number of remaining rerolls.</li>
+                </ul>
+                <p>If you want, you can maintain several players by clikcing "Add Player". That just means there is a state for each player saved and that the UI switches as you switch in the drop down. Again, no playing order is enfoced.</p>
             </div>
         </div>
 

@@ -12,7 +12,7 @@ body.loaded {
 }
 
 /**************************************************
- * Basic Page Layout
+ * Page Layout
  **************************************************/
 body {
     font-family: Arial, sans-serif;
@@ -25,11 +25,15 @@ body {
     display: flex;
     align-items: flex-start;
     gap: 20px;
+    width: 100%; /* Ensures it spans the viewport */
 }
 
-/* Fixed width on the left to prevent resizing */
-.column {
-    flex: 0 0 500px;
+.left-column {
+    flex: 0 0 300px; /* Fixed width for left column */
+    max-width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px; /* Space between scorecard and instructions */
 }
 
 .right-column {
@@ -144,6 +148,47 @@ tr.invalid-category {
 .evaluate-button:hover {
     background: #53688a;
 }
+
+/**************************************************
+ * Instructions Box
+ **************************************************/
+
+
+#instructionsBox {
+    display: block;
+    overflow: hidden;
+    max-height: 0; /* Collapsed by default */
+    margin-top: 10px;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: #f9f9f9;
+    color: #333; /* Ensure text is visible */
+    transition: max-height 0.3s ease-out, padding 0.3s ease-out; /* Smooth expand/collapse */
+}
+
+#instructionsBox.show {
+    max-height: none; /* Remove height restriction */
+    height: auto; /* Automatically adjust height based on content */
+    padding: 10px; /* Add padding when expanded */
+    border: 1px solid #ccc;
+    margin-top: 10px;
+}
+
+#toggleInstructionsButton {
+    display: block;
+    background: #ccc;
+    border: 1px solid #999;
+    border-radius: 3px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+#toggleInstructionsButton:hover {
+    background: #bbb;
+}
+
 
 /**************************************************
  * Right Sections

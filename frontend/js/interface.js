@@ -393,6 +393,23 @@ function attachEventHandlers() {
             return;
         }
 
+        // Handle "Show Instructions" button
+        if (button.id === "toggleInstructionsButton") {
+            const instructionsBox = document.getElementById("instructionsBox");
+            if (instructionsBox) {
+                if (instructionsBox.classList.contains("hidden")) {
+                    instructionsBox.classList.remove("hidden");
+                    button.textContent = "Hide Instructions";
+                    instructionsBox.classList.add("show");
+                } else {
+                    instructionsBox.classList.add("hidden");
+                    button.textContent = "Show Instructions";
+                    instructionsBox.classList.remove("show");
+                }
+            }
+            return;
+        }
+
         // Handle Reroll actions
         if (button.id === "reroll_down" || button.id === "reroll_up") {
             const currentPlayer = getActivePlayer();
