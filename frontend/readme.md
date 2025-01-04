@@ -10,7 +10,7 @@ The core HTML structure of the Delta Yatzy application. It includes:
 - A **dice container** for managing and displaying the dice states.
 - Sections for **optimal actions**, **histograms**, and **debugging information**.
 - Integration with external libraries like Chart.js for visualizing data.
-- References to `styles.css` and `interface.js` for styling and functionality.
+- References to `styles.css` and `app.js` for styling and functionality.
 
 ### 2. `styles.css`
 The stylesheet defining the appearance of the application. It includes:
@@ -19,7 +19,7 @@ The stylesheet defining the appearance of the application. It includes:
 - Highlights for game states (e.g., locked, reroll, scored categories).
 - Styling for additional features like the histogram, loading overlay, and debug box.
 
-### 3. `interface.js`
+### 3. `app.js`
 The JavaScript logic powering the Delta Yatzy game. Key features include:
 - **Player management**: Support for multiplayer with individual scorecards and dice states.
 - **Dice interactions**: Dice rolling, reroll management, and UI updates for dice states.

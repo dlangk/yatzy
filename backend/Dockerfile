@@ -29,6 +29,9 @@ EXPOSE 9000
 # Ensure the data directory is writable (optional)
 RUN chmod -R 777 /app/data
 
+# Ensure the data directory is present
+RUN ls -l /app/data
+
 # Set the base path used to locate the data directory
 ENV YATZY_BASE_PATH=/app
 

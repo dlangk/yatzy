@@ -10,9 +10,9 @@ services:
     expose:
       - 8090
     environment:
-      - API_BASE_URL=http://localhost:9000  # Communicate with backend via host-accessible port
+      - API_BASE_URL=http://localhost:9000
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8090"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8090" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -30,7 +30,7 @@ services:
     environment:
       - API_PORT=9000  # Environment variable for backend port
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000" ]
       interval: 30s
       timeout: 10s
       retries: 3
