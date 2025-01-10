@@ -17,7 +17,7 @@ WORKDIR /app
 # Copy the source code and data directory
 COPY . /app
 
-# Ensure the build directory is clean, then build the project
+# Build the project
 RUN rm -rf build && mkdir build && cd build && cmake .. && make
 
 # Verify the yatzy binary exists
@@ -26,14 +26,13 @@ RUN ls -l /app/build/yatzy
 # Expose the port the server listens on
 EXPOSE 9000
 
-# Ensure the data directory is writable (optional)
+# Ensure the data directory is writable and verify its contents
 RUN chmod -R 777 /app/data
-
-# Ensure the data directory is present
 RUN ls -l /app/data
 
-# Set the base path used to locate the data directory
+# Set environment variables for the dynamic data directory
 ENV YATZY_BASE_PATH=/app
+ENV YATZY_DATA_DIR=/app/data
 
 # Command to run the server
 CMD ["/app/build/yatzy"]

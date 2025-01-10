@@ -1,24 +1,23 @@
+#include "webserver.h"
+#include <context.h>
+#include <game_mechanics.h>
+#include <microhttpd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <json-c/json.h>
+#include <math.h>
+#include <computations.h>
+#include <json-c/json_object.h>
+#include <json-c/json_tokener.h>
+#include <sys/signal.h>
 
-#include "yatzy.h"
-#include "precompute_scores.h"
-#include "webserver.h"
+#include "dice_mechanics.h"
 
-#include "file_utilities.h"
-
-// Add a helper function to set CORS headers on every response
 void AddCORSHeaders(struct MHD_Response *response) {
     MHD_add_response_header(response, "Access-Control-Allow-Origin", "*");
     MHD_add_response_header(response, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    MHD_add_response_header(response, "Access-Control-Allow-Headers",
-                            "Content-Type, Authorization, X-Requested-With, sec-ch-ua, sec-ch-ua-mobile, sec-ch-ua-platform");
-    MHD_add_response_header(response, "Access-Control-Max-Age", "86400");
+    MHD_add_response_header(response, "Access-Control-Allow-Headers", "Content-Type");
 }
-
 
 void handle_get_score_histogram(YatzyContext *ctx, struct MHD_Connection *connection) {
     FILE *file = fopen("data/score_histogram.csv", "r");
@@ -103,10 +102,9 @@ void handle_get_state_value(YatzyContext *ctx, struct MHD_Connection *connection
 
     int upper_score = atoi(up_str);
     int scored_categories = atoi(sc_str);
+    const double val = ctx->state_values[STATE_INDEX(upper_score, scored_categories)];
 
-    double val = GetStateValue(ctx, upper_score, scored_categories);
-
-    struct json_object *resp = json_object_new_object();
+    json_object *resp = json_object_new_object();
     json_object_object_add(resp, "upper_score", json_object_new_int(upper_score));
     json_object_object_add(resp, "scored_categories", json_object_new_int(scored_categories));
     json_object_object_add(resp, "expected_final_score", json_object_new_double(val));
@@ -121,8 +119,8 @@ void handle_get_state_value(YatzyContext *ctx, struct MHD_Connection *connection
 
 void handle_evaluate_category_score(YatzyContext *ctx, struct MHD_Connection *connection,
                                     struct json_object *parsed) {
-    struct json_object *dice_arr = json_object_object_get(parsed, "dice");
-    struct json_object *cat_obj = json_object_object_get(parsed, "category_id");
+    json_object *dice_arr = json_object_object_get(parsed, "dice");
+    json_object *cat_obj = json_object_object_get(parsed, "category_id");
     if (!dice_arr || !cat_obj) {
         const char *err = "{\"error\":\"Missing dice or category_id\"}";
         struct MHD_Response *resp = MHD_create_response_from_buffer(strlen(err), (void *) err, MHD_RESPMEM_PERSISTENT);
@@ -132,14 +130,14 @@ void handle_evaluate_category_score(YatzyContext *ctx, struct MHD_Connection *co
     }
     int dice[5];
     for (int i = 0; i < 5; i++) {
-        struct json_object *d = json_object_array_get_idx(dice_arr, i);
+        json_object *d = json_object_array_get_idx(dice_arr, i);
         dice[i] = json_object_get_int(d);
     }
     int cat_id = json_object_get_int(cat_obj);
     SortDiceSet(dice);
     int score = ctx->precomputed_scores[FindDiceSetIndex(ctx, dice)][cat_id];
 
-    struct json_object *resp = json_object_new_object();
+    json_object *resp = json_object_new_object();
     json_object_object_add(resp, "category_id", json_object_new_int(cat_id));
     json_object_object_add(resp, "category_name", json_object_new_string(ctx->category_names[cat_id]));
     json_object_object_add(resp, "score", json_object_new_int(score));
@@ -155,10 +153,10 @@ void handle_evaluate_category_score(YatzyContext *ctx, struct MHD_Connection *co
 
 void handle_available_categories(YatzyContext *ctx, struct MHD_Connection *connection,
                                  struct json_object *parsed) {
-    struct json_object *upper_obj = json_object_object_get(parsed, "upper_score");
-    struct json_object *scored_obj = json_object_object_get(parsed, "scored_categories");
-    struct json_object *dice_arr = json_object_object_get(parsed, "dice");
-    struct json_object *rerolls_obj = json_object_object_get(parsed, "rerolls_remaining");
+    json_object *upper_obj = json_object_object_get(parsed, "upper_score");
+    json_object *scored_obj = json_object_object_get(parsed, "scored_categories");
+    json_object *dice_arr = json_object_object_get(parsed, "dice");
+    json_object *rerolls_obj = json_object_object_get(parsed, "rerolls_remaining");
 
     if (!upper_obj || !scored_obj || !dice_arr || !rerolls_obj) {
         const char *err = "{\"error\":\"Missing required fields\"}";
@@ -221,12 +219,13 @@ void handle_available_categories(YatzyContext *ctx, struct MHD_Connection *conne
     json_object_put(resp);
 }
 
-void handle_evaluate_all_categories(YatzyContext *ctx, struct MHD_Connection *connection,
-                                    struct json_object *parsed) {
-    struct json_object *upper_obj = json_object_object_get(parsed, "upper_score");
-    struct json_object *scored_obj = json_object_object_get(parsed, "scored_categories");
-    struct json_object *dice_arr = json_object_object_get(parsed, "dice");
-    struct json_object *rerolls_obj = json_object_object_get(parsed, "rerolls_remaining");
+void handle_evaluate_all_categories(YatzyContext *ctx,
+                                    struct MHD_Connection *connection,
+                                    json_object *parsed) {
+    json_object *upper_obj = json_object_object_get(parsed, "upper_score");
+    json_object *scored_obj = json_object_object_get(parsed, "scored_categories");
+    json_object *dice_arr = json_object_object_get(parsed, "dice");
+    json_object *rerolls_obj = json_object_object_get(parsed, "rerolls_remaining");
 
     if (!upper_obj || !scored_obj || !dice_arr || !rerolls_obj) {
         const char *err = "{\"error\":\"Missing required fields\"}";
@@ -250,7 +249,7 @@ void handle_evaluate_all_categories(YatzyContext *ctx, struct MHD_Connection *co
 
     int dice[5];
     for (int i = 0; i < 5; i++) {
-        struct json_object *d = json_object_array_get_idx(dice_arr, i);
+        json_object *d = json_object_array_get_idx(dice_arr, i);
         if (!d) {
             const char *err = "{\"error\":\"Invalid dice array\"}";
             struct MHD_Response *resp = MHD_create_response_from_buffer(strlen(err), (void *) err,
@@ -469,8 +468,8 @@ void handle_suggest_optimal_action(YatzyContext *ctx, struct MHD_Connection *con
     for (int i = 0; i < 5; i++) {
         dice_str[i] = dice[i] + '0';
     }
-    json_object_object_add(resp, "dice_set", json_object_new_string(dice_str));
 
+    json_object_object_add(resp, "dice_set", json_object_new_string(dice_str));
     json_object_object_add(resp, "best_category", NULL);
     json_object_object_add(resp, "best_reroll", NULL);
     json_object_object_add(resp, "expected_value", NULL);
@@ -501,7 +500,7 @@ void handle_suggest_optimal_action(YatzyContext *ctx, struct MHD_Connection *con
         int best_category = ChooseBestCategoryNoRerolls(ctx, upper_score, scored_categories, dice, &best_ev);
 
         if (best_category >= 0) {
-            struct json_object *category_obj = json_object_new_object();
+            json_object *category_obj = json_object_new_object();
             json_object_object_add(category_obj, "id", json_object_new_int(best_category));
             json_object_object_add(category_obj, "name", json_object_new_string(ctx->category_names[best_category]));
             json_object_object_add(resp, "best_category", category_obj);
@@ -523,17 +522,17 @@ void handle_suggest_optimal_action(YatzyContext *ctx, struct MHD_Connection *con
 
 void handle_evaluate_user_action(YatzyContext *ctx, struct MHD_Connection *connection,
                                  struct json_object *parsed) {
-    struct json_object *upper_score_obj = json_object_object_get(parsed, "upper_score");
-    struct json_object *scored_categories_obj = json_object_object_get(parsed, "scored_categories");
-    struct json_object *dice_arr = json_object_object_get(parsed, "dice");
-    struct json_object *rerolls_obj = json_object_object_get(parsed, "rerolls_remaining");
-    struct json_object *user_action_obj = json_object_object_get(parsed, "user_action");
+    json_object *upper_score_obj = json_object_object_get(parsed, "upper_score");
+    json_object *scored_categories_obj = json_object_object_get(parsed, "scored_categories");
+    json_object *dice_arr = json_object_object_get(parsed, "dice");
+    json_object *rerolls_obj = json_object_object_get(parsed, "rerolls_remaining");
+    json_object *user_action_obj = json_object_object_get(parsed, "user_action");
 
     if (!upper_score_obj || !scored_categories_obj || !dice_arr || !rerolls_obj || !user_action_obj) {
         const char *error_msg = "{\"error\":\"Missing required fields\"}";
         struct MHD_Response *error_response = MHD_create_response_from_buffer(
             strlen(error_msg), (void *) error_msg, MHD_RESPMEM_PERSISTENT);
-        AddCORSHeaders(error_response); // Add CORS headers
+        AddCORSHeaders(error_response);
         MHD_queue_response(connection, MHD_HTTP_BAD_REQUEST, error_response);
         MHD_destroy_response(error_response);
         return;
@@ -545,7 +544,7 @@ void handle_evaluate_user_action(YatzyContext *ctx, struct MHD_Connection *conne
 
     int dice[5];
     for (int i = 0; i < 5; i++) {
-        struct json_object *die_val = json_object_array_get_idx(dice_arr, i);
+        json_object *die_val = json_object_array_get_idx(dice_arr, i);
         if (!die_val) {
             const char *error_msg = "{\"error\":\"Invalid dice array\"}";
             struct MHD_Response *error_response = MHD_create_response_from_buffer(
@@ -559,25 +558,25 @@ void handle_evaluate_user_action(YatzyContext *ctx, struct MHD_Connection *conne
     }
     SortDiceSet(dice);
 
-    struct json_object *resp = json_object_new_object();
+    json_object *resp = json_object_new_object();
     json_object_object_add(resp, "expected_value", NULL);
     json_object_object_add(resp, "best_category", NULL);
     json_object_object_add(resp, "best_reroll", NULL);
 
     if (rerolls > 0) {
-        struct json_object *best_reroll_obj = json_object_object_get(user_action_obj, "best_reroll");
+        json_object *best_reroll_obj = json_object_object_get(user_action_obj, "best_reroll");
         if (!best_reroll_obj) {
             const char *error_msg = "{\"error\":\"User action missing best_reroll field\"}";
             struct MHD_Response *error_response = MHD_create_response_from_buffer(
                 strlen(error_msg), (void *) error_msg, MHD_RESPMEM_PERSISTENT);
-            AddCORSHeaders(error_response); // Add CORS headers
+            AddCORSHeaders(error_response);
             MHD_queue_response(connection, MHD_HTTP_BAD_REQUEST, error_response);
             MHD_destroy_response(error_response);
-            json_object_put(resp); // Free resp
+            json_object_put(resp);
             return;
         }
 
-        struct json_object *mask_id_obj = json_object_object_get(best_reroll_obj, "id");
+        json_object *mask_id_obj = json_object_object_get(best_reroll_obj, "id");
         if (!mask_id_obj) {
             const char *error_msg = "{\"error\":\"User action missing id in best_reroll\"}";
             struct MHD_Response *error_response = MHD_create_response_from_buffer(
@@ -593,12 +592,10 @@ void handle_evaluate_user_action(YatzyContext *ctx, struct MHD_Connection *conne
         double ev = EvaluateChosenRerollMask(ctx, upper_score, scored_categories, dice, mask, rerolls);
 
         json_object_object_add(resp, "expected_value", json_object_new_double(ev));
-
-        // Increment ref count before adding to resp
         json_object_get(best_reroll_obj);
         json_object_object_add(resp, "best_reroll", best_reroll_obj);
     } else {
-        struct json_object *best_category_obj = json_object_object_get(user_action_obj, "best_category");
+        json_object *best_category_obj = json_object_object_get(user_action_obj, "best_category");
         if (!best_category_obj) {
             const char *error_msg = "{\"error\":\"User action missing best_category field\"}";
             struct MHD_Response *error_response = MHD_create_response_from_buffer(
@@ -610,7 +607,7 @@ void handle_evaluate_user_action(YatzyContext *ctx, struct MHD_Connection *conne
             return;
         }
 
-        struct json_object *category_id_obj = json_object_object_get(best_category_obj, "id");
+        json_object *category_id_obj = json_object_object_get(best_category_obj, "id");
         if (!category_id_obj) {
             const char *error_msg = "{\"error\":\"User action missing id in best_category\"}";
             struct MHD_Response *error_response = MHD_create_response_from_buffer(
@@ -626,25 +623,24 @@ void handle_evaluate_user_action(YatzyContext *ctx, struct MHD_Connection *conne
         double ev = EvaluateChosenCategory(ctx, upper_score, scored_categories, dice, category_id);
 
         json_object_object_add(resp, "expected_value", json_object_new_double(ev));
-
-        // Increment ref count before adding to resp
         json_object_get(best_category_obj);
         json_object_object_add(resp, "best_category", best_category_obj);
     }
 
     const char *response_str = json_object_to_json_string(resp);
-    struct MHD_Response *mhd_response = MHD_create_response_from_buffer(strlen(response_str), (void *) response_str,
+    struct MHD_Response *mhd_response = MHD_create_response_from_buffer(strlen(response_str),
+                                                                        (void *) response_str,
                                                                         MHD_RESPMEM_MUST_COPY);
-    AddCORSHeaders(mhd_response); // Add CORS headers to the successful response
+    AddCORSHeaders(mhd_response);
     MHD_queue_response(connection, MHD_HTTP_OK, mhd_response);
     MHD_destroy_response(mhd_response);
     json_object_put(resp);
 }
 
-
-// Utility function to send an error response with CORS headers
-enum MHD_Result respond_with_error(struct MHD_Connection *connection, int status_code,
-                                   const char *error_message, struct RequestContext *req_ctx) {
+enum MHD_Result respond_with_error(struct MHD_Connection *connection,
+                                   int status_code,
+                                   const char *error_message,
+                                   struct RequestContext *req_ctx) {
     struct MHD_Response *response = MHD_create_response_from_buffer(strlen(error_message),
                                                                     (void *) error_message,
                                                                     MHD_RESPMEM_PERSISTENT);
@@ -659,50 +655,31 @@ enum MHD_Result respond_with_error(struct MHD_Connection *connection, int status
     return MHD_YES;
 }
 
-// Main request handler:
+void log_request(const char *method, const char *url, const char *payload, int status_code, const char *message) {
+    printf("Request: Method=%s, URL=%s, Payload=%s\n", method, url, payload ? payload : "(none)");
+    if (status_code > 0) {
+        printf("Response: Status=%d, Message=%s\n", status_code, message ? message : "(none)");
+    }
+}
+
 enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *connection,
                                      const char *url, const char *method,
                                      const char *version, const char *upload_data,
                                      size_t *upload_data_size, void **con_cls) {
-    YatzyContext *ctx = (YatzyContext *) cls; // Server context
+    YatzyContext *ctx = cls;
 
-    // Declare reusable variables for logging
-    time_t now = time(NULL);
-    struct tm *local_time = localtime(&now);
-    char time_buf[20] = {0}; // Initialize buffer
-
-    // Check if localtime is valid
-    if (!local_time) {
-        strncpy(time_buf, "UNKNOWN_TIME", sizeof(time_buf));
-    } else {
-        // Use strftime and check for errors
-        if (strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", local_time) == 0) {
-            strncpy(time_buf, "UNKNOWN_TIME", sizeof(time_buf)); // Fallback if strftime fails
-        }
-    }
-
-    // First call: Initialize request context and log request details
     if (*con_cls == NULL) {
-        struct RequestContext *req_ctx = (struct RequestContext *) calloc(1, sizeof(struct RequestContext));
+        struct RequestContext *req_ctx = calloc(1, sizeof(struct RequestContext));
         req_ctx->post_data = NULL;
         req_ctx->post_size = 0;
         *con_cls = req_ctx;
-
-        // Get current time and log the request
-        now = time(NULL);
-        local_time = localtime(&now);
-        strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", local_time);
-        printf("[%s] Received request: Method = %s, URL = %s, Version = %s\n",
-               time_buf, method, url, version);
-
         return MHD_YES;
     }
 
-    struct RequestContext *req_ctx = (struct RequestContext *) (*con_cls);
+    struct RequestContext *req_ctx = *con_cls;
 
-    // Handle OPTIONS preflight requests
     if (strcmp(method, "OPTIONS") == 0) {
-        printf("[%s] OPTIONS request received for URL: %s\n", time_buf, url);
+        log_request(method, url, NULL, 0, NULL);
         struct MHD_Response *options_response = MHD_create_response_from_buffer(0, "", MHD_RESPMEM_PERSISTENT);
         AddCORSHeaders(options_response);
         MHD_add_response_header(options_response, "Access-Control-Max-Age", "86400");
@@ -715,17 +692,10 @@ enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *connectio
         return MHD_YES;
     }
 
-    // Handle POST requests
     if (strcmp(method, "POST") == 0) {
-        // Collect upload data
         if (*upload_data_size != 0) {
             size_t new_size = req_ctx->post_size + *upload_data_size;
             req_ctx->post_data = (char *) realloc(req_ctx->post_data, new_size + 1);
-            if (!req_ctx->post_data) {
-                printf("[%s] Error: Memory allocation failed while processing POST data.\n", time_buf);
-                return respond_with_error(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, "Memory allocation error",
-                                          req_ctx);
-            }
             memcpy(req_ctx->post_data + req_ctx->post_size, upload_data, *upload_data_size);
             req_ctx->post_size = new_size;
             req_ctx->post_data[req_ctx->post_size] = '\0';
@@ -733,44 +703,19 @@ enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *connectio
             return MHD_YES;
         }
 
-        // Log the collected POST data
-        printf("[%s] POST request received for URL: %s with data: %s\n", time_buf, url, req_ctx->post_data);
-
         // Process full POST data
         if (!req_ctx->post_data) {
-            printf("[%s] Error: No POST data received for URL: %s\n", time_buf, url);
-            struct MHD_Response *response = MHD_create_response_from_buffer(
-                strlen("No data received"),
-                (void *) "No data received",
-                MHD_RESPMEM_PERSISTENT
-            );
-            AddCORSHeaders(response);
-            MHD_queue_response(connection, MHD_HTTP_BAD_REQUEST, response);
-            MHD_destroy_response(response);
-            free(req_ctx);
-            *con_cls = NULL;
-            return MHD_YES;
+            log_request(method, url, NULL, MHD_HTTP_BAD_REQUEST, "No data received");
+            return respond_with_error(connection, MHD_HTTP_BAD_REQUEST, "No data received", req_ctx);
         }
 
         struct json_object *parsed = json_tokener_parse(req_ctx->post_data);
         if (!parsed) {
-            printf("[%s] Error: Invalid JSON received for URL: %s\n", time_buf, url);
-            struct MHD_Response *response = MHD_create_response_from_buffer(
-                strlen("Invalid JSON"),
-                (void *) "Invalid JSON",
-                MHD_RESPMEM_PERSISTENT
-            );
-            AddCORSHeaders(response);
-            MHD_queue_response(connection, MHD_HTTP_BAD_REQUEST, response);
-            MHD_destroy_response(response);
-            free(req_ctx->post_data);
-            free(req_ctx);
-            *con_cls = NULL;
-            return MHD_YES;
+            log_request(method, url, req_ctx->post_data, MHD_HTTP_BAD_REQUEST, "Invalid JSON");
+            return respond_with_error(connection, MHD_HTTP_BAD_REQUEST, "Invalid JSON", req_ctx);
         }
 
-        // Log routing information
-        printf("[%s] Routing POST request to URL: %s\n", time_buf, url);
+        log_request(method, url, req_ctx->post_data, 0, NULL);
 
         // Route the POST request
         if (strcmp(url, "/evaluate_category_score") == 0) {
@@ -786,20 +731,9 @@ enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *connectio
         } else if (strcmp(url, "/evaluate_user_action") == 0) {
             handle_evaluate_user_action(ctx, connection, parsed);
         } else {
-            printf("[%s] Error: Unknown endpoint %s\n", time_buf, url);
-            struct MHD_Response *response = MHD_create_response_from_buffer(
-                strlen("Unknown endpoint"),
-                (void *) "Unknown endpoint",
-                MHD_RESPMEM_PERSISTENT
-            );
-            AddCORSHeaders(response);
-            MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, response);
-            MHD_destroy_response(response);
             json_object_put(parsed);
-            free(req_ctx->post_data);
-            free(req_ctx);
-            *con_cls = NULL;
-            return MHD_YES;
+            log_request(method, url, req_ctx->post_data, MHD_HTTP_NOT_FOUND, "Unknown endpoint");
+            return respond_with_error(connection, MHD_HTTP_NOT_FOUND, "Unknown endpoint", req_ctx);
         }
 
         json_object_put(parsed);
@@ -811,13 +745,13 @@ enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *connectio
 
     // Handle GET requests
     if (strcmp(method, "GET") == 0) {
-        printf("[%s] GET request received for URL: %s\n", time_buf, url);
+        log_request(method, url, NULL, 0, NULL);
         if (strncmp(url, "/state_value", 12) == 0) {
             handle_get_state_value(ctx, connection);
         } else if (strcmp(url, "/score_histogram") == 0) {
             handle_get_score_histogram(ctx, connection);
         } else {
-            printf("[%s] Error: Unknown endpoint %s\n", time_buf, url);
+            log_request(method, url, NULL, MHD_HTTP_NOT_FOUND, "Unknown endpoint");
             return respond_with_error(connection, MHD_HTTP_NOT_FOUND, "Unknown endpoint", req_ctx);
         }
 
@@ -827,8 +761,39 @@ enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *connectio
         return MHD_YES;
     }
 
-    // Log unsupported methods
-    printf("[%s] Error: Unsupported HTTP method %s for URL: %s\n", time_buf, method, url);
-
+    // Unsupported methods
+    log_request(method, url, NULL, MHD_HTTP_METHOD_NOT_ALLOWED, "Only POST and GET supported");
     return respond_with_error(connection, MHD_HTTP_METHOD_NOT_ALLOWED, "Only POST and GET supported", req_ctx);
+}
+
+// Global variable to manage server shutdown
+static volatile int running = 1;
+
+static void handle_signal(int signal) {
+    printf("Signal %d received. Stopping server...\n", signal);
+    running = 0;
+}
+
+int start_webserver(YatzyContext *ctx) {
+    struct MHD_Daemon *daemon = MHD_start_daemon(MHD_USE_INTERNAL_POLLING_THREAD,
+                                                 9000,
+                                                 NULL, NULL,
+                                                 &answer_to_connection, ctx,
+                                                 MHD_OPTION_END);
+
+    if (NULL == daemon) {
+        perror("MHD_start_daemon failed");
+        return 1;
+    }
+
+    signal(SIGINT, handle_signal); // Handle Ctrl+C to stop the server
+
+    printf("Server is running. Press Ctrl+C to stop.\n");
+    while (running) {
+        sleep(1); // Sleep to avoid busy-waiting
+    }
+
+    printf("\nStopping server...\n");
+    MHD_stop_daemon(daemon);
+    return 0;
 }
