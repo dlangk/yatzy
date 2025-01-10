@@ -1,5 +1,6 @@
-#include "context.h"
 #include <stdlib.h>
+
+#include "context.h"
 #include <computations.h>
 
 double GetStateValue(const YatzyContext *ctx, int up, int scored) {
@@ -7,7 +8,7 @@ double GetStateValue(const YatzyContext *ctx, int up, int scored) {
 }
 
 YatzyContext *CreateYatzyContext() {
-    YatzyContext *ctx = (YatzyContext *) malloc(sizeof(YatzyContext));
+    YatzyContext *ctx = malloc(sizeof(YatzyContext));
 
     ctx->category_names[0] = "Ones";
     ctx->category_names[1] = "Twos";
@@ -37,4 +38,9 @@ YatzyContext *CreateYatzyContext() {
     InitializeFinalStates(ctx);
 
     return ctx;
+}
+
+void FreeYatzyContext(YatzyContext *ctx) {
+    free(ctx->state_values);
+    free(ctx);
 }

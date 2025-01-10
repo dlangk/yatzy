@@ -36,6 +36,10 @@ set(SOURCES
         ${SRC_DIR}/dice_mechanics.c
         ${SRC_DIR}/webserver.c
         ${SRC_DIR}/context.c
+        ${SRC_DIR}/simulations.c
+        src/storage.c
+        include/storage.h
+        src/simulations.c
 )
 message(STATUS "Source Directory: ${SRC_DIR}")
 

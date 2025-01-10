@@ -28,22 +28,18 @@
 #define STATE_INDEX(upper_score, scored_categories) ((upper_score)*(1<<15)+(scored_categories))
 
 typedef struct {
+    const char *category_names[CATEGORY_COUNT];
+
     int all_dice_sets[252][5];
-    double transition_table[252][32][252];
     int num_combinations;
-
     int index_lookup[6][6][6][6][6];
-
     int precomputed_scores[252][CATEGORY_COUNT];
-    double dice_set_probabilities[252];
-
+    int scored_category_count_cache[1 << CATEGORY_COUNT];
     int factorial[6 + 1];
 
     double *state_values;
-
-    const char *category_names[CATEGORY_COUNT];
-
-    int scored_category_count_cache[1 << CATEGORY_COUNT];
+    double dice_set_probabilities[252];
+    double transition_table[252][32][252];
 } YatzyContext;
 
 typedef struct {
@@ -52,6 +48,8 @@ typedef struct {
 } YatzyState;
 
 double GetStateValue(const YatzyContext *ctx, int up, int scored);
+
 YatzyContext *CreateYatzyContext();
+void FreeYatzyContext(YatzyContext *ctx);
 
 #endif // CONTEXT_H

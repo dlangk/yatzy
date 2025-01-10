@@ -1,7 +1,7 @@
 #include "context.h"
 #include "dice_mechanics.h"
 
-int CalculateCategoryScore(const int dice[5], int category) {
+int CalculateCategoryScore(const int dice[5], const int category) {
     int face_count[7];
     CountFaces(dice, face_count);
     int sum_all = 0;
@@ -14,7 +14,7 @@ int CalculateCategoryScore(const int dice[5], int category) {
         case CATEGORY_FOURS:
         case CATEGORY_FIVES:
         case CATEGORY_SIXES: {
-            int face = category + 1;
+            const int face = category + 1;
             return face_count[face] * face;
         }
         case CATEGORY_ONE_PAIR:
@@ -34,13 +34,13 @@ int CalculateCategoryScore(const int dice[5], int category) {
         case CATEGORY_THREE_OF_A_KIND: return NOfAKindScore(face_count, 3);
         case CATEGORY_FOUR_OF_A_KIND: return NOfAKindScore(face_count, 4);
         case CATEGORY_SMALL_STRAIGHT:
-            if (face_count[1] == 1 && face_count[2] == 1 && face_count[3] == 1 && face_count[4] == 1 && face_count[5] ==
-                1)
+            if (face_count[1] == 1 && face_count[2] == 1
+                && face_count[3] == 1 && face_count[4] == 1 && face_count[5] == 1)
                 return 15;
             return 0;
         case CATEGORY_LARGE_STRAIGHT:
-            if (face_count[2] == 1 && face_count[3] == 1 && face_count[4] == 1 && face_count[5] == 1 && face_count[6] ==
-                1)
+            if (face_count[2] == 1 && face_count[3] == 1
+                && face_count[4] == 1 && face_count[5] == 1 && face_count[6] == 1)
                 return 20;
             return 0;
         case CATEGORY_FULL_HOUSE: {
@@ -59,6 +59,7 @@ int CalculateCategoryScore(const int dice[5], int category) {
                 if (face_count[f] == 5) return 50;
             }
             return 0;
+        default: ;
     }
     return 0;
 }

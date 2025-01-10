@@ -19,6 +19,8 @@ void PrecomputeRerollTransitionProbabilities(YatzyContext *ctx);
 void PrecomputeDiceSetProbabilities(YatzyContext *ctx);
 void InitializeFinalStates(YatzyContext *ctx);
 
+void ComputeAllStateValues(YatzyContext *ctx);
+
 void ComputeDistributionForRerollMask(const YatzyContext *ctx,
                                       int ds_index,
                                       const double E_ds_for_masks[252],
@@ -79,5 +81,9 @@ double EvaluateChosenCategory(const YatzyContext *ctx,
                                      int scored_categories,
                                      const int dice[5],
                                      int chosen_category);
+
+const double *ComputeExpectedValues(YatzyContext *ctx, int upper_score, int scored_categories, int rerolls);
+
+double ComputeEVFromDistribution(const EVProbabilityPair distribution[], int size);
 
 #endif
