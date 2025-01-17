@@ -11,7 +11,7 @@ void parse_csv_line(char *line, char *fields[], int *num_fields);
 int read_csv(const char *filename);
 
 // Utility functions
-void SetWorkingDirectory(const char *base_path);
+void SetWorkingDirectory();
 int FileExists(const char *filename);
 
 // Functions for saving and loading state values

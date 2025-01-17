@@ -1,4 +1,3 @@
-#include <omp.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,7 +24,6 @@
  * @param ctx Pointer to the YatzyContext where the precomputed scores will be stored.
  */
 void PrecomputeCategoryScores(YatzyContext *ctx) {
-#pragma omp parallel for schedule(static)
     for (int i = 0; i < 252; i++) {
         int *dice = ctx->all_dice_sets[i];
         for (int cat = 0; cat < CATEGORY_COUNT; cat++) {
@@ -111,7 +109,8 @@ static void GenerateRerolledValues(int outcome_id, int count_reroll, int *reroll
 /**
  * @brief Combine locked and rerolled dice into a final dice set.
  */
-static void CombineDiceSets(const int *ds1, const int *locked_indices, int count_locked, const int *rerolled_values, int count_reroll, int *final_dice) {
+static void CombineDiceSets(const int *ds1, const int *locked_indices, int count_locked, const int *rerolled_values,
+                            int count_reroll, int *final_dice) {
     for (int idx = 0; idx < count_locked; idx++) {
         final_dice[idx] = ds1[locked_indices[idx]];
     }
@@ -140,7 +139,6 @@ static void CombineDiceSets(const int *ds1, const int *locked_indices, int count
  * @param ctx Pointer to the YatzyContext where the precomputed probabilities will be stored.
  */
 void PrecomputeRerollTransitionProbabilities(YatzyContext *ctx) {
-    #pragma omp parallel for schedule(dynamic)
     for (int ds1_i = 0; ds1_i < 252; ds1_i++) {
         const int *ds1 = ctx->all_dice_sets[ds1_i];
 
@@ -203,7 +201,6 @@ void PrecomputeScoredCategoryCounts(YatzyContext *ctx) {
 }
 
 void PrecomputeDiceSetProbabilities(YatzyContext *ctx) {
-    #pragma omp parallel for schedule(static)
     for (int ds_i = 0; ds_i < 252; ds_i++) {
         ctx->dice_set_probabilities[ds_i] = ComputeProbabilityOfDiceSet(ctx, ctx->all_dice_sets[ds_i]);
     }
@@ -259,7 +256,7 @@ void ComputeEDs0ForState(const YatzyContext *ctx,
                          int scored_categories,
                          double E_ds_0[252]) {
     YatzyState state = {upper_score, scored_categories};
-#pragma omp parallel for
+    #pragma omp parallel for
     for (int ds_i = 0; ds_i < 252; ds_i++) {
         E_ds_0[ds_i] = ComputeBestScoringValueForDiceSet(ctx, &state, ctx->all_dice_sets[ds_i]);
     }
@@ -322,13 +319,11 @@ void ComputeBestRerollStrategy(const YatzyContext *ctx,
 }
 
 
-void ComputeExpectedValuesForNRerolls(
-    const YatzyContext *ctx,
-    int n,
-    double E_ds_prev[252],
-    double E_ds_current[252],
-    int best_mask_for_n[252]
-) {
+void ComputeExpectedValuesForNRerolls(const YatzyContext *ctx,
+                                      int n,
+                                      double E_ds_prev[252],
+                                      double E_ds_current[252],
+                                      int best_mask_for_n[252]) {
 #pragma omp parallel for schedule(static)
     for (int ds_i = 0; ds_i < 252; ds_i++) {
         double best_val = -INFINITY;
@@ -501,11 +496,11 @@ void ComputeAllStateValues(YatzyContext *ctx) {
 }
 
 const double *ComputeExpectedValues(YatzyContext *ctx, int upper_score, int scored_categories, int rerolls) {
-    static double E_ds[3][252]; // Supports up to 2 rerolls (E_ds_0, E_ds_1, E_ds_2)
+    static double E_ds[3][252];
     YatzyState state = {upper_score, scored_categories};
 
     // Compute E_ds_0 (no rerolls scenario)
-#pragma omp parallel for
+    #pragma omp parallel for
     for (int ds_i = 0; ds_i < 252; ds_i++) {
         double best_val = -INFINITY;
         for (int c = 0; c < CATEGORY_COUNT; c++) {
@@ -522,7 +517,7 @@ const double *ComputeExpectedValues(YatzyContext *ctx, int upper_score, int scor
 
     // If rerolls > 0, compute E_ds_1 and optionally E_ds_2
     for (int n = 1; n <= rerolls; n++) {
-#pragma omp parallel for
+        #pragma omp parallel for
         for (int ds_i = 0; ds_i < 252; ds_i++) {
             double best_val = -INFINITY;
             const double (*row)[252] = ctx->transition_table[ds_i];

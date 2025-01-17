@@ -3,7 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sys/syslimits.h>
+#include <limits.h>
+#include <unistd.h>
 
 #include <webserver.h>
 
@@ -152,7 +153,9 @@ int LoadStateValuesForCount(YatzyContext *ctx, int scored_count, const char *fil
     return 1;
 }
 
-void SetWorkingDirectory(const char *base_path) {
+void SetWorkingDirectory() {
+    char *base_path = getenv("YATZY_BASE_PATH");
+    printf("YATZY_BASE_PATH=%s\n", base_path);
     if (!base_path) {
         base_path = ".";
     }

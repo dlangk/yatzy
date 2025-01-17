@@ -1,9 +1,6 @@
 import {TOTAL_DICE, YAHTZEE_CATEGORIES} from "../utils/constants.js";
-import {refreshHistogram, runRefreshers} from "../utils/refreshers.js";
-
-let GAME_STATE_LOCALSTORAGE = "yatzyGameState";
-let BONUS_SCORE = 50;
-let BONUS_THRESHOLD = 63;
+import {runRefreshers} from "../utils/refreshers.js";
+import {GAME_STATE_LOCALSTORAGE, BONUS_SCORE, BONUS_THRESHOLD} from "../utils/constants.js";
 
 const gameState = {
     players: [],
@@ -100,7 +97,6 @@ const gameState = {
         if (diceState[index]) {
             diceState[index].isLocked = !diceState[index].isLocked;
             this.saveState();
-            await runRefreshers(); // Trigger refresh after lock state change
         }
     },
 
@@ -226,8 +222,9 @@ const gameState = {
         console.log("Resetting game state...");
         localStorage.removeItem(GAME_STATE_LOCALSTORAGE);
         this.initializePlayers();
-        this.randomizeDice();
-        this.saveState();
+        this.randomizeDice().then(() => {
+            this.saveState();
+        });
     }
 };
 
@@ -240,8 +237,10 @@ export function loadOrCreateGameState() {
     } else {
         console.log("Creating new game state...");
         gameState.initializePlayers();
-        gameState.randomizeDice();
-        gameState.saveState();
+        gameState.randomizeDice().then(() => {
+            gameState.saveState();
+        })
     }
-    refreshHistogram();
+    window.gameState = gameState;
+    runRefreshers().then(() => console.log("Finished creating game state."));
 }

@@ -1,7 +1,7 @@
 import {API_ENDPOINTS, postJsonRequest} from "./endpoints.js";
 import gameState from "../game/gameState.js";
 import {renderUI} from "./uiBuilders.js";
-import {refreshAvailableCategories, runRefreshers} from "./refreshers.js";
+import {runRefreshers} from "./refreshers.js";
 import elements from "./elements.js";
 
 export function attachEventHandlers() {
@@ -58,10 +58,8 @@ export function attachEventHandlers() {
     });
 
     elements.playerSelect.addEventListener("change", () => {
-        gameState.setActivePlayerIndex(parseInt(playerSelect.value, 10));
-        gameState.saveState();
-        runRefreshers();
-        renderUI();
+        const currentPlayer = elements.playerSelect.value;
+        handlePlayerSelectionChange(currentPlayer);
     });
 
     elements.scorecardTable.addEventListener("change", (event) => {
@@ -70,16 +68,27 @@ export function attachEventHandlers() {
     });
 }
 
+function handlePlayerSelectionChange(selectedPlayerIndex) {
+    gameState.setActivePlayerIndex(parseInt(selectedPlayerIndex, 10));
+    gameState.saveState();
+    runRefreshers().then(() => {
+        renderUI();
+    });
+}
+
 function handleAddPlayer() {
     gameState.addPlayer();
+    const newPlayerIndex = gameState.players.length - 1;
+    handlePlayerSelectionChange(newPlayerIndex);
     renderUI();
 }
 
 async function handleDiceRandomize() {
     await gameState.randomizeDice();
     gameState.saveState();
-    await runRefreshers(); // Refresh available categories after randomization
-    renderUI();
+    runRefreshers().then(() => {
+        renderUI();
+    });
 }
 
 async function handleDiceActions(button) {
@@ -101,7 +110,7 @@ async function handleDiceActions(button) {
         default:
             console.warn(`Unhandled dice action: ${action}`);
     }
-    refreshAvailableCategories().then(() => {
+    runRefreshers().then(() => {
         gameState.saveState();
         renderUI();
     });
@@ -115,8 +124,10 @@ function handleRerollActions(button) {
     } else if (button.id === "rerollIncrease") {
         activePlayer.rerollsRemaining = Math.min(2, activePlayer.rerollsRemaining + 1);
     }
-    gameState.saveState();
-    renderUI();
+    runRefreshers().then(() => {
+        gameState.saveState();
+        renderUI();
+    });
 }
 
 function handleInstructionToggle() {
@@ -220,13 +231,15 @@ function handleScoreCheckboxChange(event) {
     if (checkbox.checked) {
         category.isScored = true;
         category.score = category.suggestedScore || 0;
-        gameState.randomizeDice();
+        gameState.randomizeDice().then(() => {
+        })
     } else {
         category.isScored = false;
         category.score = 0;
     }
 
     gameState.saveState();
-    runRefreshers();
-    renderUI();
+    runRefreshers().then(() => {
+        renderUI();
+    })
 }

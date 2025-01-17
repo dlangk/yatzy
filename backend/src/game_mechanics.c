@@ -64,10 +64,10 @@ int CalculateCategoryScore(const int dice[5], const int category) {
     return 0;
 }
 
-int UpdateUpperScore(int upper_score, int category, int score) {
+int UpdateUpperScore(const int upper_score, const int category, const int score) {
     if (category < 6) {
-        int new_up = upper_score + score;
-        return (new_up > 63) ? 63 : new_up;
+        const int new_upper_score = upper_score + score;
+        return (new_upper_score > 63) ? 63 : new_upper_score;
     }
     return upper_score;
 }

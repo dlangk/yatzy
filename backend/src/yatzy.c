@@ -12,8 +12,7 @@
 
 int main() {
     setvbuf(stdout, NULL, _IONBF, 0);
-    char *base_path = getenv("YATZY_BASE_PATH");
-    SetWorkingDirectory(base_path);
+    SetWorkingDirectory();
     printf("Starting yatzy API server...\n");
     printf("Initializing context...\n");
     YatzyContext *ctx = CreateYatzyContext();

@@ -84,7 +84,6 @@ export function renderSortedDice() {
 
 function renderUserEvaluation() {
     const activePlayer = gameState.getActivePlayer();
-
     if (!elements.userEvaluation) {
         console.warn("User evaluation element not found.");
         return;
@@ -110,7 +109,6 @@ function renderUserEvaluation() {
 
         elements.userEvaluation.innerHTML = `
             <p><b>Expected Total Score:</b> ${adjustedExpectedValue}</p>
-            <pre>${JSON.stringify(details, null, 2)}</pre>
         `;
     }
 }

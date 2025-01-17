@@ -29,6 +29,25 @@ void SortDiceSet(int arr[5]) {
     }
 }
 
+/**
+ * @brief Finds the index of a specific sorted dice set in the context's index lookup table.
+ *
+ * This function retrieves the precomputed index for a sorted set of dice values (`dice[5]`)
+ * by accessing the `index_lookup` table within the `YatzyContext`. The table maps all possible
+ * sorted dice combinations to unique indices, which can be used for efficient state lookup
+ * or probability computation in the game logic.
+ *
+ * The steps are:
+ * 1. The input `dice` array is expected to be sorted in ascending order (values between 1-6).
+ * 2. Each dice value is adjusted by subtracting 1 to align with 0-based indexing.
+ * 3. The function performs a lookup in the 5-dimensional `index_lookup` table using the adjusted
+ *    dice values as indices.
+ * 4. Returns the precomputed index associated with the given dice combination.
+ *
+ * @param ctx Pointer to the YatzyContext containing the precomputed `index_lookup` table.
+ * @param dice An array of 5 integers representing a sorted dice set (values 1-6).
+ * @return The precomputed index corresponding to the given sorted dice set.
+ */
 int FindDiceSetIndex(const YatzyContext *ctx, const int dice[5]) {
     return ctx->index_lookup[dice[0] - 1][dice[1] - 1][dice[2] - 1][dice[3] - 1][dice[4] - 1];
 }

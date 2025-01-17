@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.22.1)
 project(Yatzy VERSION 1.0 LANGUAGES C)
 
 # Specify the C standard
-set(CMAKE_C_STANDARD 23)
+set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # ---------------------------------------------------------------
@@ -40,6 +40,8 @@ set(SOURCES
         src/storage.c
         include/storage.h
         src/simulations.c
+        src/utilities.c
+        include/utilities.h
 )
 message(STATUS "Source Directory: ${SRC_DIR}")
 

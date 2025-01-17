@@ -1,7 +1,7 @@
 import gameState from "../game/gameState.js";
-import {API_ENDPOINTS, postJsonRequest} from "./endpoints.js";
-import {applyMappingToRerollMask, convertMaskToId, createMappingForSortedDice, reverseMapping} from "./mappings.js";
 import {renderUI} from "./uiBuilders.js";
+import {API_ENDPOINTS, getJsonRequest, postJsonRequest} from "./endpoints.js";
+import {applyMappingToRerollMask, convertMaskToId, createMappingForSortedDice, reverseMapping} from "./mappings.js";
 
 const refreshers = [
     refreshAvailableCategories,
@@ -56,8 +56,7 @@ export async function refreshAvailableCategories() {
 }
 
 export async function refreshOptimalAction() {
-    console.log("Refreshing optimal action...");
-
+    // First we check that requirements are fulfilled to send the request
     const activePlayer = gameState.getActivePlayer();
     if (!activePlayer) {
         console.warn("No active player found.");
@@ -70,25 +69,40 @@ export async function refreshOptimalAction() {
         return;
     }
 
-    const { sortedDice, mapping } = createMappingForSortedDice(currentData.dice);
+    // Then we sort dices and generate a mapping between original and sorted dice
+    // This is because the backend assumes sorted dices in order to reduce lookups
+    const {sortedDice, mapping} = createMappingForSortedDice(currentData.dice);
     currentData.dice = sortedDice;
 
-    try {
-        const response = await postJsonRequest(API_ENDPOINTS.SUGGEST_OPTIMAL_ACTION, currentData);
-        if (!response) return;
+    if (!mapping || typeof mapping !== "object") {
+        console.error("Invalid mapping generated:", mapping);
+        return;
+    }
 
+    try {
+        // We are now ready to post a request to the API
+        const response = await postJsonRequest(API_ENDPOINTS.SUGGEST_OPTIMAL_ACTION, currentData);
+        if (!response) {
+            console.warn("No response from API when requesting optimal action.")
+            return;
+        }
         console.log("Optimal action response:", response);
 
-        // Update gameState
-        if (response.expected_value != null) {
-            activePlayer.optimalActionResult = response.expected_value; // Store optimal expected value
+        // Assuming we get a satisfying response we store the result
+        if (response.best_reroll?.expected_value != null) {
+            activePlayer.optimalActionResult = response.best_reroll.expected_value; // Store optimal expected value
         }
-
-        if (currentData.rerolls_remaining > 0 && response.best_reroll) {
-            const reversedMask = reverseMapping(response.best_reroll.mask_binary, mapping);
+        // There are two options now: we will either highlight which dice to reroll or which category to score
+        let highlight_reroll = currentData.rerolls_remaining > 0 && response.best_reroll?.mask_binary;
+        let highlight_category = currentData.rerolls_remaining === 0 && response.best_category?.id != null;
+        if (highlight_reroll) {
+            let maskBinary = response.best_reroll.mask_binary;
+            const reversedMask = reverseMapping(maskBinary, mapping);
             activePlayer.optimalRerollMask = reversedMask.split("");
-        } else if (currentData.rerolls_remaining === 0 && response.best_category) {
+        } else if (highlight_category) {
             activePlayer.optimalCategoryId = response.best_category.id;
+        } else {
+            console.warn("No valid optimal action available.");
         }
     } catch (error) {
         console.error("Error refreshing optimal action:", error);
@@ -103,7 +117,7 @@ export function refreshUserAction() {
         const mask = activePlayer.diceState
             .map(die => (die.isLocked ? "0" : "1"))
             .join("");
-        userAction.best_reroll = { mask_binary: mask };
+        userAction.best_reroll = {mask_binary: mask};
     } else if (!userAction.best_category) {
         userAction.best_category = null;
     }
@@ -123,20 +137,20 @@ export async function refreshUserActionResult() {
     const userAction = activePlayer.userAction?.best_reroll || activePlayer.userAction?.best_category;
     if (!userAction) {
         console.warn("No user action chosen.");
-        activePlayer.userActionResult = { error: "Please evaluate an option." };
+        activePlayer.userActionResult = {error: "Please evaluate an option."};
         return;
     }
 
     let diceToSend = activePlayer.diceState.map(die => die.value);
     if (diceToSend.length !== 5) {
         console.error("Invalid dice array length.");
-        activePlayer.userActionResult = { error: "Invalid dice array length." };
+        activePlayer.userActionResult = {error: "Invalid dice array length."};
         return;
     }
 
     let newUserAction;
     if (activePlayer.rerollsRemaining > 0) {
-        const { sortedDice, mapping } = createMappingForSortedDice(diceToSend);
+        const {sortedDice, mapping} = createMappingForSortedDice(diceToSend);
         const newMask = applyMappingToRerollMask(userAction.mask_binary, mapping);
 
         diceToSend = sortedDice;
@@ -174,9 +188,10 @@ export async function refreshUserActionResult() {
         };
     } catch (error) {
         console.error("Error evaluating user action:", error);
-        activePlayer.userActionResult = { error: error.message };
+        activePlayer.userActionResult = {error: error.message};
     }
 }
+
 export async function refreshHistogram() {
     console.log("Refreshing histogram...");
 
@@ -193,14 +208,16 @@ export async function refreshHistogram() {
 
         // Invalidate cache to ensure updated data is used
         const actionResponse = await postJsonRequest(API_ENDPOINTS.EVALUATE_ACTIONS, gameState.getEvaluationPayload());
-        const histogramResponse = await fetch(API_ENDPOINTS.GET_HISTOGRAM).then(res => res.json());
+        const histogramResponse = await getJsonRequest(API_ENDPOINTS.GET_HISTOGRAM);
+        console.log("Histogram response:", histogramResponse);
+        console.log("Action response:", actionResponse);
 
         if (!actionResponse?.actions || !histogramResponse?.bins) {
             console.warn("Invalid response data for histogram.");
             return;
         }
 
-        const { bins: optimalBins, min_ev, max_ev, bin_count } = histogramResponse;
+        const {bins: optimalBins, min_ev, max_ev, bin_count} = histogramResponse;
         const binWidth = (max_ev - min_ev) / bin_count;
 
         const allEvs = [];
@@ -210,15 +227,13 @@ export async function refreshHistogram() {
             .join("");
 
         actionResponse.actions.forEach(action => {
-            if (action.distribution) {
-                action.distribution.forEach(dist => {
-                    const ev = dist.ev + totalScore;
-                    allEvs.push(ev);
+            const ev = action.expected_value + totalScore;
+            allEvs.push(ev);
 
-                    if (action.binary === currentRerollMask) {
-                        currentMaskEvs.push(ev);
-                    }
-                });
+            // Convert the numeric mask to binary format and compare with currentRerollMask
+            const binaryMask = action.mask.toString(2).padStart(activePlayer.diceState.length, "0");
+            if (binaryMask === currentRerollMask) {
+                currentMaskEvs.push(ev);
             }
         });
 
@@ -248,12 +263,12 @@ export async function refreshHistogram() {
             return reverseCumulativeValue;
         }, 0);
 
-        const labels = Array.from({ length: bin_count }, (_, i) => {
+        const labels = Array.from({length: bin_count}, (_, i) => {
             const start = Math.round(min_ev + i * binWidth);
             const end = Math.round(start + binWidth);
             return `${start} - ${end}`;
         });
-        activePlayer.histogramData = { currentBins, currentMaskBins, reverseCumulativeBins, labels };
+        activePlayer.histogramData = {currentBins, currentMaskBins, reverseCumulativeBins, labels};
     } catch (error) {
         console.error("Error refreshing histogram:", error);
     }

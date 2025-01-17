@@ -9,7 +9,31 @@ export const API_ENDPOINTS = {
     GET_HISTOGRAM: `${API_BASE_URL}/score_histogram`
 };
 
-/* Category / Reroll / Optimal */
+export function buildUrlWithParams(baseUrl, params) {
+    const url = new URL(baseUrl);
+    Object.entries(params).forEach(([key, value]) => url.searchParams.append(key, value));
+    return url.toString();
+}
+
+export async function getJsonRequest(url, options = {}) {
+    try {
+        console.log(`Fetching: ${url} with options:`, options);
+        const response = await fetch(url, options);
+
+        if (!response.ok) {
+            console.error(`Error fetching ${url}: ${response.status} - ${response.statusText}`);
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log(`Successfully fetched ${url}:`, data);
+        return data;
+    } catch (error) {
+        console.error(`Error during fetch ${url}:`, error);
+        throw error;
+    }
+}
+
 export async function postJsonRequest(url, data) {
     console.log("Sending POST request to:", url, data);
     try {

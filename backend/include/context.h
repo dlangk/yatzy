@@ -3,7 +3,6 @@
 
 #define CATEGORY_COUNT 15
 
-#define CATEGORY_COUNT 15
 #define CATEGORY_ONES 0
 #define CATEGORY_TWOS 1
 #define CATEGORY_THREES 2
@@ -20,9 +19,17 @@
 #define CATEGORY_CHANCE 13
 #define CATEGORY_YATZY 14
 
+// Defines the total number of states by:
+// 1. Calculating 1 << 15, which represents 2^15 (shifting 1 left by 15 bits).
+// 2. Multiplying the result (32,768) by 64 to get the total number of states.
 #define NUM_STATES (64*(1<<15))
 
-#define IS_CATEGORY_SCORED(scored,cat) (((scored)&(1<<(cat)))!=0)
+// Checks if category 'cat' is scored by:
+// 1. Creating a bitmask with a 1 at position 'cat' using (1 << cat).
+// 2. Performing a bitwise AND between the bitmask and 'scored'.
+// 3. Checking if the result is non-zero, which indicates the category is scored.
+#define IS_CATEGORY_SCORED(scored,cat) ((scored & (1 << cat)) != 0)
+
 #define SET_CATEGORY(scored,cat) ((scored)|=(1<<(cat)))
 #define CLEAR_CATEGORY(scored,cat) ((scored)&=~(1<<(cat)))
 #define STATE_INDEX(upper_score, scored_categories) ((upper_score)*(1<<15)+(scored_categories))
@@ -50,6 +57,7 @@ typedef struct {
 double GetStateValue(const YatzyContext *ctx, int up, int scored);
 
 YatzyContext *CreateYatzyContext();
+
 void FreeYatzyContext(YatzyContext *ctx);
 
 #endif // CONTEXT_H
