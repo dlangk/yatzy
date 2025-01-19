@@ -132,12 +132,16 @@ void handle_available_categories(YatzyContext *ctx, struct MHD_Connection *conne
     const char *fields[] = {"scored_categories"};
     int *values[] = {&scored_categories};
 
-    // Validate only the required fields: scored_categories and dice
+    // Validate required fields: scored_categories and dice
     if (!ValidateAndParseJSON(parsed, fields, 1, values) || !ParseDiceFromJSON(parsed, dice)) {
         RespondWithError(connection, MHD_HTTP_BAD_REQUEST, "Missing required fields");
         return;
     }
 
+    // Sort the dice before finding the index
+    SortDiceSet(dice);
+
+    // Find the index for the sorted dice
     const int ds_index = FindDiceSetIndex(ctx, dice);
     json_object *resp = json_object_new_object();
     json_object *categories = json_object_new_array();
@@ -271,6 +275,7 @@ void handle_suggest_optimal_action(YatzyContext *ctx, struct MHD_Connection *con
         if (best_category >= 0) {
             json_object *category_obj = json_object_new_object();
             AddJSONField(category_obj, "id", best_category);
+            AddJSONFieldString(category_obj, "name", ctx->category_names[best_category]);
             AddJSONFieldDouble(category_obj, "expected_value", best_ev);
             json_object_object_add(resp, "best_category", category_obj);
         }
@@ -278,7 +283,8 @@ void handle_suggest_optimal_action(YatzyContext *ctx, struct MHD_Connection *con
     RespondWithJSON(connection, MHD_HTTP_OK, resp);
 }
 
-void handle_evaluate_user_action(const YatzyContext *ctx, struct MHD_Connection *connection, const json_object *parsed) {
+void handle_evaluate_user_action(YatzyContext *ctx, struct MHD_Connection *connection,
+                                 const json_object *parsed) {
     int upper_score, scored_categories, rerolls, dice[5];
     const char *fields[] = {"upper_score", "scored_categories", "rerolls_remaining"};
     int *values[] = {&upper_score, &scored_categories, &rerolls};
