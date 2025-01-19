@@ -39,6 +39,8 @@ export async function refreshAvailableCategories() {
         if (!response || !response.categories) {
             console.warn("No categories data in the response.");
             return;
+        } else{
+            console.log("Available categories response:", response);
         }
 
         // Update suggested scores and validity for each category
