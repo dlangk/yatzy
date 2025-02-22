@@ -1,7 +1,7 @@
-import {API_ENDPOINTS, postJsonRequest} from "./endpoints.js";
-import gameState from "../game/gameState.js";
-import {renderUI} from "./uiBuilders.js";
+import {postJsonRequest, API_ENDPOINTS} from "./endpoints.js";
 import {runRefreshers} from "./refreshers.js";
+import {renderUI} from "./uiBuilders.js";
+import gameState from "../game/gameState.js";
 import elements from "./elements.js";
 
 export function attachEventHandlers() {

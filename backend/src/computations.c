@@ -324,7 +324,7 @@ void ComputeExpectedValuesForNRerolls(const YatzyContext *ctx,
                                       double E_ds_prev[252],
                                       double E_ds_current[252],
                                       int best_mask_for_n[252]) {
-#pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static)
     for (int ds_i = 0; ds_i < 252; ds_i++) {
         double best_val = -INFINITY;
         int best_mask = 0;
@@ -350,7 +350,7 @@ double ComputeExpectedStateValue(const YatzyContext *ctx,
     double E_ds_0[252], E_ds_1[252], E_ds_2[252];
     int best_mask_1[252], best_mask_2[252];
 
-#pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static)
     for (int ds_i = 0; ds_i < 252; ds_i++) {
         E_ds_0[ds_i] = ComputeBestScoringValueForDiceSet(ctx, S, ctx->all_dice_sets[ds_i]);
     }
@@ -436,14 +436,21 @@ double EvaluateChosenCategory(const YatzyContext *ctx,
     if (IS_CATEGORY_SCORED(scored_categories, chosen_category)) {
         return -INFINITY;
     }
-
     int ds_index = FindDiceSetIndex(ctx, dice);
-    int scr = ctx->precomputed_scores[ds_index][chosen_category];
-    if (scr == 0) return -INFINITY;
-    int new_up = UpdateUpperScore(upper_score, chosen_category, scr);
+    int score = ctx->precomputed_scores[ds_index][chosen_category];
+
+    // print relevant debugging information on the next row
+    printf("Score: %d\n", score);
+    printf("Category: %d\n", chosen_category);
+    printf("Scored categories: %d\n", scored_categories);
+    printf("Upper score: %d\n", upper_score);
+    printf("Dice: %d %d %d %d %d\n", dice[0], dice[1], dice[2], dice[3], dice[4]);
+
+    if (score == 0) return -INFINITY;
+    int new_up = UpdateUpperScore(upper_score, chosen_category, score);
     int new_scored = scored_categories | (1 << chosen_category);
     double future_val = GetStateValue(ctx, new_up, new_scored);
-    return scr + future_val;
+    return score + future_val;
 }
 
 void ComputeAllStateValues(YatzyContext *ctx) {

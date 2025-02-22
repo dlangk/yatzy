@@ -4,7 +4,6 @@
 #include <string.h>
 #include <math.h>
 #include <stdbool.h>
-#include <time.h>
 #include <signal.h>
 #include <json-c/json_object.h>
 #include <json-c/json_tokener.h>
@@ -201,6 +200,12 @@ void handle_evaluate_all_categories(YatzyContext *ctx, struct MHD_Connection *co
     RespondWithJSON(connection, MHD_HTTP_OK, resp);
 }
 
+void handle_health_check(YatzyContext *ctx, struct MHD_Connection *connection) {
+    json_object *resp = json_object_new_object();
+    AddJSONFieldString(resp, "status", "OK");
+    RespondWithJSON(connection, MHD_HTTP_OK, resp);
+}
+
 void handle_evaluate_actions(YatzyContext *ctx, struct MHD_Connection *connection, const json_object *parsed) {
     int upper_score, scored_categories, rerolls, dice[5];
     const char *fields[] = {"upper_score", "scored_categories", "rerolls_remaining"};
@@ -283,8 +288,7 @@ void handle_suggest_optimal_action(YatzyContext *ctx, struct MHD_Connection *con
     RespondWithJSON(connection, MHD_HTTP_OK, resp);
 }
 
-void handle_evaluate_user_action(YatzyContext *ctx, struct MHD_Connection *connection,
-                                 const json_object *parsed) {
+void handle_evaluate_user_action(YatzyContext *ctx, struct MHD_Connection *connection, const json_object *parsed) {
     int upper_score, scored_categories, rerolls, dice[5];
     const char *fields[] = {"upper_score", "scored_categories", "rerolls_remaining"};
     int *values[] = {&upper_score, &scored_categories, &rerolls};
@@ -301,6 +305,7 @@ void handle_evaluate_user_action(YatzyContext *ctx, struct MHD_Connection *conne
     }
 
     json_object *resp = json_object_new_object();
+
     if (rerolls > 0) {
         int mask;
         if (!ParseJSONField(user_action, "best_reroll", &mask)) {
@@ -319,7 +324,7 @@ void handle_evaluate_user_action(YatzyContext *ctx, struct MHD_Connection *conne
             RespondWithError(connection, MHD_HTTP_BAD_REQUEST, "Invalid best_category");
             return;
         }
-
+        SortDiceSet(dice);
         double ev = EvaluateChosenCategory(ctx, upper_score, scored_categories, dice, category_id);
         if (isnan(ev) || isinf(ev)) {
             ev = 0.0; // Replace invalid values with a default
@@ -416,6 +421,7 @@ void HandleGETRequest(YatzyContext *ctx,
     GETEndpoint endpoints[] = {
         {"/state_value", handle_get_state_value},
         {"/score_histogram", handle_get_score_histogram},
+        {"/health", handle_health_check},
     };
 
     // Search for a matching endpoint in the routing table
