@@ -11,4 +11,4 @@ fi
 echo "window.API_BASE_URL='${API_BASE_URL}';" > /app/js/config.js
 
 # Start the Python HTTP server
-exec python3 -m http.server 8090
+exec python3 -m http.server 8090 --bind 0.0.0.0
