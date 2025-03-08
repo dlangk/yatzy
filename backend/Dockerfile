@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
     make \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory and copy source
+# Set working directory and copy source code
 WORKDIR /app
 COPY . /app
 
@@ -26,10 +26,9 @@ RUN ls -l /app/build/yatzy
 # ---------------------------
 # Stage 2: Runtime
 # ---------------------------
-# Use a slim runtime image; debian:bullseye-slim is a good candidate if your binary is glibc-based.
-FROM debian:bullseye-slim
+FROM ubuntu:22.04
 
-# Install runtime dependencies and curl for healthcheck
+# Install minimal runtime dependencies and curl for the healthcheck
 RUN apt-get update && apt-get install -y \
     libmicrohttpd-dev \
     libjson-c-dev \
@@ -40,7 +39,7 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy the compiled binary and data directory from the builder stage
+# Copy the compiled binary and data directory from the build stage
 COPY --from=builder /app/build/yatzy /app/build/yatzy
 COPY --from=builder /app/data /app/data
 
