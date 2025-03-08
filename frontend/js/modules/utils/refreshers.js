@@ -14,9 +14,7 @@ const refreshers = [
 export async function runRefreshers() {
     console.log("Running refreshers...");
     try {
-        for (const refresher of refreshers) {
-            await refresher(); // Run each refresher sequentially
-        }
+        await Promise.all(refreshers.map(refresher => refresher()));
         // Perform a single save operation after all refreshers
         gameState.saveState();
         renderUI(); // Perform a single render operation
