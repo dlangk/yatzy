@@ -21,8 +21,12 @@ void ComputeBestRerollStrategy(const YatzyContext *ctx,
                                int rerolls_remaining,
                                int *best_mask,
                                double *best_ev) {
+    /* Group 6: E(S, r, 0) for all r */
     double E_ds_0[252];
-    ComputeEDs0ForState(ctx, upper_score, scored_categories, E_ds_0);
+    YatzyState state = {upper_score, scored_categories};
+    for (int ds_i = 0; ds_i < 252; ds_i++) {
+        E_ds_0[ds_i] = ComputeBestScoringValueForDiceSet(ctx, &state, ctx->all_dice_sets[ds_i]);
+    }
 
     if (rerolls_remaining == 1) {
         *best_mask = ChooseBestRerollMask(ctx, E_ds_0, dice, best_ev);
@@ -31,7 +35,7 @@ void ComputeBestRerollStrategy(const YatzyContext *ctx,
 
     double E_ds_1[252];
     int dummy_mask[252];
-    ComputeExpectedValuesForNRerolls(ctx, 1, E_ds_0, E_ds_1, dummy_mask);
+    ComputeExpectedValuesForNRerolls(ctx, E_ds_0, E_ds_1, dummy_mask);
     *best_mask = ChooseBestRerollMask(ctx, E_ds_1, dice, best_ev);
 }
 
@@ -77,13 +81,17 @@ double EvaluateChosenRerollMask(const YatzyContext *ctx,
                                 const int dice[5],
                                 int chosen_mask,
                                 int rerolls_remaining) {
+    /* Group 6: E(S, r, 0) for all r */
     double E_ds_0[252];
-    ComputeEDs0ForState(ctx, upper_score, scored_categories, E_ds_0);
+    YatzyState state = {upper_score, scored_categories};
+    for (int ds_i = 0; ds_i < 252; ds_i++) {
+        E_ds_0[ds_i] = ComputeBestScoringValueForDiceSet(ctx, &state, ctx->all_dice_sets[ds_i]);
+    }
 
     double E_ds_1[252];
     int dummy_mask[252];
     if (rerolls_remaining == 2) {
-        ComputeExpectedValuesForNRerolls(ctx, 1, E_ds_0, E_ds_1, dummy_mask);
+        ComputeExpectedValuesForNRerolls(ctx, E_ds_0, E_ds_1, dummy_mask);
     }
 
     const double *E_ds_for_masks = (rerolls_remaining == 1) ? E_ds_0 : E_ds_1;
@@ -141,10 +149,11 @@ void ComputeDistributionForRerollMask(const YatzyContext *ctx,
 }
 
 /* Compute E(S, r, n) for all r, for a given number of rerolls.
- * Returns a static array of 252 expected values. */
-const double *ComputeExpectedValues(YatzyContext *ctx, int upper_score, int scored_categories, int rerolls) {
-    static double E_ds[3][252];
-    YatzyState state = {upper_score, scored_categories};
+ * Copies result into caller-provided buffer (thread-safe). */
+void ComputeExpectedValues(const YatzyContext *ctx, int upper_score,
+                           int scored_categories, int rerolls,
+                           double out_E_ds[252]) {
+    double E_ds[3][252];
 
     /* Level 0: E(S, r, 0) = max_c [s(S,r,c) + E(n(S,r,c))] */
     #pragma omp parallel for
@@ -163,16 +172,16 @@ const double *ComputeExpectedValues(YatzyContext *ctx, int upper_score, int scor
     }
 
     /* Levels 1..rerolls: E(S, r, n) = max_{mask} Σ P(r'→r'') · E_ds[n-1][r''] */
-    const double *vals = ctx->sparse_transitions.values;
-    const int *cols = ctx->sparse_transitions.col_indices;
+    const double * restrict vals = ctx->sparse_transitions.values;
+    const int * restrict cols = ctx->sparse_transitions.col_indices;
     const int *offsets = ctx->sparse_transitions.row_offsets;
 
     for (int n = 1; n <= rerolls; n++) {
         #pragma omp parallel for
         for (int ds_i = 0; ds_i < 252; ds_i++) {
-            double best_val = -INFINITY;
+            double best_val = E_ds[n - 1][ds_i]; /* mask=0: keep all */
             int row_base = ds_i * 32;
-            for (int mask = 0; mask < 32; mask++) {
+            for (int mask = 1; mask < 32; mask++) {
                 int start = offsets[row_base + mask];
                 int end = offsets[row_base + mask + 1];
                 double ev = 0.0;
@@ -185,7 +194,10 @@ const double *ComputeExpectedValues(YatzyContext *ctx, int upper_score, int scor
         }
     }
 
-    return E_ds[rerolls];
+    /* Copy result to caller's buffer */
+    for (int i = 0; i < 252; i++) {
+        out_E_ds[i] = E_ds[rerolls][i];
+    }
 }
 
 /* Weighted sum of EV over a probability distribution. */

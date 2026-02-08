@@ -25,16 +25,9 @@ double ComputeBestScoringValueForDiceSet(const YatzyContext *ctx,
                                          const YatzyState *S,
                                          const int dice[5]);
 
-/* Group 6 for all rolls: compute E(S, r, 0) for every r ∈ R_{5,6}. */
-void ComputeEDs0ForState(const YatzyContext *ctx,
-                         int upper_score,
-                         int scored_categories,
-                         double E_ds_0[252]);
-
-/* Groups 5 & 3: E(S, r, n) = max_{mask} Σ P(r'→r'') · E_prev[r''].
- * Propagates expected values from reroll level n-1 to level n. */
+/* Groups 5 & 3 (API path): E(S, r, n) = max_{mask} Σ P(r'→r'') · E_prev[r''].
+ * Propagates expected values and tracks the best mask per dice set. */
 void ComputeExpectedValuesForNRerolls(const YatzyContext *ctx,
-                                      int n,
                                       double E_ds_prev[252],
                                       double E_ds_current[252],
                                       int best_mask_for_n[252]);

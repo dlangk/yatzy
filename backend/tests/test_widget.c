@@ -62,8 +62,12 @@ static void test_late_game_chance_only(YatzyContext *ctx) {
 static void test_keep_all_mask(YatzyContext *ctx) {
     int all_but_yatzy = ((1 << CATEGORY_COUNT) - 1) ^ (1 << CATEGORY_YATZY);
 
+    /* Compute E_ds_0 inline (Group 6 for all rolls) */
     double E_ds_0[252];
-    ComputeEDs0ForState(ctx, 0, all_but_yatzy, E_ds_0);
+    YatzyState state = {0, all_but_yatzy};
+    for (int ds_i = 0; ds_i < 252; ds_i++) {
+        E_ds_0[ds_i] = ComputeBestScoringValueForDiceSet(ctx, &state, ctx->all_dice_sets[ds_i]);
+    }
 
     /* For ds_index=251 ([6,6,6,6,6]), mask=0 should give E_ds_0[251] */
     double ev_keep = ComputeExpectedValueForRerollMask(ctx, 251, E_ds_0, 0);
@@ -82,8 +86,12 @@ static void test_keep_all_mask(YatzyContext *ctx) {
 static void test_choose_best_reroll(YatzyContext *ctx) {
     int all_but_yatzy = ((1 << CATEGORY_COUNT) - 1) ^ (1 << CATEGORY_YATZY);
 
+    /* Compute E_ds_0 inline */
     double E_ds_0[252];
-    ComputeEDs0ForState(ctx, 0, all_but_yatzy, E_ds_0);
+    YatzyState state = {0, all_but_yatzy};
+    for (int ds_i = 0; ds_i < 252; ds_i++) {
+        E_ds_0[ds_i] = ComputeBestScoringValueForDiceSet(ctx, &state, ctx->all_dice_sets[ds_i]);
+    }
 
     for (int ds = 0; ds < 252; ds += 50) { /* spot-check every 50th */
         double best_ev;
@@ -102,20 +110,23 @@ static void test_choose_best_reroll(YatzyContext *ctx) {
 static void bench_widget(YatzyContext *ctx) {
     printf("\n--- Widget Solver Benchmarks ---\n");
 
-    /* Benchmark ComputeEDs0ForState (Group 6: 252 scoring evaluations) */
+    /* Benchmark Group 6 (252 scoring evaluations) */
     int all_but_yatzy = ((1 << CATEGORY_COUNT) - 1) ^ (1 << CATEGORY_YATZY);
     double E_ds_0[252];
     double E_ds_1[252];
     int best_masks[252];
 
+    YatzyState state = {0, all_but_yatzy};
     double t0 = timer_now();
-    ComputeEDs0ForState(ctx, 0, all_but_yatzy, E_ds_0);
+    for (int ds_i = 0; ds_i < 252; ds_i++) {
+        E_ds_0[ds_i] = ComputeBestScoringValueForDiceSet(ctx, &state, ctx->all_dice_sets[ds_i]);
+    }
     double dt_group6 = timer_elapsed_ms(t0);
-    printf("  %-42s %8.3f ms\n", "Group 6 (ComputeEDs0ForState)", dt_group6);
+    printf("  %-42s %8.3f ms\n", "Group 6 (inline loop)", dt_group6);
 
     /* Benchmark ComputeExpectedValuesForNRerolls (Group 5: 252×32×252) */
     t0 = timer_now();
-    ComputeExpectedValuesForNRerolls(ctx, 1, E_ds_0, E_ds_1, best_masks);
+    ComputeExpectedValuesForNRerolls(ctx, E_ds_0, E_ds_1, best_masks);
     double dt_group5 = timer_elapsed_ms(t0);
     printf("  %-42s %8.3f ms\n", "Group 5 (N-rerolls, 1 level)", dt_group5);
 

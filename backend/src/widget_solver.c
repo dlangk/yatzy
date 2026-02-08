@@ -20,7 +20,10 @@
  * E(S, r, 0) = max_{c ∉ C} [s(S,r,c) + E(n(S,r,c))]
  *
  * For each unused category c, computes the immediate score plus the
- * precomputed future value of the successor state n(S,r,c). */
+ * precomputed future value of the successor state n(S,r,c).
+ *
+ * Upper categories (0-5) are handled separately since only they affect
+ * upper score. Lower categories (6-14) skip the UpdateUpperScore call. */
 double ComputeBestScoringValueForDiceSet(const YatzyContext *ctx,
                                          const YatzyState *S,
                                          const int dice[5]) {
@@ -29,7 +32,8 @@ double ComputeBestScoringValueForDiceSet(const YatzyContext *ctx,
     int scored = S->scored_categories;
     int up_score = S->upper_score;
 
-    for (int c = 0; c < CATEGORY_COUNT; c++) {
+    /* Upper categories (0-5): affect upper score */
+    for (int c = 0; c < 6; c++) {
         if (!IS_CATEGORY_SCORED(scored, c)) {
             int scr = ctx->precomputed_scores[ds_index][c];
             int new_up = UpdateUpperScore(up_score, c, scr);
@@ -39,20 +43,49 @@ double ComputeBestScoringValueForDiceSet(const YatzyContext *ctx,
         }
     }
 
+    /* Lower categories (6-14): upper score unchanged */
+    for (int c = 6; c < CATEGORY_COUNT; c++) {
+        if (!IS_CATEGORY_SCORED(scored, c)) {
+            int scr = ctx->precomputed_scores[ds_index][c];
+            int new_scored = (scored | (1 << c));
+            double val = scr + GetStateValue(ctx, up_score, new_scored);
+            if (val > best_val) best_val = val;
+        }
+    }
+
     return best_val;
 }
 
-/* Group 6 for all rolls: compute E(S, r, 0) for every r ∈ R_{5,6}.
- * Fills E_ds_0[252] — the "exit values" of the widget. */
-void ComputeEDs0ForState(const YatzyContext *ctx,
-                         int upper_score,
-                         int scored_categories,
-                         double E_ds_0[252]) {
-    YatzyState state = {upper_score, scored_categories};
-    #pragma omp parallel for
-    for (int ds_i = 0; ds_i < 252; ds_i++) {
-        E_ds_0[ds_i] = ComputeBestScoringValueForDiceSet(ctx, &state, ctx->all_dice_sets[ds_i]);
+/* Group 6, inner loop variant that takes ds_index directly.
+ * Used in the DP hot path where the index is already known. */
+static inline double ComputeBestScoringValueForDiceSetByIndex(
+        const YatzyContext *ctx,
+        int up_score, int scored,
+        int ds_index) {
+    double best_val = -INFINITY;
+
+    /* Upper categories (0-5): affect upper score */
+    for (int c = 0; c < 6; c++) {
+        if (!IS_CATEGORY_SCORED(scored, c)) {
+            int scr = ctx->precomputed_scores[ds_index][c];
+            int new_up = UpdateUpperScore(up_score, c, scr);
+            int new_scored = (scored | (1 << c));
+            double val = scr + GetStateValue(ctx, new_up, new_scored);
+            if (val > best_val) best_val = val;
+        }
     }
+
+    /* Lower categories (6-14): upper score unchanged */
+    for (int c = 6; c < CATEGORY_COUNT; c++) {
+        if (!IS_CATEGORY_SCORED(scored, c)) {
+            int scr = ctx->precomputed_scores[ds_index][c];
+            int new_scored = (scored | (1 << c));
+            double val = scr + GetStateValue(ctx, up_score, new_scored);
+            if (val > best_val) best_val = val;
+        }
+    }
+
+    return best_val;
 }
 
 /* Single mask evaluation: Σ_{r''} P(r'→r'') · E_prev[r''].
@@ -98,30 +131,27 @@ int ChooseBestRerollMask(const YatzyContext *ctx,
     return best_mask;
 }
 
-/* Groups 5 & 3: propagate expected values from reroll level n-1 to n.
+/* Groups 5 & 3 (API path): propagate expected values with mask tracking.
  * E(S, r, n) = max_{mask} Σ P(r'→r'') · E_prev[r'']
  *
- * For each dice set ds_i (= roll r), tries all 32 reroll masks and picks
- * the one maximizing the weighted sum over transition outcomes.
- *
- * Uses the sparse CSR transition table for ~5× fewer memory accesses.
- *
- * See pseudocode Groups 5 and 3 in SOLVE_WIDGET. */
+ * For each dice set ds_i, tries all 32 reroll masks and picks the one
+ * maximizing the weighted sum over transition outcomes. Stores both the
+ * best EV and the best mask for API response. */
 void ComputeExpectedValuesForNRerolls(const YatzyContext *ctx,
-                                      int n,
                                       double E_ds_prev[252],
                                       double E_ds_current[252],
                                       int best_mask_for_n[252]) {
-    const double *vals = ctx->sparse_transitions.values;
-    const int *cols = ctx->sparse_transitions.col_indices;
+    const double * restrict vals = ctx->sparse_transitions.values;
+    const int * restrict cols = ctx->sparse_transitions.col_indices;
     const int *offsets = ctx->sparse_transitions.row_offsets;
 
     #pragma omp parallel for schedule(static)
     for (int ds_i = 0; ds_i < 252; ds_i++) {
-        double best_val = -INFINITY;
+        /* mask=0 is identity: keeping all dice yields E_ds_prev[ds_i] */
+        double best_val = E_ds_prev[ds_i];
         int best_mask = 0;
         int row_base = ds_i * 32;
-        for (int mask = 0; mask < 32; mask++) {
+        for (int mask = 1; mask < 32; mask++) {
             int start = offsets[row_base + mask];
             int end = offsets[row_base + mask + 1];
             double ev = 0.0;
@@ -138,36 +168,65 @@ void ComputeExpectedValuesForNRerolls(const YatzyContext *ctx,
     }
 }
 
+/* DP-only variant: computes E_ds_current without tracking optimal masks.
+ * Saves 252 int writes per reroll level per widget (504 writes × 2.1M widgets).
+ * Static so the compiler can inline into ComputeExpectedStateValue. */
+static void ComputeMaxEVForNRerolls(const YatzyContext *ctx,
+                                     const double E_ds_prev[252],
+                                     double E_ds_current[252]) {
+    const double * restrict vals = ctx->sparse_transitions.values;
+    const int * restrict cols = ctx->sparse_transitions.col_indices;
+    const int *offsets = ctx->sparse_transitions.row_offsets;
+
+    for (int ds_i = 0; ds_i < 252; ds_i++) {
+        double best_val = E_ds_prev[ds_i]; /* mask=0: keep all */
+        int row_base = ds_i * 32;
+        for (int mask = 1; mask < 32; mask++) {
+            int start = offsets[row_base + mask];
+            int end = offsets[row_base + mask + 1];
+            double ev = 0.0;
+            for (int k = start; k < end; k++) {
+                ev += vals[k] * E_ds_prev[cols[k]];
+            }
+            if (ev > best_val) best_val = ev;
+        }
+        E_ds_current[ds_i] = best_val;
+    }
+}
+
 /* SOLVE_WIDGET(S): compute E(S) for one turn-start state.
  *
  * Evaluates the widget bottom-up:
- *   1. Group 6: E_ds_0[r] = best category score for each final roll
- *   2. Group 5: E_ds_1[r] = best reroll from E_ds_0 (1 reroll remaining)
- *   3. Group 3: E_ds_2[r] = best reroll from E_ds_1 (2 rerolls remaining)
- *   4. Group 1: E(S) = Σ P(⊥→r) · E_ds_2[r]
+ *   1. Group 6: E[0][r] = best category score for each final roll
+ *   2. Group 5: E[1][r] = best reroll from E[0] (1 reroll remaining)
+ *   3. Group 3: E[0][r] = best reroll from E[1] (2 rerolls remaining, reuses buf)
+ *   4. Group 1: E(S) = Σ P(⊥→r) · E[0][r]
+ *
+ * Uses ping-pong buffers to halve stack footprint (4 KB instead of 6 KB).
  *
  * See pseudocode Phase 2a: SOLVE_WIDGET. */
 double ComputeExpectedStateValue(const YatzyContext *ctx,
                                  const YatzyState *S) {
-    double E_ds_0[252], E_ds_1[252], E_ds_2[252];
-    int best_mask_1[252], best_mask_2[252];
+    double E[2][252]; /* ping-pong buffers */
 
-    /* Group 6: E(S, r, 0) for all r */
-    #pragma omp parallel for schedule(static)
+    int up_score = S->upper_score;
+    int scored = S->scored_categories;
+
+    /* Group 6: E(S, r, 0) for all r — uses ds_index variant */
     for (int ds_i = 0; ds_i < 252; ds_i++) {
-        E_ds_0[ds_i] = ComputeBestScoringValueForDiceSet(ctx, S, ctx->all_dice_sets[ds_i]);
+        E[0][ds_i] = ComputeBestScoringValueForDiceSetByIndex(ctx, up_score, scored, ds_i);
     }
 
-    /* Group 5: E(S, r, 1) = max_{mask} Σ P(r'→r'') · E_ds_0[r''] */
-    ComputeExpectedValuesForNRerolls(ctx, 1, E_ds_0, E_ds_1, best_mask_1);
+    /* Group 5: E(S, r, 1) = max_{mask} Σ P(r'→r'') · E[0][r''] */
+    ComputeMaxEVForNRerolls(ctx, E[0], E[1]);
 
-    /* Group 3: E(S, r, 2) = max_{mask} Σ P(r'→r'') · E_ds_1[r''] */
-    ComputeExpectedValuesForNRerolls(ctx, 2, E_ds_1, E_ds_2, best_mask_2);
+    /* Group 3: E(S, r, 2) = max_{mask} Σ P(r'→r'') · E[1][r''] */
+    ComputeMaxEVForNRerolls(ctx, E[1], E[0]);
 
-    /* Group 1: E(S) = Σ P(⊥→r) · E_ds_2[r] */
+    /* Group 1: E(S) = Σ P(⊥→r) · E[0][r] */
     double E_S = 0.0;
     for (int ds_i = 0; ds_i < 252; ds_i++) {
-        E_S += ctx->dice_set_probabilities[ds_i] * E_ds_2[ds_i];
+        E_S += ctx->dice_set_probabilities[ds_i] * E[0][ds_i];
     }
 
     return E_S;

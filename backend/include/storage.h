@@ -28,11 +28,7 @@ int FileExists(const char *filename);
 void SaveStateValuesForCount(YatzyContext *ctx, int scored_count, const char *filename);
 int LoadStateValuesForCount(YatzyContext *ctx, int scored_count, const char *filename);
 
-/* Consolidated file I/O: save/load all state values in one file. */
-int LoadAllStateValues(YatzyContext *ctx, const char *filename);
-void SaveAllStateValues(YatzyContext *ctx, const char *filename);
-
-/* Memory-mapped variants for better performance. */
+/* Memory-mapped I/O for consolidated state files. */
 int LoadAllStateValuesMmap(YatzyContext *ctx, const char *filename);
 void SaveAllStateValuesMmap(YatzyContext *ctx, const char *filename);
 

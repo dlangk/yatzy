@@ -17,6 +17,30 @@
 #include "storage.h"
 #include "timing.h"
 
+/* ── State iteration helper ──────────────────────────────────────────── */
+
+/* Iterate all (up, scored) pairs for a given scored_count.
+ * Uses the scored_category_count_cache for fast popcount checks. */
+typedef void (*StateFn)(int up, int scored, void *data);
+
+static void ForEachStateAtLevel(const YatzyContext *ctx, int scored_count,
+                                StateFn fn, void *data) {
+    for (int scored = 0; scored < (1 << CATEGORY_COUNT); scored++) {
+        if (ctx->scored_category_count_cache[scored] == scored_count) {
+            for (int up = 0; up <= 63; up++) {
+                fn(up, scored, data);
+            }
+        }
+    }
+}
+
+/* Iterate all states in level order (scored_count 0..15). */
+static void ForEachStateByLevel(const YatzyContext *ctx, StateFn fn, void *data) {
+    for (int sc = 0; sc <= 15; sc++) {
+        ForEachStateAtLevel(ctx, sc, fn, data);
+    }
+}
+
 /* ── File utilities ──────────────────────────────────────────────────── */
 
 int FileExists(const char *filename) {
@@ -25,6 +49,26 @@ int FileExists(const char *filename) {
 }
 
 /* ── Per-level I/O ───────────────────────────────────────────────────── */
+
+/* Callback data for SaveStateValuesForCount */
+typedef struct {
+    FILE *f;
+    const YatzyContext *ctx;
+    int count;
+} SaveLevelData;
+
+static void CountState(int up, int scored, void *data) {
+    (void)up; (void)scored;
+    ((SaveLevelData *)data)->count++;
+}
+
+static void WriteState(int up, int scored, void *data) {
+    SaveLevelData *d = (SaveLevelData *)data;
+    double val = d->ctx->state_values[STATE_INDEX(up, scored)];
+    fwrite(&up, sizeof(int), 1, d->f);
+    fwrite(&scored, sizeof(int), 1, d->f);
+    fwrite(&val, sizeof(double), 1, d->f);
+}
 
 void SaveStateValuesForCount(YatzyContext *ctx, int scored_count, const char *filename) {
     printf("Saving state values to file: %s for scored_count = %d\n", filename, scored_count);
@@ -35,30 +79,12 @@ void SaveStateValuesForCount(YatzyContext *ctx, int scored_count, const char *fi
         return;
     }
 
-    /* Count the number of states */
-    int count = 0;
-    for (int scored = 0; scored < (1 << CATEGORY_COUNT); scored++) {
-        if (ctx->scored_category_count_cache[scored] == scored_count) {
-            for (int up = 0; up <= 63; up++) {
-                count++;
-            }
-        }
-    }
-    printf("Total states to save for scored_count = %d: %d\n", scored_count, count);
+    SaveLevelData d = {f, ctx, 0};
+    ForEachStateAtLevel(ctx, scored_count, CountState, &d);
+    printf("Total states to save for scored_count = %d: %d\n", scored_count, d.count);
+    fwrite(&d.count, sizeof(int), 1, f);
 
-    fwrite(&count, sizeof(int), 1, f);
-
-    /* Write state values */
-    for (int scored = 0; scored < (1 << CATEGORY_COUNT); scored++) {
-        if (ctx->scored_category_count_cache[scored] == scored_count) {
-            for (int up = 0; up <= 63; up++) {
-                double val = ctx->state_values[STATE_INDEX(up, scored)];
-                fwrite(&up, sizeof(int), 1, f);
-                fwrite(&scored, sizeof(int), 1, f);
-                fwrite(&val, sizeof(double), 1, f);
-            }
-        }
-    }
+    ForEachStateAtLevel(ctx, scored_count, WriteState, &d);
 
     fclose(f);
     printf("Successfully saved state values for scored_count = %d to file: %s\n", scored_count, filename);
@@ -114,119 +140,26 @@ int LoadStateValuesForCount(YatzyContext *ctx, int scored_count, const char *fil
     return 1;
 }
 
-/* ── Consolidated file I/O ───────────────────────────────────────────── */
-
-int LoadAllStateValues(YatzyContext *ctx, const char *filename) {
-    double start_time = timer_now();
-    printf("Loading all state values from %s...\n", filename);
-
-    FILE *f = fopen(filename, "rb");
-    if (!f) {
-        printf("File not found: %s\n", filename);
-        return 0;
-    }
-
-    StateFileHeader header;
-    if (fread(&header, sizeof(header), 1, f) != 1) {
-        fclose(f);
-        return 0;
-    }
-
-    if (header.magic != STATE_FILE_MAGIC || header.version != STATE_FILE_VERSION) {
-        printf("Invalid file format\n");
-        fclose(f);
-        return 0;
-    }
-
-    printf("Loading %u total states...\n", header.total_states);
-
-    int loaded = 0;
-    for (int scored_count = 0; scored_count <= 15; scored_count++) {
-        for (int scored = 0; scored < (1 << CATEGORY_COUNT); scored++) {
-            if (__builtin_popcount(scored) == scored_count) {
-                for (int up = 0; up <= 63; up++) {
-                    double val;
-                    if (fread(&val, sizeof(double), 1, f) != 1) {
-                        printf("Error reading state values\n");
-                        fclose(f);
-                        return 0;
-                    }
-                    ctx->state_values[STATE_INDEX(up, scored)] = val;
-                    loaded++;
-                }
-            }
-        }
-
-        if (loaded % 10000 == 0) {
-            printf("\rLoaded %d/%u states (%.1f%%)...", loaded, header.total_states,
-                   (double)loaded / header.total_states * 100.0);
-            fflush(stdout);
-        }
-    }
-
-    fclose(f);
-    double elapsed = timer_now() - start_time;
-    printf("\nSuccessfully loaded %d states in %.2f seconds (%.0f states/sec)\n",
-           loaded, elapsed, loaded / elapsed);
-    return 1;
-}
-
-void SaveAllStateValues(YatzyContext *ctx, const char *filename) {
-    double start_time = timer_now();
-    printf("Saving all state values to %s...\n", filename);
-
-    FILE *f = fopen(filename, "wb");
-    if (!f) {
-        fprintf(stderr, "Error: Could not open file for writing: %s\n", filename);
-        return;
-    }
-
-    StateFileHeader header;
-    header.magic = STATE_FILE_MAGIC;
-    header.version = STATE_FILE_VERSION;
-    header.total_states = 0;
-
-    uint32_t offset = 0;
-    for (int scored_count = 0; scored_count <= 15; scored_count++) {
-        header.level_offsets[scored_count] = offset;
-        int count = 0;
-        for (int scored = 0; scored < (1 << CATEGORY_COUNT); scored++) {
-            if (__builtin_popcount(scored) == scored_count) {
-                count += 64;
-            }
-        }
-        offset += count;
-        header.total_states += count;
-    }
-
-    fwrite(&header, sizeof(header), 1, f);
-
-    int saved = 0;
-    for (int scored_count = 0; scored_count <= 15; scored_count++) {
-        for (int scored = 0; scored < (1 << CATEGORY_COUNT); scored++) {
-            if (__builtin_popcount(scored) == scored_count) {
-                for (int up = 0; up <= 63; up++) {
-                    double val = ctx->state_values[STATE_INDEX(up, scored)];
-                    fwrite(&val, sizeof(double), 1, f);
-                    saved++;
-                }
-            }
-        }
-
-        if (saved % 10000 == 0) {
-            printf("\rSaved %d/%u states (%.1f%%)...", saved, header.total_states,
-                   (double)saved / header.total_states * 100.0);
-            fflush(stdout);
-        }
-    }
-
-    fclose(f);
-    double elapsed = timer_now() - start_time;
-    printf("\nSuccessfully saved %d states in %.2f seconds (%.0f states/sec)\n",
-           saved, elapsed, saved / elapsed);
-}
-
 /* ── Memory-mapped I/O ───────────────────────────────────────────────── */
+
+/* Callback data for mmap load/save */
+typedef struct {
+    double *data;
+    YatzyContext *ctx;
+    int index;
+} MmapData;
+
+static void LoadMmapState(int up, int scored, void *data) {
+    MmapData *d = (MmapData *)data;
+    d->ctx->state_values[STATE_INDEX(up, scored)] = d->data[d->index];
+    d->index++;
+}
+
+static void SaveMmapState(int up, int scored, void *data) {
+    MmapData *d = (MmapData *)data;
+    d->data[d->index] = d->ctx->state_values[STATE_INDEX(up, scored)];
+    d->index++;
+}
 
 int LoadAllStateValuesMmap(YatzyContext *ctx, const char *filename) {
     double start_time = timer_now();
@@ -264,25 +197,15 @@ int LoadAllStateValuesMmap(YatzyContext *ctx, const char *filename) {
     printf("Loading %u total states via mmap...\n", header->total_states);
 
     double *data = (double *)((char *)mapped + sizeof(StateFileHeader));
-    int loaded = 0;
-
-    for (int scored_count = 0; scored_count <= 15; scored_count++) {
-        for (int scored = 0; scored < (1 << CATEGORY_COUNT); scored++) {
-            if (__builtin_popcount(scored) == scored_count) {
-                for (int up = 0; up <= 63; up++) {
-                    ctx->state_values[STATE_INDEX(up, scored)] = data[loaded];
-                    loaded++;
-                }
-            }
-        }
-    }
+    MmapData d = {data, ctx, 0};
+    ForEachStateByLevel(ctx, LoadMmapState, &d);
 
     munmap(mapped, st.st_size);
     close(fd);
 
     double elapsed = timer_now() - start_time;
     printf("Successfully loaded %d states in %.2f seconds (%.0f states/sec)\n",
-           loaded, elapsed, loaded / elapsed);
+           d.index, elapsed, d.index / elapsed);
     return 1;
 }
 
@@ -311,6 +234,7 @@ void SaveAllStateValuesMmap(YatzyContext *ctx, const char *filename) {
         return;
     }
 
+    /* Write header */
     StateFileHeader *header = (StateFileHeader *)mapped;
     header->magic = STATE_FILE_MAGIC;
     header->version = STATE_FILE_VERSION;
@@ -321,7 +245,7 @@ void SaveAllStateValuesMmap(YatzyContext *ctx, const char *filename) {
         header->level_offsets[scored_count] = offset;
         int count = 0;
         for (int scored = 0; scored < (1 << CATEGORY_COUNT); scored++) {
-            if (__builtin_popcount(scored) == scored_count) {
+            if (ctx->scored_category_count_cache[scored] == scored_count) {
                 count += 64;
             }
         }
@@ -329,19 +253,10 @@ void SaveAllStateValuesMmap(YatzyContext *ctx, const char *filename) {
         header->total_states += count;
     }
 
+    /* Write state data */
     double *data = (double *)((char *)mapped + sizeof(StateFileHeader));
-    int saved = 0;
-
-    for (int scored_count = 0; scored_count <= 15; scored_count++) {
-        for (int scored = 0; scored < (1 << CATEGORY_COUNT); scored++) {
-            if (__builtin_popcount(scored) == scored_count) {
-                for (int up = 0; up <= 63; up++) {
-                    data[saved] = ctx->state_values[STATE_INDEX(up, scored)];
-                    saved++;
-                }
-            }
-        }
-    }
+    MmapData d = {data, ctx, 0};
+    ForEachStateByLevel(ctx, SaveMmapState, &d);
 
     msync(mapped, file_size, MS_SYNC);
     munmap(mapped, file_size);
@@ -349,5 +264,5 @@ void SaveAllStateValuesMmap(YatzyContext *ctx, const char *filename) {
 
     double elapsed = timer_now() - start_time;
     printf("Successfully saved %d states in %.2f seconds (%.0f states/sec)\n",
-           saved, elapsed, saved / elapsed);
+           d.index, elapsed, d.index / elapsed);
 }

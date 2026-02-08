@@ -46,8 +46,11 @@ double EvaluateChosenCategory(const YatzyContext *ctx,
                               const int dice[5],
                               int chosen_category);
 
-/* Compute E(S, r, n) for all r, for a given number of rerolls. */
-const double *ComputeExpectedValues(YatzyContext *ctx, int upper_score, int scored_categories, int rerolls);
+/* Compute E(S, r, n) for all r, for a given number of rerolls.
+ * Thread-safe: writes result into caller-provided buffer. */
+void ComputeExpectedValues(const YatzyContext *ctx, int upper_score,
+                           int scored_categories, int rerolls,
+                           double out_E_ds[252]);
 
 /* Build outcome distribution for a specific reroll mask. */
 void ComputeDistributionForRerollMask(const YatzyContext *ctx,

@@ -10,6 +10,15 @@ project(Yatzy VERSION 1.0 LANGUAGES C)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+# Default to Release if no build type specified
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# Optimization flags
+set(CMAKE_C_FLAGS_RELEASE "-O3 -mcpu=apple-m1 -flto -funroll-loops")
+set(CMAKE_C_FLAGS_DEBUG "-O0 -g")
+
 # ---------------------------------------------------------------
 # Include directories for Homebrew-installed libraries
 include_directories(/opt/homebrew/include)
@@ -37,7 +46,6 @@ set(LIB_SOURCES
         ${SRC_DIR}/dice_mechanics.c
         ${SRC_DIR}/webserver.c
         ${SRC_DIR}/context.c
-        ${SRC_DIR}/simulations.c
         ${SRC_DIR}/storage.c
         ${SRC_DIR}/utilities.c
         ${SRC_DIR}/state_computation.c
@@ -90,6 +98,7 @@ add_yatzy_test(test_dice_mechanics)
 add_yatzy_test(test_phase0)
 add_yatzy_test(test_widget)
 add_yatzy_test(test_storage)
+add_yatzy_test(test_precomputed)
 
 # Aggregate target to run all tests
 add_custom_target(test_all COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure

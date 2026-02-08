@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <omp.h>
 
 #include "state_computation.h"
 #include "storage.h"
@@ -138,9 +139,10 @@ void ComputeAllStateValues(YatzyContext *ctx) {
             }
         }
 
-        const int BATCH = 1000;
+        const int BATCH = 10000;
+        int pre_loop_completed = progress.completed_states;
 
-        #pragma omp parallel for schedule(dynamic, 64)
+        #pragma omp parallel for schedule(guided)
         for (int i = 0; i < state_index; i++) {
             int up = state_list[i][0];
             int scored = state_list[i][1];
@@ -150,18 +152,17 @@ void ComputeAllStateValues(YatzyContext *ctx) {
             ctx->state_values[STATE_INDEX(up, scored)] = ev;
 
             if (i % BATCH == 0) {
-                #pragma omp critical
-                {
-                    UpdateProgress(&progress, num_scored, BATCH);
+                #pragma omp atomic
+                progress.completed_states += BATCH;
+                if (omp_get_thread_num() == 0) {
                     PrintProgress(&progress, num_scored);
                 }
             }
         }
 
-        int remaining = state_index % BATCH;
-        if (remaining > 0) {
-            UpdateProgress(&progress, num_scored, remaining);
-        }
+        /* Correct completed_states to exact value (atomic adds are approximate) */
+        progress.completed_states = pre_loop_completed + state_index;
+        progress.time_per_level[num_scored] = timer_now() - progress.start_time;
 
         free(state_list);
         SaveStateValuesForCount(ctx, num_scored, level_filename);

@@ -221,7 +221,8 @@ void handle_evaluate_actions(YatzyContext *ctx, struct MHD_Connection *connectio
         return;
     }
 
-    const double *E_ds_for_masks = ComputeExpectedValues(ctx, upper_score, scored_categories, rerolls);
+    double E_ds_for_masks[252];
+    ComputeExpectedValues(ctx, upper_score, scored_categories, rerolls, E_ds_for_masks);
     int ds_index = FindDiceSetIndex(ctx, dice);
 
     json_object *resp = json_object_new_object();
