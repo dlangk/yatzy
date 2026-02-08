@@ -10,6 +10,9 @@
 #ifndef CONTEXT_H
 #define CONTEXT_H
 
+#include <stdint.h>
+#include <stddef.h>
+
 /* Number of scoring categories in Scandinavian Yatzy (Ones through Yatzy). */
 #define CATEGORY_COUNT 15
 
@@ -84,8 +87,10 @@ typedef struct {
     /* factorial[n] for n ∈ 0..6, used for multinomial P(⊥ → r) calculations. */
     int factorial[6 + 1];
 
-    /* E_table[S]: DP result — expected game value for state S = (m, C). */
-    double *state_values;
+    /* E_table[S]: DP result — expected game value for state S = (m, C).
+     * Stored as float (7 significant digits) to halve file and memory size.
+     * All DP computation uses double; only the stored result is float. */
+    float *state_values;
     /* P(⊥ → r): probability of rolling each r ∈ R_{5,6} from 5 fresh dice. */
     double dice_set_probabilities[252];
     /*
@@ -93,6 +98,13 @@ typedef struct {
      * Replaces the dense transition_table[252][32][252].
      */
     SparseTransitionTable sparse_transitions;
+
+    /* Phase 1 reachability: reachable[upper_mask][upper_score] = 1 if reachable. */
+    uint8_t reachable[64][64];
+
+    /* mmap tracking: if state_values points into an mmap'd region. */
+    void *mmap_base;       /* NULL if state_values is malloc'd */
+    size_t mmap_size;      /* for munmap */
 } YatzyContext;
 
 typedef struct {

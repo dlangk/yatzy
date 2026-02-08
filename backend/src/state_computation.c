@@ -3,6 +3,7 @@
  *
  * Backward induction orchestrator. Processes states from |C|=15 (terminal)
  * down to |C|=0 (game start), calling SOLVE_WIDGET for each state.
+ * Skips unreachable states using Phase 1 reachability table.
  *
  * See: theory/optimal_yahtzee_pseudocode.md, Phase 2: COMPUTE_OPTIMAL_STRATEGY.
  */
@@ -29,7 +30,7 @@ typedef struct {
     double time_per_level[16];
 } ComputeProgress;
 
-static void InitProgress(ComputeProgress *progress) {
+static void InitProgress(ComputeProgress *progress, const YatzyContext *ctx) {
     memset(progress, 0, sizeof(ComputeProgress));
     progress->start_time = timer_now();
     progress->last_report_time = progress->start_time;
@@ -38,7 +39,10 @@ static void InitProgress(ComputeProgress *progress) {
         int states = 0;
         for (int scored = 0; scored < (1 << CATEGORY_COUNT); scored++) {
             if (__builtin_popcount(scored) == num_scored) {
-                states += 64;
+                int upper_mask = scored & 0x3F;
+                for (int up = 0; up <= 63; up++) {
+                    if (ctx->reachable[upper_mask][up]) states++;
+                }
             }
         }
         progress->states_per_level[num_scored] = states;
@@ -74,10 +78,10 @@ static void PrintProgress(ComputeProgress *progress, int current_level) {
 
 void ComputeAllStateValues(YatzyContext *ctx) {
     ComputeProgress progress;
-    InitProgress(&progress);
+    InitProgress(&progress, ctx);
 
     printf("=== Starting State Value Computation ===\n");
-    printf("Total states to compute: %d\n", progress.total_states);
+    printf("Total states to compute: %d (after reachability pruning)\n", progress.total_states);
     printf("States per level:\n");
     for (int i = 0; i <= 15; i++) {
         printf("  Level %2d: %6d states\n", i, progress.states_per_level[i]);
@@ -88,36 +92,18 @@ void ComputeAllStateValues(YatzyContext *ctx) {
 
     /* Try to load consolidated file first */
     const char *consolidated_file = "data/all_states.bin";
-    if (LoadAllStateValuesMmap(ctx, consolidated_file)) {
+    if (LoadAllStateValues(ctx, consolidated_file)) {
         printf("Loaded pre-computed states from consolidated file\n");
         return;
     }
 
-    /* Process states level by level, from game end (15) to game start (0) */
-    for (int num_scored = 15; num_scored >= 0; num_scored--) {
+    /* Process states level by level, from game end (14) to game start (0).
+     * Level 15 (terminal) is already initialized by PrecomputeLookupTables. */
+    for (int num_scored = 14; num_scored >= 0; num_scored--) {
         double level_start = timer_now();
-        char level_filename[64];
-        snprintf(level_filename, sizeof(level_filename), "data/states_%d.bin", num_scored);
 
         PrintProgress(&progress, num_scored);
 
-        /* Level 15: terminal states (base case) */
-        if (num_scored == 15) {
-            if (!LoadStateValuesForCount(ctx, num_scored, level_filename)) {
-                InitializeFinalStates(ctx);
-                SaveStateValuesForCount(ctx, num_scored, level_filename);
-            }
-            UpdateProgress(&progress, num_scored, progress.states_per_level[num_scored]);
-            continue;
-        }
-
-        /* Try loading from disk */
-        if (LoadStateValuesForCount(ctx, num_scored, level_filename)) {
-            UpdateProgress(&progress, num_scored, progress.states_per_level[num_scored]);
-            continue;
-        }
-
-        /* Compute this level */
         printf("\nComputing level %d (%d states)...\n",
                num_scored, progress.states_per_level[num_scored]);
 
@@ -131,7 +117,9 @@ void ComputeAllStateValues(YatzyContext *ctx) {
         int state_index = 0;
         for (int scored = 0; scored < (1 << CATEGORY_COUNT); scored++) {
             if (__builtin_popcount(scored) == num_scored) {
+                int upper_mask = scored & 0x3F;
                 for (int up = 0; up <= 63; up++) {
+                    if (!ctx->reachable[upper_mask][up]) continue;
                     state_list[state_index][0] = up;
                     state_list[state_index][1] = scored;
                     state_index++;
@@ -165,7 +153,6 @@ void ComputeAllStateValues(YatzyContext *ctx) {
         progress.time_per_level[num_scored] = timer_now() - progress.start_time;
 
         free(state_list);
-        SaveStateValuesForCount(ctx, num_scored, level_filename);
 
         double level_dur = timer_now() - level_start;
         printf("\nLevel %d completed in %.2f seconds (%.0f states/sec)\n",
@@ -175,7 +162,7 @@ void ComputeAllStateValues(YatzyContext *ctx) {
     printf("\n\n=== Computation Complete ===\n");
 
     printf("\nSaving consolidated state file...\n");
-    SaveAllStateValuesMmap(ctx, consolidated_file);
+    SaveAllStateValues(ctx, consolidated_file);
 
     double total_time = timer_now() - total_start;
     printf("\nTotal computation time: %.2f seconds\n", total_time);

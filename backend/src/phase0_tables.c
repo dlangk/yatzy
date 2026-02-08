@@ -14,6 +14,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "phase0_tables.h"
 #include "dice_mechanics.h"
@@ -231,4 +232,79 @@ void InitializeFinalStates(YatzyContext *ctx) {
         double final_val = (up >= 63) ? 50.0 : 0.0;
         ctx->state_values[STATE_INDEX(up, all_scored_mask)] = final_val;
     }
+}
+
+/*
+ * Phase 1: Reachability pruning.
+ *
+ * Determines which (upper_mask, upper_score) pairs are reachable.
+ * upper_mask is the 6-bit mask of which upper categories (Ones..Sixes)
+ * have been scored. upper_score is the capped sum m ∈ [0,63].
+ *
+ * DP: R_exact[n][mask] = true if exact upper total n is achievable
+ *     by scoring exactly the categories in mask.
+ *
+ * R_exact[0][0] = true (base case: no cats scored, total = 0)
+ * R_exact[n][mask] = exists face x in mask, exists k in 0..5:
+ *     k*x <= n AND R_exact[n - k*x][mask \ {x}]
+ *
+ * upper_score=63 means ">=63", so reachable[mask][63] = any(R_exact[k][mask] for k=63..105).
+ * Max possible: 5*1 + 5*2 + ... + 5*6 = 105.
+ */
+void PrecomputeReachability(YatzyContext *ctx) {
+    /* R_exact[n][mask]: n ∈ [0,105], mask ∈ [0,63] */
+    uint8_t R[106][64];
+    memset(R, 0, sizeof(R));
+    R[0][0] = 1;
+
+    /* Build R_exact bottom-up: add one face at a time */
+    for (int face = 1; face <= 6; face++) {
+        int bit = 1 << (face - 1);
+        /* Process in reverse order of n to avoid using newly-set values
+         * within the same face iteration. Actually we need to iterate
+         * over masks that include this face and derive from masks without it. */
+        for (int n = 105; n >= 0; n--) {
+            for (int mask = 0; mask < 64; mask++) {
+                if (!(mask & bit)) continue;  /* face not in mask */
+                if (R[n][mask]) continue;      /* already reachable */
+                int prev_mask = mask ^ bit;    /* mask without this face */
+                for (int k = 0; k <= 5; k++) {
+                    int contrib = k * face;
+                    if (contrib > n) break;
+                    if (R[n - contrib][prev_mask]) {
+                        R[n][mask] = 1;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /* Collapse to reachable[mask][upper_score] with 63-cap handling */
+    memset(ctx->reachable, 0, sizeof(ctx->reachable));
+    for (int mask = 0; mask < 64; mask++) {
+        for (int n = 0; n < 63; n++) {
+            ctx->reachable[mask][n] = R[n][mask];
+        }
+        /* upper_score=63 means ">=63": OR together all exact values 63..105 */
+        for (int n = 63; n <= 105; n++) {
+            if (R[n][mask]) {
+                ctx->reachable[mask][63] = 1;
+                break;
+            }
+        }
+    }
+
+    /* Diagnostics: count reachable vs total */
+    int reachable_count = 0;
+    int total_count = 0;
+    for (int mask = 0; mask < 64; mask++) {
+        for (int up = 0; up <= 63; up++) {
+            total_count++;
+            if (ctx->reachable[mask][up]) reachable_count++;
+        }
+    }
+    printf("    Reachable upper pairs: %d / %d (%.1f%% pruned)\n",
+           reachable_count, total_count,
+           100.0 * (1.0 - (double)reachable_count / total_count));
 }

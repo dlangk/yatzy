@@ -33,7 +33,7 @@ int main() {
 
     PrecomputeLookupTables(ctx);
 
-    if (!LoadAllStateValuesMmap(ctx, "data/all_states.bin")) {
+    if (!LoadAllStateValues(ctx, "data/all_states.bin")) {
         printf("No precomputed data found, computing (run yatzy_precompute to avoid this)...\n");
         ComputeAllStateValues(ctx);
     }

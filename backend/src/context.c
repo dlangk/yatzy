@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/mman.h>
 
 #include "context.h"
 #include "phase0_tables.h"
@@ -43,12 +44,12 @@ YatzyContext *CreateYatzyContext() {
     ctx->category_names[13] = "Chance";
     ctx->category_names[14] = "Yatzy";
 
-    ctx->state_values = (double *) malloc(NUM_STATES * sizeof(double));
+    ctx->state_values = (float *) malloc(NUM_STATES * sizeof(float));
     if (!ctx->state_values) {
         free(ctx);
         return NULL;
     }
-    for (int i = 0; i < NUM_STATES; i++) ctx->state_values[i] = 0.0;
+    for (int i = 0; i < NUM_STATES; i++) ctx->state_values[i] = 0.0f;
 
     return ctx;
 }
@@ -64,6 +65,7 @@ YatzyContext *CreateYatzyContext() {
  *   5. Dice set probs     — P(⊥ → r) for all r ∈ R_{5,6}
  *   6. Scored cat counts  — popcount cache for 2^15 bitmasks
  *   7. Final states       — Phase 2 base case: E(S) for |C| = 15
+ *   8. Reachability       — Phase 1: mark reachable (upper_mask, upper_score) pairs
  *
  * See pseudocode Phase 0: PRECOMPUTE_ROLLS_AND_PROBABILITIES.
  */
@@ -78,6 +80,7 @@ void PrecomputeLookupTables(YatzyContext *ctx) {
     TIMER_BLOCK("Dice set probabilities",  PrecomputeDiceSetProbabilities(ctx));
     TIMER_BLOCK("Scored category counts",  PrecomputeScoredCategoryCounts(ctx));
     TIMER_BLOCK("Terminal states",         InitializeFinalStates(ctx));
+    TIMER_BLOCK("Reachability pruning",    PrecomputeReachability(ctx));
 
     printf("  %-42s %8.3f ms\n", "TOTAL Phase 0", timer_elapsed_ms(phase0_start));
     printf("\n");
@@ -86,7 +89,11 @@ void PrecomputeLookupTables(YatzyContext *ctx) {
 /* Free all memory owned by the context. Safe to call with NULL. */
 void FreeYatzyContext(YatzyContext *ctx) {
     if (!ctx) return;
-    free(ctx->state_values);
+    if (ctx->mmap_base) {
+        munmap(ctx->mmap_base, ctx->mmap_size);
+    } else {
+        free(ctx->state_values);
+    }
     free(ctx->sparse_transitions.values);
     free(ctx->sparse_transitions.col_indices);
     free(ctx);

@@ -38,4 +38,8 @@ void PrecomputeDiceSetProbabilities(YatzyContext *ctx);
 /* Phase 2 base case: E(S) = 50 if m >= 63, else 0 for terminal states (|C|=15). */
 void InitializeFinalStates(YatzyContext *ctx);
 
+/* Phase 1: mark reachable (upper_mask, upper_score) pairs via DP.
+ * Populates ctx->reachable[64][64]. */
+void PrecomputeReachability(YatzyContext *ctx);
+
 #endif // PHASE0_TABLES_H
