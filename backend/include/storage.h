@@ -1,21 +1,39 @@
-#ifndef CSV_AND_STATE_H
-#define CSV_AND_STATE_H
+/*
+ * storage.h — Binary file I/O for precomputed state values
+ *
+ * Provides load/save functions for both per-level state files
+ * and consolidated all-states files (with optional mmap).
+ */
+#ifndef STORAGE_H
+#define STORAGE_H
 
 #include "context.h"
+#include <stdint.h>
 
-#define MAX_FIELDS 100         // Define the maximum number of fields per line
-#define MAX_LINE_LENGTH 1024   // Define the maximum length of a line
+/* Binary file format header for consolidated state files. */
+typedef struct {
+    uint32_t magic;              /* File identifier: 0x59545A53 ("STZY") */
+    uint32_t version;            /* Format version for future compatibility */
+    uint32_t total_states;       /* Total number of states in file */
+    uint32_t level_offsets[16];  /* Starting position of each level's data */
+} StateFileHeader;
 
-// Function declarations for CSV parsing
-void parse_csv_line(char *line, char *fields[], int *num_fields);
-int read_csv(const char *filename);
+#define STATE_FILE_MAGIC 0x59545A53    /* "STZY" in hex */
+#define STATE_FILE_VERSION 1
 
-// Utility functions
-void SetWorkingDirectory();
+/* Check if a file exists on disk. */
 int FileExists(const char *filename);
 
-// Functions for saving and loading state values
+/* Per-level I/O: save/load state values for states with |C| = scored_count. */
 void SaveStateValuesForCount(YatzyContext *ctx, int scored_count, const char *filename);
 int LoadStateValuesForCount(YatzyContext *ctx, int scored_count, const char *filename);
 
-#endif // CSV_AND_STATE_H
+/* Consolidated file I/O: save/load all state values in one file. */
+int LoadAllStateValues(YatzyContext *ctx, const char *filename);
+void SaveAllStateValues(YatzyContext *ctx, const char *filename);
+
+/* Memory-mapped variants for better performance. */
+int LoadAllStateValuesMmap(YatzyContext *ctx, const char *filename);
+void SaveAllStateValuesMmap(YatzyContext *ctx, const char *filename);
+
+#endif /* STORAGE_H */

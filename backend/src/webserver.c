@@ -10,7 +10,7 @@
 
 #include <utilities.h>
 #include <game_mechanics.h>
-#include <computations.h>
+#include <api_computations.h>
 #include <webserver.h>
 #include <context.h>
 #include <dice_mechanics.h>

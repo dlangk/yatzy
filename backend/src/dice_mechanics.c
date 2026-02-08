@@ -1,14 +1,24 @@
+/*
+ * dice_mechanics.c — Phase 0: Dice enumeration & probability
+ *
+ * Implements dice multiset operations on R_{5,6} (the 252 sorted 5-dice
+ * multisets) and probability calculations P(⊥ → r).
+ *
+ * See: theory/optimal_yahtzee_pseudocode.md, Phase 0: PRECOMPUTE_ROLLS_AND_PROBABILITIES.
+ */
 #include <stdlib.h>
 #include <math.h>
 
 #include <context.h>
 
+/* Simulation helper: roll all 5 dice uniformly at random. */
 void RollDice(int dice[5]) {
     for (int i = 0; i < 5; i++) {
         dice[i] = rand() % 6 + 1;
     }
 }
 
+/* Simulation helper: reroll dice indicated by mask (bit i = reroll die i). */
 void RerollDice(int dice[5], const int mask) {
     for (int i = 0; i < 5; i++) {
         if (mask & (1 << i)) {
@@ -17,6 +27,8 @@ void RerollDice(int dice[5], const int mask) {
     }
 }
 
+/* Normalize dice to canonical sorted form (ascending).
+ * All dice sets in R_{5,6} are stored sorted for deduplication. */
 void SortDiceSet(int arr[5]) {
     for (int i = 0; i < 4; i++) {
         for (int j = i + 1; j < 5; j++) {
@@ -29,48 +41,20 @@ void SortDiceSet(int arr[5]) {
     }
 }
 
-/**
- * @brief Finds the index of a specific sorted dice set in the context's index lookup table.
- *
- * This function retrieves the precomputed index for a sorted set of dice values (`dice[5]`)
- * by accessing the `index_lookup` table within the `YatzyContext`. The table maps all possible
- * sorted dice combinations to unique indices, which can be used for efficient state lookup
- * or probability computation in the game logic.
- *
- * The steps are:
- * 1. The input `dice` array is expected to be sorted in ascending order (values between 1-6).
- * 2. Each dice value is adjusted by subtracting 1 to align with 0-based indexing.
- * 3. The function performs a lookup in the 5-dimensional `index_lookup` table using the adjusted
- *    dice values as indices.
- * 4. Returns the precomputed index associated with the given dice combination.
- *
- * @param ctx Pointer to the YatzyContext containing the precomputed `index_lookup` table.
- * @param dice An array of 5 integers representing a sorted dice set (values 1-6).
- * @return The precomputed index corresponding to the given sorted dice set.
- */
+/* Map a sorted dice set to its index in R_{5,6} (0–251).
+ * Uses the precomputed 5D index_lookup table for O(1) access. */
 int FindDiceSetIndex(const YatzyContext *ctx, const int dice[5]) {
     return ctx->index_lookup[dice[0] - 1][dice[1] - 1][dice[2] - 1][dice[3] - 1][dice[4] - 1];
 }
 
-/**
- * @brief Computes the probability of a specific sorted dice set occurring in a single roll.
+/* Compute P(⊥ → r): probability of rolling this exact sorted dice set
+ * from 5 fresh dice.
  *
- * This function calculates the probability of rolling a specific sorted dice set (`dice[5]`)
- * during a single roll of five dice. The calculation considers the number of permutations
- * that can produce the same sorted set, accounting for duplicate dice values, and divides
- * by the total number of possible outcomes (6^5).
+ * Formula: multinomial(5; face_counts) / 6^5
+ *        = 5! / (n1! · n2! · ... · n6!) / 6^5
  *
- * The steps are:
- * 1. Count the occurrences of each dice face in the input dice set.
- * 2. Compute the numerator as the factorial of the total dice count (5!).
- * 3. Compute the denominator by calculating the product of factorials of duplicate dice counts.
- * 4. Divide the numerator by the denominator to determine the number of unique permutations.
- * 5. Normalize by the total number of outcomes (6^5) to obtain the final probability.
- *
- * @param ctx Pointer to the YatzyContext containing precomputed factorial values.
- * @param dice An array of 5 integers representing a sorted dice set.
- * @return The probability of rolling the specified dice set in a single roll.
- */
+ * See pseudocode Phase 0: "For each full roll r in R_5,6:
+ *   Compute P(⊥ → r) = multinomial(5; counts of each face in r) / 6^5" */
 double ComputeProbabilityOfDiceSet(const YatzyContext *ctx, const int dice[5]) {
     int face_count[7];
     for (int i = 1; i <= 6; i++) face_count[i] = 0;
@@ -92,40 +76,15 @@ double ComputeProbabilityOfDiceSet(const YatzyContext *ctx, const int dice[5]) {
     return permutations / total_outcomes;
 }
 
-/**
- * @brief Counts the occurrences of each dice face in a given dice set.
- *
- * This function iterates over a set of 5 dice and counts the number of times each face
- * (1 through 6) appears, storing the results in the `face_count` array.
- *
- * The `face_count` array must have at least 7 elements (index 0 is unused), and it will
- * be initialized to zeros for all faces before counting.
- *
- * @param dice An array of 5 integers representing the dice values.
- * @param face_count An array of 7 integers where the counts for each face (1-6) will be stored.
- *                   Index 0 is unused.
- */
+/* Count occurrences of each face (1–6) in a 5-dice set.
+ * face_count[0] is unused; face_count[f] = count of face f. */
 void CountFaces(const int dice[5], int face_count[7]) {
     for (int i = 1; i <= 6; i++) face_count[i] = 0;
     for (int i = 0; i < 5; i++) face_count[dice[i]]++;
 }
 
-/**
- * @brief Calculates the score for an "N-of-a-Kind" category in Yatzy.
- *
- * This function computes the score for an "N-of-a-Kind" category by checking if
- * any dice face appears at least `n` times in the given face count. If such a
- * face exists, the score is calculated as `face * n` (the value of the face
- * multiplied by the count of `n` dice). If no face meets the condition, the
- * function returns a score of 0.
- *
- * The function prioritizes higher face values by iterating from 6 down to 1.
- *
- * @param face_count An array of integers where `face_count[i]` represents the
- *                   number of dice showing the face value `i`.
- * @param n The required number of identical dice to qualify for the category.
- * @return The score for the "N-of-a-Kind" category, or 0 if no valid combination exists.
- */
+/* Scoring helper for N-of-a-kind categories.
+ * Returns highest_face * n if any face appears >= n times, else 0. */
 int NOfAKindScore(const int face_count[7], int n) {
     for (int face = 6; face >= 1; face--) {
         if (face_count[face] >= n) return face * n;

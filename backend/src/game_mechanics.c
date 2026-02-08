@@ -1,6 +1,16 @@
+/*
+ * game_mechanics.c — Phase 0: Scoring rules
+ *
+ * Implements s(S, r, c), the score function for Scandinavian Yatzy's
+ * 15 categories, and the upper-score successor m' = min(m + u(S,r,c), 63).
+ *
+ * See: theory/optimal_yahtzee_pseudocode.md, "Notation" table.
+ */
 #include "context.h"
 #include "dice_mechanics.h"
 
+/* Compute s(S, r, c): the score for placing dice[5] in the given category.
+ * Categories 0–5 are upper section (Ones–Sixes), 6–14 are lower section. */
 int CalculateCategoryScore(const int dice[5], const int category) {
     int face_count[7];
     CountFaces(dice, face_count);
@@ -64,6 +74,9 @@ int CalculateCategoryScore(const int dice[5], const int category) {
     return 0;
 }
 
+/* Compute successor upper score: m' = min(m + u(S,r,c), 63).
+ * Upper categories (0–5) add their score to m; others leave m unchanged.
+ * The cap at 63 reflects the upper bonus threshold. */
 int UpdateUpperScore(const int upper_score, const int category, const int score) {
     if (category < 6) {
         const int new_upper_score = upper_score + score;

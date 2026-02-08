@@ -13,20 +13,22 @@ precomputation, file utilities, and a webserver to interact with the game.
     - Evaluating optimal actions based on the current state.
     - Simulating a single Yatzy game for testing and validation.
 
-### 2. **State Precomputation (`precompute_scores.c`)**
+### 2. **State Computation (`state_computation.c`)**
 
-- Precomputes essential game data to optimize runtime performance:
-    - Precomputes category scores for all dice combinations.
-    - Precomputes transition probabilities for reroll scenarios.
-    - Precomputes expected state values for various game states.
-- Saves and loads state values to/from binary files for efficiency.
+- Implements dynamic programming engine for computing optimal game strategies:
+    - Uses backward induction to compute expected values for all game states.
+    - Features real-time progress tracking with ETA calculations.
+    - Utilizes memory-mapped I/O for fast file operations.
+    - Supports parallel computation using OpenMP.
+    - Automatically saves progress to resume interrupted computations.
+    - Creates consolidated binary file (`all_states.bin`) for fast loading.
 
-### 3. **File Utilities (`file_utilities.c`)**
+### 3. **File Utilities**
 
-- Handles file-related operations:
-    - Parses CSV files and extracts data.
-    - Saves and loads precomputed game state values to binary files.
-    - Checks file existence to manage data persistence.
+- Binary file format with magic number and versioning for compatibility.
+- Consolidated state file (`data/all_states.bin`) contains all precomputed values.
+- Memory-mapped I/O support for efficient loading of large state files.
+- Automatic fallback to per-level files if consolidated file not found.
 
 ### 4. **API Server (`webserver.c`)**
 

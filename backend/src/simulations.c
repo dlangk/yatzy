@@ -1,6 +1,7 @@
 #include <dice_mechanics.h>
 #include <context.h>
-#include <computations.h>
+#include "api_computations.h"
+#include "game_mechanics.h"
 
 int SimulateSingleGame(YatzyContext *ctx) {
     int upper_score = 0;

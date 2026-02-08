@@ -11,8 +11,8 @@ The backend powers the game with precomputed data, efficient file management, an
 
 #### Key Features:
 - **Game Logic**: Implements core Yatzy gameplay, including rolling dice, calculating scores, and evaluating optimal actions.
-- **State Precomputation**: Optimizes runtime performance with precomputed category scores and transition probabilities.
-- **File Utilities**: Manages game state persistence with CSV parsing and binary file operations.
+- **State Precomputation**: Optimizes runtime performance with precomputed category scores and transition probabilities. Features real-time progress tracking and memory-mapped I/O for efficient computation.
+- **File Utilities**: Manages game state persistence with consolidated binary file format (all_states.bin) and memory-mapped I/O for fast loading.
 - **API Server**: Provides endpoints for evaluating actions, retrieving scores, and more, built with `libmicrohttpd`.
 
 #### Technologies:
@@ -63,11 +63,11 @@ curl http://localhost:8080/state_value?upper_score=50&scored_categories=3
 ## Project Structure
 
 ### Backend
-- **Core Logic:** `yatzy.c`
-- **Precomputation:** `precompute_scores.c`
-- **File Management:** `file_utilities.c`
-- **API Server:** `webserver.c`
-- **Entry Point:** `main.c`
+- **Core Logic:** `yatzy.c` - Entry point and context initialization
+- **State Computation:** `state_computation.c` - Dynamic programming engine with progress tracking
+- **Game Mechanics:** `game_mechanics.c` - Core Yatzy rules and scoring
+- **API Server:** `webserver.c` - RESTful API endpoints
+- **Computations:** `computations.c` - Expected value calculations
 
 ### Frontend
 - **HTML:** `index.html` (UI structure)
