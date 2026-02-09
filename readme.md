@@ -74,7 +74,7 @@ Source modules:
 | `types.rs` | YatzyContext, KeepTable, StateValues (owned/mmap) |
 | `storage.rs` | Binary file I/O (zero-copy mmap via memmap2) |
 
-See `backend-legacy-c/theory/optimal_yahtzee_pseudocode.md` for the algorithm specification that the code implements.
+See `theory/optimal_yahtzee_pseudocode.md` for the algorithm specification that the code implements.
 
 ### Frontend (`frontend/`)
 
