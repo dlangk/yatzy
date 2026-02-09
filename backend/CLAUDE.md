@@ -1,4 +1,6 @@
-# Backend CLAUDE.md
+# Backend CLAUDE.md (Legacy C)
+
+> **Legacy**: The primary backend is `backend-rust/`. This C code is kept for reference only.
 
 ## Build & Test
 

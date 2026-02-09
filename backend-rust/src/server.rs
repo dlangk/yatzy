@@ -1,3 +1,22 @@
+//! Axum HTTP server: 9 endpoints for the Yatzy frontend.
+//!
+//! All endpoints are stateless lookups against the precomputed `YatzyContext`.
+//! The context is shared as `Arc<YatzyContext>` across async handlers.
+//!
+//! ## Endpoints
+//!
+//! | Method | Path | Description |
+//! |--------|------|-------------|
+//! | GET | `/health` | Health check |
+//! | GET | `/state_value` | Look up E_table[S] for a given state |
+//! | GET | `/score_histogram` | Binned score distribution from CSV |
+//! | POST | `/evaluate_category_score` | Score for placing dice in a category |
+//! | POST | `/available_categories` | List categories with scores and validity |
+//! | POST | `/evaluate_all_categories` | EV for each available category (0 rerolls) |
+//! | POST | `/evaluate_actions` | EV for all 32 reroll masks |
+//! | POST | `/suggest_optimal_action` | Best reroll mask or best category |
+//! | POST | `/evaluate_user_action` | EV of a user's chosen action |
+
 use std::sync::Arc;
 
 use axum::{

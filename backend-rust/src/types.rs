@@ -1,6 +1,27 @@
+//! Core data structures: game context, keep-multiset table, and state values.
+//!
+//! The central type is [`YatzyContext`], which holds all precomputed lookup tables
+//! and the DP result array E_table[S]. It is built once by Phase 0
+//! ([`crate::phase0_tables::precompute_lookup_tables`]) and then shared immutably
+//! across threads during Phase 2 computation and API serving.
+
 use crate::constants::*;
 
-/// Keep-multiset transition table with sparse per-row storage.
+/// Keep-multiset transition table with sparse CSR (Compressed Sparse Row) storage.
+///
+/// A "keep-multiset" is the sorted multiset of dice retained before rerolling.
+/// Multiple 5-bit reroll masks can produce the same keep (e.g., dice [1,1,2,3,4]
+/// with masks 0b00001 and 0b00010 both keep {1,2,3,4}). This table collapses
+/// those duplicates and stores transition probabilities P(r'→r) in sparse format.
+///
+/// Pseudocode equivalent: the P(r'→r) lookup in SOLVE_WIDGET groups 3 and 5.
+///
+/// Layout:
+/// - `vals[row_start[ki]..row_start[ki+1]]` — probabilities for keep ki
+/// - `cols[row_start[ki]..row_start[ki+1]]` — target dice-set indices
+/// - `unique_keep_ids[ds][0..unique_count[ds]]` — deduplicated keep indices per dice set
+/// - `mask_to_keep[ds*32 + mask]` — reroll mask → keep index (API input translation)
+/// - `keep_to_mask[ds*32 + j]` — unique keep j → representative mask (API output)
 pub struct KeepTable {
     /// Sparse probability values for each keep row.
     pub vals: Vec<f64>,
@@ -38,14 +59,25 @@ impl KeepTable {
     }
 }
 
-/// Turn-start state S = (m, C).
+/// Turn-start state S = (m, C) from the pseudocode.
+///
+/// - `upper_score` (m): capped upper-section total, 0 ≤ m ≤ 63
+/// - `scored_categories` (C): 15-bit bitmask where bit i is set if category i has been scored
+///
+/// The pseudocode also includes a Yahtzee bonus flag `f`, which is not used in
+/// Scandinavian Yatzy.
 #[derive(Clone, Copy, Debug)]
 pub struct YatzyState {
     pub upper_score: i32,
     pub scored_categories: i32,
 }
 
-/// State values: either owned (for computation) or memory-mapped (for loading).
+/// E_table[S] storage: either owned (during computation) or memory-mapped (loaded from disk).
+///
+/// - `Owned(Vec<f32>)`: allocated during precomputation, written via unsafe raw pointers
+///   from parallel rayon workers.
+/// - `Mmap`: zero-copy memory-mapped file, loaded in <1ms. The mmap includes a 16-byte
+///   header (Storage v3 format), so `as_slice()` skips the first 16 bytes.
 pub enum StateValues {
     Owned(Vec<f32>),
     Mmap { mmap: memmap2::Mmap },
@@ -70,7 +102,20 @@ impl StateValues {
     }
 }
 
-/// Core context containing all precomputed tables and the DP result table.
+/// Core context: all precomputed tables (Phase 0) and the DP result array (Phase 2).
+///
+/// This struct is ~10 MB and must be heap-allocated (use [`YatzyContext::new_boxed`]).
+/// After Phase 0, it is shared immutably (`Arc<YatzyContext>`) across:
+/// - Rayon workers during Phase 2 backward induction
+/// - Axum HTTP handlers during API serving
+///
+/// Fields map to pseudocode concepts:
+/// - `all_dice_sets` → R_{5,6} (252 sorted 5-dice multisets)
+/// - `precomputed_scores` → s(S, r, c) (score for dice set r in category c)
+/// - `dice_set_probabilities` → P(⊥ → r) (probability of rolling r from scratch)
+/// - `keep_table` → P(r' → r) transition probabilities (sparse CSR format)
+/// - `state_values` → E_table[S] (expected game value for each turn-start state)
+/// - `reachable` → Phase 1 pruning result
 pub struct YatzyContext {
     /// R_{5,6}: all 252 distinct sorted 5-dice multisets.
     pub all_dice_sets: [[i32; 5]; NUM_DICE_SETS],
@@ -118,12 +163,14 @@ impl YatzyContext {
         }
     }
 
-    /// Allocate on the heap directly.
+    /// Allocate on the heap directly (avoids stack overflow in debug builds).
     pub fn new_boxed() -> Box<Self> {
         Box::new(Self::new())
     }
 
     /// Look up E_table[S] for state (upper_score, scored_categories).
+    ///
+    /// Returns f64 for computation precision, even though storage is f32.
     #[inline(always)]
     pub fn get_state_value(&self, upper_score: i32, scored: i32) -> f64 {
         self.state_values.as_slice()[state_index(upper_score as usize, scored as usize)] as f64

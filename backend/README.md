@@ -1,4 +1,6 @@
-# Yatzy Backend
+# Yatzy Backend (Legacy C)
+
+> **This is the legacy C implementation.** The primary backend is now the [Rust version](../backend-rust/) (`backend-rust/`), which produces bit-identical output with better safety, simpler builds, and comparable performance. This code is kept for reference.
 
 C-based API server and DP solver for Scandinavian Yatzy. Precomputes optimal expected values for all 2M+ game states using backward induction, then serves real-time strategy advice via a REST API.
 

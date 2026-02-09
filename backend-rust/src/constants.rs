@@ -1,4 +1,13 @@
+//! Game constants and state-indexing functions.
+//!
+//! Maps pseudocode notation to concrete values:
+//! - |𝒞| = [`CATEGORY_COUNT`] = 15 (Scandinavian Yatzy)
+//! - |R_{5,6}| = [`NUM_DICE_SETS`] = 252
+//! - |R_k| = [`NUM_KEEP_MULTISETS`] = 462
+//! - STATE_INDEX(m, C) = [`state_index`]`(m, C)` = m * 2^15 + C
+
 /// Number of scoring categories in Scandinavian Yatzy (Ones through Yatzy).
+/// Pseudocode uses |𝒞| = 13 (standard Yahtzee); we use 15.
 pub const CATEGORY_COUNT: usize = 15;
 
 /// Total number of game states: 64 possible upper-section scores * 2^15 scored-category bitmasks.

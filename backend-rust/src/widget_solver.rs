@@ -1,10 +1,36 @@
+//! SOLVE_WIDGET implementation — the DP hot path.
+//!
+//! Implements the pseudocode's `SOLVE_WIDGET(S)` which computes E(S) for a single
+//! turn-start state by evaluating 6 groups bottom-up:
+//!
+//! ```text
+//! Group 6 → E(S, r, 0)   : best category for each final roll
+//! Group 5 → E(S, r, 1)   : best keep after 1st reroll (uses Group 6 results)
+//! Group 4 → E(S, r', 1)  : expected value over 1st reroll outcomes
+//! Group 3 → E(S, r, 2)   : best keep from initial roll (uses Group 4/5 results)
+//! Group 2 → E(S, r', 2)  : expected value over initial roll outcomes
+//! Group 1 → E(S)          : weighted sum P(⊥→r) · E(S, r, 2)
+//! ```
+//!
+//! Groups 4+5 and 2+3 are fused into single passes. Uses ping-pong buffers `e[0]`
+//! and `e[1]` (each 252 × f64) to avoid allocation.
+//!
+//! ## Performance optimizations
+//!
+//! - `sv` slice cached once per widget (avoids enum match per state lookup)
+//! - `#[inline(always)]` on all hot functions
+//! - `get_unchecked` in inner loops (indices validated by precomputation)
+//! - Iterates deduplicated keep-multisets (avg 16.3 vs 31 raw masks per dice set)
+
 use crate::constants::*;
 use crate::dice_mechanics::{find_dice_set_index, sort_dice_set};
 use crate::game_mechanics::update_upper_score;
 use crate::types::{YatzyContext, YatzyState};
 
-/// Group 6, inner loop: best category for one roll r.
-/// E(S, r, 0) = max_{c not in C} [s(S,r,c) + E(n(S,r,c))]
+/// Group 6 entry point: best category score for one roll r (public API path).
+///
+/// Pseudocode: E(S, r, 0) = max_{c ∉ C} [s(S,r,c) + E(n(S,r,c))]
+/// Sorts and looks up the dice set index, then delegates to the by-index variant.
 pub fn compute_best_scoring_value_for_dice_set(
     ctx: &YatzyContext,
     state: &YatzyState,
@@ -21,8 +47,14 @@ pub fn compute_best_scoring_value_for_dice_set(
     )
 }
 
-/// Group 6, inner loop variant that takes ds_index directly.
-/// Accepts a pre-extracted state_values slice to avoid enum match overhead.
+/// Group 6 hot path: best category for dice set r (by index).
+///
+/// Pseudocode: E(S, r, 0) = max_{c ∉ C} [s(S,r,c) + E_table[n(S,r,c)]]
+///
+/// Accepts a pre-extracted `sv` slice to avoid the `StateValues` enum match overhead
+/// on every lookup (called ~billions of times during precomputation).
+/// Split into upper (0–5) and lower (6–14) loops because upper categories affect
+/// `upper_score` while lower categories leave it unchanged.
 #[inline(always)]
 pub fn compute_best_scoring_value_for_dice_set_by_index(
     ctx: &YatzyContext,
@@ -65,7 +97,10 @@ pub fn compute_best_scoring_value_for_dice_set_by_index(
     best_val
 }
 
-/// Single mask evaluation: sum P(r'->r'') * E_prev[r''].
+/// Evaluate a single reroll mask: E(S, r', n) = Σ P(r'→r'') · E_prev[r''].
+///
+/// Pseudocode: "After keeping dice — expected value over reroll outcomes."
+/// Uses sparse dot product over the keep-multiset's CSR row.
 #[inline(always)]
 pub fn compute_expected_value_for_reroll_mask(
     ctx: &YatzyContext,
@@ -93,6 +128,10 @@ pub fn compute_expected_value_for_reroll_mask(
 }
 
 /// Find argmax mask: best reroll decision for a specific dice set.
+///
+/// Pseudocode: E(S, r, n) = max_{r' ⊆ r} E(S, r', n)
+/// Returns the representative mask for the best keep and writes the EV to `best_ev`.
+/// Iterates only deduplicated keep-multisets (via `unique_keep_ids`).
 pub fn choose_best_reroll_mask(
     ctx: &YatzyContext,
     e_ds_for_masks: &[f64; 252],
@@ -132,7 +171,10 @@ pub fn choose_best_reroll_mask(
     best_mask
 }
 
-/// Groups 5 & 3 (API path): propagate expected values with mask tracking.
+/// Groups 5 & 3 (API path): propagate EV across one reroll level with mask tracking.
+///
+/// For each dice set ds, finds: E(S, ds, n) = max_{r' ⊆ ds} Σ P(r'→r'') · E_prev[r'']
+/// Records both the best EV and the best mask per dice set (needed for API responses).
 pub fn compute_expected_values_for_n_rerolls(
     ctx: &YatzyContext,
     e_ds_prev: &[f64; 252],
@@ -167,7 +209,11 @@ pub fn compute_expected_values_for_n_rerolls(
     }
 }
 
-/// DP-only variant: computes E_ds_current without tracking optimal masks.
+/// DP-only variant of Groups 5/3: computes E_ds_current without tracking masks.
+///
+/// Same logic as [`compute_expected_values_for_n_rerolls`] but omits the
+/// `best_mask_for_n` output. Used in the precomputation hot path where only
+/// the EV matters (strategy is not recorded).
 #[inline(always)]
 fn compute_max_ev_for_n_rerolls(
     ctx: &YatzyContext,
@@ -201,11 +247,17 @@ fn compute_max_ev_for_n_rerolls(
 
 /// SOLVE_WIDGET(S): compute E(S) for one turn-start state.
 ///
-/// Evaluates the widget bottom-up using ping-pong buffers:
-///   1. Group 6: E[0][r] = best category score for each final roll
-///   2. Group 5: E[1][r] = best reroll from E[0] (1 reroll remaining)
-///   3. Group 3: E[0][r] = best reroll from E[1] (2 rerolls remaining)
-///   4. Group 1: E(S) = sum P(empty->r) * E[0][r]
+/// Pseudocode: `SOLVE_WIDGET(S)` from Phase 2a.
+///
+/// Evaluates the widget bottom-up using ping-pong buffers `e[0]`/`e[1]`:
+///
+/// 1. **Group 6** → `e[0][r]`: best category for each final roll (n=0 rerolls)
+/// 2. **Group 5** → `e[1][r]`: best keep after seeing each roll (n=1 reroll left)
+/// 3. **Group 3** → `e[0][r]`: best keep from initial roll (n=2 rerolls left)
+/// 4. **Group 1** → `E(S)`:    weighted sum P(⊥→r) · e[0][r]
+///
+/// The `sv` slice is extracted once here and passed to inner functions to avoid
+/// repeatedly matching the `StateValues` enum (the main optimization for this path).
 pub fn compute_expected_state_value(ctx: &YatzyContext, state: &YatzyState) -> f64 {
     let mut e = [[0.0f64; 252]; 2]; // ping-pong buffers
 

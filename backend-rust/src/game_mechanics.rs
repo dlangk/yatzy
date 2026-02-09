@@ -1,8 +1,16 @@
+//! Yatzy scoring rules: s(S, r, c) and upper-score successor function.
+//!
+//! Implements the pseudocode's scoring function s(S, r, c) for all 15 Scandinavian
+//! Yatzy categories, and the upper-score update u(S, r, c) used to compute
+//! successor states n(S, r, c).
+
 use crate::constants::*;
 use crate::dice_mechanics::count_faces;
 
-/// Compute s(S, r, c): the score for placing dice[5] in the given category.
-/// Categories 0-5 are upper section (Ones-Sixes), 6-14 are lower section.
+/// Compute s(S, r, c): the score for placing a 5-dice roll in the given category.
+///
+/// Categories 0–5 are the upper section (Ones through Sixes): score = face_value × count.
+/// Categories 6–14 are the lower section (One Pair through Yatzy) with Scandinavian rules.
 pub fn calculate_category_score(dice: &[i32; 5], category: usize) -> i32 {
     let face_count = count_faces(dice);
     let sum_all: i32 = dice.iter().sum();
@@ -106,7 +114,9 @@ fn n_of_a_kind_score(face_count: &[i32; 7], n: i32) -> i32 {
 }
 
 /// Compute successor upper score: m' = min(m + u(S,r,c), 63).
-/// Upper categories (0-5) add their score to m; others leave m unchanged.
+///
+/// Pseudocode: u(S, r, c) = s(S,r,c) for upper categories (c ∈ {0..5}), 0 otherwise.
+/// The result is capped at 63 because the upper bonus threshold is 63 points.
 pub fn update_upper_score(upper_score: i32, category: usize, score: i32) -> i32 {
     if category < 6 {
         let new_upper_score = upper_score + score;

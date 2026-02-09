@@ -1,7 +1,13 @@
+//! Dice operations: face counting, sorting, index lookup, and probability calculation.
+//!
+//! These functions support the pseudocode's R_{5,6} enumeration and P(⊥→r) computation
+//! from Phase 0 (`PRECOMPUTE_ROLLS_AND_PROBABILITIES`).
+
 use crate::types::YatzyContext;
 
-/// Count occurrences of each face (1-6) in a 5-dice set.
-/// face_count[0] is unused; face_count[f] = count of face f.
+/// Count occurrences of each face value (1–6) in a 5-dice set.
+/// Returns a 7-element array where `face_count[f]` = number of dice showing face `f`.
+/// Index 0 is unused (faces are 1-indexed).
 pub fn count_faces(dice: &[i32; 5]) -> [i32; 7] {
     let mut face_count = [0i32; 7];
     for &d in dice {
@@ -10,7 +16,8 @@ pub fn count_faces(dice: &[i32; 5]) -> [i32; 7] {
     face_count
 }
 
-/// Normalize dice to canonical sorted form (ascending).
+/// Normalize dice to canonical sorted form (ascending order).
+/// Required because R_{5,6} contains only sorted multisets.
 pub fn sort_dice_set(arr: &mut [i32; 5]) {
     for i in 0..4 {
         for j in (i + 1)..5 {
@@ -21,7 +28,8 @@ pub fn sort_dice_set(arr: &mut [i32; 5]) {
     }
 }
 
-/// Map a sorted dice set to its index in R_{5,6} (0-251).
+/// Map a sorted dice set to its index in R_{5,6} (0–251).
+/// Uses a precomputed 5D lookup table for O(1) access.
 #[inline(always)]
 pub fn find_dice_set_index(ctx: &YatzyContext, dice: &[i32; 5]) -> usize {
     ctx.index_lookup[(dice[0] - 1) as usize][(dice[1] - 1) as usize][(dice[2] - 1) as usize]

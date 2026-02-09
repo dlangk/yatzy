@@ -1,9 +1,20 @@
+//! API-facing computation wrappers.
+//!
+//! These functions compose the widget solver primitives for use by HTTP handlers.
+//! Unlike the precomputation hot path (which only computes E(S)), these also track
+//! optimal masks, evaluate user-chosen actions, and build outcome distributions.
+//!
+//! Each function partially re-solves a widget on demand: it builds Group 6 (category
+//! scoring) and optionally Groups 5/3 (reroll levels), then queries the result for
+//! the specific dice/mask/category the API caller requested.
+
 use crate::constants::*;
 use crate::dice_mechanics::{find_dice_set_index, sort_dice_set};
 use crate::game_mechanics::update_upper_score;
 use crate::types::YatzyContext;
 use crate::widget_solver::*;
 
+/// (EV, probability, dice-set index) triple for outcome distributions.
 #[derive(Clone, Copy)]
 pub struct EVProbabilityPair {
     pub ev: f64,
@@ -12,6 +23,9 @@ pub struct EVProbabilityPair {
 }
 
 /// Compute best reroll mask for a specific game situation.
+///
+/// Partially solves the widget: builds Group 6, optionally Group 5, then finds
+/// the argmax mask for the given dice and reroll count.
 pub fn compute_best_reroll_strategy(
     ctx: &YatzyContext,
     upper_score: i32,
@@ -43,7 +57,10 @@ pub fn compute_best_reroll_strategy(
     *best_mask = choose_best_reroll_mask(ctx, &e_ds_1, dice, best_ev);
 }
 
-/// Choose best category when no rerolls remain (non-zero score only).
+/// Choose best category when no rerolls remain.
+///
+/// Group 6 only: E(S, r, 0) = max_{c ∉ C, s>0} [s(S,r,c) + E_table[n(S,r,c)]]
+/// Skips categories that would score 0 (no point in wasting a category).
 pub fn choose_best_category_no_rerolls(
     ctx: &YatzyContext,
     upper_score: i32,
@@ -78,6 +95,10 @@ pub fn choose_best_category_no_rerolls(
 }
 
 /// Evaluate the EV of a user-chosen reroll mask.
+///
+/// Used by the "evaluate user action" endpoint to score a player's reroll decision
+/// against the optimal strategy. Builds the necessary widget levels, then computes
+/// the expected value of the specific mask the user chose.
 pub fn evaluate_chosen_reroll_mask(
     ctx: &YatzyContext,
     upper_score: i32,
@@ -117,6 +138,9 @@ pub fn evaluate_chosen_reroll_mask(
 }
 
 /// Evaluate the EV of a user-chosen category assignment.
+///
+/// Returns s(S,r,c) + E_table[n(S,r,c)] for the chosen category, or NEG_INFINITY
+/// if the category is already scored or would score 0.
 pub fn evaluate_chosen_category(
     ctx: &YatzyContext,
     upper_score: i32,
@@ -139,7 +163,10 @@ pub fn evaluate_chosen_category(
     score as f64 + future_val
 }
 
-/// Compute E(S, r, n) for all r, for a given number of rerolls.
+/// Compute E(S, r, n) for all 252 dice sets r, given n rerolls remaining.
+///
+/// Builds the full Group 6 → Group 5 → Group 3 chain up to the requested reroll
+/// depth. Used by the `/evaluate_actions` endpoint to produce EV for all 32 masks.
 pub fn compute_expected_values(
     ctx: &YatzyContext,
     upper_score: i32,
@@ -198,6 +225,10 @@ pub fn compute_expected_values(
 }
 
 /// Build outcome distribution for a specific reroll mask.
+///
+/// For mask=0 (keep all): deterministic — 100% probability on current dice set.
+/// For mask>0: distributes probability across all 252 possible outcomes using
+/// the keep-multiset's sparse CSR row.
 pub fn compute_distribution_for_reroll_mask(
     ctx: &YatzyContext,
     ds_index: usize,

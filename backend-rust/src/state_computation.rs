@@ -1,3 +1,20 @@
+//! Phase 2: Backward induction — compute E_table[S] for all reachable states.
+//!
+//! Implements pseudocode `COMPUTE_OPTIMAL_STRATEGY`. Processes states in decreasing
+//! order of |C| (number of scored categories), from |C|=14 down to |C|=0. Terminal
+//! states (|C|=15) are initialized in Phase 0.
+//!
+//! Each level is parallelized with rayon `par_iter`. Within each state, SOLVE_WIDGET
+//! reads only from successor states (|C|+1), which are already computed — the same
+//! guarantee that enables parallelism in the pseudocode.
+//!
+//! ## Unsafe writes
+//!
+//! Each (upper_score, scored_categories) maps to a unique `state_index`, so parallel
+//! workers never write to the same memory location. We use `AtomicPtr` + unsafe raw
+//! pointer writes (matching the C version's OpenMP approach) to avoid the overhead
+//! of `collect()` + scatter.
+
 use std::time::Instant;
 
 use rayon::prelude::*;
@@ -7,6 +24,7 @@ use crate::storage::{load_all_state_values, save_all_state_values};
 use crate::types::{YatzyContext, YatzyState};
 use crate::widget_solver::compute_expected_state_value;
 
+/// Progress tracker for the Phase 2 computation loop.
 struct ComputeProgress {
     total_states: i32,
     completed_states: i32,
@@ -70,7 +88,13 @@ impl ComputeProgress {
     }
 }
 
-/// Compute expected values for all possible game states using backward induction.
+/// Compute E_table[S] for all reachable game states using backward induction.
+///
+/// Pseudocode: `COMPUTE_OPTIMAL_STRATEGY` — iterates num_filled from 14 down to 0,
+/// calling SOLVE_WIDGET for each valid state at that level. Level 15 (terminal) is
+/// already initialized.
+///
+/// Results are saved to `data/all_states.bin` in Storage v3 format.
 pub fn compute_all_state_values(ctx: &mut YatzyContext) {
     let mut progress = ComputeProgress::new(ctx);
 

@@ -1,3 +1,18 @@
+//! Phase 0: Precompute all static lookup tables.
+//!
+//! Implements pseudocode `PRECOMPUTE_ROLLS_AND_PROBABILITIES` and `COMPUTE_REACHABILITY`.
+//!
+//! The orchestrator [`precompute_lookup_tables`] runs 8 sub-steps in dependency order:
+//!
+//! 1. **Factorials** — 0!..5! for multinomial coefficients
+//! 2. **Dice combinations** — enumerate R_{5,6} (252 sorted 5-dice multisets) + reverse lookup
+//! 3. **Category scores** — precompute s(S, r, c) for all (r, c) pairs
+//! 4. **Keep-multiset table** — sparse CSR transition matrix P(r'→r) with dedup mappings
+//! 5. **Dice set probabilities** — P(⊥→r) for each r ∈ R_{5,6}
+//! 6. **Scored category counts** — popcount cache for bitmask → |C|
+//! 7. **Terminal states** — Phase 2 base case: E(S) = 50 if m≥63, else 0
+//! 8. **Reachability pruning** — Phase 1: which (upper_mask, m) pairs are achievable
+
 use std::time::Instant;
 
 use crate::constants::*;
@@ -13,7 +28,8 @@ pub fn precompute_factorials(ctx: &mut YatzyContext) {
     }
 }
 
-/// Enumerate all 252 sorted 5-dice multisets R_{5,6} and build reverse lookup.
+/// Enumerate all C(10,5) = 252 sorted 5-dice multisets R_{5,6} and build
+/// a 5D reverse lookup table: `index_lookup[d1-1][d2-1][d3-1][d4-1][d5-1] = index`.
 pub fn build_all_dice_combinations(ctx: &mut YatzyContext) {
     ctx.num_combinations = 0;
     for a in 1..=6i32 {
@@ -43,12 +59,25 @@ pub fn precompute_category_scores(ctx: &mut YatzyContext) {
     }
 }
 
-/// Precompute dense keep-multiset transition table.
+/// Build the keep-multiset transition table (the key optimization).
+///
+/// This is the most important Phase 0 step. It precomputes P(r'→r) from the
+/// pseudocode and organizes it in sparse CSR format with per-dice-set dedup.
 ///
 /// Three sub-steps:
-///   3a. Enumerate all 462 keep-multisets (0-5 dice from {1..6}).
-///   3b. For each keep K and target T, compute P(K->T) via multinomial formula.
-///   3c. For each (ds, mask), map to keep index; build dedup and reverse mappings.
+///
+/// **3a.** Enumerate all 462 keep-multisets R_k (0–5 dice from {1..6}) as
+/// frequency vectors [f1..f6]. Build a reverse lookup from frequency vector → index.
+///
+/// **3b.** For each keep K ∈ R_k and target T ∈ R_{5,6}, compute the transition
+/// probability P(K→T) via the multinomial formula:
+///   P(K→T) = n! / (d1!·d2!·...·d6!) / 6^n
+/// where n = 5 - |K| (dice rerolled) and di = tf[i] - kf[i] (rerolled dice per face).
+/// Results stored in CSR format: vals[]/cols[] with row_start[] boundaries.
+///
+/// **3c.** For each dice set ds and reroll mask (1–31), compute which keep-multiset
+/// the mask produces, then deduplicate: multiple masks can yield the same keep.
+/// Builds `unique_keep_ids`, `unique_count`, `mask_to_keep`, `keep_to_mask`.
 pub fn precompute_keep_table(ctx: &mut YatzyContext) {
     let kt = &mut ctx.keep_table;
 
@@ -220,7 +249,9 @@ pub fn precompute_dice_set_probabilities(ctx: &mut YatzyContext) {
 }
 
 /// Phase 2 base case (terminal states, |C| = 15).
-/// E(S) = 50 if m >= 63 (upper bonus), else 0.
+///
+/// Pseudocode: E(C, m, f) = 35 if m ≥ 63, else 0.
+/// Scandinavian Yatzy uses 50-point upper bonus instead of 35.
 pub fn initialize_final_states(ctx: &mut YatzyContext) {
     let all_scored_mask = (1 << CATEGORY_COUNT) - 1;
     let state_values = ctx.state_values.as_mut_slice();
@@ -230,9 +261,16 @@ pub fn initialize_final_states(ctx: &mut YatzyContext) {
     }
 }
 
-/// Phase 1: Reachability pruning.
+/// Phase 1: Reachability pruning (pseudocode `COMPUTE_REACHABILITY`).
 ///
-/// Determines which (upper_mask, upper_score) pairs are reachable.
+/// Determines which (upper_mask, upper_score) pairs are reachable by dynamic
+/// programming over the 6 upper-section categories. A pair (mask, n) is reachable
+/// if there exists a valid assignment of upper category scores that sums to exactly n
+/// using the categories indicated by mask.
+///
+/// Result: `ctx.reachable[mask][n]` = true if reachable. Upper score 63 means "≥63"
+/// (all exact values 63..105 are OR'd together).
+/// Eliminates ~31.8% of (mask, score) pairs, reducing the Phase 2 workload.
 pub fn precompute_reachability(ctx: &mut YatzyContext) {
     // R_exact[n][mask]: n in [0,105], mask in [0,63]
     let mut r = vec![vec![false; 64]; 106];

@@ -6,10 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Delta Yatzy is a web-based implementation of the classic dice game with optimal action suggestions and multiplayer support. The project consists of:
 
-- **Backend (Rust)**: `backend-rust/` — axum-based API server with rayon parallelism and memmap2 for zero-copy I/O
-- **Backend (C, legacy)**: `backend/` — original C implementation (kept for reference)
+- **Backend (Rust)**: `backend-rust/` — the primary backend. Axum-based API server with rayon parallelism and memmap2 for zero-copy I/O
+- **Backend (C, legacy)**: `backend/` — original C implementation, kept for reference only. Not actively maintained. Produces bit-identical output to the Rust version
 - **Frontend**: Vanilla JavaScript single-page application with dynamic UI and Chart.js visualizations
-- **Docker**: Containerized deployment for both frontend and backend services
+- **Docker**: Containerized deployment for frontend + Rust backend
 
 ## Commands
 
@@ -32,7 +32,7 @@ YATZY_BASE_PATH=. target/release/yatzy-precompute
 YATZY_BASE_PATH=. target/release/yatzy
 ```
 
-### Backend Development (C, legacy)
+### Backend Development (C, legacy — for reference only)
 
 ```bash
 # Build the backend
@@ -116,7 +116,7 @@ The frontend uses ES6 modules for clean separation of concerns:
 ## Important Considerations
 
 - Frontend assumes backend is running on port 9000 (configurable via environment or `js/config.js`)
-- Game state values are stored in `backend/data/all_states.bin` (~8 MB), symlinked from `backend-rust/data`
+- Game state values are stored in `backend/data/all_states.bin` (~8 MB), symlinked from `backend-rust/data`. Binary format is shared between C and Rust backends
 - Scandinavian Yatzy: 15 categories, 50-point upper bonus (not 35 as in American Yahtzee)
 - State representation: `upper_score` (0-63) and `scored_categories` (15-bit bitmask), total 2,097,152 states
 - Rayon thread count configurable via `RAYON_NUM_THREADS` or `OMP_NUM_THREADS` env vars (default: 8)
