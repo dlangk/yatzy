@@ -52,6 +52,7 @@ pub fn choose_best_category_no_rerolls(
     best_ev: &mut f64,
 ) -> i32 {
     let ds_index = find_dice_set_index(ctx, dice);
+    let sv = ctx.state_values.as_slice();
     let mut best_val = f64::NEG_INFINITY;
     let mut best_category = -1i32;
 
@@ -65,7 +66,7 @@ pub fn choose_best_category_no_rerolls(
         }
         let new_up = update_upper_score(upper_score, c, scr);
         let new_scored = scored_categories | (1 << c);
-        let val = scr as f64 + ctx.get_state_value(new_up, new_scored);
+        let val = scr as f64 + sv[state_index(new_up as usize, new_scored as usize)] as f64;
         if val > best_val {
             best_val = val;
             best_category = c as i32;
@@ -131,9 +132,10 @@ pub fn evaluate_chosen_category(
     if score == 0 {
         return f64::NEG_INFINITY;
     }
+    let sv = ctx.state_values.as_slice();
     let new_up = update_upper_score(upper_score, chosen_category, score);
     let new_scored = scored_categories | (1 << chosen_category);
-    let future_val = ctx.get_state_value(new_up, new_scored);
+    let future_val = sv[state_index(new_up as usize, new_scored as usize)] as f64;
     score as f64 + future_val
 }
 
@@ -146,6 +148,7 @@ pub fn compute_expected_values(
     out_e_ds: &mut [f64; 252],
 ) {
     let mut e_ds = [[0.0f64; 252]; 3];
+    let sv = ctx.state_values.as_slice();
 
     // Level 0: E(S, r, 0) = max_c [s(S,r,c) + E(n(S,r,c))]
     for ds_i in 0..252 {
@@ -155,7 +158,7 @@ pub fn compute_expected_values(
                 let scr = ctx.precomputed_scores[ds_i][c];
                 let new_up = update_upper_score(upper_score, c, scr);
                 let new_scored = scored_categories | (1 << c);
-                let val = scr as f64 + ctx.get_state_value(new_up, new_scored);
+                let val = scr as f64 + sv[state_index(new_up as usize, new_scored as usize)] as f64;
                 if val > best_val {
                     best_val = val;
                 }
@@ -166,6 +169,8 @@ pub fn compute_expected_values(
 
     // Levels 1..rerolls
     let kt = &ctx.keep_table;
+    let vals = &kt.vals;
+    let cols = &kt.cols;
     for n in 1..=rerolls as usize {
         for ds_i in 0..252 {
             let mut best_val = e_ds[n - 1][ds_i]; // mask=0: keep all
@@ -175,7 +180,10 @@ pub fn compute_expected_values(
                 let end = kt.row_start[kid + 1] as usize;
                 let mut ev = 0.0;
                 for k in start..end {
-                    ev += kt.vals[k] * e_ds[n - 1][kt.cols[k] as usize];
+                    unsafe {
+                        ev += vals.get_unchecked(k)
+                            * e_ds[n - 1].get_unchecked(*cols.get_unchecked(k) as usize);
+                    }
                 }
                 if ev > best_val {
                     best_val = ev;
@@ -213,7 +221,7 @@ pub fn compute_distribution_for_reroll_mask(
         let start = kt.row_start[kid] as usize;
         let end = kt.row_start[kid + 1] as usize;
         for k in start..end {
-            out_distribution[kt.cols[k] as usize].probability = kt.vals[k];
+            out_distribution[kt.cols[k] as usize].probability = kt.vals[k]; // not hot path
         }
     }
 }

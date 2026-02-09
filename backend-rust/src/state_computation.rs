@@ -119,26 +119,27 @@ pub fn compute_all_state_values(ctx: &mut YatzyContext) {
             }
         }
 
-        // Parallel computation: collect results then scatter back
-        // We need a read-only reference for the parallel computation
-        let ctx_ref = &*ctx;
-        let results: Vec<(usize, f32)> = state_list
-            .par_iter()
-            .map(|&(up, scored)| {
-                let state = YatzyState {
-                    upper_score: up as i32,
-                    scored_categories: scored,
-                };
-                let ev = compute_expected_state_value(ctx_ref, &state);
-                (state_index(up, scored as usize), ev as f32)
-            })
-            .collect();
+        // Parallel computation: write directly via raw pointer.
+        // Safety: each (up, scored) pair maps to a unique state_index,
+        // so no two threads write to the same location (same guarantee as OpenMP).
+        let sv_ptr = ctx.state_values.as_mut_slice().as_mut_ptr();
 
-        // Scatter results back to state_values
-        let state_values = ctx.state_values.as_mut_slice();
-        for (idx, val) in &results {
-            state_values[*idx] = *val;
-        }
+        // AtomicPtr wrapper to satisfy Send+Sync for rayon's for_each.
+        // We only use load/store — no actual atomic contention since indices are disjoint.
+        let sv_atomic = std::sync::atomic::AtomicPtr::new(sv_ptr);
+
+        let ctx_ref = &*ctx;
+        state_list.par_iter().for_each(|&(up, scored)| {
+            let state = YatzyState {
+                upper_score: up as i32,
+                scored_categories: scored,
+            };
+            let ev = compute_expected_state_value(ctx_ref, &state);
+            let ptr = sv_atomic.load(std::sync::atomic::Ordering::Relaxed);
+            unsafe {
+                *ptr.add(state_index(up, scored as usize)) = ev as f32;
+            }
+        });
 
         let pre_loop_completed = progress.completed_states;
         progress.completed_states = pre_loop_completed + state_list.len() as i32;

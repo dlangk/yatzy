@@ -11,8 +11,10 @@ pub fn compute_best_scoring_value_for_dice_set(
     dice: &[i32; 5],
 ) -> f64 {
     let ds_index = find_dice_set_index(ctx, dice);
+    let sv = ctx.state_values.as_slice();
     compute_best_scoring_value_for_dice_set_by_index(
         ctx,
+        sv,
         state.upper_score,
         state.scored_categories,
         ds_index,
@@ -20,9 +22,11 @@ pub fn compute_best_scoring_value_for_dice_set(
 }
 
 /// Group 6, inner loop variant that takes ds_index directly.
-#[inline]
+/// Accepts a pre-extracted state_values slice to avoid enum match overhead.
+#[inline(always)]
 pub fn compute_best_scoring_value_for_dice_set_by_index(
     ctx: &YatzyContext,
+    sv: &[f32],
     up_score: i32,
     scored: i32,
     ds_index: usize,
@@ -35,7 +39,9 @@ pub fn compute_best_scoring_value_for_dice_set_by_index(
             let scr = ctx.precomputed_scores[ds_index][c];
             let new_up = update_upper_score(up_score, c, scr);
             let new_scored = scored | (1 << c);
-            let val = scr as f64 + ctx.get_state_value(new_up, new_scored);
+            let val = scr as f64
+                + unsafe { *sv.get_unchecked(state_index(new_up as usize, new_scored as usize)) }
+                    as f64;
             if val > best_val {
                 best_val = val;
             }
@@ -47,7 +53,9 @@ pub fn compute_best_scoring_value_for_dice_set_by_index(
         if !is_category_scored(scored, c) {
             let scr = ctx.precomputed_scores[ds_index][c];
             let new_scored = scored | (1 << c);
-            let val = scr as f64 + ctx.get_state_value(up_score, new_scored);
+            let val = scr as f64
+                + unsafe { *sv.get_unchecked(state_index(up_score as usize, new_scored as usize)) }
+                    as f64;
             if val > best_val {
                 best_val = val;
             }
@@ -58,7 +66,7 @@ pub fn compute_best_scoring_value_for_dice_set_by_index(
 }
 
 /// Single mask evaluation: sum P(r'->r'') * E_prev[r''].
-#[inline]
+#[inline(always)]
 pub fn compute_expected_value_for_reroll_mask(
     ctx: &YatzyContext,
     ds_index: usize,
@@ -69,12 +77,17 @@ pub fn compute_expected_value_for_reroll_mask(
         return e_ds_for_masks[ds_index];
     }
     let kt = &ctx.keep_table;
+    let vals = &kt.vals;
+    let cols = &kt.cols;
     let kid = kt.mask_to_keep[ds_index * 32 + mask as usize] as usize;
     let start = kt.row_start[kid] as usize;
     let end = kt.row_start[kid + 1] as usize;
     let mut ev = 0.0;
     for k in start..end {
-        ev += kt.vals[k] * e_ds_for_masks[kt.cols[k] as usize];
+        unsafe {
+            ev += vals.get_unchecked(k)
+                * e_ds_for_masks.get_unchecked(*cols.get_unchecked(k) as usize);
+        }
     }
     ev
 }
@@ -91,6 +104,8 @@ pub fn choose_best_reroll_mask(
     let ds_index = find_dice_set_index(ctx, &sorted_dice);
 
     let kt = &ctx.keep_table;
+    let vals = &kt.vals;
+    let cols = &kt.cols;
 
     // mask=0: keep all
     let mut best_val = e_ds_for_masks[ds_index];
@@ -102,7 +117,10 @@ pub fn choose_best_reroll_mask(
         let end = kt.row_start[kid + 1] as usize;
         let mut ev = 0.0;
         for k in start..end {
-            ev += kt.vals[k] * e_ds_for_masks[kt.cols[k] as usize];
+            unsafe {
+                ev += vals.get_unchecked(k)
+                    * e_ds_for_masks.get_unchecked(*cols.get_unchecked(k) as usize);
+            }
         }
         if ev > best_val {
             best_val = ev;
@@ -122,6 +140,8 @@ pub fn compute_expected_values_for_n_rerolls(
     best_mask_for_n: &mut [i32; 252],
 ) {
     let kt = &ctx.keep_table;
+    let vals = &kt.vals;
+    let cols = &kt.cols;
 
     for ds_i in 0..252 {
         let mut best_val = e_ds_prev[ds_i]; // mask=0: keep all
@@ -132,7 +152,10 @@ pub fn compute_expected_values_for_n_rerolls(
             let end = kt.row_start[kid + 1] as usize;
             let mut ev = 0.0;
             for k in start..end {
-                ev += kt.vals[k] * e_ds_prev[kt.cols[k] as usize];
+                unsafe {
+                    ev += vals.get_unchecked(k)
+                        * e_ds_prev.get_unchecked(*cols.get_unchecked(k) as usize);
+                }
             }
             if ev > best_val {
                 best_val = ev;
@@ -145,12 +168,15 @@ pub fn compute_expected_values_for_n_rerolls(
 }
 
 /// DP-only variant: computes E_ds_current without tracking optimal masks.
+#[inline(always)]
 fn compute_max_ev_for_n_rerolls(
     ctx: &YatzyContext,
     e_ds_prev: &[f64; 252],
     e_ds_current: &mut [f64; 252],
 ) {
     let kt = &ctx.keep_table;
+    let vals = &kt.vals;
+    let cols = &kt.cols;
 
     for ds_i in 0..252 {
         let mut best_val = e_ds_prev[ds_i]; // mask=0: keep all
@@ -160,7 +186,10 @@ fn compute_max_ev_for_n_rerolls(
             let end = kt.row_start[kid + 1] as usize;
             let mut ev = 0.0;
             for k in start..end {
-                ev += kt.vals[k] * e_ds_prev[kt.cols[k] as usize];
+                unsafe {
+                    ev += vals.get_unchecked(k)
+                        * e_ds_prev.get_unchecked(*cols.get_unchecked(k) as usize);
+                }
             }
             if ev > best_val {
                 best_val = ev;
@@ -182,10 +211,12 @@ pub fn compute_expected_state_value(ctx: &YatzyContext, state: &YatzyState) -> f
 
     let up_score = state.upper_score;
     let scored = state.scored_categories;
+    let sv = ctx.state_values.as_slice();
 
     // Group 6: E(S, r, 0) for all r
     for ds_i in 0..252 {
-        e[0][ds_i] = compute_best_scoring_value_for_dice_set_by_index(ctx, up_score, scored, ds_i);
+        e[0][ds_i] =
+            compute_best_scoring_value_for_dice_set_by_index(ctx, sv, up_score, scored, ds_i);
     }
 
     // Group 5: E(S, r, 1) = max_{mask} sum P(r'->r'') * E[0][r'']
@@ -220,7 +251,7 @@ mod tests {
     use crate::phase0_tables;
 
     fn make_ctx() -> Box<YatzyContext> {
-        let mut ctx = Box::new(YatzyContext::new());
+        let mut ctx = YatzyContext::new_boxed();
         phase0_tables::precompute_lookup_tables(&mut ctx);
         ctx
     }

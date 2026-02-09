@@ -118,6 +118,11 @@ impl YatzyContext {
         }
     }
 
+    /// Allocate on the heap directly.
+    pub fn new_boxed() -> Box<Self> {
+        Box::new(Self::new())
+    }
+
     /// Look up E_table[S] for state (upper_score, scored_categories).
     #[inline(always)]
     pub fn get_state_value(&self, upper_score: i32, scored: i32) -> f64 {

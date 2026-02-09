@@ -29,7 +29,7 @@ fn setup() -> Option<Box<YatzyContext>> {
     let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
     let _ = std::env::set_current_dir(&base_path);
 
-    let mut ctx = Box::new(YatzyContext::new());
+    let mut ctx = YatzyContext::new_boxed();
     phase0_tables::precompute_lookup_tables(&mut ctx);
 
     if !load_all_state_values(&mut ctx, "data/all_states.bin") {

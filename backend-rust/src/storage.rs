@@ -143,7 +143,7 @@ mod tests {
     fn test_v3_round_trip() {
         let test_file = "/tmp/yatzy_test_all_states_v3_rust.bin";
 
-        let mut ctx1 = Box::new(YatzyContext::new());
+        let mut ctx1 = YatzyContext::new_boxed();
         phase0_tables::precompute_lookup_tables(&mut ctx1);
 
         // Set some known values
@@ -160,7 +160,7 @@ mod tests {
         save_all_state_values(&ctx1, test_file);
         assert!(file_exists(test_file));
 
-        let mut ctx2 = Box::new(YatzyContext::new());
+        let mut ctx2 = YatzyContext::new_boxed();
         assert!(load_all_state_values(&mut ctx2, test_file));
 
         // Compare all states
@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_load_nonexistent() {
-        let mut ctx = Box::new(YatzyContext::new());
+        let mut ctx = YatzyContext::new_boxed();
         assert!(!load_all_state_values(
             &mut ctx,
             "/tmp/nonexistent_yatzy_v3_rust.bin"

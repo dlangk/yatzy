@@ -31,7 +31,7 @@ fn main() {
         .unwrap();
     println!("Using {} threads", num_threads);
 
-    let mut ctx = Box::new(YatzyContext::new());
+    let mut ctx = YatzyContext::new_boxed();
     phase0_tables::precompute_lookup_tables(&mut ctx);
     compute_all_state_values(&mut ctx);
 

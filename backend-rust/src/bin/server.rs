@@ -23,7 +23,7 @@ async fn main() {
     set_working_directory();
     println!("Starting yatzy API server...");
 
-    let mut ctx = Box::new(YatzyContext::new());
+    let mut ctx = YatzyContext::new_boxed();
     phase0_tables::precompute_lookup_tables(&mut ctx);
 
     if !load_all_state_values(&mut ctx, "data/all_states.bin") {

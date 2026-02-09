@@ -337,7 +337,7 @@ mod tests {
     use super::*;
 
     fn make_ctx() -> Box<YatzyContext> {
-        let mut ctx = Box::new(YatzyContext::new());
+        let mut ctx = YatzyContext::new_boxed();
         precompute_lookup_tables(&mut ctx);
         ctx
     }
