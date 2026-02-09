@@ -6,44 +6,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Delta Yatzy is a web-based implementation of the classic dice game with optimal action suggestions and multiplayer support. The project consists of:
 
-- **Backend (Rust)**: `backend-rust/` — the primary backend. Axum-based API server with rayon parallelism and memmap2 for zero-copy I/O
-- **Backend (C, legacy)**: `backend/` — original C implementation, kept for reference only. Not actively maintained. Produces bit-identical output to the Rust version
+- **Backend**: `backend/` — Rust, axum-based API server with rayon parallelism and memmap2 for zero-copy I/O
 - **Frontend**: Vanilla JavaScript single-page application with dynamic UI and Chart.js visualizations
-- **Docker**: Containerized deployment for frontend + Rust backend
+- **Docker**: Containerized deployment for frontend + backend
+
+A legacy C implementation exists in `backend-legacy-c/` for reference only.
 
 ## Commands
 
-### Backend Development (Rust)
+### Backend Development
 
 ```bash
 # Build the backend
-cd backend-rust && cargo build --release
+cd backend && cargo build --release
 
 # Run unit tests
 cargo test
 
 # Run precomputed integration tests (requires data/all_states.bin)
-YATZY_BASE_PATH=../backend cargo test --test test_precomputed
+cargo test --test test_precomputed
 
 # Precompute state values (required once)
 YATZY_BASE_PATH=. target/release/yatzy-precompute
 
 # Run the backend server (port 9000)
 YATZY_BASE_PATH=. target/release/yatzy
-```
-
-### Backend Development (C, legacy — for reference only)
-
-```bash
-# Build the backend
-cmake -S backend -B backend/build -DCMAKE_C_COMPILER=gcc-15 -DCMAKE_BUILD_TYPE=Release
-make -C backend/build -j8
-
-# Run tests
-for t in test_context test_dice_mechanics test_game_mechanics test_phase0 test_storage test_widget; do
-  backend/build/$t
-done
-YATZY_BASE_PATH=backend backend/build/test_precomputed
 ```
 
 ### Frontend Development
@@ -69,7 +56,7 @@ docker-compose up --build
 
 ## Architecture
 
-### Backend Structure (Rust — `backend-rust/`)
+### Backend Structure (`backend/`)
 
 The backend is a multithreaded Rust application with precomputed game states:
 
@@ -87,7 +74,7 @@ The backend is a multithreaded Rust application with precomputed game states:
 - **Infrastructure**:
   - `types.rs` - YatzyContext, KeepTable, StateValues (owned/mmap)
   - `constants.rs` - Category enum, state_index, NUM_STATES
-  - `storage.rs` - Binary file I/O (Storage v3 format, zero-copy mmap via memmap2)
+  - `storage.rs` - Binary file I/O (16-byte header + float[2M], zero-copy mmap via memmap2)
 
 ### Frontend Structure
 
@@ -109,14 +96,14 @@ The frontend uses ES6 modules for clean separation of concerns:
 
 2. **Keep-Multiset Dedup**: Multiple reroll masks can produce the same kept-dice multiset. The KeepTable collapses these into 462 unique keeps (avg 16.3 per dice set vs 31 masks), eliminating ~47% of redundant dot products in the DP hot path.
 
-3. **Parallel Processing**: Rayon `par_iter` for state computation (replaces OpenMP from C version)
+3. **Parallel Processing**: Rayon `par_iter` for state computation with unsafe direct writes (each state index is unique, so no data races).
 
-4. **Binary Storage**: Storage v3 format — 16-byte header + float[2,097,152] in STATE_INDEX order (~8 MB). Zero-copy mmap loading in <1ms. Binary compatible between C and Rust backends.
+4. **Binary Storage**: 16-byte header + float[2,097,152] in STATE_INDEX order (~8 MB). Zero-copy mmap loading in <1ms.
 
 ## Important Considerations
 
 - Frontend assumes backend is running on port 9000 (configurable via environment or `js/config.js`)
-- Game state values are stored in `backend/data/all_states.bin` (~8 MB), symlinked from `backend-rust/data`. Binary format is shared between C and Rust backends
+- Game state values are stored in `data/all_states.bin` (~8 MB) inside the backend directory
 - Scandinavian Yatzy: 15 categories, 50-point upper bonus (not 35 as in American Yahtzee)
 - State representation: `upper_score` (0-63) and `scored_categories` (15-bit bitmask), total 2,097,152 states
-- Rayon thread count configurable via `RAYON_NUM_THREADS` or `OMP_NUM_THREADS` env vars (default: 8)
+- Rayon thread count configurable via `RAYON_NUM_THREADS` env var (default: 8)

@@ -1,10 +1,9 @@
-//! Binary I/O for the E_table state values (Storage v3 format).
+//! Binary I/O for the E_table state values.
 //!
 //! Format: 16-byte header + float32[2,097,152] in `state_index(m, C)` order.
 //! Total file size: 8,388,624 bytes (~8 MB).
 //!
 //! Loading uses zero-copy memory mapping via `memmap2` for <1ms startup.
-//! The binary format is compatible between the C and Rust backends.
 
 use std::fs::{self, File};
 use std::io::Write;
@@ -16,10 +15,9 @@ use memmap2::Mmap;
 use crate::constants::*;
 use crate::types::{StateValues, YatzyContext};
 
-/// Storage v3 file header: magic + version + state count + reserved.
+/// Binary file header: magic + version + state count + reserved.
 ///
 /// Magic bytes "STZY" (0x59545A53) identify the file format.
-/// Binary layout matches the C backend for cross-compatibility.
 #[repr(C)]
 struct StateFileHeader {
     magic: u32,

@@ -18,7 +18,7 @@ services:
       retries: 3
 
   yatzy-backend:
-    build: ./backend-rust
+    build: ./backend
     container_name: yatzy-backend
     restart: always
     ports:

@@ -22,10 +22,10 @@ pub const NUM_KEEP_MULTISETS: usize = 462;
 /// Upper bound on total non-zero entries across all 462 keep rows.
 pub const MAX_KEEP_NNZ_TOTAL: usize = 60000;
 
-/// Storage v3 format magic number: "STZY" in hex.
+/// Storage format magic number: "STZY" in hex.
 pub const STATE_FILE_MAGIC: u32 = 0x59545A53;
 
-/// Storage v3 format version.
+/// Storage format version.
 pub const STATE_FILE_VERSION: u32 = 3;
 
 /// Scandinavian Yatzy upper bonus: 50 points if upper score >= 63.

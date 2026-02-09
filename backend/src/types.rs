@@ -77,7 +77,7 @@ pub struct YatzyState {
 /// - `Owned(Vec<f32>)`: allocated during precomputation, written via unsafe raw pointers
 ///   from parallel rayon workers.
 /// - `Mmap`: zero-copy memory-mapped file, loaded in <1ms. The mmap includes a 16-byte
-///   header (Storage v3 format), so `as_slice()` skips the first 16 bytes.
+///   header (16 bytes), so `as_slice()` skips the first 16 bytes.
 pub enum StateValues {
     Owned(Vec<f32>),
     Mmap { mmap: memmap2::Mmap },

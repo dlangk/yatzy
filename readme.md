@@ -21,7 +21,7 @@ A web-based implementation of Scandinavian Yatzy with optimal action suggestions
 
 ```bash
 # Build backend
-cd backend-rust && cargo build --release
+cd backend && cargo build --release
 
 # Precompute state values (required once, ~90s)
 YATZY_BASE_PATH=. RAYON_NUM_THREADS=8 target/release/yatzy-precompute
@@ -44,7 +44,7 @@ docker-compose up --build
 ### Run Tests
 
 ```bash
-cd backend-rust
+cd backend
 cargo test                    # 29 unit + 20 integration = 49 tests
 cargo fmt --check             # formatting
 cargo clippy                  # lints
@@ -52,13 +52,13 @@ cargo clippy                  # lints
 
 ## Project Structure
 
-### Backend — Rust (`backend-rust/`)
+### Backend (`backend/`)
 
-Axum-based API server with rayon parallelism and memmap2 for zero-copy I/O. This is the primary backend implementation.
+Axum-based API server with rayon parallelism and memmap2 for zero-copy I/O.
 
 - **Computation Pipeline**: Phase 0 (lookup tables + keep-multiset transition table) -> Phase 2 (backward induction over 1.4M reachable states)
 - **Key Optimization**: Keep-multiset deduplication collapses equivalent reroll masks (avg 16.3 unique keeps vs 31 masks per dice set)
-- **Storage**: Storage v3 format, ~8 MB binary file with zero-copy mmap loading
+- **Storage**: ~8 MB binary file with zero-copy mmap loading
 
 Source modules:
 
@@ -72,9 +72,9 @@ Source modules:
 | `game_mechanics.rs` | Yatzy scoring rules: s(S, r, c) |
 | `dice_mechanics.rs` | Dice operations and probability calculations |
 | `types.rs` | YatzyContext, KeepTable, StateValues (owned/mmap) |
-| `storage.rs` | Binary file I/O (Storage v3 format, zero-copy mmap via memmap2) |
+| `storage.rs` | Binary file I/O (zero-copy mmap via memmap2) |
 
-See `backend/theory/optimal_yahtzee_pseudocode.md` for the algorithm specification that the code implements.
+See `backend-legacy-c/theory/optimal_yahtzee_pseudocode.md` for the algorithm specification that the code implements.
 
 ### Frontend (`frontend/`)
 
@@ -87,10 +87,6 @@ Vanilla JavaScript SPA with ES6 modules:
 - `modules/utils/refreshers.js` — Periodic UI updates and API polling
 - `modules/utils/endpoints.js` — Backend API communication
 - `modules/utils/chartConfig.js` — Chart.js histogram configuration
-
-### Legacy C Backend (`backend/`)
-
-The original C implementation is kept for reference. See [`backend/README.md`](backend/README.md). The Rust version produces bit-identical output and is the actively maintained backend.
 
 ## API Example
 

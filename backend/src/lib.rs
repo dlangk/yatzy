@@ -5,7 +5,7 @@
 //!
 //! ## Algorithm overview
 //!
-//! The algorithm is described in `backend/theory/optimal_yahtzee_pseudocode.md`.
+//! The algorithm is described in `backend-legacy-c/theory/optimal_yahtzee_pseudocode.md`.
 //! It has three phases:
 //!
 //! | Phase | Pseudocode function | Rust module | Description |

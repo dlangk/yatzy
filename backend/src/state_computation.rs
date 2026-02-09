@@ -12,7 +12,7 @@
 //!
 //! Each (upper_score, scored_categories) maps to a unique `state_index`, so parallel
 //! workers never write to the same memory location. We use `AtomicPtr` + unsafe raw
-//! pointer writes (matching the C version's OpenMP approach) to avoid the overhead
+//! pointer writes to avoid the overhead
 //! of `collect()` + scatter.
 
 use std::time::Instant;
@@ -94,7 +94,7 @@ impl ComputeProgress {
 /// calling SOLVE_WIDGET for each valid state at that level. Level 15 (terminal) is
 /// already initialized.
 ///
-/// Results are saved to `data/all_states.bin` in Storage v3 format.
+/// Results are saved to `data/all_states.bin`.
 pub fn compute_all_state_values(ctx: &mut YatzyContext) {
     let mut progress = ComputeProgress::new(ctx);
 
@@ -145,7 +145,7 @@ pub fn compute_all_state_values(ctx: &mut YatzyContext) {
 
         // Parallel computation: write directly via raw pointer.
         // Safety: each (up, scored) pair maps to a unique state_index,
-        // so no two threads write to the same location (same guarantee as OpenMP).
+        // so no two threads write to the same location.
         let sv_ptr = ctx.state_values.as_mut_slice().as_mut_ptr();
 
         // AtomicPtr wrapper to satisfy Send+Sync for rayon's for_each.
