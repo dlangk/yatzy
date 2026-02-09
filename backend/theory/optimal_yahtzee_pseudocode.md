@@ -1,7 +1,5 @@
 # Pseudocode: Computing the Optimal Solitaire Yahtzee Strategy
 
-Extracted from: *An Optimal Strategy for Yahtzee*, James Glenn (CS-TR-0002, May 2006)
-
 The algorithm computes the optimal expected score for every possible game state using **backward induction** (retrograde analysis) over a directed acyclic graph of game states. The key insight is that the graph decomposes into $2^{19}$ independent "widgets" (one per turn-start state), and widgets can be processed and discarded one at a time, keeping only a table of $E(S)$ values across widgets.
 
 ---
