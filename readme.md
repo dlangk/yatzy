@@ -1,75 +1,95 @@
-# Delta Yatzy Project
+# Delta Yatzy
 
-Delta Yatzy is a web-based implementation of the classic dice game Yatzy, designed to provide an engaging and interactive experience. This project includes both a **backend API** for game logic and state management and a **frontend** for an intuitive user interface. Together, these components offer features such as optimal action suggestions, score evaluation, and multiplayer support.
-
----
+A web-based implementation of Scandinavian Yatzy with optimal action suggestions and multiplayer support. Uses dynamic programming to precompute expected values for all 2M+ game states, then serves real-time strategy advice via a REST API.
 
 ## Features
 
-### **Backend**
-The backend powers the game with precomputed data, efficient file management, and a RESTful API.
+- **Optimal Play Advisor**: Shows the mathematically best action for any game situation
+- **Score Evaluation**: Compares player choices against optimal strategy
+- **Outcome Distributions**: Chart.js histograms showing probability distributions after rerolls
+- **Multiplayer Support**: Tracks individual player states and scores
+- **Fast**: Precomputed states load in <1ms via memory-mapped I/O; API responses are instant
 
-#### Key Features:
-- **Game Logic**: Implements core Yatzy gameplay, including rolling dice, calculating scores, and evaluating optimal actions.
-- **State Precomputation**: Optimizes runtime performance with precomputed category scores and transition probabilities. Features real-time progress tracking and memory-mapped I/O for efficient computation.
-- **File Utilities**: Manages game state persistence with consolidated binary file format (all_states.bin) and memory-mapped I/O for fast loading.
-- **API Server**: Provides endpoints for evaluating actions, retrieving scores, and more, built with `libmicrohttpd`.
+## Quick Start
 
-#### Technologies:
-- **C Programming Language**
-- **libmicrohttpd** for HTTP server
-- **json-c** for JSON handling
+### Prerequisites
 
-#### Build and Run:
 ```bash
-# Build
-mkdir build && cd build
-cmake .. -DCMAKE_C_COMPILER=gcc-14
-make
+# macOS
+brew install cmake libmicrohttpd json-c gcc
 
-# Run the server
-./yatzy´´´
+# Ubuntu
+sudo apt install cmake libmicrohttpd-dev libjson-c-dev gcc build-essential -y
+```
 
-### **Frontend**
+### Build & Run
 
-The frontend is an interactive web application that communicates with the backend to provide a seamless user experience.
-
-#### Key Features:
-- **Interactive UI**: Features a dynamic scorecard, dice container, and histogram visualizations.
-- **Optimal Suggestions**: Guides players with API-driven optimal actions and comparisons to user actions.
-- **Multiplayer Support**: Tracks individual player states and scores for multiplayer games.
-- **Visualizations**: Uses Chart.js for real-time histograms and score distributions.
-
-#### Technologies:
-- **HTML/CSS/JavaScript**
-- **Chart.js** for data visualization
-- Integration with the backend API.
-
-#### Setup:
-1. Clone the repository.
-2. Start the backend server (`./yatzy`).
-3. Open `index.html` in a browser with a local server.
-
----
-
-## API Example
-
-### Endpoint: `/state_value`
-
-**Request:**
 ```bash
-curl http://localhost:8080/state_value?upper_score=50&scored_categories=3
+# Build backend
+cmake -S backend -B backend/build -DCMAKE_C_COMPILER=gcc-15 -DCMAKE_BUILD_TYPE=Release
+make -C backend/build -j8
+
+# Precompute state values (required once, ~81s)
+YATZY_BASE_PATH=backend OMP_NUM_THREADS=8 backend/build/yatzy_precompute
+
+# Start backend API server (port 9000)
+YATZY_BASE_PATH=backend backend/build/yatzy
+
+# Start frontend server (port 8090)
+cd frontend && python3 serve.py
+```
+
+Or using Docker:
+
+```bash
+docker-compose up --build
+# Frontend: http://localhost:8090
+# Backend:  http://localhost:9000
+```
 
 ## Project Structure
 
-### Backend
-- **Core Logic:** `yatzy.c` - Entry point and context initialization
-- **State Computation:** `state_computation.c` - Dynamic programming engine with progress tracking
-- **Game Mechanics:** `game_mechanics.c` - Core Yatzy rules and scoring
-- **API Server:** `webserver.c` - RESTful API endpoints
-- **Computations:** `computations.c` - Expected value calculations
+### Backend (`backend/`)
 
-### Frontend
-- **HTML:** `index.html` (UI structure)
-- **CSS:** `styles.css` (UI styling)
-- **JavaScript:** `interface.js` (game logic and backend communication)
+C-based API server and DP solver. See [`backend/README.md`](backend/README.md) for full details.
+
+- **Computation Pipeline**: Phase 0 (lookup tables + keep-multiset transition table) -> Phase 2 (backward induction over 1.4M reachable states)
+- **Key Optimization**: Keep-multiset deduplication collapses equivalent reroll masks (avg 16.3 unique keeps vs 31 masks per dice set)
+- **Storage**: Storage v3 format, ~8 MB binary file with zero-copy mmap loading
+
+Source modules:
+- `phase0_tables.c` — Lookup tables (scores, keep-multiset table, probabilities, reachability)
+- `state_computation.c` — DP backward induction loop with OpenMP parallelism
+- `widget_solver.c` — SOLVE_WIDGET: computes E(S) for a single state
+- `api_computations.c` — API wrappers for HTTP handlers
+- `webserver.c` — REST API server (libmicrohttpd + json-c)
+- `game_mechanics.c` / `dice_mechanics.c` — Yatzy rules and dice operations
+
+### Frontend (`frontend/`)
+
+Vanilla JavaScript SPA with ES6 modules:
+
+- `js/app.js` — Entry point, initializes game state and UI
+- `modules/game/gameState.js` — Player state management and local storage persistence
+- `modules/utils/eventHandlers.js` — User interaction handling
+- `modules/utils/uiBuilders.js` — Dynamic UI construction
+- `modules/utils/refreshers.js` — Periodic UI updates and API polling
+- `modules/utils/endpoints.js` — Backend API communication
+- `modules/utils/chartConfig.js` — Chart.js histogram configuration
+
+## API Example
+
+```bash
+# Get expected value for a game state
+curl "http://localhost:9000/state_value?upper_score=50&scored_categories=3"
+
+# Get optimal reroll strategy
+curl "http://localhost:9000/best_reroll?upper_score=10&scored_categories=5&dice=1,3,3,4,6&rerolls=2"
+```
+
+## Scandinavian Yatzy Rules
+
+- 15 scoring categories (Ones through Yatzy)
+- 50-point upper section bonus (not 35 as in American Yahtzee)
+- 3 rolls per turn (initial roll + 2 rerolls)
+- Player chooses which dice to keep before each reroll
