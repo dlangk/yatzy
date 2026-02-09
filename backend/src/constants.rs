@@ -4,7 +4,11 @@
 //! - |𝒞| = [`CATEGORY_COUNT`] = 15 (Scandinavian Yatzy)
 //! - |R_{5,6}| = [`NUM_DICE_SETS`] = 252
 //! - |R_k| = [`NUM_KEEP_MULTISETS`] = 462
-//! - STATE_INDEX(m, C) = [`state_index`]`(m, C)` = m * 2^15 + C
+//! - STATE_INDEX(m, C) = [`state_index`]`(m, C)` = C * 64 + m
+//!
+//! The index layout groups all 64 upper-score variants of the same scored-categories
+//! mask into a contiguous 256-byte region, enabling L1 cache hits during Group 6
+//! successor lookups (which vary upper_score but share scored_categories).
 
 /// Number of scoring categories in Scandinavian Yatzy (Ones through Yatzy).
 /// Pseudocode uses |𝒞| = 13 (standard Yahtzee); we use 15.
@@ -25,8 +29,8 @@ pub const MAX_KEEP_NNZ_TOTAL: usize = 60000;
 /// Storage format magic number: "STZY" in hex.
 pub const STATE_FILE_MAGIC: u32 = 0x59545A53;
 
-/// Storage format version.
-pub const STATE_FILE_VERSION: u32 = 3;
+/// Storage format version (v4: scored*64+up index layout for cache locality).
+pub const STATE_FILE_VERSION: u32 = 4;
 
 /// Scandinavian Yatzy upper bonus: 50 points if upper score >= 63.
 pub const UPPER_BONUS: f64 = 50.0;
@@ -71,9 +75,14 @@ pub const CATEGORY_NAMES: [&str; CATEGORY_COUNT] = [
 ];
 
 /// Map state S = (upper_score, scored_categories) to flat array index.
+///
+/// Layout: `scored_categories * 64 + upper_score`. This groups all upper-score
+/// variants of the same scored mask into a contiguous 256-byte region (64 × f32),
+/// giving L1 cache hits when Group 6 iterates successor states that share the
+/// same scored mask but differ in upper_score.
 #[inline(always)]
 pub fn state_index(upper_score: usize, scored_categories: usize) -> usize {
-    upper_score * (1 << 15) + scored_categories
+    scored_categories * 64 + upper_score
 }
 
 /// Test whether category `cat` has been scored (bit `cat` is set).

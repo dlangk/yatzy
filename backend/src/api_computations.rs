@@ -194,26 +194,33 @@ pub fn compute_expected_values(
         e_ds[0][ds_i] = best_val;
     }
 
-    // Levels 1..rerolls
+    // Levels 1..rerolls (with keep EV dedup)
     let kt = &ctx.keep_table;
     let vals = &kt.vals;
     let cols = &kt.cols;
     for n in 1..=rerolls as usize {
+        // Step 1: compute EV for each unique keep-multiset (462 dot products)
+        let mut keep_ev = [0.0f64; NUM_KEEP_MULTISETS];
+        for kid in 0..NUM_KEEP_MULTISETS {
+            let start = kt.row_start[kid] as usize;
+            let end = kt.row_start[kid + 1] as usize;
+            let mut ev = 0.0;
+            for k in start..end {
+                unsafe {
+                    ev += vals.get_unchecked(k)
+                        * e_ds[n - 1].get_unchecked(*cols.get_unchecked(k) as usize);
+                }
+            }
+            keep_ev[kid] = ev;
+        }
+
+        // Step 2: for each dice set, find max over its unique keeps
         for ds_i in 0..252 {
             let mut best_val = e_ds[n - 1][ds_i]; // mask=0: keep all
             for j in 0..kt.unique_count[ds_i] as usize {
                 let kid = kt.unique_keep_ids[ds_i][j] as usize;
-                let start = kt.row_start[kid] as usize;
-                let end = kt.row_start[kid + 1] as usize;
-                let mut ev = 0.0;
-                for k in start..end {
-                    unsafe {
-                        ev += vals.get_unchecked(k)
-                            * e_ds[n - 1].get_unchecked(*cols.get_unchecked(k) as usize);
-                    }
-                }
-                if ev > best_val {
-                    best_val = ev;
+                if keep_ev[kid] > best_val {
+                    best_val = keep_ev[kid];
                 }
             }
             e_ds[n][ds_i] = best_val;

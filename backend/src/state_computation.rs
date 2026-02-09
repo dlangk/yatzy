@@ -130,20 +130,23 @@ pub fn compute_all_state_values(ctx: &mut YatzyContext) {
             num_scored, progress.states_per_level[num_scored as usize]
         );
 
-        // Build state list
-        let mut state_list: Vec<(usize, i32)> = Vec::new();
+        // Build state list grouped by scored_categories mask.
+        // States sharing a scored mask access the same 256-byte successor regions
+        // (due to scored*64+up index layout), so grouping them maximizes L1 cache hits.
+        let mut groups: Vec<(i32, Vec<usize>)> = Vec::new();
         for scored in 0..(1u32 << CATEGORY_COUNT) {
             if scored.count_ones() == num_scored as u32 {
                 let upper_mask = (scored & 0x3F) as usize;
-                for up in 0..=63usize {
-                    if ctx.reachable[upper_mask][up] {
-                        state_list.push((up, scored as i32));
-                    }
+                let ups: Vec<usize> = (0..=63usize)
+                    .filter(|&up| ctx.reachable[upper_mask][up])
+                    .collect();
+                if !ups.is_empty() {
+                    groups.push((scored as i32, ups));
                 }
             }
         }
 
-        // Parallel computation: write directly via raw pointer.
+        // Parallel computation: each group processes sequentially on one thread.
         // Safety: each (up, scored) pair maps to a unique state_index,
         // so no two threads write to the same location.
         let sv_ptr = ctx.state_values.as_mut_slice().as_mut_ptr();
@@ -153,20 +156,24 @@ pub fn compute_all_state_values(ctx: &mut YatzyContext) {
         let sv_atomic = std::sync::atomic::AtomicPtr::new(sv_ptr);
 
         let ctx_ref = &*ctx;
-        state_list.par_iter().for_each(|&(up, scored)| {
-            let state = YatzyState {
-                upper_score: up as i32,
-                scored_categories: scored,
-            };
-            let ev = compute_expected_state_value(ctx_ref, &state);
+        groups.par_iter().for_each(|(scored, ups)| {
             let ptr = sv_atomic.load(std::sync::atomic::Ordering::Relaxed);
-            unsafe {
-                *ptr.add(state_index(up, scored as usize)) = ev as f32;
+            for &up in ups {
+                let state = YatzyState {
+                    upper_score: up as i32,
+                    scored_categories: *scored,
+                };
+                let ev = compute_expected_state_value(ctx_ref, &state);
+                unsafe {
+                    *ptr.add(state_index(up, *scored as usize)) = ev as f32;
+                }
             }
         });
 
+        let state_count: usize = groups.iter().map(|(_, ups)| ups.len()).sum();
+
         let pre_loop_completed = progress.completed_states;
-        progress.completed_states = pre_loop_completed + state_list.len() as i32;
+        progress.completed_states = pre_loop_completed + state_count as i32;
         progress.time_per_level[num_scored as usize] = total_start.elapsed().as_secs_f64();
 
         let level_dur = level_start.elapsed().as_secs_f64();
@@ -176,6 +183,12 @@ pub fn compute_all_state_values(ctx: &mut YatzyContext) {
             level_dur,
             progress.states_per_level[num_scored as usize] as f64 / level_dur
         );
+
+        #[cfg(feature = "timing")]
+        {
+            crate::widget_solver::print_timing();
+            crate::widget_solver::reset_timing();
+        }
     }
 
     println!("\n\n=== Computation Complete ===");

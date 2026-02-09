@@ -1,6 +1,7 @@
 //! Binary I/O for the E_table state values.
 //!
-//! Format: 16-byte header + float32[2,097,152] in `state_index(m, C)` order.
+//! Format: 16-byte header + float32[2,097,152] in `state_index(m, C)` order
+//! (v4 layout: `C * 64 + m`).
 //! Total file size: 8,388,624 bytes (~8 MB).
 //!
 //! Loading uses zero-copy memory mapping via `memmap2` for <1ms startup.
@@ -149,8 +150,8 @@ mod tests {
     }
 
     #[test]
-    fn test_v3_round_trip() {
-        let test_file = "/tmp/yatzy_test_all_states_v3_rust.bin";
+    fn test_v4_round_trip() {
+        let test_file = "/tmp/yatzy_test_all_states_v4_rust.bin";
 
         let mut ctx1 = YatzyContext::new_boxed();
         phase0_tables::precompute_lookup_tables(&mut ctx1);
@@ -178,7 +179,7 @@ mod tests {
         for i in 0..NUM_STATES {
             assert!(
                 (sv1[i] - sv2[i]).abs() < 1e-6,
-                "V3 mismatch at index {}: {} != {}",
+                "V4 mismatch at index {}: {} != {}",
                 i,
                 sv1[i],
                 sv2[i]

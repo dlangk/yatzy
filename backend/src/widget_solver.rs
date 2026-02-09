@@ -27,6 +27,56 @@ use crate::dice_mechanics::{find_dice_set_index, sort_dice_set};
 use crate::game_mechanics::update_upper_score;
 use crate::types::{YatzyContext, YatzyState};
 
+#[cfg(feature = "timing")]
+use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(feature = "timing")]
+use std::time::Instant;
+
+#[cfg(feature = "timing")]
+pub static TIMING_GROUP6_NS: AtomicU64 = AtomicU64::new(0);
+#[cfg(feature = "timing")]
+pub static TIMING_GROUP53_NS: AtomicU64 = AtomicU64::new(0);
+#[cfg(feature = "timing")]
+pub static TIMING_GROUP1_NS: AtomicU64 = AtomicU64::new(0);
+#[cfg(feature = "timing")]
+pub static TIMING_WIDGET_COUNT: AtomicU64 = AtomicU64::new(0);
+
+/// Reset all timing counters to zero.
+#[cfg(feature = "timing")]
+pub fn reset_timing() {
+    TIMING_GROUP6_NS.store(0, Ordering::Relaxed);
+    TIMING_GROUP53_NS.store(0, Ordering::Relaxed);
+    TIMING_GROUP1_NS.store(0, Ordering::Relaxed);
+    TIMING_WIDGET_COUNT.store(0, Ordering::Relaxed);
+}
+
+/// Print timing breakdown and return totals.
+#[cfg(feature = "timing")]
+pub fn print_timing() {
+    let g6 = TIMING_GROUP6_NS.load(Ordering::Relaxed) as f64 / 1e9;
+    let g53 = TIMING_GROUP53_NS.load(Ordering::Relaxed) as f64 / 1e9;
+    let g1 = TIMING_GROUP1_NS.load(Ordering::Relaxed) as f64 / 1e9;
+    let count = TIMING_WIDGET_COUNT.load(Ordering::Relaxed);
+    let total = g6 + g53 + g1;
+    println!("  Widget timing ({} widgets):", count);
+    println!(
+        "    Group 6  (sv lookups):  {:>8.3}s ({:.1}%)",
+        g6,
+        g6 / total * 100.0
+    );
+    println!(
+        "    Group 53 (dot prods):   {:>8.3}s ({:.1}%)",
+        g53,
+        g53 / total * 100.0
+    );
+    println!(
+        "    Group 1  (weighted sum): {:>7.3}s ({:.1}%)",
+        g1,
+        g1 / total * 100.0
+    );
+    println!("    Total widget time:      {:>8.3}s", total);
+}
+
 /// Group 6 entry point: best category score for one roll r (public API path).
 ///
 /// Pseudocode: E(S, r, 0) = max_{c ∉ C} [s(S,r,c) + E(n(S,r,c))]
@@ -175,6 +225,9 @@ pub fn choose_best_reroll_mask(
 ///
 /// For each dice set ds, finds: E(S, ds, n) = max_{r' ⊆ ds} Σ P(r'→r'') · E_prev[r'']
 /// Records both the best EV and the best mask per dice set (needed for API responses).
+///
+/// **Optimization**: Same keep EV dedup as the DP variant — 462 dot products instead
+/// of 4,108 redundant ones.
 pub fn compute_expected_values_for_n_rerolls(
     ctx: &YatzyContext,
     e_ds_prev: &[f64; 252],
@@ -185,20 +238,28 @@ pub fn compute_expected_values_for_n_rerolls(
     let vals = &kt.vals;
     let cols = &kt.cols;
 
+    // Step 1: compute EV for each unique keep-multiset (462 dot products)
+    let mut keep_ev = [0.0f64; NUM_KEEP_MULTISETS];
+    for kid in 0..NUM_KEEP_MULTISETS {
+        let start = kt.row_start[kid] as usize;
+        let end = kt.row_start[kid + 1] as usize;
+        let mut ev = 0.0;
+        for k in start..end {
+            unsafe {
+                ev += vals.get_unchecked(k)
+                    * e_ds_prev.get_unchecked(*cols.get_unchecked(k) as usize);
+            }
+        }
+        keep_ev[kid] = ev;
+    }
+
+    // Step 2: for each dice set, find max over its unique keeps
     for ds_i in 0..252 {
         let mut best_val = e_ds_prev[ds_i]; // mask=0: keep all
         let mut best_mask = 0i32;
         for j in 0..kt.unique_count[ds_i] as usize {
             let kid = kt.unique_keep_ids[ds_i][j] as usize;
-            let start = kt.row_start[kid] as usize;
-            let end = kt.row_start[kid + 1] as usize;
-            let mut ev = 0.0;
-            for k in start..end {
-                unsafe {
-                    ev += vals.get_unchecked(k)
-                        * e_ds_prev.get_unchecked(*cols.get_unchecked(k) as usize);
-                }
-            }
+            let ev = keep_ev[kid];
             if ev > best_val {
                 best_val = ev;
                 best_mask = kt.keep_to_mask[ds_i * 32 + j];
@@ -214,6 +275,10 @@ pub fn compute_expected_values_for_n_rerolls(
 /// Same logic as [`compute_expected_values_for_n_rerolls`] but omits the
 /// `best_mask_for_n` output. Used in the precomputation hot path where only
 /// the EV matters (strategy is not recorded).
+///
+/// **Optimization**: Computes each keep's EV once (462 unique dot products),
+/// then distributes results to all 252 dice sets via lookup. This eliminates
+/// ~8.9x redundant dot products (4,108 → 462 per call).
 #[inline(always)]
 fn compute_max_ev_for_n_rerolls(
     ctx: &YatzyContext,
@@ -224,19 +289,27 @@ fn compute_max_ev_for_n_rerolls(
     let vals = &kt.vals;
     let cols = &kt.cols;
 
+    // Step 1: compute EV for each unique keep-multiset (462 dot products)
+    let mut keep_ev = [0.0f64; NUM_KEEP_MULTISETS];
+    for kid in 0..NUM_KEEP_MULTISETS {
+        let start = kt.row_start[kid] as usize;
+        let end = kt.row_start[kid + 1] as usize;
+        let mut ev = 0.0;
+        for k in start..end {
+            unsafe {
+                ev += vals.get_unchecked(k)
+                    * e_ds_prev.get_unchecked(*cols.get_unchecked(k) as usize);
+            }
+        }
+        keep_ev[kid] = ev;
+    }
+
+    // Step 2: for each dice set, find max over its unique keeps (O(1) lookup each)
     for ds_i in 0..252 {
         let mut best_val = e_ds_prev[ds_i]; // mask=0: keep all
         for j in 0..kt.unique_count[ds_i] as usize {
-            let kid = kt.unique_keep_ids[ds_i][j] as usize;
-            let start = kt.row_start[kid] as usize;
-            let end = kt.row_start[kid + 1] as usize;
-            let mut ev = 0.0;
-            for k in start..end {
-                unsafe {
-                    ev += vals.get_unchecked(k)
-                        * e_ds_prev.get_unchecked(*cols.get_unchecked(k) as usize);
-                }
-            }
+            let kid = unsafe { *kt.unique_keep_ids[ds_i].get_unchecked(j) } as usize;
+            let ev = unsafe { *keep_ev.get_unchecked(kid) };
             if ev > best_val {
                 best_val = ev;
             }
@@ -266,12 +339,62 @@ pub fn compute_expected_state_value(ctx: &YatzyContext, state: &YatzyState) -> f
     let sv = ctx.state_values.as_slice();
 
     // Group 6: E(S, r, 0) for all r
-    for ds_i in 0..252 {
-        e[0][ds_i] =
-            compute_best_scoring_value_for_dice_set_by_index(ctx, sv, up_score, scored, ds_i);
+    #[cfg(feature = "timing")]
+    let t0 = Instant::now();
+
+    // Preload lower-category successor EVs: for categories 6-14, the successor
+    // state value sv[state_index(up, scored|(1<<c))] is constant across all 252
+    // dice sets (only depends on up and scored, not the roll). Read once here
+    // instead of 252 times in the inner loop.
+    let mut lower_succ_ev = [0.0f64; CATEGORY_COUNT];
+    for c in 6..CATEGORY_COUNT {
+        if !is_category_scored(scored, c) {
+            lower_succ_ev[c] = unsafe {
+                *sv.get_unchecked(state_index(up_score as usize, (scored | (1 << c)) as usize))
+            } as f64;
+        }
     }
 
+    for ds_i in 0..252 {
+        let mut best_val = f64::NEG_INFINITY;
+
+        // Upper categories (0-5): sv lookup varies per dice set (new_up depends on score)
+        for c in 0..6 {
+            if !is_category_scored(scored, c) {
+                let scr = ctx.precomputed_scores[ds_i][c];
+                let new_up = update_upper_score(up_score, c, scr);
+                let new_scored = scored | (1 << c);
+                let val = scr as f64
+                    + unsafe {
+                        *sv.get_unchecked(state_index(new_up as usize, new_scored as usize))
+                    } as f64;
+                if val > best_val {
+                    best_val = val;
+                }
+            }
+        }
+
+        // Lower categories (6-14): use preloaded successor EV (no sv read!)
+        for c in 6..CATEGORY_COUNT {
+            if !is_category_scored(scored, c) {
+                let scr = ctx.precomputed_scores[ds_i][c];
+                let val = scr as f64 + unsafe { *lower_succ_ev.get_unchecked(c) };
+                if val > best_val {
+                    best_val = val;
+                }
+            }
+        }
+
+        e[0][ds_i] = best_val;
+    }
+
+    #[cfg(feature = "timing")]
+    TIMING_GROUP6_NS.fetch_add(t0.elapsed().as_nanos() as u64, Ordering::Relaxed);
+
     // Group 5: E(S, r, 1) = max_{mask} sum P(r'->r'') * E[0][r'']
+    #[cfg(feature = "timing")]
+    let t1 = Instant::now();
+
     let (e0, e1) = e.split_at_mut(1);
     compute_max_ev_for_n_rerolls(ctx, array_ref(&e0[0]), array_mut(&mut e1[0]));
 
@@ -279,11 +402,22 @@ pub fn compute_expected_state_value(ctx: &YatzyContext, state: &YatzyState) -> f
     let (e0, e1) = e.split_at_mut(1);
     compute_max_ev_for_n_rerolls(ctx, array_ref(&e1[0]), array_mut(&mut e0[0]));
 
+    #[cfg(feature = "timing")]
+    TIMING_GROUP53_NS.fetch_add(t1.elapsed().as_nanos() as u64, Ordering::Relaxed);
+
     // Group 1: E(S) = sum P(empty->r) * E[0][r]
+    #[cfg(feature = "timing")]
+    let t2 = Instant::now();
+
     let mut e_s = 0.0;
     for ds_i in 0..252 {
         e_s += ctx.dice_set_probabilities[ds_i] * e[0][ds_i];
     }
+
+    #[cfg(feature = "timing")]
+    TIMING_GROUP1_NS.fetch_add(t2.elapsed().as_nanos() as u64, Ordering::Relaxed);
+    #[cfg(feature = "timing")]
+    TIMING_WIDGET_COUNT.fetch_add(1, Ordering::Relaxed);
 
     e_s
 }

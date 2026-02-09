@@ -24,7 +24,9 @@
 //! - `m` ∈ [0, 63]: upper-section score (capped)
 //! - `C`: 15-bit bitmask of scored categories (Ones=bit 0 .. Yatzy=bit 14)
 //!
-//! Flat index: `state_index(m, C) = m * 2^15 + C`, giving 2,097,152 total slots.
+//! Flat index: `state_index(m, C) = C * 64 + m`, giving 2,097,152 total slots.
+//! This layout groups all upper-score variants of the same scored mask into
+//! contiguous 256-byte regions for L1 cache locality.
 //!
 //! ## Key differences from the pseudocode
 //!
