@@ -54,21 +54,39 @@
     ((upper_score) * (1 << 15) + (scored_categories))
 
 /*
- * Sparse CSR representation of the P(r' → r) transition table.
+ * Keep-multiset transition table with sparse per-row storage.
  *
- * The dense table (252 × 32 × 252 doubles = 16.3 MB) is ~79% zeros.
- * This sparse format stores only non-zero entries (~424K) in ~5 MB,
- * fitting in L2 cache on Apple Silicon (12 MB shared among P-cores).
+ * A keep-multiset is the sorted multiset of dice kept before rerolling.
+ * Total unique keep-multisets for 0-5 dice from {1..6}: 1+6+21+56+126+252 = 462.
+ * Multiple 5-bit reroll masks can yield the same keep-multiset, so we
+ * deduplicate to avoid redundant dot products in the DP hot path.
  *
- * Row index for (ds, mask) = ds * 32 + mask.  Total rows = 8064.
- * row_offsets[r] .. row_offsets[r+1] gives the range in values/col_indices.
+ * Each keep row stores only its non-zero probability entries in contiguous
+ * (value, column) pairs for efficient sparse dot products, while the dedup
+ * mappings eliminate redundant masks (~16 unique keeps vs 31 masks on avg).
  */
+#define NUM_KEEP_MULTISETS 462
+#define MAX_KEEP_NNZ_TOTAL 60000  /* upper bound on total non-zero entries across all 462 rows */
+
 typedef struct {
-    double *values;          /* probability values, flat CSR array */
-    int *col_indices;        /* target dice set index for each non-zero entry */
-    int row_offsets[252 * 32 + 1]; /* CSR row pointers */
-    int total_nonzero;
-} SparseTransitionTable;
+    /* Sparse per-row storage: for each keep ki, non-zero probabilities and column indices.
+     * row_start[ki]..row_start[ki+1] gives range in vals[]/cols[]. */
+    double vals[MAX_KEEP_NNZ_TOTAL];
+    int cols[MAX_KEEP_NNZ_TOTAL];
+    int row_start[NUM_KEEP_MULTISETS + 1];
+
+    /* Per dice set: deduplicated unique keeps (masks 1-31, excl. mask=0 keep-all). */
+    int unique_count[252];          /* how many unique keeps per dice set */
+    int unique_keep_ids[252][31];   /* keep indices for each unique keep */
+
+    /* Reverse mapping: mask_to_keep[ds*32 + mask] = keep index.
+     * API functions accept user-chosen masks, need to look up the keep. */
+    int mask_to_keep[252 * 32];
+
+    /* Representative mask: keep_to_mask[ds*32 + j] = first mask for unique keep j.
+     * API must return masks, not keep indices. */
+    int keep_to_mask[252 * 32];
+} KeepTable;
 
 typedef struct {
     /* Human-readable names for each of the 15 categories. */
@@ -93,11 +111,9 @@ typedef struct {
     float *state_values;
     /* P(⊥ → r): probability of rolling each r ∈ R_{5,6} from 5 fresh dice. */
     double dice_set_probabilities[252];
-    /*
-     * P(r' → r) sparse transition table in CSR format.
-     * Replaces the dense transition_table[252][32][252].
-     */
-    SparseTransitionTable sparse_transitions;
+    /* Dense keep-multiset transition table.
+     * Replaces the sparse CSR transition_table. */
+    KeepTable keep_table;
 
     /* Phase 1 reachability: reachable[upper_mask][upper_score] = 1 if reachable. */
     uint8_t reachable[64][64];

@@ -138,13 +138,18 @@ void ComputeDistributionForRerollMask(const YatzyContext *ctx,
         out_distribution[ds2_i].ds2_index = ds2_i;
     }
 
-    /* Fill non-zero probabilities from sparse table */
-    const SparseTransitionTable *sp = &ctx->sparse_transitions;
-    int row = ds_index * 32 + mask;
-    int start = sp->row_offsets[row];
-    int end = sp->row_offsets[row + 1];
-    for (int k = start; k < end; k++) {
-        out_distribution[sp->col_indices[k]].probability = sp->values[k];
+    /* Fill probabilities from keep table */
+    if (mask == 0) {
+        /* mask=0: keep all → deterministic self-transition */
+        out_distribution[ds_index].probability = 1.0;
+    } else {
+        const KeepTable *kt = &ctx->keep_table;
+        int kid = kt->mask_to_keep[ds_index * 32 + mask];
+        int start = kt->row_start[kid];
+        int end = kt->row_start[kid + 1];
+        for (int k = start; k < end; k++) {
+            out_distribution[kt->cols[k]].probability = kt->vals[k];
+        }
     }
 }
 
@@ -171,22 +176,20 @@ void ComputeExpectedValues(const YatzyContext *ctx, int upper_score,
         E_ds[0][ds_i] = best_val;
     }
 
-    /* Levels 1..rerolls: E(S, r, n) = max_{mask} Σ P(r'→r'') · E_ds[n-1][r''] */
-    const double * restrict vals = ctx->sparse_transitions.values;
-    const int * restrict cols = ctx->sparse_transitions.col_indices;
-    const int *offsets = ctx->sparse_transitions.row_offsets;
+    /* Levels 1..rerolls: E(S, r, n) = max_{keep} Σ P(keep→r'') · E_ds[n-1][r''] */
+    const KeepTable *kt = &ctx->keep_table;
 
     for (int n = 1; n <= rerolls; n++) {
         #pragma omp parallel for
         for (int ds_i = 0; ds_i < 252; ds_i++) {
             double best_val = E_ds[n - 1][ds_i]; /* mask=0: keep all */
-            int row_base = ds_i * 32;
-            for (int mask = 1; mask < 32; mask++) {
-                int start = offsets[row_base + mask];
-                int end = offsets[row_base + mask + 1];
+            for (int j = 0; j < kt->unique_count[ds_i]; j++) {
+                int kid = kt->unique_keep_ids[ds_i][j];
+                int start = kt->row_start[kid];
+                int end = kt->row_start[kid + 1];
                 double ev = 0.0;
                 for (int k = start; k < end; k++) {
-                    ev += vals[k] * E_ds[n - 1][cols[k]];
+                    ev += kt->vals[k] * E_ds[n - 1][kt->cols[k]];
                 }
                 if (ev > best_val) best_val = ev;
             }

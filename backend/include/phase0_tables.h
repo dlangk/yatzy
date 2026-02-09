@@ -29,8 +29,8 @@ void BuildAllDiceCombinations(YatzyContext *ctx);
 /* Popcount cache: maps each scored-category bitmask to |C|. */
 void PrecomputeScoredCategoryCounts(YatzyContext *ctx);
 
-/* Precompute P(r' → r) transition table for all (dice_set, reroll_mask) pairs. */
-void PrecomputeRerollTransitionProbabilities(YatzyContext *ctx);
+/* Precompute dense keep-multiset transition table. */
+void PrecomputeKeepTable(YatzyContext *ctx);
 
 /* Precompute P(⊥ → r) for all r ∈ R_{5,6}. */
 void PrecomputeDiceSetProbabilities(YatzyContext *ctx);

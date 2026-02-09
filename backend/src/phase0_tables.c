@@ -63,140 +63,163 @@ void BuildAllDiceCombinations(YatzyContext *ctx) {
     }
 }
 
-/* Helper: extract which dice are locked vs rerolled for a given mask. */
-static void ExtractLockedAndRerollIndices(int reroll_mask, int *locked_indices, int *count_locked, int *count_reroll) {
-    *count_locked = 0;
-    *count_reroll = 0;
-    for (int i = 0; i < 5; i++) {
-        if (reroll_mask & (1 << i)) {
-            (*count_reroll)++;
-        } else {
-            locked_indices[(*count_locked)++] = i;
-        }
-    }
-}
-
-/* Helper: generate dice values for one reroll outcome (base-6 decode). */
-static void GenerateRerolledValues(int outcome_id, int count_reroll, int *rerolled_values) {
-    for (int p = 0; p < count_reroll; p++) {
-        rerolled_values[p] = (outcome_id % 6) + 1;
-        outcome_id /= 6;
-    }
-}
-
-/* Helper: merge locked and rerolled dice into a single dice set. */
-static void CombineDiceSets(const int *ds1, const int *locked_indices, int count_locked, const int *rerolled_values,
-                            int count_reroll, int *final_dice) {
-    for (int idx = 0; idx < count_locked; idx++) {
-        final_dice[idx] = ds1[locked_indices[idx]];
-    }
-    for (int idx = 0; idx < count_reroll; idx++) {
-        final_dice[count_locked + idx] = rerolled_values[idx];
-    }
-}
-
-/* Precompute P(r' → r) transition probabilities and build sparse CSR table.
+/*
+ * PrecomputeKeepTable — Build dense keep-multiset transition table.
  *
- * Builds transitions into a temporary dense buffer, then compresses to CSR
- * format in ctx->sparse_transitions. The dense buffer is freed after.
- *
- * See pseudocode Phase 0: "For each keep r' in R_k and each full roll r in R_5,6:
- *   Compute P(r' -> r)" */
-void PrecomputeRerollTransitionProbabilities(YatzyContext *ctx) {
-    /* Allocate temporary dense buffer (252 × 32 × 252 doubles = 16.3 MB) */
-    double (*dense)[32][252] = malloc(252 * 32 * 252 * sizeof(double));
-    if (!dense) {
-        fprintf(stderr, "Failed to allocate temp transition buffer\n");
-        return;
-    }
+ * Three sub-steps:
+ *   3a. Enumerate all 462 keep-multisets (0-5 dice from {1..6}).
+ *   3b. For each keep K and target T, compute P(K→T) via multinomial formula.
+ *   3c. For each (ds, mask), map to keep index; build dedup and reverse mappings.
+ */
+void PrecomputeKeepTable(YatzyContext *ctx) {
+    KeepTable *kt = &ctx->keep_table;
 
-    /* Pass 1: compute dense transition probabilities */
-    for (int ds1_i = 0; ds1_i < 252; ds1_i++) {
-        const int *ds1 = ctx->all_dice_sets[ds1_i];
+    /*
+     * 3a: Enumerate all 462 keep-multisets as frequency vectors [f1..f6].
+     *
+     * A keep-multiset is defined by how many of each face {1..6} are kept.
+     * For 0 kept dice: [0,0,0,0,0,0] (1 multiset)
+     * For k kept dice: all ways to partition k into 6 bins (C(k+5,5) multisets)
+     * Total: 1 + 6 + 21 + 56 + 126 + 252 = 462
+     */
+    int keep_freq[NUM_KEEP_MULTISETS][6]; /* frequency vector per keep */
+    int keep_size[NUM_KEEP_MULTISETS];    /* number of dice kept */
+    int num_keeps = 0;
 
-        for (int reroll_mask = 0; reroll_mask < 32; reroll_mask++) {
-            int locked_indices[5];
-            int count_locked, count_reroll;
+    /* Reverse lookup: freq vector -> keep index.
+     * Index: f1*6^5 + f2*6^4 + f3*6^3 + f4*6^2 + f5*6 + f6
+     * but frequencies are 0-5, so max index = 5*6^5+... = 46655. Use 6^6=46656 array. */
+    int keep_lookup[46656];
+    memset(keep_lookup, -1, sizeof(keep_lookup));
 
-            ExtractLockedAndRerollIndices(reroll_mask, locked_indices, &count_locked, &count_reroll);
-
-            /* mask=0: keep all dice, deterministic transition to self */
-            if (count_reroll == 0) {
-                for (int ds2_i = 0; ds2_i < 252; ds2_i++) {
-                    dense[ds1_i][reroll_mask][ds2_i] = (ds1_i == ds2_i) ? 1.0 : 0.0;
-                }
-                continue;
-            }
-
-            int total_outcomes = 1;
-            for (int p = 0; p < count_reroll; p++) {
-                total_outcomes *= 6;
-            }
-
-            double counts[252] = {0.0};
-
-            for (int outcome_id = 0; outcome_id < total_outcomes; outcome_id++) {
-                int final_dice[5];
-                int rerolled_values[5];
-                GenerateRerolledValues(outcome_id, count_reroll, rerolled_values);
-                CombineDiceSets(ds1, locked_indices, count_locked, rerolled_values, count_reroll, final_dice);
-
-                SortDiceSet(final_dice);
-                const int ds2_index = ctx->index_lookup[final_dice[0] - 1][final_dice[1] - 1][final_dice[2] - 1][
-                    final_dice[3] - 1][final_dice[4] - 1];
-                counts[ds2_index] += 1.0;
-            }
-
-            const double inv_total = 1.0 / total_outcomes;
-            for (int ds2_i = 0; ds2_i < 252; ds2_i++) {
-                dense[ds1_i][reroll_mask][ds2_i] = counts[ds2_i] * inv_total;
-            }
+    for (int f1 = 0; f1 <= 5; f1++)
+    for (int f2 = 0; f2 <= 5 - f1; f2++)
+    for (int f3 = 0; f3 <= 5 - f1 - f2; f3++)
+    for (int f4 = 0; f4 <= 5 - f1 - f2 - f3; f4++)
+    for (int f5 = 0; f5 <= 5 - f1 - f2 - f3 - f4; f5++) {
+        int f6 = 0; /* f6 can be 0..5-sum, but we enumerate all valid totals */
+        for (f6 = 0; f6 <= 5 - f1 - f2 - f3 - f4 - f5; f6++) {
+            int idx = num_keeps++;
+            keep_freq[idx][0] = f1;
+            keep_freq[idx][1] = f2;
+            keep_freq[idx][2] = f3;
+            keep_freq[idx][3] = f4;
+            keep_freq[idx][4] = f5;
+            keep_freq[idx][5] = f6;
+            keep_size[idx] = f1 + f2 + f3 + f4 + f5 + f6;
+            int lookup_key = ((((f1 * 6 + f2) * 6 + f3) * 6 + f4) * 6 + f5) * 6 + f6;
+            keep_lookup[lookup_key] = idx;
         }
     }
 
-    /* Pass 2: count non-zeros and build CSR row_offsets */
-    SparseTransitionTable *sp = &ctx->sparse_transitions;
-    int total_nz = 0;
+    /*
+     * 3b: Compute P(K→T) for each keep K and target T.
+     * Store in sparse per-row format: only non-zero entries.
+     *
+     * For keep K (freq [k1..k6]) and target T (freq [t1..t6]):
+     *   P(K→T) = n! / prod((ti-ki)!) / 6^n   if ki <= ti for all i
+     *          = 0                              otherwise
+     * where n = 5 - |K| (number of rerolled dice).
+     */
+    int pow6[6] = {1, 6, 36, 216, 1296, 7776};
+    int nnz = 0;
+
+    for (int ki = 0; ki < num_keeps; ki++) {
+        kt->row_start[ki] = nnz;
+        int n = 5 - keep_size[ki]; /* dice rerolled */
+
+        if (n == 0) {
+            /* Keep all 5: deterministic transition to self */
+            int dice[5], d = 0;
+            for (int face = 0; face < 6; face++)
+                for (int c = 0; c < keep_freq[ki][face]; c++)
+                    dice[d++] = face + 1;
+            if (d == 5) {
+                int ti = ctx->index_lookup[dice[0]-1][dice[1]-1][dice[2]-1][dice[3]-1][dice[4]-1];
+                kt->vals[nnz] = 1.0;
+                kt->cols[nnz] = ti;
+                nnz++;
+            }
+            continue;
+        }
+
+        double inv_pow6n = 1.0 / pow6[n];
+        int fact_n = ctx->factorial[n];
+
+        for (int ti = 0; ti < 252; ti++) {
+            /* Get target frequency vector */
+            int tf[6] = {0};
+            const int *td = ctx->all_dice_sets[ti];
+            for (int j = 0; j < 5; j++) tf[td[j] - 1]++;
+
+            /* Check subset: ki <= ti for all faces */
+            int valid = 1;
+            int denom = 1;
+            for (int f = 0; f < 6; f++) {
+                if (keep_freq[ki][f] > tf[f]) { valid = 0; break; }
+                denom *= ctx->factorial[tf[f] - keep_freq[ki][f]];
+            }
+            if (!valid) continue;
+
+            kt->vals[nnz] = (double)fact_n / denom * inv_pow6n;
+            kt->cols[nnz] = ti;
+            nnz++;
+        }
+    }
+    kt->row_start[num_keeps] = nnz;
+
+    /*
+     * 3c: For each (ds, mask), compute kept-dice frequency vector,
+     *     look up keep index, build dedup and reverse mappings.
+     */
+    memset(kt->unique_count, 0, sizeof(kt->unique_count));
+    memset(kt->mask_to_keep, -1, sizeof(kt->mask_to_keep));
+
+    int total_unique = 0;
     for (int ds = 0; ds < 252; ds++) {
-        for (int mask = 0; mask < 32; mask++) {
-            sp->row_offsets[ds * 32 + mask] = total_nz;
-            for (int ds2 = 0; ds2 < 252; ds2++) {
-                if (dense[ds][mask][ds2] > 0.0) total_nz++;
-            }
-        }
-    }
-    sp->row_offsets[252 * 32] = total_nz;
-    sp->total_nonzero = total_nz;
+        const int *dice = ctx->all_dice_sets[ds];
+        int seen[NUM_KEEP_MULTISETS]; /* track which keep ids we've seen for this ds */
+        int n_unique = 0;
 
-    /* Allocate CSR arrays */
-    sp->values = malloc(total_nz * sizeof(double));
-    sp->col_indices = malloc(total_nz * sizeof(int));
-    if (!sp->values || !sp->col_indices) {
-        fprintf(stderr, "Failed to allocate sparse transition table (%d entries)\n", total_nz);
-        free(dense);
-        return;
-    }
-
-    /* Pass 3: fill CSR arrays */
-    int k = 0;
-    for (int ds = 0; ds < 252; ds++) {
-        for (int mask = 0; mask < 32; mask++) {
-            for (int ds2 = 0; ds2 < 252; ds2++) {
-                if (dense[ds][mask][ds2] > 0.0) {
-                    sp->values[k] = dense[ds][mask][ds2];
-                    sp->col_indices[k] = ds2;
-                    k++;
+        for (int mask = 1; mask < 32; mask++) {
+            /* Compute frequency vector of kept dice (bits NOT set in mask) */
+            int kf[6] = {0};
+            for (int i = 0; i < 5; i++) {
+                if (!(mask & (1 << i))) {
+                    kf[dice[i] - 1]++;
                 }
             }
+            int lookup_key = ((((kf[0] * 6 + kf[1]) * 6 + kf[2]) * 6 + kf[3]) * 6 + kf[4]) * 6 + kf[5];
+            int kid = keep_lookup[lookup_key];
+            kt->mask_to_keep[ds * 32 + mask] = kid;
+
+            /* Dedup: check if we've already seen this keep for this ds */
+            int found = 0;
+            for (int j = 0; j < n_unique; j++) {
+                if (seen[j] == kid) { found = 1; break; }
+            }
+            if (!found) {
+                seen[n_unique] = kid;
+                kt->unique_keep_ids[ds][n_unique] = kid;
+                kt->keep_to_mask[ds * 32 + n_unique] = mask;
+                n_unique++;
+            }
         }
+
+        kt->unique_count[ds] = n_unique;
+        total_unique += n_unique;
+
+        /* mask=0: keep all → identity, not stored in unique_keep_ids */
+        /* Map mask=0 to the keep index for all 5 dice */
+        int kf_all[6] = {0};
+        for (int i = 0; i < 5; i++) kf_all[dice[i] - 1]++;
+        int lookup_key = ((((kf_all[0] * 6 + kf_all[1]) * 6 + kf_all[2]) * 6 + kf_all[3]) * 6 + kf_all[4]) * 6 + kf_all[5];
+        kt->mask_to_keep[ds * 32 + 0] = keep_lookup[lookup_key];
     }
 
-    free(dense);
-
-    printf("    Sparse transition table: %d non-zero / %d total (%.1f%% sparse), %.1f MB\n",
-           total_nz, 252 * 32 * 252,
-           100.0 * (1.0 - (double)total_nz / (252 * 32 * 252)),
-           (total_nz * (sizeof(double) + sizeof(int))) / 1e6);
+    printf("    Keep-multiset table: %d keeps, %d nnz, avg %.1f unique/ds, %.1f KB\n",
+           num_keeps, nnz, (double)total_unique / 252,
+           (nnz * (sizeof(double) + sizeof(int))) / 1024.0);
 }
 
 /* Popcount cache: maps scored-category bitmask → |C| (number of categories scored).

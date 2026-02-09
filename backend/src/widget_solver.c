@@ -95,19 +95,20 @@ double ComputeExpectedValueForRerollMask(const YatzyContext *ctx,
                                          int ds_index,
                                          const double E_ds_for_masks[252],
                                          int mask) {
-    const SparseTransitionTable *sp = &ctx->sparse_transitions;
-    int row = ds_index * 32 + mask;
-    int start = sp->row_offsets[row];
-    int end = sp->row_offsets[row + 1];
+    if (mask == 0) return E_ds_for_masks[ds_index]; /* keep all */
+    const KeepTable *kt = &ctx->keep_table;
+    int kid = kt->mask_to_keep[ds_index * 32 + mask];
+    int start = kt->row_start[kid];
+    int end = kt->row_start[kid + 1];
     double ev = 0.0;
     for (int k = start; k < end; k++) {
-        ev += sp->values[k] * E_ds_for_masks[sp->col_indices[k]];
+        ev += kt->vals[k] * E_ds_for_masks[kt->cols[k]];
     }
     return ev;
 }
 
 /* Find argmax mask: best reroll decision for a specific dice set.
- * Tries all 32 masks and returns the one maximizing expected value. */
+ * Iterates unique keep-multisets and returns the best mask. */
 int ChooseBestRerollMask(const YatzyContext *ctx,
                          const double E_ds_for_masks[252],
                          const int dice[5],
@@ -116,14 +117,23 @@ int ChooseBestRerollMask(const YatzyContext *ctx,
     SortDiceSet(sorted_dice);
     int ds_index = FindDiceSetIndex(ctx, sorted_dice);
 
-    double best_val = -INFINITY;
+    const KeepTable *kt = &ctx->keep_table;
+
+    /* mask=0: keep all */
+    double best_val = E_ds_for_masks[ds_index];
     int best_mask = 0;
 
-    for (int mask = 0; mask < 32; mask++) {
-        double ev = ComputeExpectedValueForRerollMask(ctx, ds_index, E_ds_for_masks, mask);
+    for (int j = 0; j < kt->unique_count[ds_index]; j++) {
+        int kid = kt->unique_keep_ids[ds_index][j];
+        int start = kt->row_start[kid];
+        int end = kt->row_start[kid + 1];
+        double ev = 0.0;
+        for (int k = start; k < end; k++) {
+            ev += kt->vals[k] * E_ds_for_masks[kt->cols[k]];
+        }
         if (ev > best_val) {
             best_val = ev;
-            best_mask = mask;
+            best_mask = kt->keep_to_mask[ds_index * 32 + j];
         }
     }
 
@@ -134,33 +144,30 @@ int ChooseBestRerollMask(const YatzyContext *ctx,
 /* Groups 5 & 3 (API path): propagate expected values with mask tracking.
  * E(S, r, n) = max_{mask} Σ P(r'→r'') · E_prev[r'']
  *
- * For each dice set ds_i, tries all 32 reroll masks and picks the one
- * maximizing the weighted sum over transition outcomes. Stores both the
- * best EV and the best mask for API response. */
+ * Iterates unique keep-multisets per dice set (avg ~16 vs 31 masks).
+ * Sparse per-row storage avoids wasted zero-multiply overhead. */
 void ComputeExpectedValuesForNRerolls(const YatzyContext *ctx,
                                       double E_ds_prev[252],
                                       double E_ds_current[252],
                                       int best_mask_for_n[252]) {
-    const double * restrict vals = ctx->sparse_transitions.values;
-    const int * restrict cols = ctx->sparse_transitions.col_indices;
-    const int *offsets = ctx->sparse_transitions.row_offsets;
+    const KeepTable *kt = &ctx->keep_table;
 
     #pragma omp parallel for schedule(static)
     for (int ds_i = 0; ds_i < 252; ds_i++) {
         /* mask=0 is identity: keeping all dice yields E_ds_prev[ds_i] */
         double best_val = E_ds_prev[ds_i];
         int best_mask = 0;
-        int row_base = ds_i * 32;
-        for (int mask = 1; mask < 32; mask++) {
-            int start = offsets[row_base + mask];
-            int end = offsets[row_base + mask + 1];
+        for (int j = 0; j < kt->unique_count[ds_i]; j++) {
+            int kid = kt->unique_keep_ids[ds_i][j];
+            int start = kt->row_start[kid];
+            int end = kt->row_start[kid + 1];
             double ev = 0.0;
             for (int k = start; k < end; k++) {
-                ev += vals[k] * E_ds_prev[cols[k]];
+                ev += kt->vals[k] * E_ds_prev[kt->cols[k]];
             }
             if (ev > best_val) {
                 best_val = ev;
-                best_mask = mask;
+                best_mask = kt->keep_to_mask[ds_i * 32 + j];
             }
         }
         E_ds_current[ds_i] = best_val;
@@ -169,24 +176,24 @@ void ComputeExpectedValuesForNRerolls(const YatzyContext *ctx,
 }
 
 /* DP-only variant: computes E_ds_current without tracking optimal masks.
- * Saves 252 int writes per reroll level per widget (504 writes × 2.1M widgets).
+ * Iterates unique keep-multisets per dice set for dedup + sparse dot products.
  * Static so the compiler can inline into ComputeExpectedStateValue. */
 static void ComputeMaxEVForNRerolls(const YatzyContext *ctx,
                                      const double E_ds_prev[252],
                                      double E_ds_current[252]) {
-    const double * restrict vals = ctx->sparse_transitions.values;
-    const int * restrict cols = ctx->sparse_transitions.col_indices;
-    const int *offsets = ctx->sparse_transitions.row_offsets;
+    const KeepTable *kt = &ctx->keep_table;
+    const double * restrict v = kt->vals;
+    const int * restrict c = kt->cols;
 
     for (int ds_i = 0; ds_i < 252; ds_i++) {
         double best_val = E_ds_prev[ds_i]; /* mask=0: keep all */
-        int row_base = ds_i * 32;
-        for (int mask = 1; mask < 32; mask++) {
-            int start = offsets[row_base + mask];
-            int end = offsets[row_base + mask + 1];
+        for (int j = 0; j < kt->unique_count[ds_i]; j++) {
+            int kid = kt->unique_keep_ids[ds_i][j];
+            int start = kt->row_start[kid];
+            int end = kt->row_start[kid + 1];
             double ev = 0.0;
             for (int k = start; k < end; k++) {
-                ev += vals[k] * E_ds_prev[cols[k]];
+                ev += v[k] * E_ds_prev[c[k]];
             }
             if (ev > best_val) best_val = ev;
         }

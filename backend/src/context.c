@@ -76,7 +76,7 @@ void PrecomputeLookupTables(YatzyContext *ctx) {
     TIMER_BLOCK("Factorials",              PrecomputeFactorials(ctx));
     TIMER_BLOCK("Dice combinations (252)", BuildAllDiceCombinations(ctx));
     TIMER_BLOCK("Category scores",         PrecomputeCategoryScores(ctx));
-    TIMER_BLOCK("Reroll transitions",      PrecomputeRerollTransitionProbabilities(ctx));
+    TIMER_BLOCK("Keep-multiset table",     PrecomputeKeepTable(ctx));
     TIMER_BLOCK("Dice set probabilities",  PrecomputeDiceSetProbabilities(ctx));
     TIMER_BLOCK("Scored category counts",  PrecomputeScoredCategoryCounts(ctx));
     TIMER_BLOCK("Terminal states",         InitializeFinalStates(ctx));
@@ -94,7 +94,6 @@ void FreeYatzyContext(YatzyContext *ctx) {
     } else {
         free(ctx->state_values);
     }
-    free(ctx->sparse_transitions.values);
-    free(ctx->sparse_transitions.col_indices);
+    /* KeepTable is inline in YatzyContext — no heap to free */
     free(ctx);
 }

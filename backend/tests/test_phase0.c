@@ -40,79 +40,91 @@ static void test_252_dice_sets(YatzyContext *ctx) {
     ASSERT(all_unique, "All 252 dice sets are unique");
 }
 
-static void test_transition_row_sums(YatzyContext *ctx) {
-    /* For every (ds, mask), sparse transition probabilities sum to 1.0 */
-    const SparseTransitionTable *sp = &ctx->sparse_transitions;
+static void test_keep_table_row_sums(YatzyContext *ctx) {
+    /* Every probability row in the keep table sums to 1.0 */
+    const KeepTable *kt = &ctx->keep_table;
     int all_ok = 1;
-    for (int ds = 0; ds < 252; ds++) {
-        for (int mask = 0; mask < 32; mask++) {
-            int row = ds * 32 + mask;
-            int start = sp->row_offsets[row];
-            int end = sp->row_offsets[row + 1];
-            double sum = 0.0;
-            for (int k = start; k < end; k++) {
-                sum += sp->values[k];
-            }
-            if (fabs(sum - 1.0) > 1e-9) {
-                all_ok = 0;
-                fprintf(stderr, "  sparse_transitions[%d][%d] sums to %.12f\n", ds, mask, sum);
-                break;
-            }
+    for (int ki = 0; ki < NUM_KEEP_MULTISETS; ki++) {
+        int start = kt->row_start[ki];
+        int end = kt->row_start[ki + 1];
+        if (start == end) continue; /* empty row (unused keep) */
+        double sum = 0.0;
+        for (int k = start; k < end; k++) {
+            sum += kt->vals[k];
         }
-        if (!all_ok) break;
-    }
-    ASSERT(all_ok, "Transition rows sum to 1.0 for all (ds, mask)");
-}
-
-static void test_transition_identity(YatzyContext *ctx) {
-    /* mask=0 (keep all) → exactly 1 non-zero entry: P(ds→ds)=1.0 */
-    const SparseTransitionTable *sp = &ctx->sparse_transitions;
-    int identity_ok = 1;
-    for (int ds = 0; ds < 252; ds++) {
-        int row = ds * 32 + 0; /* mask=0 */
-        int start = sp->row_offsets[row];
-        int end = sp->row_offsets[row + 1];
-        /* Should have exactly 1 entry: self-transition */
-        if (end - start != 1) {
-            identity_ok = 0;
-            fprintf(stderr, "  mask=0 ds=%d: expected 1 entry, got %d\n", ds, end - start);
-            break;
-        }
-        if (sp->col_indices[start] != ds || fabs(sp->values[start] - 1.0) > 1e-9) {
-            identity_ok = 0;
+        if (fabs(sum - 1.0) > 1e-9) {
+            all_ok = 0;
+            fprintf(stderr, "  keep_table row %d sums to %.12f\n", ki, sum);
             break;
         }
     }
-    ASSERT(identity_ok, "Transition identity: mask=0 → single entry P(ds→ds)=1");
+    ASSERT(all_ok, "Keep table: all non-zero probability rows sum to 1.0");
 }
 
-static void test_transition_reroll_all(YatzyContext *ctx) {
-    /* mask=31 (reroll all 5) gives same distribution regardless of starting ds.
-     * Reconstruct dense rows for ds=0 and ds=N, compare. */
-    const SparseTransitionTable *sp = &ctx->sparse_transitions;
-    int symmetry_ok = 1;
+static void test_keep_table_enumeration(YatzyContext *ctx) {
+    /* Check unique_count bounds for known dice sets */
+    const KeepTable *kt = &ctx->keep_table;
 
-    /* Build dense reference row for ds=0, mask=31 */
-    double ref[252] = {0.0};
-    int row0 = 0 * 32 + 31;
-    for (int k = sp->row_offsets[row0]; k < sp->row_offsets[row0 + 1]; k++) {
-        ref[sp->col_indices[k]] = sp->values[k];
+    /* ds=0 is [1,1,1,1,1] (all same): only 5 unique keeps
+     * (keep 4, keep 3, keep 2, keep 1, keep 0) */
+    ASSERT(kt->unique_count[0] == 5,
+           "Keep table: [1,1,1,1,1] has 5 unique keeps");
+
+    /* ds=251 is [6,6,6,6,6] (all same): also 5 unique keeps */
+    ASSERT(kt->unique_count[251] == 5,
+           "Keep table: [6,6,6,6,6] has 5 unique keeps");
+
+    /* Find [1,2,3,4,5] (all distinct): should have 31 unique keeps
+     * (every mask 1-31 produces a distinct keep multiset) */
+    int ds_12345 = ctx->index_lookup[0][1][2][3][4]; /* [1,2,3,4,5] */
+    ASSERT(kt->unique_count[ds_12345] == 31,
+           "Keep table: [1,2,3,4,5] has 31 unique keeps (all distinct)");
+
+    /* Average should be roughly 18-20 */
+    int total = 0;
+    for (int ds = 0; ds < 252; ds++) total += kt->unique_count[ds];
+    double avg = (double)total / 252;
+    ASSERT(avg > 15.0 && avg < 25.0,
+           "Keep table: average unique keeps per ds is reasonable (15-25)");
+}
+
+static void test_keep_table_reroll_all(YatzyContext *ctx) {
+    /* mask=31 (reroll all 5) maps to the same keep (empty set) for all dice sets.
+     * The empty keep's probabilities should match dice_set_probabilities. */
+    const KeepTable *kt = &ctx->keep_table;
+
+    /* All dice sets with mask=31 should map to the same keep index */
+    int empty_kid = kt->mask_to_keep[0 * 32 + 31]; /* ds=0, mask=31 */
+    int all_same = 1;
+    for (int ds = 1; ds < 252; ds++) {
+        if (kt->mask_to_keep[ds * 32 + 31] != empty_kid) {
+            all_same = 0;
+            fprintf(stderr, "  ds=%d mask=31 keep=%d != expected %d\n",
+                    ds, kt->mask_to_keep[ds * 32 + 31], empty_kid);
+            break;
+        }
+    }
+    ASSERT(all_same, "Keep table: mask=31 maps to same keep (empty) for all ds");
+
+    /* Empty keep probs should match dice_set_probabilities.
+     * Build dense row from sparse storage for comparison. */
+    double empty_probs[252] = {0.0};
+    int start = kt->row_start[empty_kid];
+    int end = kt->row_start[empty_kid + 1];
+    for (int k = start; k < end; k++) {
+        empty_probs[kt->cols[k]] = kt->vals[k];
     }
 
-    for (int ds = 1; ds < 252 && symmetry_ok; ds++) {
-        double row_vals[252] = {0.0};
-        int row = ds * 32 + 31;
-        for (int k = sp->row_offsets[row]; k < sp->row_offsets[row + 1]; k++) {
-            row_vals[sp->col_indices[k]] = sp->values[k];
-        }
-        for (int ds2 = 0; ds2 < 252; ds2++) {
-            if (fabs(row_vals[ds2] - ref[ds2]) > 1e-9) {
-                symmetry_ok = 0;
-                break;
-            }
+    int probs_match = 1;
+    for (int t = 0; t < 252; t++) {
+        if (fabs(empty_probs[t] - ctx->dice_set_probabilities[t]) > 1e-9) {
+            probs_match = 0;
+            fprintf(stderr, "  empty keep prob[%d]=%.12f != dice_set_prob=%.12f\n",
+                    t, empty_probs[t], ctx->dice_set_probabilities[t]);
+            break;
         }
     }
-    ASSERT(symmetry_ok, "Transition symmetry: mask=31 gives same dist for all starting ds");
+    ASSERT(probs_match, "Keep table: empty keep probs match dice_set_probabilities");
 }
 
 static void test_precomputed_scores_match(YatzyContext *ctx) {
@@ -193,9 +205,9 @@ TEST_MAIN_BEGIN("test_phase0")
     PrecomputeLookupTables(ctx);
 
     test_252_dice_sets(ctx);
-    test_transition_row_sums(ctx);
-    test_transition_identity(ctx);
-    test_transition_reroll_all(ctx);
+    test_keep_table_row_sums(ctx);
+    test_keep_table_enumeration(ctx);
+    test_keep_table_reroll_all(ctx);
     test_precomputed_scores_match(ctx);
     test_popcount_cache(ctx);
     test_initial_roll_probs(ctx);
