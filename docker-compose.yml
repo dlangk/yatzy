@@ -12,7 +12,7 @@ services:
     environment:
       - API_BASE_URL=http://localhost:9000
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8090" ]
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8090" ]
       interval: 30s
       timeout: 10s
       retries: 3

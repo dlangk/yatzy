@@ -1,14 +1,11 @@
-#!/bin/bash
+#!/bin/sh
+set -e
 
-set -e  # Exit immediately if a command fails
-
-# Inject API_BASE_URL into a JavaScript file
 if [ -z "${API_BASE_URL}" ]; then
   echo "Error: API_BASE_URL is not set."
   exit 1
 fi
 
-echo "window.API_BASE_URL='${API_BASE_URL}';" > /app/js/config.js
+echo "window.__API_BASE_URL__='${API_BASE_URL}';" > /usr/share/nginx/html/config.js
 
-# Start the Python HTTP server
-exec python3 /app/serve.py
+exec nginx -g 'daemon off;'

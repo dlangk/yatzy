@@ -1,24 +1,13 @@
-# Use a lightweight Python image as the base
-FROM python:3.10-slim
-
-# Install curl for healthchecks
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-
-# Set the working directory
+FROM node:20-alpine AS builder
 WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
 
-# Copy the application files into the container
-COPY . /app
-
-# Ensure the entrypoint script is executable
-RUN chmod +x /app/entrypoint.sh
-
-# Expose the port for the Python HTTP server
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY entrypoint.sh /docker-entrypoint.d/40-inject-env.sh
+RUN chmod +x /docker-entrypoint.d/40-inject-env.sh
 EXPOSE 8090
-
-# Add a HEALTHCHECK to verify that the server is responding
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD curl -f http://localhost:8090 || exit 1
-
-# Set the entrypoint script
-ENTRYPOINT ["/app/entrypoint.sh"]
