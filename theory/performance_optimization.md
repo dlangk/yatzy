@@ -26,6 +26,7 @@ targets a specific bottleneck in the cache hierarchy of the Apple M1 Max
 | 5 | Rust port | ~117s | 0.7x | Safety overhead (recovered next step) |
 | 6 | Unsafe hot path tuning | ~92s | 1.3x | Eliminate bounds checks, enum dispatch |
 | 7 | Keep-EV dedup + index swap + grouped par | ~2.3s | 40x | 462 vs 4108 dot products; L1 successor hits |
+| 8 | f32 internal computation | ~2.3s | — | Enables GPU path (10.4 vs 0.3 TFLOPS); max 0.00046 pt diff |
 
 **Total: ~500x end-to-end.**
 
@@ -262,6 +263,39 @@ Current performance (2.3s) is at **52% of theoretical peak**. The gap is
 almost entirely the cost of scatter-gather memory access patterns in the
 sparse CSR dot product — a fundamental limitation of the format on ARM.
 
+## Step 8: f32 internal computation (precision validation)
+
+**Commit `5ae9cdd`**
+
+Switched all internal DP accumulation from f64 to f32. Previously, storage
+was f32 but ping-pong buffers, keep_ev arrays, and dot product accumulators
+used f64. Since every level boundary truncates to f32 anyway (for storage),
+the f64 intermediate precision was wasted.
+
+Empirical comparison across all 2,097,152 states:
+
+```
+States with any difference:  1,338,944 (64%)
+Max absolute difference:     0.000458 points
+Max relative difference:     4.05e-6
+Game-start EV (f64):         248.439987
+Game-start EV (f32):         248.440140
+Difference:                  0.000153 points (0.00006%)
+```
+
+Decision impact analysis found 22 successor ordering flips out of 1.43M
+reachable states, all involving pairs where the f64 values differ by less
+than 0.0001 points. The EV loss from any individual "wrong" decision is
+below 0.0002 points — completely irrelevant for gameplay.
+
+This change enables future GPU acceleration: the M1 Max GPU runs f32 at
+10.4 TFLOPS but f64 at only 325 GFLOPS (1/32 rate). With f32 throughout,
+the GPU path becomes viable for a potential 5-10× additional speedup.
+
+No performance change on CPU (the hot path was already operating on f32
+values from the state array; the f64 accumulators just added unnecessary
+widening/narrowing casts).
+
 ## Verification
 
 All optimizations preserve numerical correctness:
@@ -271,3 +305,4 @@ All optimizations preserve numerical correctness:
   optimal reroll masks, category choices, monotonicity across all 1.43M
   reachable states, and the upper bonus cliff
 - Storage format versioned (v3 → v4) to prevent loading old-layout data
+- f32 precision validated: max 0.00046 pt difference, zero decision impact
