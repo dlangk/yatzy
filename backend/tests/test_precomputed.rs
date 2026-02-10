@@ -8,11 +8,9 @@
 
 use yatzy::api_computations::*;
 use yatzy::constants::*;
-use yatzy::dice_mechanics::sort_dice_set;
 use yatzy::phase0_tables;
 use yatzy::storage::{file_exists, load_all_state_values};
-use yatzy::types::{YatzyContext, YatzyState};
-use yatzy::widget_solver::compute_best_scoring_value_for_dice_set;
+use yatzy::types::YatzyContext;
 
 const ALL_SCORED: i32 = (1 << CATEGORY_COUNT) - 1;
 
@@ -25,7 +23,6 @@ fn ev(ctx: &YatzyContext, up: i32, scored: i32) -> f64 {
 }
 
 fn setup() -> Option<Box<YatzyContext>> {
-    // Set working directory
     let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
     let _ = std::env::set_current_dir(&base_path);
 
@@ -162,9 +159,8 @@ fn test_optimal_category_choice() {
         let scored =
             ALL_SCORED ^ (1 << CATEGORY_YATZY) ^ (1 << CATEGORY_CHANCE) ^ (1 << CATEGORY_SIXES);
         let dice = [6, 6, 6, 6, 6];
-        let mut best_ev = 0.0;
-        let cat = choose_best_category_no_rerolls(&ctx, 0, scored, &dice, &mut best_ev);
-        assert_eq!(cat, CATEGORY_YATZY as i32);
+        let resp = compute_roll_response(&ctx, 0, scored, &dice, 0);
+        assert_eq!(resp.optimal_category, CATEGORY_YATZY as i32);
     }
 
     // [1,1,1,1,1] with Yatzy + Ones + Chance open -> pick Yatzy
@@ -172,64 +168,56 @@ fn test_optimal_category_choice() {
         let scored =
             ALL_SCORED ^ (1 << CATEGORY_YATZY) ^ (1 << CATEGORY_ONES) ^ (1 << CATEGORY_CHANCE);
         let dice = [1, 1, 1, 1, 1];
-        let mut best_ev = 0.0;
-        let cat = choose_best_category_no_rerolls(&ctx, 0, scored, &dice, &mut best_ev);
-        assert_eq!(cat, CATEGORY_YATZY as i32);
+        let resp = compute_roll_response(&ctx, 0, scored, &dice, 0);
+        assert_eq!(resp.optimal_category, CATEGORY_YATZY as i32);
     }
 
     // [1,2,3,4,5] with Small Straight + Ones open -> pick Small Straight
     {
         let scored = ALL_SCORED ^ (1 << CATEGORY_SMALL_STRAIGHT) ^ (1 << CATEGORY_ONES);
         let dice = [1, 2, 3, 4, 5];
-        let mut best_ev = 0.0;
-        let cat = choose_best_category_no_rerolls(&ctx, 0, scored, &dice, &mut best_ev);
-        assert_eq!(cat, CATEGORY_SMALL_STRAIGHT as i32);
+        let resp = compute_roll_response(&ctx, 0, scored, &dice, 0);
+        assert_eq!(resp.optimal_category, CATEGORY_SMALL_STRAIGHT as i32);
     }
 
     // [2,3,4,5,6] with Large Straight + Small Straight open -> pick Large
     {
         let scored = ALL_SCORED ^ (1 << CATEGORY_LARGE_STRAIGHT) ^ (1 << CATEGORY_SMALL_STRAIGHT);
         let dice = [2, 3, 4, 5, 6];
-        let mut best_ev = 0.0;
-        let cat = choose_best_category_no_rerolls(&ctx, 0, scored, &dice, &mut best_ev);
-        assert_eq!(cat, CATEGORY_LARGE_STRAIGHT as i32);
+        let resp = compute_roll_response(&ctx, 0, scored, &dice, 0);
+        assert_eq!(resp.optimal_category, CATEGORY_LARGE_STRAIGHT as i32);
     }
 
     // [3,3,3,4,4] with Full House + Three of Kind open -> pick Full House
     {
         let scored = ALL_SCORED ^ (1 << CATEGORY_FULL_HOUSE) ^ (1 << CATEGORY_THREE_OF_A_KIND);
-        let mut dice = [3, 3, 3, 4, 4];
-        sort_dice_set(&mut dice);
-        let mut best_ev = 0.0;
-        let cat = choose_best_category_no_rerolls(&ctx, 0, scored, &dice, &mut best_ev);
-        assert_eq!(cat, CATEGORY_FULL_HOUSE as i32);
+        let dice = [3, 3, 3, 4, 4];
+        let resp = compute_roll_response(&ctx, 0, scored, &dice, 0);
+        assert_eq!(resp.optimal_category, CATEGORY_FULL_HOUSE as i32);
     }
 
     // [1,5,5,6,6] with Two Pairs + One Pair open -> pick Two Pairs
     {
         let scored = ALL_SCORED ^ (1 << CATEGORY_TWO_PAIRS) ^ (1 << CATEGORY_ONE_PAIR);
         let dice = [1, 5, 5, 6, 6];
-        let mut best_ev = 0.0;
-        let cat = choose_best_category_no_rerolls(&ctx, 0, scored, &dice, &mut best_ev);
-        assert_eq!(cat, CATEGORY_TWO_PAIRS as i32);
+        let resp = compute_roll_response(&ctx, 0, scored, &dice, 0);
+        assert_eq!(resp.optimal_category, CATEGORY_TWO_PAIRS as i32);
     }
 
     // [5,6,6,6,6] with 4oaK + 3oaK open -> pick 4oaK
     {
         let scored = ALL_SCORED ^ (1 << CATEGORY_FOUR_OF_A_KIND) ^ (1 << CATEGORY_THREE_OF_A_KIND);
         let dice = [5, 6, 6, 6, 6];
-        let mut best_ev = 0.0;
-        let cat = choose_best_category_no_rerolls(&ctx, 0, scored, &dice, &mut best_ev);
-        assert_eq!(cat, CATEGORY_FOUR_OF_A_KIND as i32);
+        let resp = compute_roll_response(&ctx, 0, scored, &dice, 0);
+        assert_eq!(resp.optimal_category, CATEGORY_FOUR_OF_A_KIND as i32);
     }
 
     // [2,3,4,5,6] with Large Straight + Chance open -> pick Large Straight
     {
         let scored = ALL_SCORED ^ (1 << CATEGORY_LARGE_STRAIGHT) ^ (1 << CATEGORY_CHANCE);
         let dice = [2, 3, 4, 5, 6];
-        let mut best_ev = 0.0;
-        let cat = choose_best_category_no_rerolls(&ctx, 0, scored, &dice, &mut best_ev);
-        assert_eq!(cat, CATEGORY_LARGE_STRAIGHT as i32);
+        let resp = compute_roll_response(&ctx, 0, scored, &dice, 0);
+        assert_eq!(resp.optimal_category, CATEGORY_LARGE_STRAIGHT as i32);
     }
 }
 
@@ -243,188 +231,78 @@ fn test_optimal_reroll() {
     // [1,6,6,6,6] with only Yatzy left -> reroll the 1 (mask=1)
     {
         let dice = [1, 6, 6, 6, 6];
-        let mut best_mask = 0;
-        let mut best_ev = 0.0;
-        compute_best_reroll_strategy(
-            &ctx,
-            0,
-            only(CATEGORY_YATZY),
-            &dice,
-            2,
-            &mut best_mask,
-            &mut best_ev,
-        );
-        assert_eq!(best_mask, 1);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_YATZY), &dice, 2);
+        assert_eq!(resp.optimal_mask.unwrap(), 1);
     }
 
     // [6,6,6,6,6] with Yatzy left -> keep all
     {
         let dice = [6, 6, 6, 6, 6];
-        let mut best_mask = 0;
-        let mut best_ev = 0.0;
-        compute_best_reroll_strategy(
-            &ctx,
-            0,
-            only(CATEGORY_YATZY),
-            &dice,
-            2,
-            &mut best_mask,
-            &mut best_ev,
-        );
-        assert_eq!(best_mask, 0);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_YATZY), &dice, 2);
+        assert_eq!(resp.optimal_mask.unwrap(), 0);
     }
 
     // [1,1,1,1,1] with only Sixes left -> reroll all (mask=31)
     {
         let dice = [1, 1, 1, 1, 1];
-        let mut best_mask = 0;
-        let mut best_ev = 0.0;
-        compute_best_reroll_strategy(
-            &ctx,
-            0,
-            only(CATEGORY_SIXES),
-            &dice,
-            2,
-            &mut best_mask,
-            &mut best_ev,
-        );
-        assert_eq!(best_mask, 31);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_SIXES), &dice, 2);
+        assert_eq!(resp.optimal_mask.unwrap(), 31);
     }
 
     // [1,2,3,4,5] with only Small Straight left -> keep all
     {
         let dice = [1, 2, 3, 4, 5];
-        let mut best_mask = 0;
-        let mut best_ev = 0.0;
-        compute_best_reroll_strategy(
-            &ctx,
-            0,
-            only(CATEGORY_SMALL_STRAIGHT),
-            &dice,
-            2,
-            &mut best_mask,
-            &mut best_ev,
-        );
-        assert_eq!(best_mask, 0);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_SMALL_STRAIGHT), &dice, 2);
+        assert_eq!(resp.optimal_mask.unwrap(), 0);
     }
 
     // [2,3,4,5,6] with only Large Straight left -> keep all
     {
         let dice = [2, 3, 4, 5, 6];
-        let mut best_mask = 0;
-        let mut best_ev = 0.0;
-        compute_best_reroll_strategy(
-            &ctx,
-            0,
-            only(CATEGORY_LARGE_STRAIGHT),
-            &dice,
-            2,
-            &mut best_mask,
-            &mut best_ev,
-        );
-        assert_eq!(best_mask, 0);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_LARGE_STRAIGHT), &dice, 2);
+        assert_eq!(resp.optimal_mask.unwrap(), 0);
     }
 
     // [1,1,1,1,2] with only Ones left -> reroll the 2 (mask=16)
     {
         let dice = [1, 1, 1, 1, 2];
-        let mut best_mask = 0;
-        let mut best_ev = 0.0;
-        compute_best_reroll_strategy(
-            &ctx,
-            0,
-            only(CATEGORY_ONES),
-            &dice,
-            2,
-            &mut best_mask,
-            &mut best_ev,
-        );
-        assert_eq!(best_mask, 16);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_ONES), &dice, 2);
+        assert_eq!(resp.optimal_mask.unwrap(), 16);
     }
 
     // [4,5,6,6,6] with only Sixes left -> reroll 4,5 (mask=3)
     {
         let dice = [4, 5, 6, 6, 6];
-        let mut best_mask = 0;
-        let mut best_ev = 0.0;
-        compute_best_reroll_strategy(
-            &ctx,
-            0,
-            only(CATEGORY_SIXES),
-            &dice,
-            2,
-            &mut best_mask,
-            &mut best_ev,
-        );
-        assert_eq!(best_mask, 3);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_SIXES), &dice, 2);
+        assert_eq!(resp.optimal_mask.unwrap(), 3);
     }
 
     // [3,3,3,4,4] with only Full House left -> keep all
     {
         let dice = [3, 3, 3, 4, 4];
-        let mut best_mask = 0;
-        let mut best_ev = 0.0;
-        compute_best_reroll_strategy(
-            &ctx,
-            0,
-            only(CATEGORY_FULL_HOUSE),
-            &dice,
-            2,
-            &mut best_mask,
-            &mut best_ev,
-        );
-        assert_eq!(best_mask, 0);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_FULL_HOUSE), &dice, 2);
+        assert_eq!(resp.optimal_mask.unwrap(), 0);
     }
 
     // [5,5,5,5,5] with only Yatzy left -> keep all
     {
         let dice = [5, 5, 5, 5, 5];
-        let mut best_mask = 0;
-        let mut best_ev = 0.0;
-        compute_best_reroll_strategy(
-            &ctx,
-            0,
-            only(CATEGORY_YATZY),
-            &dice,
-            2,
-            &mut best_mask,
-            &mut best_ev,
-        );
-        assert_eq!(best_mask, 0);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_YATZY), &dice, 2);
+        assert_eq!(resp.optimal_mask.unwrap(), 0);
     }
 
     // [1,2,3,4,6] with only Small Straight left -> reroll the 6 (mask=16)
     {
         let dice = [1, 2, 3, 4, 6];
-        let mut best_mask = 0;
-        let mut best_ev = 0.0;
-        compute_best_reroll_strategy(
-            &ctx,
-            0,
-            only(CATEGORY_SMALL_STRAIGHT),
-            &dice,
-            2,
-            &mut best_mask,
-            &mut best_ev,
-        );
-        assert_eq!(best_mask, 16);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_SMALL_STRAIGHT), &dice, 2);
+        assert_eq!(resp.optimal_mask.unwrap(), 16);
     }
 
     // [1,3,4,5,6] with only Large Straight left -> reroll 1 (mask=1)
     {
         let dice = [1, 3, 4, 5, 6];
-        let mut best_mask = 0;
-        let mut best_ev = 0.0;
-        compute_best_reroll_strategy(
-            &ctx,
-            0,
-            only(CATEGORY_LARGE_STRAIGHT),
-            &dice,
-            2,
-            &mut best_mask,
-            &mut best_ev,
-        );
-        assert_eq!(best_mask, 1);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_LARGE_STRAIGHT), &dice, 2);
+        assert_eq!(resp.optimal_mask.unwrap(), 1);
     }
 }
 
@@ -438,103 +316,43 @@ fn test_reroll_ev_bounds() {
     // [6,6,6,6,6] only Yatzy -> EV = 50
     {
         let dice = [6, 6, 6, 6, 6];
-        let mut best_mask = 0;
-        let mut best_ev = 0.0;
-        compute_best_reroll_strategy(
-            &ctx,
-            0,
-            only(CATEGORY_YATZY),
-            &dice,
-            2,
-            &mut best_mask,
-            &mut best_ev,
-        );
-        assert!((best_ev - 50.0).abs() < 1e-9);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_YATZY), &dice, 2);
+        assert!((resp.optimal_mask_ev.unwrap() - 50.0).abs() < 1e-9);
     }
 
     // [1,2,3,4,5] only Sm Straight -> EV = 15
     {
         let dice = [1, 2, 3, 4, 5];
-        let mut best_mask = 0;
-        let mut best_ev = 0.0;
-        compute_best_reroll_strategy(
-            &ctx,
-            0,
-            only(CATEGORY_SMALL_STRAIGHT),
-            &dice,
-            2,
-            &mut best_mask,
-            &mut best_ev,
-        );
-        assert!((best_ev - 15.0).abs() < 1e-9);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_SMALL_STRAIGHT), &dice, 2);
+        assert!((resp.optimal_mask_ev.unwrap() - 15.0).abs() < 1e-9);
     }
 
     // [2,3,4,5,6] only Lg Straight -> EV = 20
     {
         let dice = [2, 3, 4, 5, 6];
-        let mut best_mask = 0;
-        let mut best_ev = 0.0;
-        compute_best_reroll_strategy(
-            &ctx,
-            0,
-            only(CATEGORY_LARGE_STRAIGHT),
-            &dice,
-            2,
-            &mut best_mask,
-            &mut best_ev,
-        );
-        assert!((best_ev - 20.0).abs() < 1e-9);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_LARGE_STRAIGHT), &dice, 2);
+        assert!((resp.optimal_mask_ev.unwrap() - 20.0).abs() < 1e-9);
     }
 
     // [6,6,6,6,6] only Chance -> EV = 30
     {
         let dice = [6, 6, 6, 6, 6];
-        let mut best_mask = 0;
-        let mut best_ev = 0.0;
-        compute_best_reroll_strategy(
-            &ctx,
-            0,
-            only(CATEGORY_CHANCE),
-            &dice,
-            2,
-            &mut best_mask,
-            &mut best_ev,
-        );
-        assert!((best_ev - 30.0).abs() < 1e-9);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_CHANCE), &dice, 2);
+        assert!((resp.optimal_mask_ev.unwrap() - 30.0).abs() < 1e-9);
     }
 
     // [6,6,6,6,6] only Sixes -> EV = 30
     {
         let dice = [6, 6, 6, 6, 6];
-        let mut best_mask = 0;
-        let mut best_ev = 0.0;
-        compute_best_reroll_strategy(
-            &ctx,
-            0,
-            only(CATEGORY_SIXES),
-            &dice,
-            2,
-            &mut best_mask,
-            &mut best_ev,
-        );
-        assert!((best_ev - 30.0).abs() < 1e-9);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_SIXES), &dice, 2);
+        assert!((resp.optimal_mask_ev.unwrap() - 30.0).abs() < 1e-9);
     }
 
     // [5,5,6,6,6] only Full House -> EV = 28
     {
         let dice = [5, 5, 6, 6, 6];
-        let mut best_mask = 0;
-        let mut best_ev = 0.0;
-        compute_best_reroll_strategy(
-            &ctx,
-            0,
-            only(CATEGORY_FULL_HOUSE),
-            &dice,
-            2,
-            &mut best_mask,
-            &mut best_ev,
-        );
-        assert!((best_ev - 28.0).abs() < 1e-9);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_FULL_HOUSE), &dice, 2);
+        assert!((resp.optimal_mask_ev.unwrap() - 28.0).abs() < 1e-9);
     }
 }
 
@@ -677,19 +495,14 @@ fn test_reroll_ev_consistency() {
     };
 
     let scored = (1 << CATEGORY_ONES) | (1 << CATEGORY_TWOS);
-    let mut dice = [3, 3, 4, 5, 6];
-    sort_dice_set(&mut dice);
+    let dice = [3, 3, 4, 5, 6];
 
-    let mut best_mask = 0;
-    let mut best_ev = 0.0;
-    compute_best_reroll_strategy(&ctx, 5, scored, &dice, 2, &mut best_mask, &mut best_ev);
+    let resp = compute_roll_response(&ctx, 5, scored, &dice, 2);
 
-    let state = YatzyState {
-        upper_score: 5,
-        scored_categories: scored,
-    };
-    let keep_all_ev = compute_best_scoring_value_for_dice_set(&ctx, &state, &dice);
-    assert!(best_ev >= keep_all_ev - 1e-9);
+    // Optimal mask EV should be >= keep-all EV (mask=0)
+    let mask_evs = resp.mask_evs.unwrap();
+    let keep_all_ev = mask_evs[0];
+    assert!(resp.optimal_mask_ev.unwrap() >= keep_all_ev - 1e-9);
 }
 
 #[test]
@@ -729,43 +542,32 @@ fn test_score_category_consistency() {
         None => return,
     };
 
-    // [6,6,6,6,6] only Yatzy -> score = 50
+    // [6,6,6,6,6] only Yatzy -> optimal category EV = 50
     {
         let dice = [6, 6, 6, 6, 6];
-        let mut best_ev = 0.0;
-        choose_best_category_no_rerolls(&ctx, 0, only(CATEGORY_YATZY), &dice, &mut best_ev);
-        assert!((best_ev - 50.0).abs() < 1e-9);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_YATZY), &dice, 0);
+        assert!((resp.optimal_category_ev - 50.0).abs() < 1e-9);
     }
 
-    // [1,2,3,4,6] only Small Straight -> no valid scoring
+    // [1,2,3,4,6] only Small Straight -> no valid scoring (optimal_category == -1)
     {
         let dice = [1, 2, 3, 4, 6];
-        let mut best_ev = 0.0;
-        let cat = choose_best_category_no_rerolls(
-            &ctx,
-            0,
-            only(CATEGORY_SMALL_STRAIGHT),
-            &dice,
-            &mut best_ev,
-        );
-        assert_eq!(cat, -1);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_SMALL_STRAIGHT), &dice, 0);
+        assert_eq!(resp.optimal_category, -1);
     }
 
     // [1,1,1,1,1] only Sixes -> no valid scoring
     {
         let dice = [1, 1, 1, 1, 1];
-        let mut best_ev = 0.0;
-        let cat =
-            choose_best_category_no_rerolls(&ctx, 0, only(CATEGORY_SIXES), &dice, &mut best_ev);
-        assert_eq!(cat, -1);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_SIXES), &dice, 0);
+        assert_eq!(resp.optimal_category, -1);
     }
 
     // [4,4,4,4,4] only Fours -> score = 20
     {
         let dice = [4, 4, 4, 4, 4];
-        let mut best_ev = 0.0;
-        choose_best_category_no_rerolls(&ctx, 0, only(CATEGORY_FOURS), &dice, &mut best_ev);
-        assert!((best_ev - 20.0).abs() < 1e-9);
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_FOURS), &dice, 0);
+        assert!((resp.optimal_category_ev - 20.0).abs() < 1e-9);
     }
 }
 
@@ -856,4 +658,59 @@ fn test_early_vs_late_game() {
     assert!(ev_start > ev_late);
     assert!(ev_late > 0.0);
     assert!(ev_late > 30.0 && ev_late < 80.0);
+}
+
+#[test]
+fn test_fat_response_all_categories_info() {
+    let ctx = match setup() {
+        Some(c) => c,
+        None => return,
+    };
+
+    // Game start with [1,2,3,4,5]
+    let dice = [1, 2, 3, 4, 5];
+    let resp = compute_roll_response(&ctx, 0, 0, &dice, 2);
+
+    // All 15 categories should be available
+    for cat in &resp.categories {
+        assert!(cat.available);
+        assert!(cat.ev_if_scored.is_finite());
+    }
+
+    // Small straight should score 15
+    assert_eq!(resp.categories[CATEGORY_SMALL_STRAIGHT].score, 15);
+    // Large straight should score 0
+    assert_eq!(resp.categories[CATEGORY_LARGE_STRAIGHT].score, 0);
+
+    // Should have mask EVs
+    assert!(resp.mask_evs.is_some());
+    let mask_evs = resp.mask_evs.unwrap();
+    // All mask EVs should be finite
+    for m in 0..32 {
+        assert!(mask_evs[m].is_finite());
+    }
+}
+
+#[test]
+fn test_fat_response_mask_ev_consistency() {
+    let ctx = match setup() {
+        Some(c) => c,
+        None => return,
+    };
+
+    // For perfect dice (all sixes, only Yatzy left), keep-all should be optimal
+    let dice = [6, 6, 6, 6, 6];
+    let resp = compute_roll_response(&ctx, 0, only(CATEGORY_YATZY), &dice, 2);
+    let mask_evs = resp.mask_evs.unwrap();
+
+    // mask=0 (keep all) should have highest EV
+    for mask in 1..32 {
+        assert!(
+            mask_evs[0] >= mask_evs[mask] - 1e-9,
+            "mask {} has higher EV than keep-all: {} > {}",
+            mask,
+            mask_evs[mask],
+            mask_evs[0]
+        );
+    }
 }
