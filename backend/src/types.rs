@@ -170,7 +170,7 @@ impl YatzyContext {
 
     /// Look up E_table[S] for state (upper_score, scored_categories).
     ///
-    /// Returns f64 for computation precision, even though storage is f32.
+    /// Returns f64 for JSON serialization compatibility.
     #[inline(always)]
     pub fn get_state_value(&self, upper_score: i32, scored: i32) -> f64 {
         self.state_values.as_slice()[state_index(upper_score as usize, scored as usize)] as f64

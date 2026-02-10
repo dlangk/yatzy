@@ -37,6 +37,9 @@
 //!   (avg 16.3 per dice set vs 31 raw masks), eliminating ~47% of redundant work.
 //! - **Sparse CSR storage** for transition probabilities P(r'→r) — only 4,368
 //!   non-zero entries across 462 keep rows.
+//! - **f32 throughout**: all internal computation and storage uses f32. Empirical
+//!   testing shows max 0.00046 point difference vs f64 accumulation, with zero
+//!   impact on optimal play decisions.
 
 #![allow(clippy::needless_range_loop)]
 

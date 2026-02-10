@@ -10,7 +10,7 @@ cargo test                    # 29 unit + 20 integration = 49 tests
 cargo fmt --check             # Formatting
 cargo clippy                  # Lints
 
-# Precompute state values (required once, ~90s)
+# Precompute state values (required once, ~2.3s)
 YATZY_BASE_PATH=. RAYON_NUM_THREADS=8 target/release/yatzy-precompute
 
 # Start API server (port 9000)
@@ -45,7 +45,7 @@ The code implements `theory/optimal_yahtzee_pseudocode.md` (at repo root), adapt
 
 ### State Representation
 
-S = (m, C) where m = upper score [0,63], C = 15-bit scored-categories bitmask. Index: `m * 2^15 + C` (2,097,152 slots).
+S = (m, C) where m = upper score [0,63], C = 15-bit scored-categories bitmask. Index: `C * 64 + m` (2,097,152 slots).
 
 ## Key Patterns
 
@@ -57,5 +57,5 @@ S = (m, C) where m = upper score [0,63], C = 15-bit scored-categories bitmask. I
 ## Important Notes
 
 - `data/` is a symlink to `../backend-legacy-c/data` (shared `all_states.bin`)
-- DP uses f64 internally; only storage is f32
+- All computation uses f32 throughout (storage + internal accumulation)
 - `RAYON_NUM_THREADS=8` is optimal on Apple Silicon

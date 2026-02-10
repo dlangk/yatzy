@@ -7,6 +7,8 @@
 //! Each function partially re-solves a widget on demand: it builds Group 6 (category
 //! scoring) and optionally Groups 5/3 (reroll levels), then queries the result for
 //! the specific dice/mask/category the API caller requested.
+//!
+//! All internal computation uses f32; return types are f64 for JSON compatibility.
 
 use crate::constants::*;
 use crate::dice_mechanics::{find_dice_set_index, sort_dice_set};
@@ -17,7 +19,7 @@ use crate::widget_solver::*;
 /// (EV, probability, dice-set index) triple for outcome distributions.
 #[derive(Clone, Copy)]
 pub struct EVProbabilityPair {
-    pub ev: f64,
+    pub ev: f32,
     pub probability: f64,
     pub ds2_index: usize,
 }
@@ -36,14 +38,14 @@ pub fn compute_best_reroll_strategy(
     best_ev: &mut f64,
 ) {
     // Group 6: E(S, r, 0) for all r
-    let mut e_ds_0 = [0.0f64; 252];
+    let mut e_ds_0 = [0.0f32; 252];
     let state = crate::types::YatzyState {
         upper_score,
         scored_categories,
     };
     for ds_i in 0..252 {
         e_ds_0[ds_i] =
-            compute_best_scoring_value_for_dice_set(ctx, &state, &ctx.all_dice_sets[ds_i]);
+            compute_best_scoring_value_for_dice_set(ctx, &state, &ctx.all_dice_sets[ds_i]) as f32;
     }
 
     if rerolls_remaining == 1 {
@@ -51,7 +53,7 @@ pub fn compute_best_reroll_strategy(
         return;
     }
 
-    let mut e_ds_1 = [0.0f64; 252];
+    let mut e_ds_1 = [0.0f32; 252];
     let mut dummy_mask = [0i32; 252];
     compute_expected_values_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1, &mut dummy_mask);
     *best_mask = choose_best_reroll_mask(ctx, &e_ds_1, dice, best_ev);
@@ -70,7 +72,7 @@ pub fn choose_best_category_no_rerolls(
 ) -> i32 {
     let ds_index = find_dice_set_index(ctx, dice);
     let sv = ctx.state_values.as_slice();
-    let mut best_val = f64::NEG_INFINITY;
+    let mut best_val = f32::NEG_INFINITY;
     let mut best_category = -1i32;
 
     for c in 0..CATEGORY_COUNT {
@@ -83,14 +85,14 @@ pub fn choose_best_category_no_rerolls(
         }
         let new_up = update_upper_score(upper_score, c, scr);
         let new_scored = scored_categories | (1 << c);
-        let val = scr as f64 + sv[state_index(new_up as usize, new_scored as usize)] as f64;
+        let val = scr as f32 + sv[state_index(new_up as usize, new_scored as usize)];
         if val > best_val {
             best_val = val;
             best_category = c as i32;
         }
     }
 
-    *best_ev = best_val;
+    *best_ev = best_val as f64;
     best_category
 }
 
@@ -108,17 +110,17 @@ pub fn evaluate_chosen_reroll_mask(
     rerolls_remaining: i32,
 ) -> f64 {
     // Group 6: E(S, r, 0) for all r
-    let mut e_ds_0 = [0.0f64; 252];
+    let mut e_ds_0 = [0.0f32; 252];
     let state = crate::types::YatzyState {
         upper_score,
         scored_categories,
     };
     for ds_i in 0..252 {
         e_ds_0[ds_i] =
-            compute_best_scoring_value_for_dice_set(ctx, &state, &ctx.all_dice_sets[ds_i]);
+            compute_best_scoring_value_for_dice_set(ctx, &state, &ctx.all_dice_sets[ds_i]) as f32;
     }
 
-    let mut e_ds_1 = [0.0f64; 252];
+    let mut e_ds_1 = [0.0f32; 252];
     let mut dummy_mask = [0i32; 252];
     if rerolls_remaining == 2 {
         compute_expected_values_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1, &mut dummy_mask);
@@ -159,14 +161,17 @@ pub fn evaluate_chosen_category(
     let sv = ctx.state_values.as_slice();
     let new_up = update_upper_score(upper_score, chosen_category, score);
     let new_scored = scored_categories | (1 << chosen_category);
-    let future_val = sv[state_index(new_up as usize, new_scored as usize)] as f64;
-    score as f64 + future_val
+    let future_val = sv[state_index(new_up as usize, new_scored as usize)];
+    (score as f32 + future_val) as f64
 }
 
 /// Compute E(S, r, n) for all 252 dice sets r, given n rerolls remaining.
 ///
 /// Builds the full Group 6 → Group 5 → Group 3 chain up to the requested reroll
 /// depth. Used by the `/evaluate_actions` endpoint to produce EV for all 32 masks.
+///
+/// Output is f32 internally; the `out_e_ds` array receives f32 values widened to f64
+/// for JSON serialization compatibility.
 pub fn compute_expected_values(
     ctx: &YatzyContext,
     upper_score: i32,
@@ -174,18 +179,18 @@ pub fn compute_expected_values(
     rerolls: i32,
     out_e_ds: &mut [f64; 252],
 ) {
-    let mut e_ds = [[0.0f64; 252]; 3];
+    let mut e_ds = [[0.0f32; 252]; 3];
     let sv = ctx.state_values.as_slice();
 
     // Level 0: E(S, r, 0) = max_c [s(S,r,c) + E(n(S,r,c))]
     for ds_i in 0..252 {
-        let mut best_val = f64::NEG_INFINITY;
+        let mut best_val = f32::NEG_INFINITY;
         for c in 0..CATEGORY_COUNT {
             if !is_category_scored(scored_categories, c) {
                 let scr = ctx.precomputed_scores[ds_i][c];
                 let new_up = update_upper_score(upper_score, c, scr);
                 let new_scored = scored_categories | (1 << c);
-                let val = scr as f64 + sv[state_index(new_up as usize, new_scored as usize)] as f64;
+                let val = scr as f32 + sv[state_index(new_up as usize, new_scored as usize)];
                 if val > best_val {
                     best_val = val;
                 }
@@ -200,14 +205,14 @@ pub fn compute_expected_values(
     let cols = &kt.cols;
     for n in 1..=rerolls as usize {
         // Step 1: compute EV for each unique keep-multiset (462 dot products)
-        let mut keep_ev = [0.0f64; NUM_KEEP_MULTISETS];
+        let mut keep_ev = [0.0f32; NUM_KEEP_MULTISETS];
         for kid in 0..NUM_KEEP_MULTISETS {
             let start = kt.row_start[kid] as usize;
             let end = kt.row_start[kid + 1] as usize;
-            let mut ev = 0.0;
+            let mut ev: f32 = 0.0;
             for k in start..end {
                 unsafe {
-                    ev += vals.get_unchecked(k)
+                    ev += (*vals.get_unchecked(k) as f32)
                         * e_ds[n - 1].get_unchecked(*cols.get_unchecked(k) as usize);
                 }
             }
@@ -227,8 +232,10 @@ pub fn compute_expected_values(
         }
     }
 
-    // Copy result to caller's buffer
-    out_e_ds.copy_from_slice(&e_ds[rerolls as usize]);
+    // Copy result to caller's buffer (f32 → f64 for JSON)
+    for i in 0..252 {
+        out_e_ds[i] = e_ds[rerolls as usize][i] as f64;
+    }
 }
 
 /// Build outcome distribution for a specific reroll mask.
@@ -245,7 +252,7 @@ pub fn compute_distribution_for_reroll_mask(
 ) {
     for ds2_i in 0..252 {
         out_distribution[ds2_i] = EVProbabilityPair {
-            ev: e_ds_for_masks[ds2_i],
+            ev: e_ds_for_masks[ds2_i] as f32,
             probability: 0.0,
             ds2_index: ds2_i,
         };
@@ -259,16 +266,16 @@ pub fn compute_distribution_for_reroll_mask(
         let start = kt.row_start[kid] as usize;
         let end = kt.row_start[kid + 1] as usize;
         for k in start..end {
-            out_distribution[kt.cols[k] as usize].probability = kt.vals[k]; // not hot path
+            out_distribution[kt.cols[k] as usize].probability = kt.vals[k];
         }
     }
 }
 
 /// Weighted sum of EV over a probability distribution.
 pub fn compute_ev_from_distribution(distribution: &[EVProbabilityPair], size: usize) -> f64 {
-    let mut ev = 0.0;
+    let mut ev: f64 = 0.0;
     for i in 0..size {
-        ev += distribution[i].ev * distribution[i].probability;
+        ev += distribution[i].ev as f64 * distribution[i].probability;
     }
     ev
 }
