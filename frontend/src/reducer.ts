@@ -1,6 +1,31 @@
 import type { GameState, GameAction, CategoryState } from './types.ts';
 import { CATEGORY_NAMES, CATEGORY_COUNT, TOTAL_DICE, BONUS_THRESHOLD, BONUS_SCORE, UPPER_CATEGORIES } from './constants.ts';
 
+const STORAGE_KEY = 'yatzy-game-state';
+
+export function saveState(state: GameState): void {
+  try {
+    const { lastEvalResponse: _, sortMap: _s, ...persistable } = state;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
+  } catch { /* quota exceeded or private browsing — ignore */ }
+}
+
+function loadState(): GameState | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Restore transient fields
+    return { ...parsed, lastEvalResponse: null, sortMap: null };
+  } catch {
+    return null;
+  }
+}
+
+export function clearSavedState(): void {
+  try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+}
+
 function randomDie(): number {
   return Math.floor(Math.random() * 6) + 1;
 }
@@ -17,7 +42,7 @@ function buildInitialCategories(): CategoryState[] {
   }));
 }
 
-export function initialState(): GameState {
+function freshState(): GameState {
   return {
     dice: Array.from({ length: TOTAL_DICE }, () => ({ value: 0, held: false })),
     upperScore: 0,
@@ -31,6 +56,10 @@ export function initialState(): GameState {
     showDebug: false,
     turnPhase: 'idle',
   };
+}
+
+export function initialState(): GameState {
+  return loadState() ?? freshState();
 }
 
 function computeUpperScore(categories: CategoryState[]): number {
@@ -154,7 +183,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, showDebug: !state.showDebug };
 
     case 'RESET_GAME':
-      return initialState();
+      clearSavedState();
+      return freshState();
 
     default:
       return state;

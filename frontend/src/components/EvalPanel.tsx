@@ -21,11 +21,13 @@ export function EvalPanel({
   categories,
   turnPhase,
 }: EvalPanelProps) {
-  if (turnPhase !== 'rolled' || stateEv === null) return null;
+  const hasData = turnPhase === 'rolled' && stateEv !== null;
 
   const optCatName = optimalCategory !== null && optimalCategory >= 0
     ? categories[optimalCategory]?.name ?? '?'
     : null;
+
+  const dash = '\u2014';
 
   return (
     <div style={{
@@ -39,42 +41,39 @@ export function EvalPanel({
     }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
         <span>State EV:</span>
-        <span style={{ textAlign: 'right' }}>{stateEv.toFixed(2)}</span>
+        <span style={{ textAlign: 'right' }}>{hasData ? stateEv!.toFixed(2) : dash}</span>
 
-        {rerollsRemaining > 0 && currentMaskEv !== null && (
-          <>
-            <span>Your mask EV:</span>
-            <span style={{ textAlign: 'right' }}>{currentMaskEv.toFixed(2)}</span>
-          </>
-        )}
+        <span>Your mask EV:</span>
+        <span style={{ textAlign: 'right' }}>
+          {hasData && rerollsRemaining > 0 && currentMaskEv !== null ? currentMaskEv.toFixed(2) : dash}
+        </span>
 
-        {rerollsRemaining > 0 && optimalMaskEv !== null && (
-          <>
-            <span>Best mask EV:</span>
-            <span style={{ textAlign: 'right' }}>{optimalMaskEv.toFixed(2)}</span>
-          </>
-        )}
+        <span>Best mask EV:</span>
+        <span style={{ textAlign: 'right' }}>
+          {hasData && rerollsRemaining > 0 && optimalMaskEv !== null ? optimalMaskEv.toFixed(2) : dash}
+        </span>
 
-        {rerollsRemaining > 0 && currentMaskEv !== null && optimalMaskEv !== null && (
-          <>
-            <span>Delta:</span>
-            <span style={{
-              textAlign: 'right',
-              color: Math.abs(currentMaskEv - optimalMaskEv) < 0.01 ? '#28a745' : '#dc3545',
-            }}>
-              {(currentMaskEv - optimalMaskEv).toFixed(2)}
-            </span>
-          </>
-        )}
+        <span>Delta:</span>
+        <span style={{
+          textAlign: 'right',
+          color: hasData && rerollsRemaining > 0 && currentMaskEv !== null && optimalMaskEv !== null
+            ? (Math.abs(currentMaskEv - optimalMaskEv) < 0.01 ? '#28a745' : '#dc3545')
+            : 'inherit',
+        }}>
+          {hasData && rerollsRemaining > 0 && currentMaskEv !== null && optimalMaskEv !== null
+            ? (currentMaskEv - optimalMaskEv).toFixed(2)
+            : dash}
+        </span>
 
-        {rerollsRemaining === 0 && optCatName && (
-          <>
-            <span>Best category:</span>
-            <span style={{ textAlign: 'right' }}>{optCatName}</span>
-            <span>Category EV:</span>
-            <span style={{ textAlign: 'right' }}>{optimalCategoryEv?.toFixed(2)}</span>
-          </>
-        )}
+        <span>Best category:</span>
+        <span style={{ textAlign: 'right' }}>
+          {hasData && rerollsRemaining === 0 && optCatName ? optCatName : dash}
+        </span>
+
+        <span>Category EV:</span>
+        <span style={{ textAlign: 'right' }}>
+          {hasData && rerollsRemaining === 0 && optimalCategoryEv !== null ? optimalCategoryEv.toFixed(2) : dash}
+        </span>
       </div>
     </div>
   );

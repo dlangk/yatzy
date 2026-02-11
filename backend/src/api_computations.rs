@@ -78,11 +78,11 @@ pub fn compute_roll_response(
         }
     });
 
-    // Find optimal category (argmax ev_if_scored among available with score > 0)
+    // Find optimal category (argmax ev_if_scored among available)
     let mut optimal_category = -1i32;
     let mut optimal_category_ev = f64::NEG_INFINITY;
     for cat in &categories {
-        if cat.available && cat.score > 0 && cat.ev_if_scored > optimal_category_ev {
+        if cat.available && cat.ev_if_scored > optimal_category_ev {
             optimal_category_ev = cat.ev_if_scored;
             optimal_category = cat.id as i32;
         }

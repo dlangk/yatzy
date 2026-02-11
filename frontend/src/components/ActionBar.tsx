@@ -8,37 +8,56 @@ interface ActionBarProps {
   onReset: () => void;
 }
 
+const containerStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: 12,
+  justifyContent: 'center',
+  alignItems: 'center',
+  margin: '12px 0',
+  minHeight: 40,
+};
+
 export function ActionBar({ turnPhase, rerollsRemaining, onRoll, onReroll, onReset }: ActionBarProps) {
   if (turnPhase === 'game_over') {
     return (
-      <div style={{ textAlign: 'center', margin: '12px 0' }}>
-        <strong>Game Over!</strong>{' '}
-        <button onClick={onReset} style={{ fontSize: 16, padding: '6px 16px', marginLeft: 8 }}>
+      <div style={containerStyle}>
+        <strong>Game Over!</strong>
+        <button onClick={onReset} style={{ fontSize: 16, padding: '6px 16px' }}>
           New Game
         </button>
+        <button style={{ fontSize: 12, padding: '4px 10px', visibility: 'hidden' }}>Reset</button>
       </div>
     );
   }
 
-  if (turnPhase === 'idle') {
-    return (
-      <div style={{ display: 'flex', gap: 12, justifyContent: 'center', alignItems: 'center', margin: '12px 0' }}>
+  return (
+    <div style={containerStyle}>
+      {turnPhase === 'idle' ? (
         <button onClick={onRoll} style={{ fontSize: 16, padding: '6px 20px' }}>
           Roll
         </button>
-      </div>
-    );
-  }
-
-  // turnPhase === 'rolled'
-  return (
-    <div style={{ display: 'flex', gap: 12, justifyContent: 'center', alignItems: 'center', margin: '12px 0' }}>
+      ) : (
+        <button
+          onClick={onReroll}
+          disabled={rerollsRemaining <= 0}
+          style={{ fontSize: 16, padding: '6px 20px' }}
+        >
+          Reroll ({rerollsRemaining})
+        </button>
+      )}
       <button
-        onClick={onReroll}
-        disabled={rerollsRemaining <= 0}
-        style={{ fontSize: 16, padding: '6px 20px' }}
+        onClick={() => {
+          if (window.confirm('Reset game? All progress will be lost.')) {
+            onReset();
+          }
+        }}
+        style={{
+          fontSize: 12,
+          padding: '4px 10px',
+          opacity: 0.6,
+        }}
       >
-        Reroll ({rerollsRemaining})
+        Reset
       </button>
     </div>
   );

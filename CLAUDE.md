@@ -100,6 +100,23 @@ The frontend uses ES6 modules for clean separation of concerns:
 
 4. **Binary Storage**: 16-byte header + float[2,097,152] in STATE_INDEX order (~8 MB). Zero-copy mmap loading in <1ms.
 
+## Frontend UI Rules
+
+### No Layout Shifts (Hard Requirement)
+The UI must be pixel-stable: no element may change size, move, or cause reflow when state changes. This is a hard requirement on every component.
+
+**Rules:**
+1. **Never return `null`** — every component always renders its container at a fixed size. Use placeholders (`?`, `—`), `visibility: hidden`, `opacity`, or `disabled` states instead.
+2. **Fixed row/cell heights** — table rows, grid cells, and flex items must use explicit `height` or `minHeight` so content changes (text ↔ button ↔ icon) cannot alter dimensions.
+3. **Same element, different content** — when a cell switches between states (e.g. "Score" button → "✓"), keep the same DOM element (e.g. always a `<button>`) and change only its text/style. Never swap between different element types that have different intrinsic sizes.
+4. **Fixed column widths** — tables must use `table-layout: fixed` with a `<colgroup>` defining explicit percentage widths for every column. Content changes (numbers appearing/disappearing, text length changes) must never cause columns to resize.
+
+**Current examples:**
+- Dice bar: always renders 5 dice; shows `?` at `opacity: 0.3` when idle
+- Eval panel: always renders full grid; shows `—` dashes when no data
+- Action bar: `minHeight: 40` container across all turn phases
+- Scorecard rows: `height: 32` cells, button always rendered (shows "Score" or "✓"), `visibility: hidden` when not actionable
+
 ## Important Considerations
 
 - Frontend assumes backend is running on port 9000 (configurable via environment or `js/config.js`)

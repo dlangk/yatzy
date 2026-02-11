@@ -1,13 +1,20 @@
 import { useReducer, useEffect, useCallback } from 'react';
-import { gameReducer, initialState } from './reducer.ts';
+import { gameReducer, initialState, saveState } from './reducer.ts';
 import { evaluate } from './api.ts';
 import { sortDiceWithMapping, computeRerollMask, mapMaskToSorted, unmapMask } from './mask.ts';
-import type { GameState } from './types.ts';
+import type { GameState, GameAction } from './types.ts';
 import { Scorecard } from './components/Scorecard.tsx';
 import { DiceBar } from './components/DiceBar.tsx';
 import { ActionBar } from './components/ActionBar.tsx';
 import { EvalPanel } from './components/EvalPanel.tsx';
+import { DiceLegend } from './components/DiceLegend.tsx';
 import { DebugPanel } from './components/DebugPanel.tsx';
+
+function persistingReducer(state: GameState, action: GameAction): GameState {
+  const next = gameReducer(state, action);
+  saveState(next);
+  return next;
+}
 
 function getCurrentMaskEv(state: GameState): number | null {
   if (!state.lastEvalResponse?.mask_evs || !state.sortMap) return null;
@@ -22,7 +29,7 @@ function getOptimalMaskOriginal(state: GameState): number | null {
 }
 
 export function App() {
-  const [state, dispatch] = useReducer(gameReducer, undefined, initialState);
+  const [state, dispatch] = useReducer(persistingReducer, undefined, initialState);
 
   const callEvaluate = useCallback(async (s: GameState) => {
     const { sorted, sortMap } = sortDiceWithMapping(s.dice.map((d) => d.value));
@@ -70,6 +77,11 @@ export function App() {
         hasEval={state.lastEvalResponse !== null}
       />
 
+      <DiceLegend
+        turnPhase={state.turnPhase}
+        rerollsRemaining={state.rerollsRemaining}
+      />
+
       <EvalPanel
         currentMaskEv={currentMaskEv}
         optimalMaskEv={state.lastEvalResponse?.optimal_mask_ev ?? null}
@@ -87,6 +99,7 @@ export function App() {
         bonus={state.bonus}
         totalScore={state.totalScore}
         turnPhase={state.turnPhase}
+        optimalCategoryId={state.lastEvalResponse?.optimal_category ?? null}
         onScoreCategory={(id) => dispatch({ type: 'SCORE_CATEGORY', categoryId: id })}
       />
 

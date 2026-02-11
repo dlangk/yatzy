@@ -219,6 +219,54 @@ fn test_optimal_category_choice() {
         let resp = compute_roll_response(&ctx, 0, scored, &dice, 0);
         assert_eq!(resp.optimal_category, CATEGORY_LARGE_STRAIGHT as i32);
     }
+
+    // Score-0 optimal: wasting a low-value category to preserve Chance for future rounds.
+    // Chance has very high future EV (~23), while straights and Yatzy have low future EV (~3-5).
+
+    // [1,2,3,4,6] Chance + SmStr open -> waste SmStr (score=0), preserve Chance
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_SMALL_STRAIGHT) ^ (1 << CATEGORY_CHANCE);
+        let dice = [1, 2, 3, 4, 6];
+        let resp = compute_roll_response(&ctx, 0, scored, &dice, 0);
+        assert_eq!(resp.optimal_category, CATEGORY_SMALL_STRAIGHT as i32);
+        assert_eq!(resp.categories[CATEGORY_SMALL_STRAIGHT].score, 0);
+    }
+
+    // [1,2,3,4,5] Chance + LgStr open -> waste LgStr (score=0), preserve Chance
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_LARGE_STRAIGHT) ^ (1 << CATEGORY_CHANCE);
+        let dice = [1, 2, 3, 4, 5];
+        let resp = compute_roll_response(&ctx, 0, scored, &dice, 0);
+        assert_eq!(resp.optimal_category, CATEGORY_LARGE_STRAIGHT as i32);
+        assert_eq!(resp.categories[CATEGORY_LARGE_STRAIGHT].score, 0);
+    }
+
+    // [1,1,1,1,2] Chance + Yatzy open -> waste Yatzy (score=0), preserve Chance
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_YATZY) ^ (1 << CATEGORY_CHANCE);
+        let dice = [1, 1, 1, 1, 2];
+        let resp = compute_roll_response(&ctx, 0, scored, &dice, 0);
+        assert_eq!(resp.optimal_category, CATEGORY_YATZY as i32);
+        assert_eq!(resp.categories[CATEGORY_YATZY].score, 0);
+    }
+
+    // [2,2,2,2,3] Chance + Yatzy open -> waste Yatzy (score=0), preserve Chance
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_YATZY) ^ (1 << CATEGORY_CHANCE);
+        let dice = [2, 2, 2, 2, 3];
+        let resp = compute_roll_response(&ctx, 0, scored, &dice, 0);
+        assert_eq!(resp.optimal_category, CATEGORY_YATZY as i32);
+        assert_eq!(resp.categories[CATEGORY_YATZY].score, 0);
+    }
+
+    // [1,1,1,1,1] Chance + LgStr open -> waste LgStr (score=0), preserve Chance
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_LARGE_STRAIGHT) ^ (1 << CATEGORY_CHANCE);
+        let dice = [1, 1, 1, 1, 1];
+        let resp = compute_roll_response(&ctx, 0, scored, &dice, 0);
+        assert_eq!(resp.optimal_category, CATEGORY_LARGE_STRAIGHT as i32);
+        assert_eq!(resp.categories[CATEGORY_LARGE_STRAIGHT].score, 0);
+    }
 }
 
 #[test]
@@ -549,18 +597,18 @@ fn test_score_category_consistency() {
         assert!((resp.optimal_category_ev - 50.0).abs() < 1e-9);
     }
 
-    // [1,2,3,4,6] only Small Straight -> no valid scoring (optimal_category == -1)
+    // [1,2,3,4,6] only Small Straight -> score=0 but still the only available category
     {
         let dice = [1, 2, 3, 4, 6];
         let resp = compute_roll_response(&ctx, 0, only(CATEGORY_SMALL_STRAIGHT), &dice, 0);
-        assert_eq!(resp.optimal_category, -1);
+        assert_eq!(resp.optimal_category, CATEGORY_SMALL_STRAIGHT as i32);
     }
 
-    // [1,1,1,1,1] only Sixes -> no valid scoring
+    // [1,1,1,1,1] only Sixes -> score=0 but still the only available category
     {
         let dice = [1, 1, 1, 1, 1];
         let resp = compute_roll_response(&ctx, 0, only(CATEGORY_SIXES), &dice, 0);
-        assert_eq!(resp.optimal_category, -1);
+        assert_eq!(resp.optimal_category, CATEGORY_SIXES as i32);
     }
 
     // [4,4,4,4,4] only Fours -> score = 20
@@ -712,5 +760,513 @@ fn test_fat_response_mask_ev_consistency() {
             mask_evs[mask],
             mask_evs[0]
         );
+    }
+}
+
+/// Verify that optimal_category == argmax(ev_if_scored) among available categories
+/// across a variety of game states and dice combinations.
+#[test]
+fn test_optimal_category_matches_max_ev() {
+    let ctx = match setup() {
+        Some(c) => c,
+        None => return,
+    };
+
+    // Helper: assert the invariant for a given response
+    fn assert_optimal_is_argmax(resp: &RollResponse, label: &str) {
+        let best = resp
+            .categories
+            .iter()
+            .filter(|c| c.available)
+            .max_by(|a, b| a.ev_if_scored.partial_cmp(&b.ev_if_scored).unwrap())
+            .unwrap();
+        assert_eq!(
+            resp.optimal_category, best.id as i32,
+            "{}: optimal_category={} but argmax(ev_if_scored) is {} (ev={})",
+            label, resp.optimal_category, best.id, best.ev_if_scored
+        );
+        assert!(
+            (resp.optimal_category_ev - best.ev_if_scored).abs() < 1e-9,
+            "{}: optimal_category_ev={} but max ev_if_scored={}",
+            label,
+            resp.optimal_category_ev,
+            best.ev_if_scored
+        );
+    }
+
+    // Case 1: All categories open, various dice, rerolls=0
+    let test_dice: &[[i32; 5]] = &[
+        [1, 2, 3, 4, 5],
+        [1, 1, 1, 1, 1],
+        [6, 6, 6, 6, 6],
+        [1, 2, 4, 4, 5],
+        [2, 3, 4, 5, 6],
+        [3, 3, 3, 4, 4],
+        [1, 1, 2, 2, 3],
+        [5, 5, 5, 5, 6],
+    ];
+    for dice in test_dice {
+        let resp = compute_roll_response(&ctx, 0, 0, dice, 0);
+        assert_optimal_is_argmax(&resp, &format!("all open, dice={:?}", dice));
+    }
+
+    // Case 2: Single category open, score=0 cases
+    {
+        // [1,2,3,4,6] only Small Straight open (score=0)
+        let resp =
+            compute_roll_response(&ctx, 0, only(CATEGORY_SMALL_STRAIGHT), &[1, 2, 3, 4, 6], 0);
+        assert_optimal_is_argmax(&resp, "only SmStr, score=0");
+    }
+    {
+        // [1,1,1,1,1] only Sixes open (score=0)
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_SIXES), &[1, 1, 1, 1, 1], 0);
+        assert_optimal_is_argmax(&resp, "only Sixes, score=0");
+    }
+    {
+        // [1,2,3,4,5] only Large Straight open (score=0)
+        let resp =
+            compute_roll_response(&ctx, 0, only(CATEGORY_LARGE_STRAIGHT), &[1, 2, 3, 4, 5], 0);
+        assert_optimal_is_argmax(&resp, "only LgStr, score=0");
+    }
+
+    // Case 3: Two categories open, various upper scores
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_ONES) ^ (1 << CATEGORY_CHANCE);
+        let resp = compute_roll_response(&ctx, 20, scored, &[1, 1, 3, 4, 5], 0);
+        assert_optimal_is_argmax(&resp, "Ones+Chance open, up=20");
+    }
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_YATZY) ^ (1 << CATEGORY_FULL_HOUSE);
+        let resp = compute_roll_response(&ctx, 0, scored, &[3, 3, 3, 5, 5], 0);
+        assert_optimal_is_argmax(&resp, "Yatzy+FH open");
+    }
+
+    // Case 4: Many categories open, mid-game
+    {
+        let scored = (1 << CATEGORY_ONES)
+            | (1 << CATEGORY_TWOS)
+            | (1 << CATEGORY_THREES)
+            | (1 << CATEGORY_FOURS);
+        let resp = compute_roll_response(&ctx, 12, scored, &[5, 5, 6, 6, 6], 0);
+        assert_optimal_is_argmax(&resp, "mid-game, 11 cats open");
+    }
+}
+
+/// For each of the 15 categories, test 3 dice+state combinations where that category
+/// is the optimal choice (rerolls=0). Also tests score=0 optimal cases.
+#[test]
+fn test_optimal_category_per_category() {
+    let ctx = match setup() {
+        Some(c) => c,
+        None => return,
+    };
+
+    // Helper: assert optimal category equals expected
+    fn assert_optimal(resp: &RollResponse, expected: usize, label: &str) {
+        assert_eq!(
+            resp.optimal_category, expected as i32,
+            "{}: expected {} but got {}",
+            label, expected, resp.optimal_category
+        );
+    }
+
+    // --- Ones (0) ---
+    {
+        // Only Ones open, dice score in Ones
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_ONES), &[1, 1, 1, 1, 2], 0);
+        assert_optimal(&resp, CATEGORY_ONES, "Ones: only open");
+    }
+    {
+        // Ones vs Twos: [1,1,1,2,3] -> Ones=3, Twos=2
+        let scored = ALL_SCORED ^ (1 << CATEGORY_ONES) ^ (1 << CATEGORY_TWOS);
+        let resp = compute_roll_response(&ctx, 0, scored, &[1, 1, 1, 2, 3], 0);
+        // Whichever the DP says is optimal, it must match argmax(ev_if_scored)
+        let best = resp
+            .categories
+            .iter()
+            .filter(|c| c.available)
+            .max_by(|a, b| a.ev_if_scored.partial_cmp(&b.ev_if_scored).unwrap())
+            .unwrap();
+        assert_eq!(resp.optimal_category, best.id as i32, "Ones vs Twos");
+    }
+    {
+        // Only Ones open, score=0 dice
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_ONES), &[2, 3, 4, 5, 6], 0);
+        assert_optimal(&resp, CATEGORY_ONES, "Ones: score=0, only open");
+    }
+
+    // --- Twos (1) ---
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_TWOS), &[2, 2, 2, 2, 3], 0);
+        assert_optimal(&resp, CATEGORY_TWOS, "Twos: only open");
+    }
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_TWOS) ^ (1 << CATEGORY_ONES);
+        let resp = compute_roll_response(&ctx, 0, scored, &[2, 2, 2, 2, 1], 0);
+        let best = resp
+            .categories
+            .iter()
+            .filter(|c| c.available)
+            .max_by(|a, b| a.ev_if_scored.partial_cmp(&b.ev_if_scored).unwrap())
+            .unwrap();
+        assert_eq!(resp.optimal_category, best.id as i32, "Twos vs Ones");
+    }
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_TWOS), &[1, 3, 4, 5, 6], 0);
+        assert_optimal(&resp, CATEGORY_TWOS, "Twos: score=0, only open");
+    }
+
+    // --- Threes (2) ---
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_THREES), &[3, 3, 3, 3, 4], 0);
+        assert_optimal(&resp, CATEGORY_THREES, "Threes: only open");
+    }
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_THREES) ^ (1 << CATEGORY_TWOS);
+        let resp = compute_roll_response(&ctx, 0, scored, &[3, 3, 3, 2, 1], 0);
+        let best = resp
+            .categories
+            .iter()
+            .filter(|c| c.available)
+            .max_by(|a, b| a.ev_if_scored.partial_cmp(&b.ev_if_scored).unwrap())
+            .unwrap();
+        assert_eq!(resp.optimal_category, best.id as i32, "Threes vs Twos");
+    }
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_THREES), &[1, 2, 4, 5, 6], 0);
+        assert_optimal(&resp, CATEGORY_THREES, "Threes: score=0, only open");
+    }
+
+    // --- Fours (3) ---
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_FOURS), &[4, 4, 4, 4, 5], 0);
+        assert_optimal(&resp, CATEGORY_FOURS, "Fours: only open");
+    }
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_FOURS) ^ (1 << CATEGORY_THREES);
+        let resp = compute_roll_response(&ctx, 0, scored, &[4, 4, 4, 3, 1], 0);
+        let best = resp
+            .categories
+            .iter()
+            .filter(|c| c.available)
+            .max_by(|a, b| a.ev_if_scored.partial_cmp(&b.ev_if_scored).unwrap())
+            .unwrap();
+        assert_eq!(resp.optimal_category, best.id as i32, "Fours vs Threes");
+    }
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_FOURS), &[1, 2, 3, 5, 6], 0);
+        assert_optimal(&resp, CATEGORY_FOURS, "Fours: score=0, only open");
+    }
+
+    // --- Fives (4) ---
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_FIVES), &[5, 5, 5, 5, 6], 0);
+        assert_optimal(&resp, CATEGORY_FIVES, "Fives: only open");
+    }
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_FIVES) ^ (1 << CATEGORY_FOURS);
+        let resp = compute_roll_response(&ctx, 0, scored, &[5, 5, 5, 4, 1], 0);
+        let best = resp
+            .categories
+            .iter()
+            .filter(|c| c.available)
+            .max_by(|a, b| a.ev_if_scored.partial_cmp(&b.ev_if_scored).unwrap())
+            .unwrap();
+        assert_eq!(resp.optimal_category, best.id as i32, "Fives vs Fours");
+    }
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_FIVES), &[1, 2, 3, 4, 6], 0);
+        assert_optimal(&resp, CATEGORY_FIVES, "Fives: score=0, only open");
+    }
+
+    // --- Sixes (5) ---
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_SIXES), &[6, 6, 6, 6, 5], 0);
+        assert_optimal(&resp, CATEGORY_SIXES, "Sixes: only open");
+    }
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_SIXES) ^ (1 << CATEGORY_FIVES);
+        let resp = compute_roll_response(&ctx, 0, scored, &[6, 6, 6, 5, 1], 0);
+        let best = resp
+            .categories
+            .iter()
+            .filter(|c| c.available)
+            .max_by(|a, b| a.ev_if_scored.partial_cmp(&b.ev_if_scored).unwrap())
+            .unwrap();
+        assert_eq!(resp.optimal_category, best.id as i32, "Sixes vs Fives");
+    }
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_SIXES), &[1, 1, 1, 1, 1], 0);
+        assert_optimal(&resp, CATEGORY_SIXES, "Sixes: score=0, only open");
+    }
+
+    // --- One Pair (6) ---
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_ONE_PAIR), &[6, 6, 1, 2, 3], 0);
+        assert_optimal(&resp, CATEGORY_ONE_PAIR, "OnePair: only open");
+    }
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_ONE_PAIR) ^ (1 << CATEGORY_ONES);
+        let resp = compute_roll_response(&ctx, 0, scored, &[6, 6, 1, 2, 3], 0);
+        let best = resp
+            .categories
+            .iter()
+            .filter(|c| c.available)
+            .max_by(|a, b| a.ev_if_scored.partial_cmp(&b.ev_if_scored).unwrap())
+            .unwrap();
+        assert_eq!(resp.optimal_category, best.id as i32, "OnePair vs Ones");
+    }
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_ONE_PAIR), &[1, 2, 3, 4, 6], 0);
+        assert_optimal(&resp, CATEGORY_ONE_PAIR, "OnePair: score=0, only open");
+    }
+
+    // --- Two Pairs (7) ---
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_TWO_PAIRS), &[5, 5, 6, 6, 1], 0);
+        assert_optimal(&resp, CATEGORY_TWO_PAIRS, "TwoPairs: only open");
+    }
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_TWO_PAIRS) ^ (1 << CATEGORY_ONE_PAIR);
+        let resp = compute_roll_response(&ctx, 0, scored, &[5, 5, 6, 6, 1], 0);
+        assert_eq!(
+            resp.optimal_category, CATEGORY_TWO_PAIRS as i32,
+            "TwoPairs vs OnePair"
+        );
+    }
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_TWO_PAIRS), &[1, 2, 3, 4, 6], 0);
+        assert_optimal(&resp, CATEGORY_TWO_PAIRS, "TwoPairs: score=0, only open");
+    }
+
+    // --- Three of a Kind (8) ---
+    {
+        let resp =
+            compute_roll_response(&ctx, 0, only(CATEGORY_THREE_OF_A_KIND), &[6, 6, 6, 1, 2], 0);
+        assert_optimal(&resp, CATEGORY_THREE_OF_A_KIND, "3oaK: only open");
+    }
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_THREE_OF_A_KIND) ^ (1 << CATEGORY_ONE_PAIR);
+        let resp = compute_roll_response(&ctx, 0, scored, &[6, 6, 6, 1, 2], 0);
+        let best = resp
+            .categories
+            .iter()
+            .filter(|c| c.available)
+            .max_by(|a, b| a.ev_if_scored.partial_cmp(&b.ev_if_scored).unwrap())
+            .unwrap();
+        assert_eq!(resp.optimal_category, best.id as i32, "3oaK vs OnePair");
+    }
+    {
+        let resp =
+            compute_roll_response(&ctx, 0, only(CATEGORY_THREE_OF_A_KIND), &[1, 2, 3, 4, 6], 0);
+        assert_optimal(&resp, CATEGORY_THREE_OF_A_KIND, "3oaK: score=0, only open");
+    }
+
+    // --- Four of a Kind (9) ---
+    {
+        let resp =
+            compute_roll_response(&ctx, 0, only(CATEGORY_FOUR_OF_A_KIND), &[6, 6, 6, 6, 1], 0);
+        assert_optimal(&resp, CATEGORY_FOUR_OF_A_KIND, "4oaK: only open");
+    }
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_FOUR_OF_A_KIND) ^ (1 << CATEGORY_THREE_OF_A_KIND);
+        let resp = compute_roll_response(&ctx, 0, scored, &[6, 6, 6, 6, 1], 0);
+        assert_eq!(
+            resp.optimal_category, CATEGORY_FOUR_OF_A_KIND as i32,
+            "4oaK vs 3oaK"
+        );
+    }
+    {
+        let resp =
+            compute_roll_response(&ctx, 0, only(CATEGORY_FOUR_OF_A_KIND), &[1, 2, 3, 4, 6], 0);
+        assert_optimal(&resp, CATEGORY_FOUR_OF_A_KIND, "4oaK: score=0, only open");
+    }
+
+    // --- Small Straight (10) ---
+    {
+        let resp =
+            compute_roll_response(&ctx, 0, only(CATEGORY_SMALL_STRAIGHT), &[1, 2, 3, 4, 5], 0);
+        assert_optimal(&resp, CATEGORY_SMALL_STRAIGHT, "SmStr: only open");
+    }
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_SMALL_STRAIGHT) ^ (1 << CATEGORY_ONES);
+        let resp = compute_roll_response(&ctx, 0, scored, &[1, 2, 3, 4, 5], 0);
+        assert_eq!(
+            resp.optimal_category, CATEGORY_SMALL_STRAIGHT as i32,
+            "SmStr vs Ones"
+        );
+    }
+    {
+        // Score=0 case: missing 5
+        let resp =
+            compute_roll_response(&ctx, 0, only(CATEGORY_SMALL_STRAIGHT), &[1, 2, 3, 4, 6], 0);
+        assert_optimal(&resp, CATEGORY_SMALL_STRAIGHT, "SmStr: score=0, only open");
+    }
+
+    // --- Large Straight (11) ---
+    {
+        let resp =
+            compute_roll_response(&ctx, 0, only(CATEGORY_LARGE_STRAIGHT), &[2, 3, 4, 5, 6], 0);
+        assert_optimal(&resp, CATEGORY_LARGE_STRAIGHT, "LgStr: only open");
+    }
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_LARGE_STRAIGHT) ^ (1 << CATEGORY_SMALL_STRAIGHT);
+        let resp = compute_roll_response(&ctx, 0, scored, &[2, 3, 4, 5, 6], 0);
+        assert_eq!(
+            resp.optimal_category, CATEGORY_LARGE_STRAIGHT as i32,
+            "LgStr vs SmStr"
+        );
+    }
+    {
+        // Score=0 case
+        let resp =
+            compute_roll_response(&ctx, 0, only(CATEGORY_LARGE_STRAIGHT), &[1, 2, 3, 4, 5], 0);
+        assert_optimal(&resp, CATEGORY_LARGE_STRAIGHT, "LgStr: score=0, only open");
+    }
+
+    // --- Full House (12) ---
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_FULL_HOUSE), &[5, 5, 6, 6, 6], 0);
+        assert_optimal(&resp, CATEGORY_FULL_HOUSE, "FH: only open");
+    }
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_FULL_HOUSE) ^ (1 << CATEGORY_THREE_OF_A_KIND);
+        let resp = compute_roll_response(&ctx, 0, scored, &[5, 5, 6, 6, 6], 0);
+        assert_eq!(
+            resp.optimal_category, CATEGORY_FULL_HOUSE as i32,
+            "FH vs 3oaK"
+        );
+    }
+    {
+        // Score=0 case
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_FULL_HOUSE), &[1, 2, 3, 4, 5], 0);
+        assert_optimal(&resp, CATEGORY_FULL_HOUSE, "FH: score=0, only open");
+    }
+
+    // --- Chance (13) ---
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_CHANCE), &[6, 6, 6, 6, 6], 0);
+        assert_optimal(&resp, CATEGORY_CHANCE, "Chance: only open");
+    }
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_CHANCE) ^ (1 << CATEGORY_SIXES);
+        let resp = compute_roll_response(&ctx, 0, scored, &[6, 6, 6, 6, 6], 0);
+        let best = resp
+            .categories
+            .iter()
+            .filter(|c| c.available)
+            .max_by(|a, b| a.ev_if_scored.partial_cmp(&b.ev_if_scored).unwrap())
+            .unwrap();
+        assert_eq!(resp.optimal_category, best.id as i32, "Chance vs Sixes");
+    }
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_CHANCE), &[1, 1, 1, 1, 1], 0);
+        assert_optimal(&resp, CATEGORY_CHANCE, "Chance: low dice, only open");
+    }
+
+    // --- Yatzy (14) ---
+    {
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_YATZY), &[6, 6, 6, 6, 6], 0);
+        assert_optimal(&resp, CATEGORY_YATZY, "Yatzy: only open");
+    }
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_YATZY) ^ (1 << CATEGORY_CHANCE);
+        let resp = compute_roll_response(&ctx, 0, scored, &[6, 6, 6, 6, 6], 0);
+        assert_eq!(
+            resp.optimal_category, CATEGORY_YATZY as i32,
+            "Yatzy vs Chance"
+        );
+    }
+    {
+        // Score=0 case: no Yatzy
+        let resp = compute_roll_response(&ctx, 0, only(CATEGORY_YATZY), &[1, 2, 3, 4, 5], 0);
+        assert_optimal(&resp, CATEGORY_YATZY, "Yatzy: score=0, only open");
+    }
+
+    // --- All categories open, score=0 optimal in some ---
+    {
+        let dice = [1, 2, 4, 4, 5];
+        let resp = compute_roll_response(&ctx, 0, 0, &dice, 0);
+        let best = resp
+            .categories
+            .iter()
+            .filter(|c| c.available)
+            .max_by(|a, b| a.ev_if_scored.partial_cmp(&b.ev_if_scored).unwrap())
+            .unwrap();
+        assert_eq!(
+            resp.optimal_category, best.id as i32,
+            "[1,2,4,4,5] all open"
+        );
+    }
+}
+
+/// Print ev_if_scored for interesting game states, and verify structural properties.
+/// Run with `-- --nocapture` for visibility.
+#[test]
+fn test_ev_if_scored_values() {
+    let ctx = match setup() {
+        Some(c) => c,
+        None => return,
+    };
+
+    // Late game: Chance + SmStr, dice that miss SmStr
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_SMALL_STRAIGHT) ^ (1 << CATEGORY_CHANCE);
+        let resp = compute_roll_response(&ctx, 0, scored, &[1, 2, 3, 4, 6], 0);
+        let ev_smstr = resp.categories[CATEGORY_SMALL_STRAIGHT].ev_if_scored;
+        let ev_chance = resp.categories[CATEGORY_CHANCE].ev_if_scored;
+        println!(
+            "Chance+SmStr, [1,2,3,4,6]: SmStr ev={:.2} (score=0), Chance ev={:.2} (score=16)",
+            ev_smstr, ev_chance
+        );
+        // SmStr (score=0) should have higher ev_if_scored than Chance (score=16)
+        assert!(
+            ev_smstr > ev_chance,
+            "SmStr ev={} should beat Chance ev={}",
+            ev_smstr,
+            ev_chance
+        );
+    }
+
+    // Late game: Chance + Yatzy, dice with no Yatzy
+    {
+        let scored = ALL_SCORED ^ (1 << CATEGORY_YATZY) ^ (1 << CATEGORY_CHANCE);
+        let resp = compute_roll_response(&ctx, 0, scored, &[1, 1, 1, 1, 2], 0);
+        let ev_yatzy = resp.categories[CATEGORY_YATZY].ev_if_scored;
+        let ev_chance = resp.categories[CATEGORY_CHANCE].ev_if_scored;
+        println!(
+            "Chance+Yatzy, [1,1,1,1,2]: Yatzy ev={:.2} (score=0), Chance ev={:.2} (score=6)",
+            ev_yatzy, ev_chance
+        );
+        assert!(
+            ev_yatzy > ev_chance,
+            "Yatzy ev={} should beat Chance ev={}",
+            ev_yatzy,
+            ev_chance
+        );
+    }
+
+    // All categories open, various dice — print top 3 for reference
+    for dice in &[
+        [1, 2, 3, 4, 5],
+        [1, 2, 4, 4, 5],
+        [6, 6, 6, 6, 6],
+        [3, 3, 3, 4, 4],
+    ] {
+        let resp = compute_roll_response(&ctx, 0, 0, dice, 0);
+        let mut cats: Vec<_> = resp.categories.iter().filter(|c| c.available).collect();
+        cats.sort_by(|a, b| b.ev_if_scored.partial_cmp(&a.ev_if_scored).unwrap());
+        println!(
+            "\nAll open, {:?}: optimal={} ({})",
+            dice, CATEGORY_NAMES[resp.optimal_category as usize], resp.optimal_category
+        );
+        for c in cats.iter().take(3) {
+            println!(
+                "  {:20} score={:3}  ev={:.4}",
+                c.name, c.score, c.ev_if_scored
+            );
+        }
+        // Invariant: optimal matches argmax
+        assert_eq!(resp.optimal_category, cats[0].id as i32);
     }
 }

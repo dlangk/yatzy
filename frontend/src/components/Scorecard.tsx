@@ -8,18 +8,24 @@ interface ScorecardProps {
   bonus: number;
   totalScore: number;
   turnPhase: TurnPhase;
+  optimalCategoryId: number | null;
   onScoreCategory: (id: number) => void;
 }
 
-export function Scorecard({ categories, upperScore, bonus, totalScore, turnPhase, onScoreCategory }: ScorecardProps) {
-  const optimalId = findOptimalCategory(categories);
+export function Scorecard({ categories, upperScore, bonus, totalScore, turnPhase, optimalCategoryId, onScoreCategory }: ScorecardProps) {
   const canScore = turnPhase === 'rolled';
 
   const upperCats = categories.slice(0, UPPER_CATEGORIES);
   const lowerCats = categories.slice(UPPER_CATEGORIES);
 
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12, fontFamily: 'monospace', fontSize: 14 }}>
+    <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', marginTop: 12, fontFamily: 'monospace', fontSize: 14 }}>
+      <colgroup>
+        <col style={{ width: '45%' }} />
+        <col style={{ width: '20%' }} />
+        <col style={{ width: '15%' }} />
+        <col style={{ width: '20%' }} />
+      </colgroup>
       <thead>
         <tr style={{ borderBottom: '2px solid #333' }}>
           <th style={{ textAlign: 'left', padding: '4px 8px' }}>Category</th>
@@ -33,7 +39,7 @@ export function Scorecard({ categories, upperScore, bonus, totalScore, turnPhase
           <ScorecardRow
             key={cat.id}
             category={cat}
-            isOptimal={cat.id === optimalId && canScore}
+            isOptimal={cat.id === optimalCategoryId && canScore}
             canScore={canScore}
             onScore={() => onScoreCategory(cat.id)}
           />
@@ -51,7 +57,7 @@ export function Scorecard({ categories, upperScore, bonus, totalScore, turnPhase
           <ScorecardRow
             key={cat.id}
             category={cat}
-            isOptimal={cat.id === optimalId && canScore}
+            isOptimal={cat.id === optimalCategoryId && canScore}
             canScore={canScore}
             onScore={() => onScoreCategory(cat.id)}
           />
@@ -64,16 +70,4 @@ export function Scorecard({ categories, upperScore, bonus, totalScore, turnPhase
       </tbody>
     </table>
   );
-}
-
-function findOptimalCategory(categories: CategoryState[]): number | null {
-  let bestId: number | null = null;
-  let bestEv = -Infinity;
-  for (const cat of categories) {
-    if (!cat.isScored && cat.available && cat.evIfScored > bestEv) {
-      bestEv = cat.evIfScored;
-      bestId = cat.id;
-    }
-  }
-  return bestId;
 }

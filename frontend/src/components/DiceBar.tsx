@@ -11,22 +11,25 @@ interface DiceBarProps {
 }
 
 export function DiceBar({ dice, onToggle, optimalMask, rerollsRemaining, turnPhase, hasEval }: DiceBarProps) {
-  if (turnPhase !== 'rolled') return null;
-
-  const canToggle = hasEval && rerollsRemaining > 0;
+  const active = turnPhase === 'rolled';
+  const canToggle = active && hasEval && rerollsRemaining > 0;
+  const showMaskHints = active && hasEval && optimalMask !== null && rerollsRemaining > 0;
 
   return (
-    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', margin: '12px 0' }}>
+    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', margin: '12px 0', opacity: active ? 1 : 0.3 }}>
       {dice.map((die, i) => {
-        const isOptimalReroll = optimalMask !== null && rerollsRemaining > 0 && !!(optimalMask & (1 << i));
+        const inOptimalReroll = showMaskHints && !!(optimalMask! & (1 << i));
+        const inOptimalKeep = showMaskHints && !(optimalMask! & (1 << i));
         return (
           <Die
             key={i}
-            value={die.value}
-            held={die.held}
-            isOptimalReroll={isOptimalReroll}
+            value={active ? die.value : 0}
+            held={active ? die.held : true}
+            isOptimalReroll={inOptimalReroll}
+            isOptimalKeep={inOptimalKeep}
             onClick={() => onToggle(i)}
             disabled={!canToggle}
+            faded={!active}
           />
         );
       })}
