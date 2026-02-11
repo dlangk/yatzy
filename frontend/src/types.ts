@@ -59,4 +59,8 @@ export type GameAction =
   | { type: 'SCORE_CATEGORY'; categoryId: number }
   | { type: 'SET_EVAL_RESPONSE'; response: EvaluateResponse; sortMap: number[] }
   | { type: 'TOGGLE_DEBUG' }
-  | { type: 'RESET_GAME' };
+  | { type: 'RESET_GAME' }
+  | { type: 'SET_DIE_VALUE'; index: number; value: number }
+  | { type: 'SET_REROLLS'; rerollsRemaining: number }
+  | { type: 'SET_CATEGORY_SCORE'; categoryId: number; score: number }
+  | { type: 'UNSET_CATEGORY'; categoryId: number };

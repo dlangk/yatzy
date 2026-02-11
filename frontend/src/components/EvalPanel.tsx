@@ -67,12 +67,12 @@ export function EvalPanel({
 
         <span>Best category:</span>
         <span style={{ textAlign: 'right' }}>
-          {hasData && rerollsRemaining === 0 && optCatName ? optCatName : dash}
+          {hasData && optCatName ? optCatName : dash}
         </span>
 
         <span>Category EV:</span>
         <span style={{ textAlign: 'right' }}>
-          {hasData && rerollsRemaining === 0 && optimalCategoryEv !== null ? optimalCategoryEv.toFixed(2) : dash}
+          {hasData && optimalCategoryEv !== null ? optimalCategoryEv.toFixed(2) : dash}
         </span>
       </div>
     </div>

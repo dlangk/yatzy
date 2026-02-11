@@ -10,9 +10,11 @@ interface ScorecardProps {
   turnPhase: TurnPhase;
   optimalCategoryId: number | null;
   onScoreCategory: (id: number) => void;
+  onSetCategoryScore: (id: number, score: number) => void;
+  onUnsetCategory: (id: number) => void;
 }
 
-export function Scorecard({ categories, upperScore, bonus, totalScore, turnPhase, optimalCategoryId, onScoreCategory }: ScorecardProps) {
+export function Scorecard({ categories, upperScore, bonus, totalScore, turnPhase, optimalCategoryId, onScoreCategory, onSetCategoryScore, onUnsetCategory }: ScorecardProps) {
   const canScore = turnPhase === 'rolled';
 
   const upperCats = categories.slice(0, UPPER_CATEGORIES);
@@ -42,6 +44,8 @@ export function Scorecard({ categories, upperScore, bonus, totalScore, turnPhase
             isOptimal={cat.id === optimalCategoryId && canScore}
             canScore={canScore}
             onScore={() => onScoreCategory(cat.id)}
+            onSetScore={(score) => onSetCategoryScore(cat.id, score)}
+            onUnsetCategory={() => onUnsetCategory(cat.id)}
           />
         ))}
         <tr style={{ background: '#f8f8f8', fontWeight: 'bold' }}>
@@ -49,7 +53,7 @@ export function Scorecard({ categories, upperScore, bonus, totalScore, turnPhase
             Upper ({upperScore}/{BONUS_THRESHOLD})
           </td>
           <td style={{ padding: '4px 8px', borderBottom: '2px solid #333', textAlign: 'center' }}>
-            {bonus > 0 ? `+${bonus}` : '—'}
+            {bonus > 0 ? `+${bonus}` : '\u2014'}
           </td>
           <td colSpan={2} style={{ borderBottom: '2px solid #333' }}></td>
         </tr>
@@ -60,6 +64,8 @@ export function Scorecard({ categories, upperScore, bonus, totalScore, turnPhase
             isOptimal={cat.id === optimalCategoryId && canScore}
             canScore={canScore}
             onScore={() => onScoreCategory(cat.id)}
+            onSetScore={(score) => onSetCategoryScore(cat.id, score)}
+            onUnsetCategory={() => onUnsetCategory(cat.id)}
           />
         ))}
         <tr style={{ fontWeight: 'bold', borderTop: '2px solid #333' }}>

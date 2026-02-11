@@ -82,6 +82,24 @@ function computeTotalScore(categories: CategoryState[], bonus: number): number {
   return sum + bonus;
 }
 
+function computeScoredMask(categories: CategoryState[]): number {
+  return categories.reduce(
+    (mask, c) => (c.isScored ? mask | (1 << c.id) : mask), 0
+  );
+}
+
+function recomputeDerived(categories: CategoryState[]) {
+  const upperScore = computeUpperScore(categories);
+  const rawUpperSum = categories.slice(0, UPPER_CATEGORIES).reduce(
+    (s, c) => s + (c.isScored ? c.score : 0), 0
+  );
+  const bonus = rawUpperSum >= BONUS_THRESHOLD ? BONUS_SCORE : 0;
+  const totalScore = computeTotalScore(categories, bonus);
+  const scoredCategories = computeScoredMask(categories);
+  const scoredCount = categories.filter((c) => c.isScored).length;
+  return { upperScore, bonus, totalScore, scoredCategories, scoredCount };
+}
+
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case 'ROLL': {
@@ -133,26 +151,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           : c
       );
 
-      const upperScore = computeUpperScore(categories);
-      const rawUpperSum = categories.slice(0, UPPER_CATEGORIES).reduce(
-        (s, c) => s + (c.isScored ? c.score : 0), 0
-      );
-      const bonus = rawUpperSum >= BONUS_THRESHOLD ? BONUS_SCORE : 0;
-      const totalScore = computeTotalScore(categories, bonus);
-      const scoredCategories = categories.reduce(
-        (mask, c) => (c.isScored ? mask | (1 << c.id) : mask), 0
-      );
-
-      const scoredCount = categories.filter((c) => c.isScored).length;
-      const turnPhase = scoredCount >= CATEGORY_COUNT ? 'game_over' as const : 'idle' as const;
+      const derived = recomputeDerived(categories);
+      const turnPhase = derived.scoredCount >= CATEGORY_COUNT ? 'game_over' as const : 'idle' as const;
 
       return {
         ...state,
         categories,
-        upperScore,
-        totalScore,
-        bonus,
-        scoredCategories,
+        upperScore: derived.upperScore,
+        totalScore: derived.totalScore,
+        bonus: derived.bonus,
+        scoredCategories: derived.scoredCategories,
         lastEvalResponse: null,
         sortMap: null,
         turnPhase,
@@ -181,6 +189,99 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'TOGGLE_DEBUG':
       return { ...state, showDebug: !state.showDebug };
+
+    case 'SET_DIE_VALUE': {
+      const { index, value } = action;
+      if (index < 0 || index >= TOTAL_DICE || value < 0 || value > 6) return state;
+      let dice = state.dice.map((d, i) =>
+        i === index ? { ...d, value } : d
+      );
+      let turnPhase = state.turnPhase;
+      let rerollsRemaining = state.rerollsRemaining;
+      // If idle or game_over, transition to rolled and fill zero dice with 1
+      if (turnPhase === 'idle' || turnPhase === 'game_over') {
+        turnPhase = 'rolled';
+        rerollsRemaining = 2;
+        dice = dice.map((d) => ({
+          value: d.value === 0 ? 1 : d.value,
+          held: true,
+        }));
+      }
+      return {
+        ...state,
+        dice,
+        turnPhase,
+        rerollsRemaining,
+        lastEvalResponse: null,
+        sortMap: null,
+      };
+    }
+
+    case 'SET_REROLLS': {
+      if (state.turnPhase !== 'rolled') return state;
+      const rerollsRemaining = Math.max(0, Math.min(2, action.rerollsRemaining));
+      return {
+        ...state,
+        rerollsRemaining,
+        lastEvalResponse: null,
+        sortMap: null,
+      };
+    }
+
+    case 'SET_CATEGORY_SCORE': {
+      const { categoryId, score } = action;
+      const cat = state.categories[categoryId];
+      if (!cat) return state;
+
+      const categories = state.categories.map((c) =>
+        c.id === categoryId
+          ? { ...c, isScored: true, score }
+          : c
+      );
+
+      const derived = recomputeDerived(categories);
+      const turnPhase = derived.scoredCount >= CATEGORY_COUNT ? 'game_over' as const : 'idle' as const;
+
+      return {
+        ...state,
+        categories,
+        upperScore: derived.upperScore,
+        totalScore: derived.totalScore,
+        bonus: derived.bonus,
+        scoredCategories: derived.scoredCategories,
+        lastEvalResponse: null,
+        sortMap: null,
+        turnPhase,
+        rerollsRemaining: 0,
+      };
+    }
+
+    case 'UNSET_CATEGORY': {
+      const { categoryId } = action;
+      const cat = state.categories[categoryId];
+      if (!cat || !cat.isScored) return state;
+
+      const categories = state.categories.map((c) =>
+        c.id === categoryId
+          ? { ...c, isScored: false, score: 0 }
+          : c
+      );
+
+      const derived = recomputeDerived(categories);
+      const turnPhase = state.turnPhase === 'game_over' ? 'idle' as const : state.turnPhase;
+
+      return {
+        ...state,
+        categories,
+        upperScore: derived.upperScore,
+        totalScore: derived.totalScore,
+        bonus: derived.bonus,
+        scoredCategories: derived.scoredCategories,
+        lastEvalResponse: null,
+        sortMap: null,
+        turnPhase,
+      };
+    }
 
     case 'RESET_GAME':
       clearSavedState();

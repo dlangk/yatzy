@@ -46,10 +46,13 @@ export function App() {
     }
   }, []);
 
-  // Auto-evaluate after ROLL or REROLL (when lastEvalResponse is cleared)
+  // Auto-evaluate after ROLL, REROLL, or manual edits (when lastEvalResponse is cleared)
   useEffect(() => {
     if (state.turnPhase === 'rolled' && !state.lastEvalResponse) {
-      callEvaluate(state);
+      const allValid = state.dice.every(d => d.value >= 1 && d.value <= 6);
+      if (allValid) {
+        callEvaluate(state);
+      }
     }
   }, [state.turnPhase, state.lastEvalResponse, callEvaluate]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -66,11 +69,13 @@ export function App() {
         onRoll={() => dispatch({ type: 'ROLL' })}
         onReroll={() => dispatch({ type: 'REROLL' })}
         onReset={() => dispatch({ type: 'RESET_GAME' })}
+        onSetRerolls={(r) => dispatch({ type: 'SET_REROLLS', rerollsRemaining: r })}
       />
 
       <DiceBar
         dice={state.dice}
         onToggle={(i) => dispatch({ type: 'TOGGLE_DIE', index: i })}
+        onSetDie={(i, v) => dispatch({ type: 'SET_DIE_VALUE', index: i, value: v })}
         optimalMask={optimalMask}
         rerollsRemaining={state.rerollsRemaining}
         turnPhase={state.turnPhase}
@@ -101,6 +106,8 @@ export function App() {
         turnPhase={state.turnPhase}
         optimalCategoryId={state.lastEvalResponse?.optimal_category ?? null}
         onScoreCategory={(id) => dispatch({ type: 'SCORE_CATEGORY', categoryId: id })}
+        onSetCategoryScore={(id, score) => dispatch({ type: 'SET_CATEGORY_SCORE', categoryId: id, score })}
+        onUnsetCategory={(id) => dispatch({ type: 'UNSET_CATEGORY', categoryId: id })}
       />
 
       <div style={{ textAlign: 'center', marginTop: 12 }}>

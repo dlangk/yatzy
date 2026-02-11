@@ -6,6 +6,7 @@ interface ActionBarProps {
   onRoll: () => void;
   onReroll: () => void;
   onReset: () => void;
+  onSetRerolls: (rerolls: number) => void;
 }
 
 const containerStyle: React.CSSProperties = {
@@ -17,7 +18,21 @@ const containerStyle: React.CSSProperties = {
   minHeight: 40,
 };
 
-export function ActionBar({ turnPhase, rerollsRemaining, onRoll, onReroll, onReset }: ActionBarProps) {
+const smallBtnStyle: React.CSSProperties = {
+  fontSize: 14,
+  width: 24,
+  height: 24,
+  padding: 0,
+  border: '1px solid #ccc',
+  background: '#f0f0f0',
+  cursor: 'pointer',
+  borderRadius: 3,
+  lineHeight: '22px',
+};
+
+export function ActionBar({ turnPhase, rerollsRemaining, onRoll, onReroll, onReset, onSetRerolls }: ActionBarProps) {
+  const showRerollControls = turnPhase === 'rolled';
+
   if (turnPhase === 'game_over') {
     return (
       <div style={containerStyle}>
@@ -45,6 +60,22 @@ export function ActionBar({ turnPhase, rerollsRemaining, onRoll, onReroll, onRes
           Reroll ({rerollsRemaining})
         </button>
       )}
+      <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center', visibility: showRerollControls ? 'visible' : 'hidden' }}>
+        <button
+          onClick={() => onSetRerolls(rerollsRemaining - 1)}
+          disabled={rerollsRemaining <= 0}
+          style={smallBtnStyle}
+        >
+          &minus;
+        </button>
+        <button
+          onClick={() => onSetRerolls(rerollsRemaining + 1)}
+          disabled={rerollsRemaining >= 2}
+          style={smallBtnStyle}
+        >
+          +
+        </button>
+      </span>
       <button
         onClick={() => {
           if (window.confirm('Reset game? All progress will be lost.')) {
