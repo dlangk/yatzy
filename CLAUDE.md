@@ -31,6 +31,9 @@ YATZY_BASE_PATH=. target/release/yatzy-precompute
 
 # Run the backend server (port 9000)
 YATZY_BASE_PATH=. target/release/yatzy
+
+# Simulate games and generate statistics
+YATZY_BASE_PATH=. target/release/yatzy-simulate --games 1000000 --output results
 ```
 
 ### Frontend Development
@@ -60,7 +63,7 @@ docker-compose up --build
 
 The backend is a multithreaded Rust application with precomputed game states:
 
-- **Entry Points**: `src/bin/server.rs` (API server), `src/bin/precompute.rs` (offline precomputation)
+- **Entry Points**: `src/bin/server.rs` (API server), `src/bin/precompute.rs` (offline precomputation), `src/bin/simulate.rs` (simulation + statistics)
 - **Phase 0 — Precompute lookup tables**:
   - `phase0_tables.rs` - Builds all static lookup tables (scores, keep-multiset table, probabilities)
   - `game_mechanics.rs` - Yatzy scoring rules: s(S, r, c)
@@ -71,6 +74,10 @@ The backend is a multithreaded Rust application with precomputed game states:
 - **API layer**:
   - `api_computations.rs` - Wrappers that compose widget solver primitives for HTTP handlers
   - `server.rs` - axum router, 9 HTTP handlers, CORS via tower-http
+- **Simulation** (`simulation/`):
+  - `engine.rs` - Simulate games with optimal strategy, with/without recording
+  - `statistics.rs` - Aggregate statistics from recorded games
+  - `raw_storage.rs` - Binary I/O for raw simulation data (mmap)
 - **Infrastructure**:
   - `types.rs` - YatzyContext, KeepTable, StateValues (owned/mmap)
   - `constants.rs` - Category enum, state_index, NUM_STATES

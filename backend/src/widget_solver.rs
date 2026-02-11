@@ -284,7 +284,7 @@ pub fn compute_expected_values_for_n_rerolls(
 /// then distributes results to all 252 dice sets via lookup. This eliminates
 /// ~8.9x redundant dot products (4,108 → 462 per call).
 #[inline(always)]
-fn compute_max_ev_for_n_rerolls(
+pub fn compute_max_ev_for_n_rerolls(
     ctx: &YatzyContext,
     e_ds_prev: &[f32; 252],
     e_ds_current: &mut [f32; 252],

@@ -10,6 +10,7 @@
 //! | GET | `/health` | Health check |
 //! | GET | `/state_value` | Look up E_table[S] for a given state |
 //! | GET | `/score_histogram` | Binned score distribution from CSV |
+//! | GET | `/statistics` | Aggregated game statistics from simulation |
 //! | POST | `/evaluate` | All mask EVs + category EVs for one roll |
 
 use std::sync::Arc;
@@ -39,6 +40,7 @@ pub fn create_router(ctx: Arc<YatzyContext>) -> Router {
         .route("/health", get(handle_health_check))
         .route("/state_value", get(handle_get_state_value))
         .route("/score_histogram", get(handle_get_score_histogram))
+        .route("/statistics", get(handle_get_statistics))
         .route("/evaluate", post(handle_evaluate))
         .layer(cors)
         .with_state(ctx)
@@ -122,6 +124,33 @@ async fn handle_get_score_histogram(
         "bin_count": bin_count,
         "bins": bins,
     })))
+}
+
+async fn handle_get_statistics(
+    State(_ctx): State<AppState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let file_path = "results/game_statistics.json";
+    let content = match std::fs::read_to_string(file_path) {
+        Ok(c) => c,
+        Err(_) => {
+            return Err(error_response(
+                StatusCode::NOT_FOUND,
+                "Statistics not found. Run yatzy-simulate --output results first.",
+            ))
+        }
+    };
+
+    let json: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => {
+            return Err(error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to parse statistics JSON",
+            ))
+        }
+    };
+
+    Ok(Json(json))
 }
 
 // ── POST handler ────────────────────────────────────────────────────
