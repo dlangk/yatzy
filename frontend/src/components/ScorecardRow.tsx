@@ -7,6 +7,8 @@ interface ScorecardRowProps {
   onScore: () => void;
   onSetScore: (score: number) => void;
   onUnsetCategory: () => void;
+  scoreFraction: number;
+  evFraction: number | null;
 }
 
 const cellStyle: React.CSSProperties = {
@@ -16,19 +18,50 @@ const cellStyle: React.CSSProperties = {
   boxSizing: 'border-box',
 };
 
-export function ScorecardRow({ category, isOptimal, canScore, onScore, onSetScore, onUnsetCategory }: ScorecardRowProps) {
-  const bg = category.isScored ? '#f0f0f0' : isOptimal ? '#d4edda' : 'transparent';
+function sparkGradient(fraction: number, color: string): string {
+  const pct = `${(fraction * 100).toFixed(1)}%`;
+  return `linear-gradient(to right, ${color} ${pct}, transparent ${pct})`;
+}
+
+export function ScorecardRow({ category, isOptimal, canScore, onScore, onSetScore, onUnsetCategory, scoreFraction, evFraction }: ScorecardRowProps) {
+  const displayedScore = category.isScored ? category.score : category.suggestedScore;
+  const isZero = !category.isScored && displayedScore === 0;
+  const dimmed = isZero && !isOptimal;
+
+  const bg = category.isScored
+    ? '#f0f0f0'
+    : isOptimal
+      ? '#d4edda'
+      : 'transparent';
+
+  const nameColor = dimmed ? '#aaa' : 'inherit';
+
+  const scoreBarColor = isOptimal
+    ? 'rgba(40, 167, 69, 0.18)'
+    : category.isScored
+      ? 'rgba(0, 0, 0, 0.06)'
+      : 'rgba(59, 130, 246, 0.15)';
+
+  const evBarColor = isOptimal
+    ? 'rgba(40, 167, 69, 0.18)'
+    : 'rgba(59, 130, 246, 0.15)';
+
   const showAction = canScore && !category.isScored && category.available;
+  const hasEv = !category.isScored && category.available;
 
   return (
     <tr style={{ background: bg }}>
-      <td style={cellStyle}>
+      <td style={{ ...cellStyle, color: nameColor }}>
         {category.name}
       </td>
-      <td style={{ ...cellStyle, textAlign: 'center' }}>
+      <td style={{
+        ...cellStyle,
+        textAlign: 'center',
+        background: scoreFraction > 0 ? sparkGradient(scoreFraction, scoreBarColor) : undefined,
+      }}>
         <input
           type="number"
-          value={category.isScored ? category.score : (category.suggestedScore ?? 0)}
+          value={displayedScore}
           onChange={(e) => {
             const v = parseInt(e.target.value, 10);
             if (!isNaN(v) && v >= 0) onSetScore(v);
@@ -42,12 +75,19 @@ export function ScorecardRow({ category, isOptimal, canScore, onScore, onSetScor
             fontSize: 14,
             padding: 0,
             height: 24,
+            color: dimmed ? '#aaa' : 'inherit',
             MozAppearance: 'textfield',
           }}
         />
       </td>
-      <td style={{ ...cellStyle, textAlign: 'center', fontSize: 12 }}>
-        {!category.isScored && category.available ? category.evIfScored.toFixed(1) : ''}
+      <td style={{
+        ...cellStyle,
+        textAlign: 'center',
+        fontSize: 12,
+        color: dimmed ? '#aaa' : 'inherit',
+        background: evFraction != null && evFraction > 0 ? sparkGradient(evFraction, evBarColor) : undefined,
+      }}>
+        {hasEv ? category.evIfScored.toFixed(1) : ''}
       </td>
       <td style={{ ...cellStyle, textAlign: 'center' }}>
         <button
