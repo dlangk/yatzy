@@ -16,8 +16,8 @@ YATZY_BASE_PATH=. RAYON_NUM_THREADS=8 target/release/yatzy-precompute
 # Start API server (port 9000)
 YATZY_BASE_PATH=. target/release/yatzy
 
-# Simulate games (output to repo-root results/)
-YATZY_BASE_PATH=. target/release/yatzy-simulate --games 1000000 --output ../results
+# Simulate games (output to analytics/results/bin_files/)
+YATZY_BASE_PATH=. target/release/yatzy-simulate --games 1000000 --output ../analytics/results/bin_files
 ```
 
 ## Source Layout
@@ -63,7 +63,7 @@ S = (m, C) where m = upper score [0,63], C = 15-bit scored-categories bitmask. I
 ## Important Notes
 
 - `data/` is a symlink to `../backend-legacy-c/data` (shared `all_states.bin`)
-- Simulation output goes to `../results/` (repo root, gitignored)
-- Analysis package lives at `../analysis/` (repo root)
+- Simulation output goes to `../analytics/results/bin_files/` (gitignored)
+- Analytics package lives at `../analytics/` (repo root)
 - All computation uses f32 throughout (storage + internal accumulation)
 - `RAYON_NUM_THREADS=8` is optimal on Apple Silicon

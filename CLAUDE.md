@@ -7,11 +7,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Delta Yatzy is a web-based implementation of the classic dice game with optimal action suggestions and multiplayer support. The project consists of:
 
 - **Backend**: `backend/` — Rust, axum-based API server with rayon parallelism and memmap2 for zero-copy I/O
-- **Analysis**: `analysis/` — Python package for simulation data analysis, plotting, and risk-sweep pipelines
+- **Analytics**: `analytics/` — Python package for simulation data analysis, plotting, and risk-sweep pipelines
 - **Frontend**: Vanilla JavaScript single-page application with dynamic UI and Chart.js visualizations
-- **Results**: `results/` — Generated simulation output, parquet intermediates, and plots (gitignored)
 - **Theory**: `theory/` — Analytical insights about Yatzy strategy and score distributions
 - **Docker**: Containerized deployment for frontend + backend
+
+Results (simulation binaries, aggregated parquet/csv/json, plots) live inside `analytics/results/`.
 
 A legacy C implementation exists in `backend-legacy-c/` for reference only.
 
@@ -40,20 +41,23 @@ YATZY_BASE_PATH=backend backend/target/release/yatzy-precompute
 YATZY_BASE_PATH=backend backend/target/release/yatzy
 
 # Simulate games and generate statistics (from repo root)
-YATZY_BASE_PATH=backend backend/target/release/yatzy-simulate --games 1000000 --output ../results
+YATZY_BASE_PATH=backend backend/target/release/yatzy-simulate --games 1000000 --output analytics/results/bin_files
 ```
 
-### Analysis (Python)
+### Analytics (Python)
 
 ```bash
 # Setup (once)
-cd analysis && uv venv && uv pip install -e .
+cd analytics && uv venv && uv pip install -e .
 
-# Run analysis pipeline (from repo root)
-analysis/.venv/bin/yatzy-analyze run --base-path results
+# Run analytics pipeline (from repo root)
+analytics/.venv/bin/yatzy-analyze run
 
 # Print summary table
-analysis/.venv/bin/yatzy-analyze summary --base-path results
+analytics/.venv/bin/yatzy-analyze summary
+
+# Run efficiency metrics
+analytics/.venv/bin/yatzy-analyze efficiency
 ```
 
 ### Frontend Development
@@ -102,6 +106,32 @@ The backend is a multithreaded Rust application with precomputed game states:
   - `types.rs` - YatzyContext, KeepTable, StateValues (owned/mmap)
   - `constants.rs` - Category enum, state_index, NUM_STATES
   - `storage.rs` - Binary file I/O (16-byte header + float[2M], zero-copy mmap via memmap2)
+
+### Analytics Structure (`analytics/`)
+
+Python package (`yatzy-analysis`) with CLI entry point `yatzy-analyze`:
+
+- **Source**: `analytics/src/yatzy_analysis/`
+  - `cli.py` - CLI commands: extract, compute, plot, efficiency, run, summary, tail
+  - `compute.py` - Summary stats, KDE, MER, SDVA, CVaR
+  - `config.py` - Path resolution, binary format constants, theta grids
+  - `io.py` - Binary file reading (simulation_raw.bin)
+  - `store.py` - Parquet save/load
+  - `plots/` - Plotting modules (cdf, density, efficiency, combined, etc.)
+
+### Results Layout (`analytics/results/`)
+
+```
+analytics/results/
+  bin_files/                    # Raw simulation binaries
+    theta/theta_*/              # Per-theta simulation_raw.bin + game_statistics.json
+    max_policy/scores.bin       # Max-policy simulation
+  aggregates/                   # Processed data by format
+    parquet/                    # kde, summary, scores, mer, sdva
+    csv/                        # density_kde, scores_cdf, summary_stats
+    json/                       # game_statistics
+  plots/                        # Generated PNG visualizations (flat directory)
+```
 
 ### Frontend Structure
 

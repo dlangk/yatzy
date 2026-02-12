@@ -43,20 +43,33 @@ PLOT_SUBSETS: dict[str, list[float]] = {
 
 
 # ── Path resolution ─────────────────────────────────────────────────────────
+# New layout:
+#   analytics/results/
+#     bin_files/theta/theta_*/simulation_raw.bin
+#     bin_files/max_policy/scores.bin
+#     aggregates/parquet/  (kde, summary, scores, mer, sdva)
+#     aggregates/csv/
+#     aggregates/json/
+#     plots/               (flat, no subfolders)
+
 def results_dir(base_path: str = "results") -> Path:
     return Path(base_path)
 
 
-def analysis_dir(base_path: str = "results") -> Path:
-    return results_dir(base_path) / "analysis"
+def aggregates_dir(base_path: str = "results") -> Path:
+    return results_dir(base_path) / "aggregates" / "parquet"
 
 
 def plots_dir(base_path: str = "results") -> Path:
     return results_dir(base_path) / "plots"
 
 
+def bin_files_dir(base_path: str = "results") -> Path:
+    return results_dir(base_path) / "bin_files"
+
+
 def theta_base_dir(base_path: str = "results") -> Path:
-    return results_dir(base_path) / "theta"
+    return bin_files_dir(base_path) / "theta"
 
 
 def theta_dir(theta: float, base_path: str = "results") -> Path:
@@ -68,13 +81,11 @@ def fmt_theta_dir(t: float) -> str:
     if t == 0:
         return "0"
     s = f"{t:g}"
-    # Check if directory exists with this name; if not, try .1f format
-    # (deferred to runtime in io.py where base_path is known)
     return s
 
 
 def discover_thetas(base_path: str = "results") -> list[float]:
-    """Scan results/theta/ directory for theta_* subdirs containing simulation_raw.bin."""
+    """Scan bin_files/theta/ directory for theta_* subdirs containing simulation_raw.bin."""
     base = theta_base_dir(base_path)
     thetas = []
     if not base.is_dir():
@@ -89,3 +100,7 @@ def discover_thetas(base_path: str = "results") -> list[float]:
                 except ValueError:
                     pass
     return sorted(thetas)
+
+
+# Backwards compat alias — old code used analysis_dir()
+analysis_dir = aggregates_dir

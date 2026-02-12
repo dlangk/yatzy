@@ -23,7 +23,7 @@ A web-based implementation of Scandinavian Yatzy with optimal action suggestions
 # Build backend
 cd backend && cargo build --release
 
-# Precompute state values (required once, ~90s)
+# Precompute state values (required once, ~2.3s)
 YATZY_BASE_PATH=. RAYON_NUM_THREADS=8 target/release/yatzy-precompute
 
 # Start backend API server (port 9000)
@@ -45,12 +45,26 @@ docker-compose up --build
 
 ```bash
 cd backend
-cargo test                    # 29 unit + 20 integration = 49 tests
+cargo test                    # 49 unit + 25 integration = 74 tests
 cargo fmt --check             # formatting
 cargo clippy                  # lints
 ```
 
 ## Project Structure
+
+```
+yatzy/
+  backend/              # Rust API server + solver
+  analytics/            # Python analysis package + results
+    src/yatzy_analysis/ # Package source
+    results/            # Simulation output (gitignored)
+      bin_files/        # Raw simulation binaries
+      aggregates/       # Processed parquet/csv/json
+      plots/            # Generated visualizations
+  frontend/             # Vanilla JS SPA
+  theory/               # Strategy documentation
+  backend-legacy-c/     # Legacy C implementation (reference)
+```
 
 ### Backend (`backend/`)
 
@@ -74,7 +88,23 @@ Source modules:
 | `types.rs` | YatzyContext, KeepTable, StateValues (owned/mmap) |
 | `storage.rs` | Binary file I/O (zero-copy mmap via memmap2) |
 
-See `theory/optimal_yahtzee_pseudocode.md` for the algorithm specification that the code implements.
+See `theory/pseudocode.md` for the algorithm specification that the code implements.
+
+### Analytics (`analytics/`)
+
+Python package for simulation analysis, risk-sweep pipelines, and visualization.
+
+```bash
+# Setup
+cd analytics && uv venv && uv pip install -e .
+
+# Run full pipeline (from repo root)
+analytics/.venv/bin/yatzy-analyze run
+
+# Print summary / efficiency metrics
+analytics/.venv/bin/yatzy-analyze summary
+analytics/.venv/bin/yatzy-analyze efficiency
+```
 
 ### Frontend (`frontend/`)
 

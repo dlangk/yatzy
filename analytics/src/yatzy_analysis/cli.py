@@ -13,7 +13,7 @@ def cli():
 
 
 @cli.command()
-@click.option("--base-path", default="results", help="Path to results directory.")
+@click.option("--base-path", default="analytics/results", help="Path to results directory.")
 def extract(base_path: str):
     """Step 1: Read raw binaries → scores.parquet."""
     from .config import analysis_dir, discover_thetas
@@ -38,7 +38,7 @@ def extract(base_path: str):
 
 
 @cli.command()
-@click.option("--base-path", default="results", help="Path to results directory.")
+@click.option("--base-path", default="analytics/results", help="Path to results directory.")
 def compute(base_path: str):
     """Step 2: scores.parquet → summary.parquet + kde.parquet."""
     from .compute import compute_all
@@ -67,7 +67,7 @@ def compute(base_path: str):
 
 
 @cli.command()
-@click.option("--base-path", default="results", help="Path to results directory.")
+@click.option("--base-path", default="analytics/results", help="Path to results directory.")
 @click.option(
     "--subset", default="all", type=click.Choice(["all", "dense", "sparse"]),
     help="Which theta subset to plot.",
@@ -100,48 +100,44 @@ def plot(base_path: str, subset: str, fmt: str, dpi: int):
     summary_all = load_summary(summary_path)
     kde_all = load_kde(kde_path)
 
-    if subset == "all":
-        subsets_to_plot = list(PLOT_SUBSETS.items())
-    elif subset == "dense":
-        subsets_to_plot = [("theta_dense", PLOT_SUBSETS["theta_dense"])]
-    elif subset == "sparse":
-        subsets_to_plot = [("theta_sparse", PLOT_SUBSETS["theta_sparse"])]
+    theta_list = PLOT_SUBSETS.get(
+        {"all": "all", "dense": "theta_dense", "sparse": "theta_sparse"}[subset],
+        PLOT_SUBSETS["all"],
+    )
 
-    for subset_name, theta_list in subsets_to_plot:
-        out_dir = plots_dir(base_path) / subset_name
-        out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = plots_dir(base_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-        # Filter to available thetas
-        available = set(summary_all["theta"].unique())
-        thetas = sorted([t for t in theta_list if t in available])
+    # Filter to available thetas
+    available = set(summary_all["theta"].unique())
+    thetas = sorted([t for t in theta_list if t in available])
 
-        stats_df = summary_all[summary_all["theta"].isin(thetas)]
-        k_df = kde_all[kde_all["theta"].isin(thetas)]
-        # kde.parquet has cdf and survival columns, so it serves as cdf_df too
-        cdf_df = k_df
+    stats_df = summary_all[summary_all["theta"].isin(thetas)]
+    k_df = kde_all[kde_all["theta"].isin(thetas)]
+    cdf_df = k_df
 
-        click.echo(f"[{subset_name}] {len(thetas)} thetas → {out_dir}/")
+    click.echo(f"[{subset}] {len(thetas)} thetas → {out_dir}/")
 
-        plot_cdf(thetas, cdf_df, out_dir, dpi=dpi, fmt=fmt)
-        click.echo(f"  cdf_full.{fmt}")
-        plot_tails(thetas, cdf_df, out_dir, dpi=dpi, fmt=fmt)
-        click.echo(f"  tails_zoomed.{fmt}")
-        plot_percentiles(thetas, stats_df, out_dir, dpi=dpi, fmt=fmt)
-        click.echo(f"  percentiles_vs_theta.{fmt}")
-        plot_mean_vs_std(thetas, stats_df, out_dir, dpi=dpi, fmt=fmt)
-        click.echo(f"  mean_vs_std.{fmt}")
-        plot_density(thetas, k_df, out_dir, dpi=dpi, fmt=fmt)
-        click.echo(f"  density.{fmt}")
-        plot_quantile(thetas, cdf_df, out_dir, dpi=dpi, fmt=fmt)
-        click.echo(f"  quantile.{fmt}")
-        plot_combined(thetas, cdf_df, stats_df, k_df, out_dir, dpi=dpi, fmt=fmt)
-        click.echo(f"  combined.{fmt}")
+    plot_cdf(thetas, cdf_df, out_dir, dpi=dpi, fmt=fmt)
+    click.echo(f"  cdf_full.{fmt}")
+    plot_tails(thetas, cdf_df, out_dir, dpi=dpi, fmt=fmt)
+    click.echo(f"  tails_zoomed.{fmt}")
+    plot_percentiles(thetas, stats_df, out_dir, dpi=dpi, fmt=fmt)
+    click.echo(f"  percentiles_vs_theta.{fmt}")
+    plot_mean_vs_std(thetas, stats_df, out_dir, dpi=dpi, fmt=fmt)
+    click.echo(f"  mean_vs_std.{fmt}")
+    plot_density(thetas, k_df, out_dir, dpi=dpi, fmt=fmt)
+    click.echo(f"  density.{fmt}")
+    plot_quantile(thetas, cdf_df, out_dir, dpi=dpi, fmt=fmt)
+    click.echo(f"  quantile.{fmt}")
+    plot_combined(thetas, cdf_df, stats_df, k_df, out_dir, dpi=dpi, fmt=fmt)
+    click.echo(f"  combined.{fmt}")
 
     click.echo(f"Done in {time.time() - t0:.1f}s.")
 
 
 @cli.command()
-@click.option("--base-path", default="results", help="Path to results directory.")
+@click.option("--base-path", default="analytics/results", help="Path to results directory.")
 def efficiency(base_path: str):
     """Compute and display risk-seeking efficiency metrics (MER, SDVA, CVaR)."""
     from .compute import compute_all_sdva, compute_exchange_rates
@@ -235,17 +231,16 @@ def efficiency(base_path: str):
     matplotlib.use("Agg")
     from .plots.efficiency import plot_efficiency
 
-    for subset_name in ["all", "theta_dense"]:
-        pdir = plots_dir(base_path) / subset_name
-        pdir.mkdir(parents=True, exist_ok=True)
-        plot_efficiency(thetas, summary_df, kde_df, mer_df, sdva_df, pdir)
-        click.echo(f"\nSaved {pdir}/efficiency.png")
+    pdir = plots_dir(base_path)
+    pdir.mkdir(parents=True, exist_ok=True)
+    plot_efficiency(thetas, summary_df, kde_df, mer_df, sdva_df, pdir)
+    click.echo(f"\nSaved {pdir}/efficiency.png")
 
     click.echo(f"\nDone in {time.time() - t0:.1f}s.")
 
 
 @cli.command()
-@click.option("--base-path", default="results", help="Path to results directory.")
+@click.option("--base-path", default="analytics/results", help="Path to results directory.")
 def run(base_path: str):
     """Run full pipeline: extract → compute → plot → efficiency."""
     ctx = click.get_current_context()
@@ -256,7 +251,7 @@ def run(base_path: str):
 
 
 @cli.command()
-@click.option("--base-path", default="results", help="Path to results directory.")
+@click.option("--base-path", default="analytics/results", help="Path to results directory.")
 @click.option("--scores-bin", default=None, help="Direct path to scores.bin (old format).")
 def tail(base_path: str, scores_bin: str | None):
     """Tail distribution analysis for max-policy simulations."""
@@ -279,13 +274,15 @@ def tail(base_path: str, scores_bin: str | None):
     else:
         from .io import read_scores
 
-        raw_path = Path(base_path) / "max_policy" / "simulation_raw.bin"
+        from .config import bin_files_dir
+
+        raw_path = bin_files_dir(base_path) / "max_policy" / "simulation_raw.bin"
         if raw_path.exists():
             click.echo(f"Loading scores from {raw_path}...")
             scores = read_scores(raw_path)
         else:
             # Try legacy fallback
-            legacy = Path(base_path) / "max_policy" / "scores.bin"
+            legacy = bin_files_dir(base_path) / "max_policy" / "scores.bin"
             if legacy.exists():
                 click.echo(f"Loading scores from {legacy} (legacy format)...")
                 scores = load_scores_bin(legacy)
@@ -372,7 +369,7 @@ def tail(base_path: str, scores_bin: str | None):
 
 
 @cli.command()
-@click.option("--base-path", default="results", help="Path to results directory.")
+@click.option("--base-path", default="analytics/results", help="Path to results directory.")
 def summary(base_path: str):
     """Print summary table to console (from summary.parquet)."""
     from .config import analysis_dir

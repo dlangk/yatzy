@@ -129,7 +129,7 @@ async fn handle_get_score_histogram(
 async fn handle_get_statistics(
     State(_ctx): State<AppState>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let file_path = "results/game_statistics.json";
+    let file_path = "analytics/results/aggregates/json/game_statistics.json";
     let content = match std::fs::read_to_string(file_path) {
         Ok(c) => c,
         Err(_) => {
