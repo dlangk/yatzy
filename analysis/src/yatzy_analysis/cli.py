@@ -142,12 +142,117 @@ def plot(base_path: str, subset: str, fmt: str, dpi: int):
 
 @cli.command()
 @click.option("--base-path", default="results", help="Path to results directory.")
+def efficiency(base_path: str):
+    """Compute and display risk-seeking efficiency metrics (MER, SDVA, CVaR)."""
+    from .compute import compute_all_sdva, compute_exchange_rates
+    from .config import analysis_dir, plots_dir
+    from .store import load_kde, load_summary
+
+    t0 = time.time()
+    adir = analysis_dir(base_path)
+    summary_path = adir / "summary.parquet"
+    kde_path = adir / "kde.parquet"
+    for p in [summary_path, kde_path]:
+        if not p.exists():
+            click.echo(f"{p} not found. Run 'yatzy-analyze compute' first.")
+            raise SystemExit(1)
+
+    summary_df = load_summary(summary_path)
+    kde_df = load_kde(kde_path)
+    thetas = sorted(summary_df["theta"].unique().tolist())
+
+    click.echo("Computing exchange rates...")
+    mer_df = compute_exchange_rates(summary_df)
+
+    click.echo("Computing stochastic dominance violation areas...")
+    sdva_df = compute_all_sdva(kde_df, thetas)
+
+    # Save to parquet
+    out_dir = adir
+    mer_df.to_parquet(out_dir / "mer.parquet", engine="pyarrow", index=False)
+    sdva_df.to_parquet(out_dir / "sdva.parquet", engine="pyarrow", index=False)
+    click.echo(f"Saved mer.parquet ({len(mer_df)} rows)")
+    click.echo(f"Saved sdva.parquet ({len(sdva_df)} rows)")
+
+    # Print MER table
+    click.echo()
+    click.echo("=== Marginal Exchange Rates (positive θ only) ===")
+    click.echo(
+        f"{'theta':>6s} | {'mean_cost':>9s} | {'MER_p75':>8s} | {'MER_p90':>8s} | "
+        f"{'MER_p95':>8s} | {'MER_p99':>8s} | {'MER_max':>8s}"
+    )
+    click.echo("-" * 72)
+    for _, row in mer_df[mer_df["theta"] > 0].iterrows():
+        def _fmt(v: float) -> str:
+            if abs(v) > 99 or v == float("inf") or v == float("-inf"):
+                return "    dom"
+            return f"{v:8.1f}"
+        t = row["theta"]
+        tstr = f"{t:g}" if t != int(t) or abs(t) < 1 else f"{int(t)}"
+        click.echo(
+            f"{tstr:>6s} | {row['mean_cost']:>9.1f} | {_fmt(row['mer_p75'])} | "
+            f"{_fmt(row['mer_p90'])} | {_fmt(row['mer_p95'])} | "
+            f"{_fmt(row['mer_p99'])} | {_fmt(row['mer_max'])}"
+        )
+
+    # Print SDVA table
+    click.echo()
+    click.echo("=== Stochastic Dominance Violation Areas (positive θ only) ===")
+    click.echo(
+        f"{'theta':>6s} | {'A_worse':>8s} | {'A_better':>8s} | {'ratio':>7s} | {'x_cross':>7s}"
+    )
+    click.echo("-" * 50)
+    for _, row in sdva_df[(sdva_df["theta"] > 0) & (sdva_df["theta"] <= 0.5)].iterrows():
+        t = row["theta"]
+        tstr = f"{t:g}" if t != int(t) or abs(t) < 1 else f"{int(t)}"
+        rstr = f"{row['ratio']:7.1f}" if row["ratio"] < 999 else "    inf"
+        click.echo(
+            f"{tstr:>6s} | {row['a_worse']:8.1f} | {row['a_better']:8.1f} | "
+            f"{rstr} | {row['x_cross']:7.0f}"
+        )
+
+    # Print CVaR table
+    click.echo()
+    click.echo("=== CVaR Deficit (positive θ only) ===")
+    click.echo(
+        f"{'theta':>6s} | {'mean':>7s} | {'CVaR_1':>7s} | {'CVaR_5':>7s} | {'CVaR_10':>7s} | "
+        f"{'deficit_5':>9s}"
+    )
+    click.echo("-" * 58)
+    base = summary_df[summary_df["theta"] == 0.0]
+    base_cvar5 = base.iloc[0]["cvar_5"] if not base.empty else 0.0
+    for _, row in summary_df[(summary_df["theta"] >= 0) & (summary_df["theta"] <= 0.5)].iterrows():
+        t = row["theta"]
+        tstr = f"{t:g}" if t != int(t) or abs(t) < 1 else f"{int(t)}"
+        deficit = row["cvar_5"] - base_cvar5
+        click.echo(
+            f"{tstr:>6s} | {row['mean']:>7.1f} | {row['cvar_1']:>7.1f} | "
+            f"{row['cvar_5']:>7.1f} | {row['cvar_10']:>7.1f} | {deficit:>+9.1f}"
+        )
+
+    # Generate efficiency plot
+    import matplotlib
+    matplotlib.use("Agg")
+    from .plots.efficiency import plot_efficiency
+
+    for subset_name in ["all", "theta_dense"]:
+        pdir = plots_dir(base_path) / subset_name
+        pdir.mkdir(parents=True, exist_ok=True)
+        plot_efficiency(thetas, summary_df, kde_df, mer_df, sdva_df, pdir)
+        click.echo(f"\nSaved {pdir}/efficiency.png")
+
+    click.echo(f"\nDone in {time.time() - t0:.1f}s.")
+
+
+@cli.command()
+@click.option("--base-path", default="results", help="Path to results directory.")
 def run(base_path: str):
-    """Run full pipeline: extract → compute → plot."""
+    """Run full pipeline: extract → compute → plot → efficiency."""
     ctx = click.get_current_context()
     ctx.invoke(extract, base_path=base_path)
     ctx.invoke(compute, base_path=base_path)
     ctx.invoke(plot, base_path=base_path, subset="all", fmt="png", dpi=200)
+    ctx.invoke(efficiency, base_path=base_path)
 
 
 @cli.command()

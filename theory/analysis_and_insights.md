@@ -323,6 +323,91 @@ The quadratic for std(theta) is a **right-leaning parabola** peaking around thet
 
 ---
 
+## Quantifying the Cost of Risk-Seeking
+
+### The asymmetry of risk-seeking
+
+Risk-seeking is expensive and asymmetric. The EV-optimal policy (theta=0) is a **maximum** of mean(theta) by construction, so perturbations cause **quadratic** loss in the mean. But upper percentiles respond **linearly** to small theta (shifting probability mass rightward helps the tail before the mean penalty kicks in). This creates a narrow sweet spot where you get cheap tail gains, followed by rapidly diminishing returns.
+
+### Three efficiency metrics
+
+We compute three complementary metrics from 1M-game simulations at each theta value:
+
+#### 1. Marginal Exchange Rate (MER)
+
+MER_q(theta) = [mean(0) - mean(theta)] / [q(theta) - q(0)]: mean points sacrificed per point of quantile gain.
+
+| theta | Mean cost | MER_p75 | MER_p90 | MER_p95 | MER_p99 | MER_max |
+|------:|----------:|--------:|--------:|--------:|--------:|--------:|
+| 0.01 | 0.2 | 0.2 | 0.2 | 0.2 | dom | 0.2 |
+| 0.02 | 0.7 | 0.7 | 0.3 | 0.3 | 0.7 | 0.1 |
+| 0.05 | 3.9 | 3.9 | 1.3 | 1.3 | 1.9 | 0.6 |
+| 0.08 | 9.3 | dom | 3.1 | **2.3** | 3.1 | 0.9 |
+| 0.10 | 12.5 | dom | 6.2 | **4.2** | 3.1 | 1.2 |
+| 0.20 | 24.6 | dom | dom | dom | 6.2 | 4.1 |
+
+Key observations:
+- **p75 becomes dominated at theta >= 0.06**: beyond this point, even p75 declines.
+- **p90 becomes dominated at theta >= 0.12**.
+- **p95 peaks at theta ~ 0.08** (MER = 2.3), dominated by theta >= 0.18.
+- **p99 peaks at theta ~ 0.09** (MER = 2.7), stays positive until theta ~ 0.30.
+- **max keeps improving until theta ~ 0.06** at MER < 1 (very cheap).
+
+The "peak benefit theta" shifts rightward for more extreme tail metrics, but the MER keeps rising. The benefit of risk-seeking concentrates into ever-thinner tails while the cost in mean keeps growing.
+
+#### 2. CDF Gain-Loss Decomposition (Stochastic Dominance Violation Area)
+
+For each score x, D(x) = F_theta(x) - F_0(x). Where D > 0, theta puts more probability below x (worse). Where D < 0, theta puts less probability below x (better). We decompose the integral into:
+- **A_worse**: area where risk-seeking hurts
+- **A_better**: area where risk-seeking helps
+- **Ratio**: A_worse / A_better (always > 1 since A_worse - A_better = mean loss)
+- **x_cross**: the score threshold above which risk-seeking helps
+
+| theta | A_worse | A_better | Ratio | Crossing point |
+|------:|--------:|---------:|------:|---------------:|
+| 0.01 | 0.5 | 0.3 | 1.7 | 251 |
+| 0.05 | 4.5 | 0.6 | 7.2 | 271 |
+| 0.08 | 9.7 | 0.4 | 22 | 285 |
+| 0.10 | 12.8 | 0.3 | 38 | 294 |
+| 0.20 | 24.8 | 0.1 | 217 | 312 |
+
+At theta = 0.08, the crossing point is 285 -- you need to score above ~285 (roughly p80 of the baseline distribution) for the risk-seeking policy to have put you in a better position. Below that, you're strictly worse off. The ratio of 22:1 means for every unit of distributional area that improves, 22 units get worse.
+
+#### 3. CVaR Deficit (Expected Shortfall)
+
+CVaR_alpha = mean score in the worst alpha-fraction of games. This measures **tail severity** -- not just how many bad games there are (p5 tells you that), but how bad those games actually are.
+
+| theta | Mean | CVaR_1% | CVaR_5% | CVaR_10% | CVaR_5% deficit |
+|------:|------:|--------:|--------:|---------:|----------------:|
+| 0.00 | 248.4 | 134.8 | 157.4 | 175.3 | -- |
+| 0.05 | 244.5 | 130.7 | 149.0 | 161.9 | -8.4 |
+| 0.08 | 239.1 | 126.7 | 144.2 | 155.2 | -13.2 |
+| 0.10 | 235.9 | 125.6 | 142.6 | 152.9 | -14.8 |
+| 0.20 | 223.8 | 118.9 | 135.7 | 145.0 | -21.7 |
+
+At theta = 0.08: your worst 5% of games average 144.2, down from 157.4 at theta = 0. The 13-point CVaR deficit exceeds the 9-point mean deficit -- risk-seeking hurts the worst games disproportionately.
+
+### How the three metrics work together
+
+| Metric | Question answered | Scope |
+|--------|-------------------|-------|
+| MER | "What does one point of upside cost?" | Point estimate, marginal |
+| MER family | "At what percentile does risk-seeking start to pay off?" | Peak-benefit theta shifts right for rarer events |
+| SDVA | "What fraction of outcomes improve vs degrade?" | Full distributional shape |
+| CVaR | "How bad do the bad games get?" | Downside severity |
+
+### Mathematical intuition
+
+Near theta = 0 (the EV-optimal point):
+- **Mean loss is quadratic**: mean(theta) ~ 248.4 - 618*theta^2
+- **Tail gain is linear**: p95(theta) ~ 309 + c*theta (for small theta)
+
+So initially the exchange rate is cheap (linear benefit, quadratic cost). But the quadratic cost quickly dominates. This is the same reason small portfolio tilts are cheap but large bets are expensive -- convexity of the loss function around an optimum.
+
+The extreme tail (max, top-5 avg) keeps improving well past where p95 peaks, but only because you're concentrating the benefit into an ever-thinner slice of outcomes. At theta = 0.20, max = 358 (vs 352 baseline) but you're sacrificing the experience of ~999,000 games out of 1,000,000 to improve the best ~1,000.
+
+---
+
 ## Adaptive theta: How Humans Actually Play
 
 ### The intuition
