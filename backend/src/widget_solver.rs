@@ -225,6 +225,48 @@ pub fn choose_best_reroll_mask(
     best_mask
 }
 
+/// Find best reroll mask under max-policy: chance nodes use max instead of Σ P·x.
+///
+/// For each unique keep, iterates CSR cols and takes max of `e_ds_for_masks[cols[k]]`
+/// (no probability weighting). Decision node (pick best keep) is unchanged — still argmax.
+pub fn choose_best_reroll_mask_max(
+    ctx: &YatzyContext,
+    e_ds_for_masks: &[f32; 252],
+    dice: &[i32; 5],
+    best_ev: &mut f64,
+) -> i32 {
+    let mut sorted_dice = *dice;
+    sort_dice_set(&mut sorted_dice);
+    let ds_index = find_dice_set_index(ctx, &sorted_dice);
+
+    let kt = &ctx.keep_table;
+    let cols = &kt.cols;
+
+    // mask=0: keep all
+    let mut best_val = e_ds_for_masks[ds_index];
+    let mut best_mask = 0i32;
+
+    for j in 0..kt.unique_count[ds_index] as usize {
+        let kid = kt.unique_keep_ids[ds_index][j] as usize;
+        let start = kt.row_start[kid] as usize;
+        let end = kt.row_start[kid + 1] as usize;
+        let mut max_val = f32::NEG_INFINITY;
+        for k in start..end {
+            let v = unsafe { *e_ds_for_masks.get_unchecked(*cols.get_unchecked(k) as usize) };
+            if v > max_val {
+                max_val = v;
+            }
+        }
+        if max_val > best_val {
+            best_val = max_val;
+            best_mask = kt.keep_to_mask[ds_index * 32 + j];
+        }
+    }
+
+    *best_ev = best_val as f64;
+    best_mask
+}
+
 /// Groups 5 & 3 (API path): propagate EV across one reroll level with mask tracking.
 ///
 /// For each dice set ds, finds: E(S, ds, n) = max_{r' ⊆ ds} Σ P(r'→r'') · E_prev[r'']
@@ -314,6 +356,49 @@ pub fn compute_max_ev_for_n_rerolls(
         for j in 0..kt.unique_count[ds_i] as usize {
             let kid = unsafe { *kt.unique_keep_ids[ds_i].get_unchecked(j) } as usize;
             let ev = unsafe { *keep_ev.get_unchecked(kid) };
+            if ev > best_val {
+                best_val = ev;
+            }
+        }
+        e_ds_current[ds_i] = best_val;
+    }
+}
+
+/// DP-only variant of Groups 5/3 for max-policy mode.
+///
+/// Instead of a dot product `Σ P·x`, takes `max` over reachable dice sets.
+/// Step 1: For each keep-multiset, find max of `e_ds_prev[cols[k]]` (ignoring probabilities).
+/// Step 2: For each dice set, find best keep via max over `keep_max[kid]`.
+#[inline(always)]
+pub fn compute_max_outcome_for_n_rerolls(
+    ctx: &YatzyContext,
+    e_ds_prev: &[f32; 252],
+    e_ds_current: &mut [f32; 252],
+) {
+    let kt = &ctx.keep_table;
+    let cols = &kt.cols;
+
+    // Step 1: compute max outcome for each unique keep-multiset
+    let mut keep_max = [f32::NEG_INFINITY; NUM_KEEP_MULTISETS];
+    for kid in 0..NUM_KEEP_MULTISETS {
+        let start = kt.row_start[kid] as usize;
+        let end = kt.row_start[kid + 1] as usize;
+        let mut max_val = f32::NEG_INFINITY;
+        for k in start..end {
+            let v = unsafe { *e_ds_prev.get_unchecked(*cols.get_unchecked(k) as usize) };
+            if v > max_val {
+                max_val = v;
+            }
+        }
+        keep_max[kid] = max_val;
+    }
+
+    // Step 2: for each dice set, find max over its unique keeps (decision node)
+    for ds_i in 0..252 {
+        let mut best_val = e_ds_prev[ds_i]; // mask=0: keep all
+        for j in 0..kt.unique_count[ds_i] as usize {
+            let kid = unsafe { *kt.unique_keep_ids[ds_i].get_unchecked(j) } as usize;
+            let ev = unsafe { *keep_max.get_unchecked(kid) };
             if ev > best_val {
                 best_val = ev;
             }
@@ -422,6 +507,344 @@ pub fn compute_expected_state_value(ctx: &YatzyContext, state: &YatzyState) -> f
     TIMING_GROUP1_NS.fetch_add(t2.elapsed().as_nanos() as u64, Ordering::Relaxed);
     #[cfg(feature = "timing")]
     TIMING_WIDGET_COUNT.fetch_add(1, Ordering::Relaxed);
+
+    e_s as f64
+}
+
+/// SOLVE_WIDGET for max-policy mode: chance nodes use max instead of Σ P·x.
+///
+/// Group 6: identical to standard EV (decision node — unchanged).
+/// Groups 5/3: call `compute_max_outcome_for_n_rerolls` instead of EV dot products.
+/// Group 1: `max_{ds_i} e[0][ds_i]` instead of `Σ P · e[0]`.
+pub fn compute_max_state_value(ctx: &YatzyContext, state: &YatzyState) -> f64 {
+    let mut e = [[0.0f32; 252]; 2];
+
+    let up_score = state.upper_score;
+    let scored = state.scored_categories;
+    let sv = ctx.state_values.as_slice();
+
+    // Group 6: E(S, r, 0) for all r — decision node, identical to standard EV
+    let mut lower_succ_ev = [0.0f32; CATEGORY_COUNT];
+    for c in 6..CATEGORY_COUNT {
+        if !is_category_scored(scored, c) {
+            lower_succ_ev[c] = unsafe {
+                *sv.get_unchecked(state_index(up_score as usize, (scored | (1 << c)) as usize))
+            };
+        }
+    }
+
+    for ds_i in 0..252 {
+        let mut best_val = f32::NEG_INFINITY;
+
+        for c in 0..6 {
+            if !is_category_scored(scored, c) {
+                let scr = ctx.precomputed_scores[ds_i][c];
+                let new_up = update_upper_score(up_score, c, scr);
+                let new_scored = scored | (1 << c);
+                let val = scr as f32
+                    + unsafe {
+                        *sv.get_unchecked(state_index(new_up as usize, new_scored as usize))
+                    };
+                if val > best_val {
+                    best_val = val;
+                }
+            }
+        }
+
+        for c in 6..CATEGORY_COUNT {
+            if !is_category_scored(scored, c) {
+                let scr = ctx.precomputed_scores[ds_i][c];
+                let val = scr as f32 + unsafe { *lower_succ_ev.get_unchecked(c) };
+                if val > best_val {
+                    best_val = val;
+                }
+            }
+        }
+
+        e[0][ds_i] = best_val;
+    }
+
+    // Groups 5 & 3: max-outcome propagation (chance nodes use max, not Σ P·x)
+    let (e0, e1) = e.split_at_mut(1);
+    compute_max_outcome_for_n_rerolls(ctx, &e0[0], &mut e1[0]);
+
+    let (e0, e1) = e.split_at_mut(1);
+    compute_max_outcome_for_n_rerolls(ctx, &e1[0], &mut e0[0]);
+
+    // Group 1: max over initial rolls (chance node → max instead of Σ P·x)
+    let mut max_val = f32::NEG_INFINITY;
+    for ds_i in 0..252 {
+        if e[0][ds_i] > max_val {
+            max_val = e[0][ds_i];
+        }
+    }
+
+    max_val as f64
+}
+
+/// DP-only variant of Groups 5/3 for risk-sensitive (log-domain) mode.
+///
+/// Instead of a dot product `Σ P·x`, computes log-sum-exp:
+///   LSE(x; w) = m + ln(Σ wᵢ · exp(xᵢ - m))  where m = max(xᵢ)
+///
+/// Step 1 (LSE per keep-multiset) is a stochastic node — always the same.
+/// Step 2 (best keep per dice set) is a decision node — uses min when
+/// `minimize` is true (θ < 0, risk-averse) and max when false (θ > 0).
+#[inline(always)]
+pub fn compute_opt_lse_for_n_rerolls(
+    ctx: &YatzyContext,
+    e_ds_prev: &[f32; 252],
+    e_ds_current: &mut [f32; 252],
+    minimize: bool,
+) {
+    let kt = &ctx.keep_table;
+    let vals = &kt.vals;
+    let cols = &kt.cols;
+
+    // Step 1: compute LSE for each unique keep-multiset (stochastic — unchanged)
+    let mut keep_ev = [0.0f32; NUM_KEEP_MULTISETS];
+    for kid in 0..NUM_KEEP_MULTISETS {
+        let start = kt.row_start[kid] as usize;
+        let end = kt.row_start[kid + 1] as usize;
+        if start == end {
+            keep_ev[kid] = if minimize {
+                f32::INFINITY
+            } else {
+                f32::NEG_INFINITY
+            };
+            continue;
+        }
+        // Pass 1: find max (for numerical stability, always max)
+        let mut max_val = f32::NEG_INFINITY;
+        for k in start..end {
+            let v = unsafe { *e_ds_prev.get_unchecked(*cols.get_unchecked(k) as usize) };
+            if v > max_val {
+                max_val = v;
+            }
+        }
+        // Pass 2: weighted exp-sum
+        let mut sum: f32 = 0.0;
+        for k in start..end {
+            unsafe {
+                let v = *e_ds_prev.get_unchecked(*cols.get_unchecked(k) as usize);
+                sum += (*vals.get_unchecked(k) as f32) * (v - max_val).exp();
+            }
+        }
+        keep_ev[kid] = max_val + sum.ln();
+    }
+
+    // Step 2: for each dice set, find opt (min or max) over its unique keeps (decision node)
+    for ds_i in 0..252 {
+        let mut best_val = e_ds_prev[ds_i]; // mask=0: keep all
+        for j in 0..kt.unique_count[ds_i] as usize {
+            let kid = unsafe { *kt.unique_keep_ids[ds_i].get_unchecked(j) } as usize;
+            let ev = unsafe { *keep_ev.get_unchecked(kid) };
+            let better = if minimize {
+                ev < best_val
+            } else {
+                ev > best_val
+            };
+            if better {
+                best_val = ev;
+            }
+        }
+        e_ds_current[ds_i] = best_val;
+    }
+}
+
+/// Evaluate a single reroll mask in log-domain (risk-sensitive mode).
+///
+/// Computes LSE(e_ds_for_masks[targets]; P(keep→target)).
+#[inline(always)]
+pub fn compute_lse_for_reroll_mask(
+    ctx: &YatzyContext,
+    ds_index: usize,
+    e_ds_for_masks: &[f32; 252],
+    mask: i32,
+) -> f64 {
+    if mask == 0 {
+        return e_ds_for_masks[ds_index] as f64;
+    }
+    let kt = &ctx.keep_table;
+    let vals = &kt.vals;
+    let cols = &kt.cols;
+    let kid = kt.mask_to_keep[ds_index * 32 + mask as usize] as usize;
+    let start = kt.row_start[kid] as usize;
+    let end = kt.row_start[kid + 1] as usize;
+
+    // Pass 1: find max
+    let mut max_val = f32::NEG_INFINITY;
+    for k in start..end {
+        let v = unsafe { *e_ds_for_masks.get_unchecked(*cols.get_unchecked(k) as usize) };
+        if v > max_val {
+            max_val = v;
+        }
+    }
+    // Pass 2: weighted exp-sum
+    let mut sum: f32 = 0.0;
+    for k in start..end {
+        unsafe {
+            let v = *e_ds_for_masks.get_unchecked(*cols.get_unchecked(k) as usize);
+            sum += (*vals.get_unchecked(k) as f32) * (v - max_val).exp();
+        }
+    }
+    (max_val + sum.ln()) as f64
+}
+
+/// Find optimal mask in log-domain (risk-sensitive mode).
+///
+/// Same as `choose_best_reroll_mask` but uses LSE instead of dot product.
+/// When θ < 0 (risk-averse), minimizes at the decision node instead of maximizing.
+pub fn choose_best_reroll_mask_risk(
+    ctx: &YatzyContext,
+    e_ds_for_masks: &[f32; 252],
+    dice: &[i32; 5],
+    best_ev: &mut f64,
+    minimize: bool,
+) -> i32 {
+    let mut sorted_dice = *dice;
+    sort_dice_set(&mut sorted_dice);
+    let ds_index = find_dice_set_index(ctx, &sorted_dice);
+
+    let kt = &ctx.keep_table;
+    let vals = &kt.vals;
+    let cols = &kt.cols;
+
+    // mask=0: keep all
+    let mut best_val = e_ds_for_masks[ds_index];
+    let mut best_mask = 0i32;
+
+    for j in 0..kt.unique_count[ds_index] as usize {
+        let kid = kt.unique_keep_ids[ds_index][j] as usize;
+        let start = kt.row_start[kid] as usize;
+        let end = kt.row_start[kid + 1] as usize;
+
+        // LSE: max + ln(sum(w * exp(x - max))) — stochastic node, always same
+        let mut max_x = f32::NEG_INFINITY;
+        for k in start..end {
+            let v = unsafe { *e_ds_for_masks.get_unchecked(*cols.get_unchecked(k) as usize) };
+            if v > max_x {
+                max_x = v;
+            }
+        }
+        let mut sum: f32 = 0.0;
+        for k in start..end {
+            unsafe {
+                let v = *e_ds_for_masks.get_unchecked(*cols.get_unchecked(k) as usize);
+                sum += (*vals.get_unchecked(k) as f32) * (v - max_x).exp();
+            }
+        }
+        let ev = max_x + sum.ln();
+
+        // Decision node: min for risk-averse, max for risk-seeking
+        let better = if minimize {
+            ev < best_val
+        } else {
+            ev > best_val
+        };
+        if better {
+            best_val = ev;
+            best_mask = kt.keep_to_mask[ds_index * 32 + j];
+        }
+    }
+
+    *best_ev = best_val as f64;
+    best_mask
+}
+
+/// SOLVE_WIDGET for risk-sensitive (log-domain) mode with θ ≠ 0.
+///
+/// The key transformations from the EV domain:
+/// - Group 6: `val = θ·scr + sv[successor]` — decision node (min if θ<0, max if θ>0)
+/// - Groups 5/3: LSE (stochastic) + opt over keeps (decision: min/max)
+/// - Group 1: LSE (stochastic only, no decision)
+///
+/// For θ < 0 (risk-averse), decision nodes use min instead of max.
+/// This is because we maximize the certainty equivalent CE = L(S)/θ,
+/// and dividing by negative θ flips the ordering.
+pub fn compute_expected_state_value_risk(ctx: &YatzyContext, state: &YatzyState) -> f64 {
+    let mut e = [[0.0f32; 252]; 2];
+    let theta = ctx.theta;
+    let minimize = theta < 0.0;
+
+    let up_score = state.upper_score;
+    let scored = state.scored_categories;
+    let sv = ctx.state_values.as_slice();
+
+    // Group 6: opt_{c ∉ C} [θ·scr + sv[successor]] — decision node
+    let mut lower_succ_ev = [0.0f32; CATEGORY_COUNT];
+    for c in 6..CATEGORY_COUNT {
+        if !is_category_scored(scored, c) {
+            lower_succ_ev[c] = unsafe {
+                *sv.get_unchecked(state_index(up_score as usize, (scored | (1 << c)) as usize))
+            };
+        }
+    }
+
+    for ds_i in 0..252 {
+        let mut best_val = if minimize {
+            f32::INFINITY
+        } else {
+            f32::NEG_INFINITY
+        };
+
+        for c in 0..6 {
+            if !is_category_scored(scored, c) {
+                let scr = ctx.precomputed_scores[ds_i][c];
+                let new_up = update_upper_score(up_score, c, scr);
+                let new_scored = scored | (1 << c);
+                let val = theta * scr as f32
+                    + unsafe {
+                        *sv.get_unchecked(state_index(new_up as usize, new_scored as usize))
+                    };
+                let better = if minimize {
+                    val < best_val
+                } else {
+                    val > best_val
+                };
+                if better {
+                    best_val = val;
+                }
+            }
+        }
+
+        for c in 6..CATEGORY_COUNT {
+            if !is_category_scored(scored, c) {
+                let scr = ctx.precomputed_scores[ds_i][c];
+                let val = theta * scr as f32 + unsafe { *lower_succ_ev.get_unchecked(c) };
+                let better = if minimize {
+                    val < best_val
+                } else {
+                    val > best_val
+                };
+                if better {
+                    best_val = val;
+                }
+            }
+        }
+
+        e[0][ds_i] = best_val;
+    }
+
+    // Groups 5 & 3: LSE propagation — decision node uses min/max
+    let (e0, e1) = e.split_at_mut(1);
+    compute_opt_lse_for_n_rerolls(ctx, &e0[0], &mut e1[0], minimize);
+
+    let (e0, e1) = e.split_at_mut(1);
+    compute_opt_lse_for_n_rerolls(ctx, &e1[0], &mut e0[0], minimize);
+
+    // Group 1: L(S) = LSE over initial rolls — stochastic node, always same
+    let mut max_val = f32::NEG_INFINITY;
+    for ds_i in 0..252 {
+        if e[0][ds_i] > max_val {
+            max_val = e[0][ds_i];
+        }
+    }
+    let mut sum: f32 = 0.0;
+    for ds_i in 0..252 {
+        sum += ctx.dice_set_probabilities[ds_i] as f32 * (e[0][ds_i] - max_val).exp();
+    }
+    let e_s = max_val + sum.ln();
 
     e_s as f64
 }

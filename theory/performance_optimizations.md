@@ -1,4 +1,4 @@
-# Performance Optimization: Precomputation from ~20 min to ~2.3s
+# Performance Optimizations: Precomputation from ~20 min to ~2.3s
 
 This document traces the optimization of the backward induction precomputation
 from the original C monolith to the current Rust implementation. Each step
@@ -40,7 +40,7 @@ A single `yatzy.c` file (1,542 lines). The transition table was a dense 3D array
 double transition_table[252][32][252];  // 16.3 MB, 79% zeros
 ```
 
-This stored `P(keep → outcome)` for every combination of dice set (252),
+This stored `P(keep -> outcome)` for every combination of dice set (252),
 reroll mask (32), and outcome dice set (252). The table alone exceeded the
 M1 Max's 12MB shared L2 cache. Every widget solve thrashed the cache
 hierarchy, pulling data from SLC or DRAM at ~200+ cycles per access.
@@ -57,11 +57,11 @@ No parallelism. Single-threaded.
 
 Replaced the dense transition table with Compressed Sparse Row (CSR) format.
 Only 21% of entries were non-zero, so CSR reduced memory from 16.3MB to 5.1MB
-— fitting comfortably in the 12MB shared L2.
+-- fitting comfortably in the 12MB shared L2.
 
 ```
-Dense:  16.3 MB → exceeds L2 → SLC/DRAM reads at ~200 cycles
-Sparse: 5.1 MB  → fits in L2 → reads at ~12 cycles
+Dense:  16.3 MB -> exceeds L2 -> SLC/DRAM reads at ~200 cycles
+Sparse: 5.1 MB  -> fits in L2 -> reads at ~12 cycles
 ```
 
 Added OpenMP parallelism with `schedule(guided)` over states per level.
@@ -78,7 +78,7 @@ Also decomposed the monolithic `computations.c` into focused modules:
 
 - `-O3 -mcpu=apple-m1 -flto -funroll-loops` enables Firestorm-specific
   scheduling and NEON auto-vectorization
-- Added `ComputeMaxEVForNRerolls` — a DP-only variant that drops mask
+- Added `ComputeMaxEVForNRerolls` -- a DP-only variant that drops mask
   tracking, eliminating bookkeeping branches from the hot path
 - Ping-pong buffers `E[2][252]` replaced per-level heap allocation
 - `restrict` qualifiers on sparse table pointers let the compiler prove
@@ -90,7 +90,7 @@ Also decomposed the monolithic `computations.c` into focused modules:
 **Commit `0a9fb13`**
 
 Stored state values as `f32` instead of `f64`, halving the binary from 16MB
-to 8MB. The DP still uses f64 internally for accumulation precision — only
+to 8MB. The DP still uses f64 internally for accumulation precision -- only
 stored results use f32 (7 significant digits, sufficient for game EVs in
 0-400 range).
 
@@ -126,8 +126,8 @@ solve.
 
 **Commit `36819b0`**
 
-Full rewrite: libmicrohttpd → axum, json-c → serde, OpenMP → rayon,
-manual mmap → memmap2. Same binary format, same API contract, 49 tests.
+Full rewrite: libmicrohttpd -> axum, json-c -> serde, OpenMP -> rayon,
+manual mmap -> memmap2. Same binary format, same API contract, 49 tests.
 
 Rayon's work-stealing scheduler adapts better to core heterogeneity than
 OpenMP's static/guided scheduling. The `StateValues` enum gives zero-copy
@@ -148,7 +148,7 @@ Eliminated overhead from Rust's safety guarantees in the inner loops:
   added ~15% overhead. Indices are guaranteed valid by construction.
 - **Unsafe direct writes via `AtomicPtr`**: `par_iter().map().collect()`
   allocates a Vec and scatters results. Direct writes skip the allocation
-  — safe because `state_index` is injective.
+  -- safe because `state_index` is injective.
 - **`#[inline(always)]`**: Forces inlining of widget solver hot functions.
 
 ## Step 7: Three-way optimization (40x)
@@ -157,16 +157,16 @@ Eliminated overhead from Rust's safety guarantees in the inner loops:
 
 Three interlocking optimizations that amplify each other:
 
-### 7a. Keep-EV deduplication (algorithmic — 9x fewer dot products)
+### 7a. Keep-EV deduplication (algorithmic -- 9x fewer dot products)
 
 Within one call to `compute_max_ev_for_n_rerolls`, the input array
 `e_ds_prev` is the **same** for all 252 dice sets. The sparse dot product
 for keep `kid` depends only on `kid` and `e_ds_prev`. But each `kid`
-appears in an average of 8.9 dice sets — meaning the same dot product was
+appears in an average of 8.9 dice sets -- meaning the same dot product was
 computed 8.9 times redundantly.
 
 ```
-Before: 252 dice sets × 16.3 keeps/ds = 4,108 dot products per call
+Before: 252 dice sets * 16.3 keeps/ds = 4,108 dot products per call
 After:  462 unique dot products + 4,108 table lookups per call
 ```
 
@@ -175,11 +175,11 @@ CSR rows (ideal for NEON auto-vectorization via `fmla` instructions), then
 distributes results via array lookups from a 3.7KB buffer that sits
 entirely in L1.
 
-### 7b. State index layout swap (memory layout — 45x faster Group 6)
+### 7b. State index layout swap (memory layout -- 45x faster Group 6)
 
 ```rust
-// Before: up * 32768 + scored  → scattered across 8MB
-// After:  scored * 64 + up     → 256 bytes contiguous
+// Before: up * 32768 + scored  -> scattered across 8MB
+// After:  scored * 64 + up     -> 256 bytes contiguous
 fn state_index(up: usize, scored: usize) -> usize {
     scored * 64 + up
 }
@@ -188,7 +188,7 @@ fn state_index(up: usize, scored: usize) -> usize {
 Group 6 iterates unscored categories. For each category `c`, it looks up
 `sv[state_index(new_up, scored | (1<<c))]`. With the new layout, all 64
 upper-score variants of the same scored mask occupy a contiguous **256-byte
-region** (64 × 4 bytes). On Firestorm, an L1 cache line is 128 bytes —
+region** (64 * 4 bytes). On Firestorm, an L1 cache line is 128 bytes --
 two cache lines cover all possible successor upper scores for a given
 scored mask.
 
@@ -206,7 +206,7 @@ groups.par_iter().for_each(|(scored, ups)| {
 });
 ```
 
-This gives temporal locality on top of spatial locality — consecutive
+This gives temporal locality on top of spatial locality -- consecutive
 widgets in the same group hit the same 256-byte successor regions that
 7b made contiguous.
 
@@ -238,11 +238,11 @@ Sum widget time:    20.3s (across 8 cores)
   Group 53 (dot):  16.5s  (81%)
   Group 1  (sum):   0.3s  (2%)
 Parallel efficiency: 96% of 8 cores
-Per widget:         14.2 µs = ~45,000 cycles @ 3.2GHz
+Per widget:         14.2 us = ~45,000 cycles @ 3.2GHz
 ```
 
 Group 53 dominates because the sparse dot product has a **gather load**
-(`e_ds_prev[cols[k]]`) that defeats NEON vectorization — ARM NEON has no
+(`e_ds_prev[cols[k]]`) that defeats NEON vectorization -- ARM NEON has no
 hardware gather instruction, so each access is a scalar load. This is a
 fundamental hardware limitation at the current sparsity (3.7% density).
 
@@ -252,16 +252,16 @@ The absolute minimum work per widget:
 
 | Component | Operations | Min cycles |
 |-----------|-----------|------------|
-| Group 6 | 252 × ~7.5 categories (score read + sv read + add + compare) | ~6,300 |
-| Groups 5+3 | 2 × (4,368 FMAs + 4,108 comparisons) | ~17,000 |
+| Group 6 | 252 * ~7.5 categories (score read + sv read + add + compare) | ~6,300 |
+| Groups 5+3 | 2 * (4,368 FMAs + 4,108 comparisons) | ~17,000 |
 | Group 1 | 252 multiply-accumulates | ~500 |
 | **Total** | | **~24,000** |
 
-At 24K cycles: `1.43M × 24K / 8 / 3.2 GHz = 1.34s`
+At 24K cycles: `1.43M * 24K / 8 / 3.2 GHz = 1.34s`
 
 Current performance (2.3s) is at **52% of theoretical peak**. The gap is
 almost entirely the cost of scatter-gather memory access patterns in the
-sparse CSR dot product — a fundamental limitation of the format on ARM.
+sparse CSR dot product -- a fundamental limitation of the format on ARM.
 
 ## Step 8: f32 internal computation (precision validation)
 
@@ -286,11 +286,11 @@ Difference:                  0.000153 points (0.00006%)
 Decision impact analysis found 22 successor ordering flips out of 1.43M
 reachable states, all involving pairs where the f64 values differ by less
 than 0.0001 points. The EV loss from any individual "wrong" decision is
-below 0.0002 points — completely irrelevant for gameplay.
+below 0.0002 points -- completely irrelevant for gameplay.
 
 This change enables future GPU acceleration: the M1 Max GPU runs f32 at
 10.4 TFLOPS but f64 at only 325 GFLOPS (1/32 rate). With f32 throughout,
-the GPU path becomes viable for a potential 5-10× additional speedup.
+the GPU path becomes viable for a potential 5-10x additional speedup.
 
 No performance change on CPU (the hot path was already operating on f32
 values from the state array; the f64 accumulators just added unnecessary
@@ -304,5 +304,5 @@ All optimizations preserve numerical correctness:
 - Integration tests check exact EVs (Yatzy=50, straights=15/20),
   optimal reroll masks, category choices, monotonicity across all 1.43M
   reachable states, and the upper bonus cliff
-- Storage format versioned (v3 → v4) to prevent loading old-layout data
+- Storage format versioned (v3 -> v4) to prevent loading old-layout data
 - f32 precision validated: max 0.00046 pt difference, zero decision impact

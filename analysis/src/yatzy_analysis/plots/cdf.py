@@ -3,11 +3,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import pandas as pd
 
 from ..config import MAX_SCORE
-from .style import fmt_theta, setup_theme, theta_color, theta_colorbar
+from .style import fmt_theta, make_norm, setup_theme, theta_color, theta_colorbar
 
 
 def plot_cdf(
@@ -15,18 +16,21 @@ def plot_cdf(
     cdf_df: pd.DataFrame,
     out_dir: Path,
     *,
+    norm: mcolors.Normalize | None = None,
     ax=None,
     dpi: int = 200,
     fmt: str = "png",
 ) -> None:
     setup_theme()
+    if norm is None:
+        norm = make_norm(thetas)
     standalone = ax is None
     if standalone:
         fig, ax = plt.subplots(figsize=(14, 7))
 
     for t in thetas:
         subset = cdf_df[cdf_df["theta"] == t]
-        color = theta_color(t)
+        color = theta_color(t, norm)
         lw = 2.5 if t == 0 else 1.4
         alpha = 1.0 if t == 0 else 0.85
         ax.plot(
@@ -40,7 +44,7 @@ def plot_cdf(
     ax.set_xlim(50, MAX_SCORE)
     ax.set_ylim(0, 1)
     ax.legend(loc="upper left", fontsize=8, ncol=2, framealpha=0.9)
-    theta_colorbar(ax)
+    theta_colorbar(ax, norm)
 
     if standalone:
         fig.tight_layout()
@@ -53,11 +57,14 @@ def plot_tails(
     cdf_df: pd.DataFrame,
     out_dir: Path,
     *,
+    norm: mcolors.Normalize | None = None,
     axes=None,
     dpi: int = 200,
     fmt: str = "png",
 ) -> None:
     setup_theme()
+    if norm is None:
+        norm = make_norm(thetas)
     standalone = axes is None
     if standalone:
         fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(16, 6))
@@ -66,7 +73,7 @@ def plot_tails(
 
     for t in thetas:
         subset = cdf_df[cdf_df["theta"] == t]
-        color = theta_color(t)
+        color = theta_color(t, norm)
         lw = 2.5 if t == 0 else 1.4
         alpha = 1.0 if t == 0 else 0.85
 

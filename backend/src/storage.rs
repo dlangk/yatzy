@@ -16,15 +16,28 @@ use memmap2::Mmap;
 use crate::constants::*;
 use crate::types::{StateValues, YatzyContext};
 
-/// Binary file header: magic + version + state count + reserved.
+/// Binary file header: magic + version + state count + theta_bits.
 ///
 /// Magic bytes "STZY" (0x59545A53) identify the file format.
+/// V4: reserved field is 0. V5: reserved field stores θ as f32 bits.
 #[repr(C)]
 struct StateFileHeader {
     magic: u32,
     version: u32,
     total_states: u32,
-    reserved: u32,
+    /// V4: 0. V5: f32::to_bits(theta).
+    theta_bits: u32,
+}
+
+/// Return the state file path for a given θ value.
+/// θ=0.0 uses the standard `data/all_states.bin`.
+/// Other θ values use `data/all_states_theta_{theta:.3}.bin`.
+pub fn state_file_path(theta: f32) -> String {
+    if theta == 0.0 {
+        "data/all_states.bin".to_string()
+    } else {
+        format!("data/all_states_theta_{:.3}.bin", theta)
+    }
 }
 
 /// Check if a file exists on disk.
@@ -69,10 +82,12 @@ pub fn load_all_state_values(ctx: &mut YatzyContext, filename: &str) -> bool {
         }
     };
 
-    // Validate header
+    // Validate header (accept v4 or v5)
     let header_ptr = mmap.as_ptr() as *const StateFileHeader;
     let header = unsafe { &*header_ptr };
-    if header.magic != STATE_FILE_MAGIC || header.version != STATE_FILE_VERSION {
+    if header.magic != STATE_FILE_MAGIC
+        || (header.version != STATE_FILE_VERSION && header.version != STATE_FILE_VERSION_V5)
+    {
         println!(
             "Invalid file format (magic=0x{:08x} version={})",
             header.magic, header.version
@@ -110,9 +125,13 @@ pub fn save_all_state_values(ctx: &YatzyContext, filename: &str) {
 
     let header = StateFileHeader {
         magic: STATE_FILE_MAGIC,
-        version: STATE_FILE_VERSION,
+        version: if ctx.theta == 0.0 {
+            STATE_FILE_VERSION
+        } else {
+            STATE_FILE_VERSION_V5
+        },
         total_states: NUM_STATES as u32,
-        reserved: 0,
+        theta_bits: ctx.theta.to_bits(),
     };
 
     // Write header

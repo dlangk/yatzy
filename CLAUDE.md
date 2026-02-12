@@ -7,12 +7,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Delta Yatzy is a web-based implementation of the classic dice game with optimal action suggestions and multiplayer support. The project consists of:
 
 - **Backend**: `backend/` — Rust, axum-based API server with rayon parallelism and memmap2 for zero-copy I/O
+- **Analysis**: `analysis/` — Python package for simulation data analysis, plotting, and risk-sweep pipelines
 - **Frontend**: Vanilla JavaScript single-page application with dynamic UI and Chart.js visualizations
+- **Results**: `results/` — Generated simulation output, parquet intermediates, and plots (gitignored)
+- **Theory**: `theory/` — Analytical insights about Yatzy strategy and score distributions
 - **Docker**: Containerized deployment for frontend + backend
 
 A legacy C implementation exists in `backend-legacy-c/` for reference only.
 
 ## Commands
+
+### Convention: Run Everything from Repo Root
+
+All commands below assume you are at the repository root (`yatzy/`).
 
 ### Backend Development
 
@@ -20,27 +27,40 @@ A legacy C implementation exists in `backend-legacy-c/` for reference only.
 # Build the backend
 cd backend && cargo build --release
 
-# Run unit tests
+# Run unit tests (from backend/)
 cargo test
 
 # Run precomputed integration tests (requires data/all_states.bin)
 cargo test --test test_precomputed
 
-# Precompute state values (required once)
-YATZY_BASE_PATH=. target/release/yatzy-precompute
+# Precompute state values (required once, from repo root)
+YATZY_BASE_PATH=backend backend/target/release/yatzy-precompute
 
-# Run the backend server (port 9000)
-YATZY_BASE_PATH=. target/release/yatzy
+# Run the backend server (port 9000, from repo root)
+YATZY_BASE_PATH=backend backend/target/release/yatzy
 
-# Simulate games and generate statistics
-YATZY_BASE_PATH=. target/release/yatzy-simulate --games 1000000 --output results
+# Simulate games and generate statistics (from repo root)
+YATZY_BASE_PATH=backend backend/target/release/yatzy-simulate --games 1000000 --output ../results
+```
+
+### Analysis (Python)
+
+```bash
+# Setup (once)
+cd analysis && uv venv && uv pip install -e .
+
+# Run analysis pipeline (from repo root)
+analysis/.venv/bin/yatzy-analyze run --base-path results
+
+# Print summary table
+analysis/.venv/bin/yatzy-analyze summary --base-path results
 ```
 
 ### Frontend Development
 
 ```bash
 # Run frontend server (from frontend directory)
-python3 serve.py  # Serves on port 8090
+python3 frontend/serve.py  # Serves on port 8090
 
 # Or using Docker
 docker-compose up
@@ -123,6 +143,17 @@ The UI must be pixel-stable: no element may change size, move, or cause reflow w
 - Eval panel: always renders full grid; shows `—` dashes when no data
 - Action bar: `minHeight: 40` container across all turn phases
 - Scorecard rows: `height: 32` cells, button always rendered (shows "Score" or "✓"), `visibility: hidden` when not actionable
+
+## Theory & Insights
+
+The `theory/` directory contains four documents:
+
+- `theory/pseudocode.md` — Optimal Scandinavian Yatzy algorithm pseudocode
+- `theory/performance_optimizations.md` — Optimization history from ~20 min to ~2.3s
+- `theory/risk_parameter_theta.md` — Mathematical framework for the risk-sensitive solver
+- `theory/analysis_and_insights.md` — Living document of empirical findings and simulation results
+
+**When a conversation produces new statistical or theoretical insights, update `theory/analysis_and_insights.md`.** Review the entire document before editing — restructure sections if needed to maintain a coherent structure rather than just appending.
 
 ## Important Considerations
 

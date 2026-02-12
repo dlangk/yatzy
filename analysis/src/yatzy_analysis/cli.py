@@ -152,6 +152,122 @@ def run(base_path: str):
 
 @cli.command()
 @click.option("--base-path", default="results", help="Path to results directory.")
+@click.option("--scores-bin", default=None, help="Direct path to scores.bin (old format).")
+def tail(base_path: str, scores_bin: str | None):
+    """Tail distribution analysis for max-policy simulations."""
+    from .tail_analysis import (
+        analytical_p374,
+        fit_log_linear,
+        load_scores_bin,
+        tail_distribution,
+    )
+
+    # Load scores from either old format or new format
+    scores = None
+    if scores_bin is not None:
+        p = Path(scores_bin)
+        if not p.exists():
+            click.echo(f"File not found: {scores_bin}")
+            raise SystemExit(1)
+        click.echo(f"Loading scores from {scores_bin} (legacy format)...")
+        scores = load_scores_bin(p)
+    else:
+        from .io import read_scores
+
+        raw_path = Path(base_path) / "max_policy" / "simulation_raw.bin"
+        if raw_path.exists():
+            click.echo(f"Loading scores from {raw_path}...")
+            scores = read_scores(raw_path)
+        else:
+            # Try legacy fallback
+            legacy = Path(base_path) / "max_policy" / "scores.bin"
+            if legacy.exists():
+                click.echo(f"Loading scores from {legacy} (legacy format)...")
+                scores = load_scores_bin(legacy)
+
+    click.echo()
+    click.echo("=" * 65)
+    click.echo("  Max-Policy Tail Distribution Analysis")
+    click.echo("=" * 65)
+    click.echo()
+
+    if scores is not None and len(scores) > 0:
+        # Tail distribution table
+        td = tail_distribution(scores)
+        click.echo(f"Loaded {td['n']:,} scores")
+        click.echo(f"Mean: {td['mean']:.2f}")
+        click.echo(f"Max:  {td['max']}")
+        click.echo()
+        click.echo("Score threshold | Count >= | Fraction     | 1/Fraction")
+        click.echo("----------------|---------|--------------|------------")
+        for row in td["thresholds"]:
+            click.echo(
+                f"  {row['threshold']:>13}  | {row['count']:>7,} | "
+                f"{row['fraction']:.6e} | {row['inv_fraction']:.1e}"
+            )
+        click.echo()
+
+        # Log-linear fit
+        lf = fit_log_linear(scores)
+        if lf["n_points"] >= 2:
+            click.echo(
+                f"Log-linear fit: log10(P(X >= t)) = "
+                f"{lf['a']:.4f} + {lf['b']:.6f} * t"
+            )
+            click.echo(
+                f"  Decay rate: ~10^({lf['b']:.4f}) per point "
+                f"= {lf['decay_per_point']:.6f}x per point"
+            )
+            click.echo()
+            click.echo(
+                f"Extrapolated P(score >= 374) ~ "
+                f"10^({lf['log10_p374']:.1f}) ~ {lf['p374']:.2e}"
+            )
+            click.echo(
+                f"Expected games to see 374:    ~ {lf['games_needed']:.2e}"
+            )
+            click.echo(
+                "(NOTE: this underestimates -- see analytical estimate below)"
+            )
+        else:
+            click.echo("Insufficient data points for log-linear fit.")
+        click.echo()
+    else:
+        click.echo("No scores found. Skipping empirical analysis.")
+        click.echo()
+
+    # Analytical estimate
+    click.echo("=" * 65)
+    click.echo("  Analytical Estimate: P(score = 374)")
+    click.echo("=" * 65)
+    click.echo()
+
+    result = analytical_p374()
+    click.echo(
+        f"P(five of specific face, 3 rolls) = "
+        f"{result['p_five_of_specific_face']:.6f} = "
+        f"1 in {1 / result['p_five_of_specific_face']:.0f}"
+    )
+    click.echo()
+    click.echo("Per-category probabilities (3 rolls, optimal keeping):")
+    click.echo("-" * 65)
+    for cat in result["categories"]:
+        click.echo(
+            f"  {cat['name']:<35s}  P = {cat['probability']:.6f}"
+            f"  (1 in {cat['inv_probability']:,.0f})"
+        )
+    click.echo()
+    click.echo(f"Product (assuming independence): {result['overall']:.3e}")
+    click.echo(f"Expected games for 374:          {result['games_needed']:.3e}")
+    click.echo()
+    click.echo(
+        f"At {result['games_per_sec']:,} games/sec: "
+        f"~{result['years']:.2e} years"
+    )
+
+
+@cli.command()
+@click.option("--base-path", default="results", help="Path to results directory.")
 def summary(base_path: str):
     """Print summary table to console (from summary.parquet)."""
     from .config import analysis_dir

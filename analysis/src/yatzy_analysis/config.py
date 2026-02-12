@@ -55,8 +55,12 @@ def plots_dir(base_path: str = "results") -> Path:
     return results_dir(base_path) / "plots"
 
 
+def theta_base_dir(base_path: str = "results") -> Path:
+    return results_dir(base_path) / "theta"
+
+
 def theta_dir(theta: float, base_path: str = "results") -> Path:
-    return results_dir(base_path) / f"theta_{fmt_theta_dir(theta)}"
+    return theta_base_dir(base_path) / f"theta_{fmt_theta_dir(theta)}"
 
 
 def fmt_theta_dir(t: float) -> str:
@@ -70,8 +74,8 @@ def fmt_theta_dir(t: float) -> str:
 
 
 def discover_thetas(base_path: str = "results") -> list[float]:
-    """Scan results directory for theta_* subdirs containing simulation_raw.bin."""
-    base = results_dir(base_path)
+    """Scan results/theta/ directory for theta_* subdirs containing simulation_raw.bin."""
+    base = theta_base_dir(base_path)
     thetas = []
     if not base.is_dir():
         return thetas

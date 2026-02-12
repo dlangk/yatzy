@@ -3,11 +3,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import pandas as pd
 
 from ..config import MAX_SCORE
-from .style import fmt_theta, setup_theme, theta_color
+from .style import fmt_theta, make_norm, setup_theme, theta_color
 
 
 def plot_density(
@@ -15,18 +16,21 @@ def plot_density(
     kde_df: pd.DataFrame,
     out_dir: Path,
     *,
+    norm: mcolors.Normalize | None = None,
     ax=None,
     dpi: int = 200,
     fmt: str = "png",
 ) -> None:
     setup_theme()
+    if norm is None:
+        norm = make_norm(thetas)
     standalone = ax is None
     if standalone:
         fig, ax = plt.subplots(figsize=(14, 6))
 
     for t in thetas:
         subset = kde_df[kde_df["theta"] == t].sort_values("score")
-        color = theta_color(t)
+        color = theta_color(t, norm)
         lw = 2.5 if t == 0 else 1.4
         alpha = 0.9 if t == 0 else 0.7
         ax.plot(

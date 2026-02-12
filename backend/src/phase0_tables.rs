@@ -252,11 +252,16 @@ pub fn precompute_dice_set_probabilities(ctx: &mut YatzyContext) {
 ///
 /// Pseudocode: E(C, m, f) = 35 if m ≥ 63, else 0.
 /// Scandinavian Yatzy uses 50-point upper bonus instead of 35.
+///
+/// When θ ≠ 0 (risk-sensitive mode), terminal values are in the log domain:
+/// L(S) = θ·bonus instead of E(S) = bonus.
 pub fn initialize_final_states(ctx: &mut YatzyContext) {
     let all_scored_mask = (1 << CATEGORY_COUNT) - 1;
+    let theta = ctx.theta;
     let state_values = ctx.state_values.as_mut_slice();
     for up in 0..=63usize {
-        let final_val = if up >= 63 { 50.0f32 } else { 0.0f32 };
+        let bonus = if up >= 63 { 50.0f32 } else { 0.0f32 };
+        let final_val = if theta == 0.0 { bonus } else { theta * bonus };
         state_values[state_index(up, all_scored_mask)] = final_val;
     }
 }

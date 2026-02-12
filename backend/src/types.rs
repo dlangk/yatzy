@@ -139,6 +139,15 @@ pub struct YatzyContext {
 
     /// Phase 1 reachability: reachable[upper_mask][upper_score] = true if reachable.
     pub reachable: [[bool; 64]; 64],
+
+    /// Risk parameter θ for exponential utility: u(x) = e^(θx).
+    /// θ = 0.0 is risk-neutral (standard EV maximization).
+    /// θ < 0 is risk-averse, θ > 0 is risk-seeking.
+    pub theta: f32,
+
+    /// Max-policy mode: chance nodes use max instead of expected value.
+    /// Creates an "optimistic" policy assuming the best possible dice outcome.
+    pub max_policy: bool,
 }
 
 impl Default for YatzyContext {
@@ -160,6 +169,8 @@ impl YatzyContext {
             dice_set_probabilities: [0.0; NUM_DICE_SETS],
             keep_table: KeepTable::new(),
             reachable: [[false; 64]; 64],
+            theta: 0.0,
+            max_policy: false,
         }
     }
 

@@ -32,6 +32,9 @@ pub const STATE_FILE_MAGIC: u32 = 0x59545A53;
 /// Storage format version (v4: scored*64+up index layout for cache locality).
 pub const STATE_FILE_VERSION: u32 = 4;
 
+/// Storage format version v5: adds θ (risk parameter) in the reserved header field.
+pub const STATE_FILE_VERSION_V5: u32 = 5;
+
 /// Scandinavian Yatzy upper bonus: 50 points if upper score >= 63.
 pub const UPPER_BONUS: f64 = 50.0;
 

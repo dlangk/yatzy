@@ -20,9 +20,11 @@ use std::time::Instant;
 use rayon::prelude::*;
 
 use crate::constants::*;
-use crate::storage::{load_all_state_values, save_all_state_values};
+use crate::storage::{load_all_state_values, save_all_state_values, state_file_path};
 use crate::types::{YatzyContext, YatzyState};
-use crate::widget_solver::compute_expected_state_value;
+use crate::widget_solver::{
+    compute_expected_state_value, compute_expected_state_value_risk, compute_max_state_value,
+};
 
 /// Progress tracker for the Phase 2 computation loop.
 struct ComputeProgress {
@@ -112,8 +114,12 @@ pub fn compute_all_state_values(ctx: &mut YatzyContext) {
     let total_start = Instant::now();
 
     // Try to load consolidated file first
-    let consolidated_file = "data/all_states.bin";
-    if load_all_state_values(ctx, consolidated_file) {
+    let consolidated_file = if ctx.max_policy {
+        "data/all_states_max.bin".to_string()
+    } else {
+        state_file_path(ctx.theta)
+    };
+    if load_all_state_values(ctx, &consolidated_file) {
         println!("Loaded pre-computed states from consolidated file");
         return;
     }
@@ -156,6 +162,8 @@ pub fn compute_all_state_values(ctx: &mut YatzyContext) {
         let sv_atomic = std::sync::atomic::AtomicPtr::new(sv_ptr);
 
         let ctx_ref = &*ctx;
+        let use_max = ctx_ref.max_policy;
+        let use_risk = ctx_ref.theta != 0.0;
         groups.par_iter().for_each(|(scored, ups)| {
             let ptr = sv_atomic.load(std::sync::atomic::Ordering::Relaxed);
             for &up in ups {
@@ -163,7 +171,13 @@ pub fn compute_all_state_values(ctx: &mut YatzyContext) {
                     upper_score: up as i32,
                     scored_categories: *scored,
                 };
-                let ev = compute_expected_state_value(ctx_ref, &state);
+                let ev = if use_max {
+                    compute_max_state_value(ctx_ref, &state)
+                } else if use_risk {
+                    compute_expected_state_value_risk(ctx_ref, &state)
+                } else {
+                    compute_expected_state_value(ctx_ref, &state)
+                };
                 unsafe {
                     *ptr.add(state_index(up, *scored as usize)) = ev as f32;
                 }
@@ -193,8 +207,13 @@ pub fn compute_all_state_values(ctx: &mut YatzyContext) {
 
     println!("\n\n=== Computation Complete ===");
 
+    let save_file = if ctx.max_policy {
+        "data/all_states_max.bin".to_string()
+    } else {
+        state_file_path(ctx.theta)
+    };
     println!("\nSaving consolidated state file...");
-    save_all_state_values(ctx, consolidated_file);
+    save_all_state_values(ctx, &save_file);
 
     let total_time = total_start.elapsed().as_secs_f64();
     println!("\nTotal computation time: {:.2} seconds", total_time);

@@ -1,3 +1,5 @@
+use std::fs;
+use std::io::Write;
 use std::time::Instant;
 
 use yatzy::phase0_tables;
@@ -5,8 +7,24 @@ use yatzy::simulation::{
     aggregate_statistics, save_raw_simulation, save_statistics, simulate_batch,
     simulate_batch_with_recording,
 };
-use yatzy::storage::load_all_state_values;
+use yatzy::storage::{load_all_state_values, state_file_path};
 use yatzy::types::YatzyContext;
+
+/// Save scores as flat binary: u32 count + i32[count].
+fn save_scores_binary(scores: &[i32], path: &str) {
+    if let Some(parent) = std::path::Path::new(path).parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let mut f = fs::File::create(path).unwrap_or_else(|e| {
+        eprintln!("Failed to create {}: {}", path, e);
+        std::process::exit(1);
+    });
+    let count = scores.len() as u32;
+    f.write_all(&count.to_le_bytes()).unwrap();
+    let bytes =
+        unsafe { std::slice::from_raw_parts(scores.as_ptr() as *const u8, scores.len() * 4) };
+    f.write_all(bytes).unwrap();
+}
 
 fn set_working_directory() {
     let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
@@ -16,11 +34,13 @@ fn set_working_directory() {
     }
 }
 
-fn parse_args() -> (usize, u64, Option<String>) {
+fn parse_args() -> (usize, u64, Option<String>, f32, bool) {
     let args: Vec<String> = std::env::args().collect();
     let mut num_games = 1000usize;
     let mut seed = 42u64;
     let mut output: Option<String> = None;
+    let mut theta = 0.0f32;
+    let mut max_policy = false;
 
     let mut i = 1;
     while i < args.len() {
@@ -49,30 +69,53 @@ fn parse_args() -> (usize, u64, Option<String>) {
                     output = Some(args[i].clone());
                 }
             }
+            "--theta" => {
+                i += 1;
+                if i < args.len() {
+                    theta = args[i].parse().unwrap_or_else(|_| {
+                        eprintln!("Invalid --theta value: {}", args[i]);
+                        std::process::exit(1);
+                    });
+                }
+            }
+            "--max-policy" => {
+                max_policy = true;
+            }
             "--help" | "-h" => {
-                println!("Usage: yatzy-simulate [--games N] [--seed S] [--output DIR]");
+                println!(
+                    "Usage: yatzy-simulate [--games N] [--seed S] [--output DIR] [--theta FLOAT] [--max-policy]"
+                );
                 println!();
                 println!("Options:");
-                println!("  --games N     Number of games to simulate (default: 1000)");
-                println!("  --seed S      RNG seed (default: 42)");
-                println!("  --output DIR  Write raw data and statistics to DIR");
+                println!("  --games N      Number of games to simulate (default: 1000)");
+                println!("  --seed S       RNG seed (default: 42)");
+                println!("  --output DIR   Write raw data and statistics to DIR");
+                println!("  --theta FLOAT  Risk parameter (default: 0.0, risk-neutral)");
+                println!("  --max-policy   Max-policy mode (chance nodes use max, not EV)");
                 std::process::exit(0);
             }
             other => {
                 eprintln!("Unknown argument: {}", other);
-                eprintln!("Usage: yatzy-simulate [--games N] [--seed S] [--output DIR]");
+                eprintln!(
+                    "Usage: yatzy-simulate [--games N] [--seed S] [--output DIR] [--theta FLOAT] [--max-policy]"
+                );
                 std::process::exit(1);
             }
         }
         i += 1;
     }
 
-    (num_games, seed, output)
+    if max_policy && theta != 0.0 {
+        eprintln!("Error: --max-policy and --theta are mutually exclusive");
+        std::process::exit(1);
+    }
+
+    (num_games, seed, output, theta, max_policy)
 }
 
 fn main() {
     set_working_directory();
-    let (num_games, seed, output) = parse_args();
+    let (num_games, seed, output, theta, max_policy) = parse_args();
 
     // Configure rayon thread pool
     let num_threads = std::env::var("RAYON_NUM_THREADS")
@@ -87,19 +130,35 @@ fn main() {
         .unwrap();
 
     println!("Yatzy Simulation ({} games)", num_games);
+    if max_policy {
+        println!("  Mode: max-policy (chance nodes use max, not EV)");
+    } else if theta != 0.0 {
+        println!("  Risk parameter θ = {:.4}", theta);
+    }
 
     let t0 = Instant::now();
     let mut ctx = YatzyContext::new_boxed();
+    ctx.theta = theta;
+    ctx.max_policy = max_policy;
     let alloc_ms = t0.elapsed().as_secs_f64() * 1000.0;
 
     let t1 = Instant::now();
     phase0_tables::precompute_lookup_tables(&mut ctx);
     let tables_ms = t1.elapsed().as_secs_f64() * 1000.0;
 
+    let state_file = if max_policy {
+        "data/all_states_max.bin".to_string()
+    } else {
+        state_file_path(theta)
+    };
     let t2 = Instant::now();
-    if !load_all_state_values(&mut ctx, "data/all_states.bin") {
-        eprintln!("Failed to load state values from data/all_states.bin");
-        eprintln!("Run yatzy-precompute first.");
+    if !load_all_state_values(&mut ctx, &state_file) {
+        eprintln!("Failed to load state values from {}", state_file);
+        if max_policy {
+            eprintln!("Run yatzy-precompute --max-policy first.");
+        } else {
+            eprintln!("Run yatzy-precompute --theta {} first.", theta);
+        }
         std::process::exit(1);
     }
     let mmap_ms = t2.elapsed().as_secs_f64() * 1000.0;
@@ -112,7 +171,47 @@ fn main() {
     println!("  Starting EV:   {:.4}", starting_ev);
     println!();
 
-    if let Some(ref output_dir) = output {
+    if max_policy {
+        // Max-policy mode: lightweight batch (no recording), save scores binary
+        println!(
+            "Simulating {} games ({} threads)...",
+            num_games, num_threads
+        );
+        let result = simulate_batch(&ctx, num_games, seed);
+
+        let per_game_us = result.elapsed.as_secs_f64() * 1e6 / num_games as f64;
+        let throughput = num_games as f64 / result.elapsed.as_secs_f64();
+
+        println!(
+            "  Elapsed:     {:.1} ms",
+            result.elapsed.as_secs_f64() * 1000.0
+        );
+        println!("  Per game:    {:.1} \u{00b5}s", per_game_us);
+        println!("  Throughput:  {:.0} games/sec", throughput);
+        println!();
+
+        println!("Results:");
+        println!(
+            "  Mean score:  {:.2} (precomputed max-value: {:.2})",
+            result.mean, starting_ev
+        );
+        println!("  Std dev:     {:.1}", result.std_dev);
+        println!("  Min:         {}", result.min);
+        println!("  Max:         {}", result.max);
+        println!("  Median:      {}", result.median);
+
+        if let Some(ref output_dir) = output {
+            let scores_path = format!("{}/scores.bin", output_dir);
+            save_scores_binary(&result.scores, &scores_path);
+            let size_mb = (std::fs::metadata(&scores_path)
+                .map(|m| m.len())
+                .unwrap_or(0)) as f64
+                / 1024.0
+                / 1024.0;
+            println!();
+            println!("  Scores saved: {} ({:.1} MB)", scores_path, size_mb);
+        }
+    } else if let Some(ref output_dir) = output {
         // Recording mode: capture full per-step data
         println!(
             "Simulating {} games with recording ({} threads)...",

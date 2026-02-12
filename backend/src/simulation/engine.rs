@@ -18,7 +18,10 @@ use crate::constants::*;
 use crate::dice_mechanics::{find_dice_set_index, sort_dice_set};
 use crate::game_mechanics::update_upper_score;
 use crate::types::YatzyContext;
-use crate::widget_solver::{choose_best_reroll_mask, compute_max_ev_for_n_rerolls};
+use crate::widget_solver::{
+    choose_best_reroll_mask, choose_best_reroll_mask_max, choose_best_reroll_mask_risk,
+    compute_max_ev_for_n_rerolls, compute_max_outcome_for_n_rerolls, compute_opt_lse_for_n_rerolls,
+};
 
 /// Results of a batch simulation.
 pub struct SimulationResult {
@@ -137,6 +140,186 @@ fn compute_group6(
     }
 }
 
+/// Compute Group 6 for risk-sensitive mode: val = θ·scr + sv[successor].
+/// Decision node: min when θ < 0 (risk-averse), max when θ > 0 (risk-seeking).
+#[inline(always)]
+fn compute_group6_risk(
+    ctx: &YatzyContext,
+    sv: &[f32],
+    up_score: i32,
+    scored: i32,
+    theta: f32,
+    minimize: bool,
+    e_ds_0: &mut [f32; 252],
+) {
+    let mut lower_succ_ev = [0.0f32; CATEGORY_COUNT];
+    for c in 6..CATEGORY_COUNT {
+        if !is_category_scored(scored, c) {
+            lower_succ_ev[c] = unsafe {
+                *sv.get_unchecked(state_index(up_score as usize, (scored | (1 << c)) as usize))
+            };
+        }
+    }
+
+    for ds_i in 0..252 {
+        let mut best_val = if minimize {
+            f32::INFINITY
+        } else {
+            f32::NEG_INFINITY
+        };
+
+        for c in 0..6 {
+            if !is_category_scored(scored, c) {
+                let scr = ctx.precomputed_scores[ds_i][c];
+                let new_up = update_upper_score(up_score, c, scr);
+                let new_scored = scored | (1 << c);
+                let val = theta * scr as f32
+                    + unsafe {
+                        *sv.get_unchecked(state_index(new_up as usize, new_scored as usize))
+                    };
+                let better = if minimize {
+                    val < best_val
+                } else {
+                    val > best_val
+                };
+                if better {
+                    best_val = val;
+                }
+            }
+        }
+
+        for c in 6..CATEGORY_COUNT {
+            if !is_category_scored(scored, c) {
+                let scr = ctx.precomputed_scores[ds_i][c];
+                let val = theta * scr as f32 + unsafe { *lower_succ_ev.get_unchecked(c) };
+                let better = if minimize {
+                    val < best_val
+                } else {
+                    val > best_val
+                };
+                if better {
+                    best_val = val;
+                }
+            }
+        }
+
+        e_ds_0[ds_i] = best_val;
+    }
+}
+
+/// Find the best category in risk-sensitive mode: val = θ·scr + sv[successor].
+/// Decision node: min when θ < 0 (risk-averse), max when θ > 0 (risk-seeking).
+#[inline(always)]
+fn find_best_category_risk(
+    ctx: &YatzyContext,
+    sv: &[f32],
+    up_score: i32,
+    scored: i32,
+    ds_index: usize,
+    theta: f32,
+    minimize: bool,
+) -> (usize, i32) {
+    let mut best_val = if minimize {
+        f32::INFINITY
+    } else {
+        f32::NEG_INFINITY
+    };
+    let mut best_cat = 0usize;
+    let mut best_score = 0i32;
+
+    for c in 0..6 {
+        if !is_category_scored(scored, c) {
+            let scr = ctx.precomputed_scores[ds_index][c];
+            let new_up = update_upper_score(up_score, c, scr);
+            let new_scored = scored | (1 << c);
+            let val = theta * scr as f32
+                + unsafe { *sv.get_unchecked(state_index(new_up as usize, new_scored as usize)) };
+            let better = if minimize {
+                val < best_val
+            } else {
+                val > best_val
+            };
+            if better {
+                best_val = val;
+                best_cat = c;
+                best_score = scr;
+            }
+        }
+    }
+
+    for c in 6..CATEGORY_COUNT {
+        if !is_category_scored(scored, c) {
+            let scr = ctx.precomputed_scores[ds_index][c];
+            let new_scored = scored | (1 << c);
+            let val = theta * scr as f32
+                + unsafe { *sv.get_unchecked(state_index(up_score as usize, new_scored as usize)) };
+            let better = if minimize {
+                val < best_val
+            } else {
+                val > best_val
+            };
+            if better {
+                best_val = val;
+                best_cat = c;
+                best_score = scr;
+            }
+        }
+    }
+
+    (best_cat, best_score)
+}
+
+/// Find the best category for the LAST turn in risk-sensitive mode.
+/// Optimizes θ·(scr + bonus) to match the precomputed log-domain values.
+/// On the last turn only 1 category remains, so min/max doesn't matter,
+/// but we include the flag for correctness.
+#[inline(always)]
+fn find_best_category_final_risk(
+    ctx: &YatzyContext,
+    up_score: i32,
+    scored: i32,
+    ds_index: usize,
+    theta: f32,
+    minimize: bool,
+) -> (usize, i32) {
+    let mut best_val = if minimize {
+        f32::INFINITY
+    } else {
+        f32::NEG_INFINITY
+    };
+    let mut best_cat = 0usize;
+    let mut best_score = 0i32;
+
+    for c in 0..CATEGORY_COUNT {
+        if !is_category_scored(scored, c) {
+            let scr = ctx.precomputed_scores[ds_index][c];
+            let bonus = if c < 6 {
+                let new_up = update_upper_score(up_score, c, scr);
+                if new_up >= 63 && up_score < 63 {
+                    50
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+            let val = theta * (scr + bonus) as f32;
+            let better = if minimize {
+                val < best_val
+            } else {
+                val > best_val
+            };
+            if better {
+                best_val = val;
+                best_cat = c;
+                best_score = scr;
+            }
+        }
+    }
+
+    (best_cat, best_score)
+}
+
 /// Find the best category to score for the given dice, returning (category_index, score).
 #[inline(always)]
 fn find_best_category(
@@ -233,6 +416,14 @@ fn dice_to_u8(dice: &[i32; 5]) -> [u8; 5] {
 
 /// Simulate one full game, returning the final score.
 pub fn simulate_game(ctx: &YatzyContext, rng: &mut SmallRng) -> i32 {
+    if ctx.max_policy {
+        return simulate_game_max(ctx, rng);
+    }
+    let theta = ctx.theta;
+    if theta != 0.0 {
+        return simulate_game_risk(ctx, rng, theta);
+    }
+
     let sv = ctx.state_values.as_slice();
     let mut up_score: i32 = 0;
     let mut scored: i32 = 0;
@@ -298,9 +489,114 @@ pub fn simulate_game(ctx: &YatzyContext, rng: &mut SmallRng) -> i32 {
     total_score
 }
 
+/// Risk-sensitive simulation: decisions use log-domain values, but scoring is still integer.
+/// For θ < 0 (risk-averse), decision nodes use min instead of max.
+fn simulate_game_risk(ctx: &YatzyContext, rng: &mut SmallRng, theta: f32) -> i32 {
+    let sv = ctx.state_values.as_slice();
+    let minimize = theta < 0.0;
+    let mut up_score: i32 = 0;
+    let mut scored: i32 = 0;
+    let mut total_score: i32 = 0;
+
+    let mut e_ds_0 = [0.0f32; 252];
+    let mut e_ds_1 = [0.0f32; 252];
+
+    for turn in 0..CATEGORY_COUNT {
+        let is_last_turn = turn == CATEGORY_COUNT - 1;
+
+        let mut dice = roll_dice(rng);
+
+        compute_group6_risk(ctx, sv, up_score, scored, theta, minimize, &mut e_ds_0);
+        compute_opt_lse_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1, minimize);
+
+        let mut best_ev = 0.0;
+        let mask1 = choose_best_reroll_mask_risk(ctx, &e_ds_1, &dice, &mut best_ev, minimize);
+        if mask1 != 0 {
+            apply_reroll(&mut dice, mask1, rng);
+        }
+
+        let mask2 = choose_best_reroll_mask_risk(ctx, &e_ds_0, &dice, &mut best_ev, minimize);
+        if mask2 != 0 {
+            apply_reroll(&mut dice, mask2, rng);
+        }
+
+        let ds_index = find_dice_set_index(ctx, &dice);
+        let (cat, scr) = if is_last_turn {
+            find_best_category_final_risk(ctx, up_score, scored, ds_index, theta, minimize)
+        } else {
+            find_best_category_risk(ctx, sv, up_score, scored, ds_index, theta, minimize)
+        };
+
+        up_score = update_upper_score(up_score, cat, scr);
+        scored |= 1 << cat;
+        total_score += scr;
+    }
+
+    if up_score >= 63 {
+        total_score += 50;
+    }
+
+    total_score
+}
+
+/// Max-policy simulation: decisions use max-outcome values, but actual dice are random.
+/// Chance nodes in the decision evaluation use max instead of Σ P·x.
+fn simulate_game_max(ctx: &YatzyContext, rng: &mut SmallRng) -> i32 {
+    let sv = ctx.state_values.as_slice();
+    let mut up_score: i32 = 0;
+    let mut scored: i32 = 0;
+    let mut total_score: i32 = 0;
+
+    let mut e_ds_0 = [0.0f32; 252];
+    let mut e_ds_1 = [0.0f32; 252];
+
+    for turn in 0..CATEGORY_COUNT {
+        let is_last_turn = turn == CATEGORY_COUNT - 1;
+
+        let mut dice = roll_dice(rng);
+
+        // Group 6: standard (decision node, unchanged)
+        compute_group6(ctx, sv, up_score, scored, &mut e_ds_0);
+        // Groups 5: max-outcome propagation
+        compute_max_outcome_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1);
+
+        let mut best_ev = 0.0;
+        let mask1 = choose_best_reroll_mask_max(ctx, &e_ds_1, &dice, &mut best_ev);
+        if mask1 != 0 {
+            apply_reroll(&mut dice, mask1, rng);
+        }
+
+        // Groups 3: already in e_ds_0 from Group 6 (reroll decision uses max-outcome)
+        let mask2 = choose_best_reroll_mask_max(ctx, &e_ds_0, &dice, &mut best_ev);
+        if mask2 != 0 {
+            apply_reroll(&mut dice, mask2, rng);
+        }
+
+        let ds_index = find_dice_set_index(ctx, &dice);
+        let (cat, scr) = if is_last_turn {
+            find_best_category_final(ctx, up_score, scored, ds_index)
+        } else {
+            find_best_category(ctx, sv, up_score, scored, ds_index)
+        };
+
+        up_score = update_upper_score(up_score, cat, scr);
+        scored |= 1 << cat;
+        total_score += scr;
+    }
+
+    if up_score >= 63 {
+        total_score += 50;
+    }
+
+    total_score
+}
+
 /// Simulate one full game with recording, returning a `GameRecord`.
 pub fn simulate_game_with_recording(ctx: &YatzyContext, rng: &mut SmallRng) -> GameRecord {
     let sv = ctx.state_values.as_slice();
+    let theta = ctx.theta;
+    let use_risk = theta != 0.0;
+    let minimize = theta < 0.0;
     let mut up_score: i32 = 0;
     let mut scored: i32 = 0;
     let mut total_score: i32 = 0;
@@ -316,20 +612,33 @@ pub fn simulate_game_with_recording(ctx: &YatzyContext, rng: &mut SmallRng) -> G
         let mut dice = roll_dice(rng);
         let dice_initial = dice_to_u8(&dice);
 
-        // Compute EVs
-        compute_group6(ctx, sv, up_score, scored, &mut e_ds_0);
-        compute_max_ev_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1);
+        // Compute EVs (dispatch based on theta)
+        if use_risk {
+            compute_group6_risk(ctx, sv, up_score, scored, theta, minimize, &mut e_ds_0);
+            compute_opt_lse_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1, minimize);
+        } else {
+            compute_group6(ctx, sv, up_score, scored, &mut e_ds_0);
+            compute_max_ev_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1);
+        }
 
         // First reroll
         let mut best_ev = 0.0;
-        let mask1 = choose_best_reroll_mask(ctx, &e_ds_1, &dice, &mut best_ev);
+        let mask1 = if use_risk {
+            choose_best_reroll_mask_risk(ctx, &e_ds_1, &dice, &mut best_ev, minimize)
+        } else {
+            choose_best_reroll_mask(ctx, &e_ds_1, &dice, &mut best_ev)
+        };
         if mask1 != 0 {
             apply_reroll(&mut dice, mask1, rng);
         }
         let dice_after_reroll1 = dice_to_u8(&dice);
 
         // Second reroll
-        let mask2 = choose_best_reroll_mask(ctx, &e_ds_0, &dice, &mut best_ev);
+        let mask2 = if use_risk {
+            choose_best_reroll_mask_risk(ctx, &e_ds_0, &dice, &mut best_ev, minimize)
+        } else {
+            choose_best_reroll_mask(ctx, &e_ds_0, &dice, &mut best_ev)
+        };
         if mask2 != 0 {
             apply_reroll(&mut dice, mask2, rng);
         }
@@ -337,7 +646,13 @@ pub fn simulate_game_with_recording(ctx: &YatzyContext, rng: &mut SmallRng) -> G
 
         // Score
         let ds_index = find_dice_set_index(ctx, &dice);
-        let (cat, scr) = if is_last_turn {
+        let (cat, scr) = if use_risk {
+            if is_last_turn {
+                find_best_category_final_risk(ctx, up_score, scored, ds_index, theta, minimize)
+            } else {
+                find_best_category_risk(ctx, sv, up_score, scored, ds_index, theta, minimize)
+            }
+        } else if is_last_turn {
             find_best_category_final(ctx, up_score, scored, ds_index)
         } else {
             find_best_category(ctx, sv, up_score, scored, ds_index)

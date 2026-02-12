@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
-from .config import HEADER_SIZE, RECORD_SIZE, TOTAL_SCORE_OFFSET, results_dir
+from .config import HEADER_SIZE, RECORD_SIZE, TOTAL_SCORE_OFFSET, theta_base_dir
 
 
 def fmt_theta(t: float, base_path: str = "results") -> str:
@@ -15,9 +15,9 @@ def fmt_theta(t: float, base_path: str = "results") -> str:
     if t == 0:
         return "0"
     s = f"{t:g}"
-    if not (results_dir(base_path) / f"theta_{s}").is_dir():
+    if not (theta_base_dir(base_path) / f"theta_{s}").is_dir():
         alt = f"{t:.1f}"
-        if (results_dir(base_path) / f"theta_{alt}").is_dir():
+        if (theta_base_dir(base_path) / f"theta_{alt}").is_dir():
             return alt
     return s
 
@@ -44,7 +44,7 @@ def read_all_scores(
 ) -> dict[float, NDArray[np.int32]]:
     """Read scores for multiple thetas. Returns {theta: sorted_scores}."""
     result: dict[float, NDArray[np.int32]] = {}
-    base = results_dir(base_path)
+    base = theta_base_dir(base_path)
     for t in thetas:
         tname = fmt_theta(t, base_path)
         path = base / f"theta_{tname}" / "simulation_raw.bin"

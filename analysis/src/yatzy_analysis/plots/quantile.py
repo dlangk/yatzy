@@ -3,11 +3,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import pandas as pd
 
 from ..config import MAX_SCORE
-from .style import fmt_theta, setup_theme, theta_color
+from .style import fmt_theta, make_norm, setup_theme, theta_color
 
 
 def plot_quantile(
@@ -15,18 +16,21 @@ def plot_quantile(
     cdf_df: pd.DataFrame,
     out_dir: Path,
     *,
+    norm: mcolors.Normalize | None = None,
     ax=None,
     dpi: int = 200,
     fmt: str = "png",
 ) -> None:
     setup_theme()
+    if norm is None:
+        norm = make_norm(thetas)
     standalone = ax is None
     if standalone:
         fig, ax = plt.subplots(figsize=(12, 6))
 
     for t in thetas:
         subset = cdf_df[cdf_df["theta"] == t]
-        color = theta_color(t)
+        color = theta_color(t, norm)
         lw = 2.5 if t == 0 else 1.4
         ax.plot(
             subset["cdf"], subset["score"],
