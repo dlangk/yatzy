@@ -9,6 +9,11 @@ import pandas as pd
 
 from .style import make_norm, setup_theme, theta_color, theta_colorbar
 
+# Shared axis ranges for all adaptive frontier plots (individual + combined).
+# Data ranges: Mean 186–248, p95 266–314, p99 300–329, p999 328–341.
+_ADAPTIVE_XLIM = (180, 255)
+_ADAPTIVE_YLIM = (258, 348)
+
 
 def plot_efficiency(
     thetas: list[float],
@@ -142,4 +147,195 @@ def plot_efficiency(
 
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     fig.savefig(out_dir / f"efficiency.{fmt}", dpi=dpi, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _plot_adaptive_frontier(
+    thetas: list[float],
+    summary_df: pd.DataFrame,
+    adaptive_df: pd.DataFrame,
+    out_dir: Path,
+    percentile_col: str,
+    percentile_label: str,
+    filename: str,
+    *,
+    ax: plt.Axes | None = None,
+    xlim: tuple[float, float] | None = None,
+    ylim: tuple[float, float] | None = None,
+    dpi: int = 200,
+    fmt: str = "png",
+) -> None:
+    """Efficient frontier with adaptive policy overlay for a given percentile.
+
+    Shows fixed-θ points, their convex hull, and adaptive policy points.
+    Key question: do any adaptive points lie above the convex hull?
+
+    When *ax* is provided, plots onto that axes (panel mode) — no figure
+    creation or save.  When *ax* is None, creates a standalone figure.
+    """
+    from scipy.spatial import ConvexHull
+
+    standalone = ax is None
+    if standalone:
+        setup_theme()
+        fig, ax = plt.subplots(figsize=(12, 8))
+        fig.suptitle(
+            f"Adaptive θ Policies vs Fixed-θ Frontier (Mean vs {percentile_label})",
+            fontsize=16, fontweight="bold", y=0.98,
+        )
+
+    norm = make_norm(thetas)
+    stats = summary_df[summary_df["theta"].isin(thetas)].copy()
+
+    # Plot fixed-θ points
+    for _, row in stats.iterrows():
+        t = row["theta"]
+        color = theta_color(t, norm)
+        ax.scatter(row["mean"], row[percentile_col], color=color, s=50, zorder=5,
+                   edgecolors="white", linewidths=0.5, alpha=0.7)
+
+    # Connect fixed-θ points
+    ax.plot(stats["mean"], stats[percentile_col], color="gray", linewidth=0.8, alpha=0.4, zorder=1)
+
+    # Compute and shade convex hull of fixed-θ points
+    points = stats[["mean", percentile_col]].values
+    if len(points) >= 3:
+        try:
+            hull = ConvexHull(points)
+            hull_pts = points[hull.vertices]
+            hull_pts = np.vstack([hull_pts, hull_pts[0]])  # close the polygon
+            ax.fill(hull_pts[:, 0], hull_pts[:, 1], alpha=0.08, color="blue",
+                    label="Fixed-θ convex hull")
+            ax.plot(hull_pts[:, 0], hull_pts[:, 1], color="blue", linewidth=1.0,
+                    alpha=0.4, linestyle="--")
+        except Exception:
+            pass  # degenerate hull
+
+    # Mark θ=0 baseline
+    base = stats[stats["theta"] == 0.0]
+    if not base.empty:
+        ax.scatter(base["mean"], base[percentile_col], color="black", s=150, marker="*",
+                   zorder=10, label="θ=0 (EV-optimal)")
+
+    # Mark best fixed-θ for this percentile
+    peak_idx = stats[percentile_col].idxmax()
+    peak = stats.loc[peak_idx]
+    ax.scatter(peak["mean"], peak[percentile_col], color="red", s=120, marker="D",
+               zorder=10, label=f"Best fixed {percentile_label} (θ={peak['theta']:.2f})")
+
+    # Plot adaptive policy points
+    markers = {"bonus-adaptive": "^", "phase-based": "s", "combined": "P", "always-ev": "o"}
+    colors = {"bonus-adaptive": "tab:green", "phase-based": "tab:orange",
+              "combined": "tab:purple", "always-ev": "gray"}
+
+    for _, row in adaptive_df.iterrows():
+        name = row["policy"]
+        m = markers.get(name, "X")
+        c = colors.get(name, "tab:brown")
+        ax.scatter(row["mean"], row[percentile_col], color=c, s=200, marker=m,
+                   zorder=15, edgecolors="black", linewidths=1.0,
+                   label=f"{name}")
+
+    ax.set_xlabel("Mean Score", fontsize=13)
+    ax.set_ylabel(f"{percentile_label} Score", fontsize=13)
+    ax.set_title(f"Mean vs {percentile_label}", fontsize=13, fontweight="bold")
+    ax.legend(fontsize=9, loc="lower left")
+    ax.grid(True, alpha=0.3)
+    theta_colorbar(ax, norm, label="θ (fixed policies)")
+
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+
+    if standalone:
+        fig.tight_layout(rect=[0, 0, 1, 0.95])
+        fig.savefig(out_dir / f"{filename}.{fmt}", dpi=dpi, bbox_inches="tight")
+        plt.close(fig)
+
+
+def plot_efficiency_with_adaptive(
+    thetas: list[float],
+    summary_df: pd.DataFrame,
+    adaptive_df: pd.DataFrame,
+    out_dir: Path,
+    *,
+    dpi: int = 200,
+    fmt: str = "png",
+) -> None:
+    """Efficient frontier with adaptive overlay for p95 (default view)."""
+    _plot_adaptive_frontier(
+        thetas, summary_df, adaptive_df, out_dir,
+        percentile_col="p95", percentile_label="p95",
+        filename="efficiency_adaptive",
+        xlim=_ADAPTIVE_XLIM, ylim=_ADAPTIVE_YLIM,
+        dpi=dpi, fmt=fmt,
+    )
+
+
+def plot_efficiency_adaptive_p99(
+    thetas: list[float],
+    summary_df: pd.DataFrame,
+    adaptive_df: pd.DataFrame,
+    out_dir: Path,
+    *,
+    dpi: int = 200,
+    fmt: str = "png",
+) -> None:
+    """Efficient frontier with adaptive overlay for p99."""
+    _plot_adaptive_frontier(
+        thetas, summary_df, adaptive_df, out_dir,
+        percentile_col="p99", percentile_label="p99",
+        filename="efficiency_adaptive_p99",
+        xlim=_ADAPTIVE_XLIM, ylim=_ADAPTIVE_YLIM,
+        dpi=dpi, fmt=fmt,
+    )
+
+
+def plot_efficiency_adaptive_p999(
+    thetas: list[float],
+    summary_df: pd.DataFrame,
+    adaptive_df: pd.DataFrame,
+    out_dir: Path,
+    *,
+    dpi: int = 200,
+    fmt: str = "png",
+) -> None:
+    """Efficient frontier with adaptive overlay for p99.9."""
+    _plot_adaptive_frontier(
+        thetas, summary_df, adaptive_df, out_dir,
+        percentile_col="p999", percentile_label="p99.9",
+        filename="efficiency_adaptive_p999",
+        xlim=_ADAPTIVE_XLIM, ylim=_ADAPTIVE_YLIM,
+        dpi=dpi, fmt=fmt,
+    )
+
+
+def plot_efficiency_adaptive_combined(
+    thetas: list[float],
+    summary_df: pd.DataFrame,
+    adaptive_df: pd.DataFrame,
+    out_dir: Path,
+    *,
+    dpi: int = 200,
+    fmt: str = "png",
+) -> None:
+    """Three-panel combined adaptive frontier: p95, p99, p99.9 side-by-side."""
+    setup_theme()
+    fig, axes = plt.subplots(1, 3, figsize=(36, 10))
+    for ax_i, (pcol, plabel) in zip(axes, [
+        ("p95", "p95"), ("p99", "p99"), ("p999", "p99.9"),
+    ]):
+        _plot_adaptive_frontier(
+            thetas, summary_df, adaptive_df, out_dir,
+            percentile_col=pcol, percentile_label=plabel,
+            filename="",
+            ax=ax_i, xlim=_ADAPTIVE_XLIM, ylim=_ADAPTIVE_YLIM,
+        )
+    fig.suptitle(
+        "Adaptive θ Policies vs Fixed-θ Frontier",
+        fontsize=18, fontweight="bold", y=0.98,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    fig.savefig(out_dir / f"efficiency_adaptive_combined.{fmt}", dpi=dpi, bbox_inches="tight")
     plt.close(fig)

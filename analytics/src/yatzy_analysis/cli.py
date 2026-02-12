@@ -370,6 +370,135 @@ def tail(base_path: str, scores_bin: str | None):
 
 @cli.command()
 @click.option("--base-path", default="analytics/results", help="Path to results directory.")
+def adaptive(base_path: str):
+    """Analyze adaptive θ policy simulations and compare to fixed-θ frontier."""
+    from .adaptive import (
+        compute_adaptive_kde,
+        compute_adaptive_summary,
+        discover_adaptive_policies,
+        read_adaptive_scores,
+    )
+    from .config import analysis_dir, plots_dir
+    from .store import load_summary
+
+    t0 = time.time()
+
+    policies = discover_adaptive_policies(base_path)
+    if not policies:
+        click.echo("No adaptive policy results found in bin_files/adaptive/.")
+        click.echo("Run simulations first:")
+        click.echo("  yatzy-simulate --policy bonus-adaptive --games 1000000 --output ...")
+        raise SystemExit(1)
+
+    click.echo(f"Found {len(policies)} adaptive policies: {', '.join(policies)}")
+
+    # Read scores
+    scores = read_adaptive_scores(policies, base_path)
+    for name in sorted(scores.keys()):
+        click.echo(f"  {name}: {len(scores[name]):>10,d} games")
+
+    # Compute summary and KDE
+    click.echo("Computing summary stats...")
+    adaptive_summary = compute_adaptive_summary(scores)
+    adaptive_kde = compute_adaptive_kde(scores)
+
+    # Save
+    adir = analysis_dir(base_path)
+    adir.mkdir(parents=True, exist_ok=True)
+    adaptive_summary.to_parquet(adir / "adaptive_summary.parquet", engine="pyarrow", index=False)
+    click.echo(f"Saved adaptive_summary.parquet ({len(adaptive_summary)} rows)")
+
+    if not adaptive_kde.empty:
+        adaptive_kde.to_parquet(adir / "adaptive_kde.parquet", engine="pyarrow", index=False)
+        click.echo(f"Saved adaptive_kde.parquet ({len(adaptive_kde)} rows)")
+
+    # Print comparison table
+    click.echo()
+    click.echo("=== Adaptive Policy Results ===")
+    header = (
+        f"{'policy':>16s} | {'n':>10s} | {'mean':>7s} | {'std':>5s} | "
+        f"{'p5':>5s} | {'p50':>5s} | {'p90':>5s} | {'p95':>5s} | {'p99':>5s} | "
+        f"{'max':>5s} | {'bonus':>7s}"
+    )
+    click.echo(header)
+    click.echo("-" * len(header))
+
+    # Also load and show the θ=0 baseline for comparison
+    theta_summary_path = adir / "summary.parquet"
+    if theta_summary_path.exists():
+        theta_df = load_summary(theta_summary_path)
+        base = theta_df[theta_df["theta"] == 0.0]
+        if not base.empty:
+            b = base.iloc[0]
+            click.echo(
+                f"{'θ=0 (baseline)':>16s} | {int(b['n']):>10,d} | {b['mean']:>7.2f} | "
+                f"{b['std']:>5.1f} | {int(b['p5']):>5d} | {int(b['p50']):>5d} | "
+                f"{int(b['p90']):>5d} | {int(b['p95']):>5d} | {int(b['p99']):>5d} | "
+                f"{int(b['max']):>5d} |       -"
+            )
+        # Show best fixed-θ for p95
+        if "p95" in theta_df.columns:
+            peak_idx = theta_df["p95"].idxmax()
+            pk = theta_df.loc[peak_idx]
+            label = f"θ={pk['theta']:g} (best p95)"
+            click.echo(
+                f"{label:>16s} | {int(pk['n']):>10,d} | {pk['mean']:>7.2f} | "
+                f"{pk['std']:>5.1f} | {int(pk['p5']):>5d} | {int(pk['p50']):>5d} | "
+                f"{int(pk['p90']):>5d} | {int(pk['p95']):>5d} | {int(pk['p99']):>5d} | "
+                f"{int(pk['max']):>5d} |       -"
+            )
+        click.echo("-" * len(header))
+
+    for _, row in adaptive_summary.iterrows():
+        # Compute bonus rate from raw scores if available
+        click.echo(
+            f"{row['policy']:>16s} | {int(row['n']):>10,d} | {row['mean']:>7.2f} | "
+            f"{row['std']:>5.1f} | {int(row['p5']):>5d} | {int(row['p50']):>5d} | "
+            f"{int(row['p90']):>5d} | {int(row['p95']):>5d} | {int(row['p99']):>5d} | "
+            f"{int(row['max']):>5d} |       -"
+        )
+
+    # Generate efficiency frontier with adaptive overlay
+    if theta_summary_path.exists():
+        import matplotlib
+        matplotlib.use("Agg")
+        from .plots.efficiency import (
+            plot_efficiency_adaptive_combined,
+            plot_efficiency_adaptive_p99,
+            plot_efficiency_adaptive_p999,
+            plot_efficiency_with_adaptive,
+        )
+
+        pdir = plots_dir(base_path)
+        pdir.mkdir(parents=True, exist_ok=True)
+        theta_df = load_summary(theta_summary_path)
+        thetas = sorted(theta_df["theta"].unique().tolist())
+        plot_efficiency_with_adaptive(thetas, theta_df, adaptive_summary, pdir)
+        click.echo(f"\nSaved {pdir}/efficiency_adaptive.png")
+        plot_efficiency_adaptive_p99(thetas, theta_df, adaptive_summary, pdir)
+        click.echo(f"Saved {pdir}/efficiency_adaptive_p99.png")
+        if "p999" in theta_df.columns and "p999" in adaptive_summary.columns:
+            plot_efficiency_adaptive_p999(thetas, theta_df, adaptive_summary, pdir)
+            click.echo(f"Saved {pdir}/efficiency_adaptive_p999.png")
+        plot_efficiency_adaptive_combined(thetas, theta_df, adaptive_summary, pdir)
+        click.echo(f"Saved {pdir}/efficiency_adaptive_combined.png")
+
+        # Density plot with adaptive overlays
+        if not adaptive_kde.empty:
+            from .plots.density import plot_density_with_adaptive
+            from .store import load_kde
+
+            kde_path = adir / "kde.parquet"
+            if kde_path.exists():
+                theta_kde = load_kde(kde_path)
+                plot_density_with_adaptive(thetas, theta_kde, adaptive_kde, pdir)
+                click.echo(f"Saved {pdir}/density_adaptive.png")
+
+    click.echo(f"\nDone in {time.time() - t0:.1f}s.")
+
+
+@cli.command()
+@click.option("--base-path", default="analytics/results", help="Path to results directory.")
 def summary(base_path: str):
     """Print summary table to console (from summary.parquet)."""
     from .config import analysis_dir

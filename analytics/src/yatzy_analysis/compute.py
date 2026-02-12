@@ -38,6 +38,7 @@ def compute_summary(theta: float, scores: NDArray[np.int32]) -> dict:
         "p90": int(np.percentile(scores, 90)),
         "p95": int(np.percentile(scores, 95)),
         "p99": int(np.percentile(scores, 99)),
+        "p999": int(np.percentile(scores, 99.9)),
         "bot5_avg": float(scores[:5].mean()),
         "top5_avg": float(scores[-5:].mean()),
         "top5_pct_avg": float(scores[-top5_pct_n:].mean()),

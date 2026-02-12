@@ -77,13 +77,13 @@ def plot_tails(
         lw = 2.5 if t == 0 else 1.4
         alpha = 1.0 if t == 0 else 0.85
 
-        left = subset[subset["cdf"] <= 0.10]
+        left = subset[subset["cdf"] <= 0.05]
         ax_left.plot(
             left["score"], left["cdf"],
             color=color, linewidth=lw, alpha=alpha, label=f"θ={fmt_theta(t)}",
         )
 
-        right = subset[subset["cdf"] >= 0.90]
+        right = subset[subset["cdf"] >= 0.97]
         ax_right.plot(
             right["score"], right["survival"],
             color=color, linewidth=lw, alpha=alpha, label=f"θ={fmt_theta(t)}",
@@ -91,16 +91,16 @@ def plot_tails(
 
     ax_left.set_xlabel("Total Score", fontsize=12)
     ax_left.set_ylabel("Cumulative Probability", fontsize=12)
-    ax_left.set_title("Left Tail (bottom 10%)", fontsize=13, fontweight="bold")
-    ax_left.set_ylim(0, 0.10)
-    ax_left.set_xlim(80, 220)
+    ax_left.set_title("Left Tail (bottom 5%)", fontsize=13, fontweight="bold")
+    ax_left.set_ylim(0, 0.05)
+    ax_left.set_xlim(100, 180)
     ax_left.legend(fontsize=7, loc="upper left", framealpha=0.9)
 
     ax_right.set_xlabel("Total Score", fontsize=12)
     ax_right.set_ylabel("P(Score > x)  [survival]", fontsize=12)
-    ax_right.set_title("Right Tail (top 10%)", fontsize=13, fontweight="bold")
-    ax_right.set_ylim(0, 0.10)
-    ax_right.set_xlim(270, MAX_SCORE)
+    ax_right.set_title("Right Tail (top 3%)", fontsize=13, fontweight="bold")
+    ax_right.set_ylim(0, 0.03)
+    ax_right.set_xlim(300, MAX_SCORE)
     ax_right.legend(fontsize=7, loc="upper right", framealpha=0.9)
 
     if standalone:

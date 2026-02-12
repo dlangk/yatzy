@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yatzy-rl"
+version = "0.1.0"
+description = "RL agents for Yatzy: can we beat the optimal solver on tail percentiles?"
+requires-python = ">=3.11"
+dependencies = [
+    "torch>=2.0",
+    "numpy>=1.24",
+    "click>=8.0",
+    "scipy>=1.10",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-timeout>=2.0",
+]
+
+[project.scripts]
+yatzy-rl = "yatzy_rl.cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+timeout = 120

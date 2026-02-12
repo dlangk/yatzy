@@ -30,6 +30,11 @@ backend-legacy-c/compile_commands.json
 __pycache__/
 *.py[cod]
 
+# RL package
+rl/.venv/
+rl/checkpoints/
+rl/src/*.egg-info/
+
 # Node (frontend)
 node_modules/
 

@@ -105,6 +105,43 @@ pub fn load_all_state_values(ctx: &mut YatzyContext, filename: &str) -> bool {
     true
 }
 
+/// Load state values via zero-copy mmap, returning `StateValues` directly.
+///
+/// Unlike `load_all_state_values`, this does not require a `YatzyContext`.
+/// Used by adaptive policies to load multiple θ tables independently.
+pub fn load_state_values_standalone(filename: &str) -> Option<StateValues> {
+    let file = File::open(filename).ok()?;
+    let metadata = file.metadata().ok()?;
+
+    let expected_size =
+        std::mem::size_of::<StateFileHeader>() + NUM_STATES * std::mem::size_of::<f32>();
+    if metadata.len() as usize != expected_size {
+        eprintln!(
+            "File size mismatch for {}: expected {}, got {}",
+            filename,
+            expected_size,
+            metadata.len()
+        );
+        return None;
+    }
+
+    let mmap = unsafe { Mmap::map(&file) }.ok()?;
+
+    let header_ptr = mmap.as_ptr() as *const StateFileHeader;
+    let header = unsafe { &*header_ptr };
+    if header.magic != STATE_FILE_MAGIC
+        || (header.version != STATE_FILE_VERSION && header.version != STATE_FILE_VERSION_V5)
+    {
+        eprintln!(
+            "Invalid file format for {}: magic=0x{:08x} version={}",
+            filename, header.magic, header.version
+        );
+        return None;
+    }
+
+    Some(StateValues::Mmap { mmap })
+}
+
 /// Save state values as a flat dump in STATE_INDEX order.
 pub fn save_all_state_values(ctx: &YatzyContext, filename: &str) {
     let start_time = Instant::now();
