@@ -147,75 +147,70 @@ The 7 categories requiring five-of-a-specific-face (each 1-in-75) are the domina
 
 \*The EV-optimal policy has a much better chance of high scores because it makes realistic decisions. The max-policy actively hurts performance by chasing unrealistic best-case outcomes.
 
+Notably, the max-policy also has the **lowest Yatzy hit rate** of all strategies tested (4.9% vs 38.8% for EV-optimal). See "Conditional Yatzy Hit Rate" section below for analysis.
+
 ---
 
 ## Risk-Sensitive theta Sweep Results
 
-### Coarse sweep (1M games each, 21 theta values)
+### Full sweep (1M games each, 37 theta values, progressive spacing)
 
-|     theta |      Mean |      Std |      p5 | p95 (actual) | p95 (Gaussian) |    Delta |
-| --------: | --------: | -------: | ------: | -----------: | -------------: | -------: |
-|   -20.000 |     181.9 |     36.0 |     134 |          247 |          241.1 |     +5.9 |
-|   -10.000 |     182.7 |     36.2 |     134 |          249 |          242.2 |     +6.8 |
-|    -5.000 |     186.6 |     37.1 |     137 |          255 |          247.7 |     +7.3 |
-|    -1.000 |     198.2 |     37.9 |     148 |          269 |          260.5 |     +8.5 |
-|    -0.100 |     239.2 |     35.9 |     172 |          300 |          298.2 |     +1.8 |
-|    -0.050 |     245.1 |     35.7 |     179 |          305 |          303.9 |     +1.1 |
-|    -0.020 |     247.9 |     37.2 |     183 |          308 |          309.1 |     -1.1 |
-|    -0.010 |     248.3 |     37.7 |     182 |          308 |          310.4 |     -2.4 |
-| **0.000** | **248.4** | **38.5** | **179** |      **309** |      **311.7** | **-2.7** |
-|    +0.010 |     248.2 |     39.4 |     175 |          310 |          313.0 |     -3.0 |
-|    +0.020 |     247.7 |     40.3 |     172 |          311 |          314.1 |     -3.1 |
-|    +0.030 |     246.9 |     41.3 |     169 |          311 |          314.9 |     -3.9 |
-|    +0.040 |     245.7 |     42.3 |     166 |          312 |          315.3 |     -3.3 |
-|    +0.050 |     244.5 |     43.2 |     164 |          312 |          315.6 |     -3.6 |
-|    +0.100 |     235.9 |     46.9 |     155 |          312 |          313.1 |     -1.1 |
-|    +0.200 |     223.8 |     48.4 |     148 |          308 |          303.3 |     +4.7 |
-|    +0.500 |     204.7 |     47.7 |     135 |          287 |          283.1 |     +3.9 |
-|    +1.000 |     194.5 |     46.3 |     128 |          276 |          270.6 |     +5.4 |
-|    +5.000 |     186.5 |     44.1 |     124 |          266 |          259.1 |     +6.9 |
-|   +10.000 |     185.8 |     43.9 |     124 |          265 |          258.1 |     +6.9 |
-|   +20.000 |     185.7 |     43.9 |     124 |          265 |          257.9 |     +7.1 |
+Grid: 37 values from -3.0 to +3.0 with progressive spacing dense near zero (delta = 0.005 in [-0.015, +0.015], 0.01 in [-0.05, +0.05], then widening to 0.5-1.0 at the extremes).
 
-### Dense sweep (1M games each, seed=42)
+| theta |   Mean |  Std | Min |  p5 | p10 | p25 | p50 | p75 | p90 | p95 | p99 | Max |
+| ----: | -----: | ---: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |
+| -3.00 | 188.54 | 37.0 |  90 | 139 | 147 | 161 | 181 | 213 | 239 | 257 | 293 | 344 |
+| -2.00 | 190.63 | 36.9 |  91 | 142 | 149 | 163 | 183 | 215 | 241 | 259 | 295 | 343 |
+| -1.50 | 192.54 | 37.0 |  95 | 143 | 151 | 164 | 185 | 218 | 243 | 261 | 296 | 343 |
+| -1.00 | 198.22 | 37.9 |  98 | 148 | 155 | 169 | 191 | 225 | 249 | 269 | 300 | 344 |
+| -0.75 | 203.24 | 38.6 | 104 | 151 | 158 | 173 | 196 | 231 | 255 | 275 | 303 | 341 |
+| -0.50 | 211.63 | 39.5 | 107 | 156 | 163 | 179 | 209 | 240 | 263 | 283 | 308 | 345 |
+| -0.30 | 221.74 | 39.8 | 105 | 161 | 169 | 187 | 226 | 250 | 272 | 290 | 313 | 356 |
+| -0.20 | 227.48 | 39.3 |  97 | 165 | 173 | 194 | 233 | 254 | 275 | 294 | 315 | 353 |
+| -0.15 | 231.83 | 38.9 | 104 | 167 | 176 | 201 | 237 | 257 | 280 | 298 | 317 | 354 |
+| -0.10 | 239.22 | 35.8 | 100 | 172 | 187 | 221 | 241 | 261 | 283 | 300 | 319 | 355 |
+| -0.07 | 242.36 | 35.0 | 100 | 175 | 199 | 224 | 243 | 263 | 287 | 302 | 320 | 355 |
+| -0.05 | 245.09 | 35.7 |  99 | 179 | 203 | 225 | 245 | 268 | 292 | 305 | 322 | 357 |
+| -0.04 | 246.45 | 36.3 |  99 | 182 | 204 | 225 | 246 | 270 | 295 | 306 | 322 | 357 |
+| -0.03 | 247.32 | 36.7 |  90 | 183 | 204 | 226 | 247 | 273 | 296 | 307 | 323 | 350 |
+| -0.02 | 247.93 | 37.2 |  93 | 183 | 204 | 226 | 248 | 274 | 297 | 308 | 323 | 351 |
+| -0.015| 248.13 | 37.4 |  93 | 182 | 204 | 226 | 248 | 275 | 298 | 308 | 324 | 351 |
+| -0.01 | 248.29 | 37.7 |  93 | 182 | 204 | 226 | 248 | 275 | 298 | 308 | 324 | 356 |
+| -0.005| 248.39 | 38.0 |  93 | 181 | 203 | 225 | 249 | 275 | 299 | 309 | 324 | 352 |
+|**0.000**|**248.40**|**38.5**|**97**|**179**|**203**|**225**|**249**|**276**|**299**|**309**|**325**|**352**|
+| 0.005 | 248.32 | 39.0 |  94 | 177 | 202 | 225 | 249 | 276 | 300 | 310 | 325 | 353 |
+| 0.010 | 248.21 | 39.4 |  90 | 175 | 201 | 225 | 249 | 277 | 300 | 310 | 325 | 353 |
+| 0.015 | 248.03 | 39.8 |  90 | 174 | 200 | 224 | 248 | 277 | 301 | 310 | 326 | 359 |
+| 0.020 | 247.73 | 40.3 |  90 | 172 | 198 | 224 | 248 | 277 | 301 | 311 | 326 | 359 |
+| 0.030 | 246.92 | 41.3 |  88 | 169 | 195 | 223 | 247 | 277 | 301 | 311 | 326 | 359 |
+| 0.040 | 245.71 | 42.3 |  88 | 166 | 190 | 221 | 245 | 278 | 302 | 312 | 327 | 359 |
+| 0.050 | 244.53 | 43.2 |  79 | 164 | 185 | 219 | 244 | 277 | 302 | 312 | 327 | 359 |
+| 0.070 | 240.86 | 45.3 |  84 | 159 | 176 | 213 | 241 | 274 | 302 | 313 | 328 | 362 |
+| 0.100 | 235.92 | 46.9 |  79 | 155 | 170 | 204 | 237 | 268 | 301 | 312 | 329 | 362 |
+| 0.150 | 229.23 | 47.9 |  74 | 152 | 165 | 192 | 231 | 261 | 296 | 311 | 329 | 362 |
+| 0.200 | 223.76 | 48.4 |  67 | 148 | 160 | 185 | 225 | 257 | 289 | 308 | 329 | 358 |
+| 0.300 | 215.74 | 48.6 |  76 | 142 | 154 | 177 | 215 | 251 | 280 | 301 | 327 | 358 |
+| 0.500 | 204.73 | 47.6 |  60 | 135 | 146 | 168 | 200 | 240 | 269 | 287 | 319 | 361 |
+| 0.750 | 198.13 | 47.0 |  57 | 130 | 141 | 162 | 192 | 233 | 262 | 280 | 313 | 360 |
+| 1.000 | 194.47 | 46.3 |  57 | 128 | 139 | 159 | 188 | 229 | 258 | 276 | 309 | 359 |
+| 1.500 | 189.22 | 45.5 |  55 | 125 | 135 | 155 | 182 | 221 | 253 | 270 | 305 | 359 |
+| 2.000 | 186.04 | 44.8 |  48 | 123 | 133 | 152 | 179 | 217 | 250 | 266 | 300 | 359 |
+| 3.000 | 186.49 | 44.2 |  50 | 124 | 135 | 154 | 179 | 216 | 250 | 266 | 301 | 359 |
 
-Grid: dense (delta_theta = 0.01) in the interesting range 0-0.20, sparser (delta_theta = 0.1-0.2) in the saturated range 0.3-3.0.
+### Best theta per metric
 
-| theta |   Mean | StdDev | Min |  p5 | p25 | p50 | p75 | p95 | p99 | Max | Bonus% |
-| ----: | -----: | -----: | --: | --: | --: | --: | --: | --: | --: | --: | -----: |
-| 0.000 | 248.40 |   38.5 |  97 | 179 | 225 | 249 | 276 | 309 | 325 | 352 |  89.8% |
-| 0.010 | 248.21 |   39.4 |  90 | 175 | 225 | 249 | 277 | 310 | 325 | 353 |  88.4% |
-| 0.020 | 247.73 |   40.3 |  90 | 172 | 224 | 248 | 277 | 311 | 326 | 359 |  86.7% |
-| 0.030 | 246.92 |   41.3 |  88 | 169 | 223 | 247 | 277 | 311 | 326 | 359 |  84.7% |
-| 0.040 | 245.71 |   42.3 |  88 | 166 | 221 | 245 | 278 | 312 | 327 | 359 |  82.5% |
-| 0.050 | 244.53 |   43.2 |  79 | 164 | 219 | 244 | 277 | 312 | 327 | 359 |  79.9% |
-| 0.060 | 242.94 |   44.2 |  79 | 162 | 216 | 243 | 276 | 312 | 328 | 362 |  77.0% |
-| 0.070 | 240.86 |   45.3 |  84 | 159 | 213 | 241 | 274 | 313 | 328 | 362 |  72.6% |
-| 0.080 | 239.12 |   46.0 |  78 | 158 | 210 | 239 | 273 | 313 | 328 | 362 |  69.4% |
-| 0.090 | 237.47 |   46.5 |  82 | 156 | 207 | 238 | 270 | 313 | 329 | 362 |  66.3% |
-| 0.100 | 235.92 |   46.9 |  79 | 155 | 204 | 237 | 268 | 312 | 329 | 362 |  63.6% |
-| 0.110 | 234.40 |   47.2 |  81 | 154 | 202 | 236 | 266 | 312 | 329 | 362 |  61.7% |
-| 0.120 | 233.05 |   47.4 |  81 | 154 | 199 | 235 | 265 | 312 | 329 | 362 |  59.6% |
-| 0.130 | 231.69 |   47.6 |  74 | 153 | 196 | 234 | 263 | 311 | 329 | 362 |  57.7% |
-| 0.140 | 230.43 |   47.8 |  74 | 152 | 194 | 232 | 262 | 311 | 329 | 362 |  55.9% |
-| 0.150 | 229.23 |   47.9 |  74 | 152 | 192 | 231 | 261 | 311 | 329 | 362 |  54.4% |
-| 0.160 | 228.02 |   48.1 |  74 | 151 | 191 | 230 | 260 | 310 | 329 | 362 |  53.0% |
-| 0.170 | 226.82 |   48.2 |  78 | 150 | 189 | 229 | 260 | 310 | 329 | 358 |  51.8% |
-| 0.180 | 225.74 |   48.3 |  75 | 149 | 188 | 228 | 259 | 309 | 329 | 358 |  50.6% |
-| 0.190 | 224.75 |   48.3 |  78 | 149 | 186 | 227 | 258 | 308 | 329 | 358 |  49.6% |
-| 0.200 | 223.76 |   48.4 |  67 | 148 | 185 | 225 | 257 | 308 | 329 | 358 |  48.5% |
-| 0.300 | 215.74 |   48.6 |  76 | 142 | 177 | 215 | 251 | 301 | 327 | 358 |  44.0% |
-| 0.400 | 209.82 |   48.3 |  67 | 138 | 171 | 207 | 245 | 293 | 323 | 358 |  40.7% |
-| 0.500 | 204.73 |   47.6 |  60 | 135 | 168 | 200 | 240 | 287 | 319 | 361 |  38.0% |
-| 0.700 | 199.29 |   47.1 |  51 | 131 | 163 | 194 | 234 | 281 | 314 | 360 |  34.7% |
-| 0.900 | 195.29 |   46.3 |  57 | 128 | 160 | 189 | 230 | 276 | 309 | 359 |  33.2% |
-| 1.100 | 193.73 |   46.1 |  51 | 127 | 158 | 187 | 228 | 275 | 308 | 359 |  32.2% |
-| 1.300 | 190.56 |   45.8 |  51 | 125 | 156 | 184 | 223 | 272 | 306 | 359 |  30.0% |
-| 1.500 | 189.22 |   45.5 |  55 | 125 | 155 | 182 | 221 | 270 | 305 | 359 |  28.8% |
-| 1.700 | 187.28 |   45.2 |  57 | 123 | 153 | 180 | 219 | 268 | 303 | 359 |  27.3% |
-| 1.900 | 186.17 |   44.8 |  48 | 123 | 152 | 179 | 217 | 267 | 300 | 359 |  27.1% |
-| 2.000 | 186.04 |   44.8 |  48 | 123 | 152 | 179 | 217 | 266 | 300 | 359 |  27.1% |
-| 3.000 | 186.49 |   44.2 |  50 | 124 | 154 | 179 | 216 | 266 | 301 | 359 |  25.7% |
+| Metric | Best theta | Value |
+| -----: | ---------: | ----: |
+| min | -0.50 | 107 |
+| p5 | -0.03 | 183 |
+| p10 | -0.04 | 204 |
+| p25 | -0.03 | 226 |
+| p50 | -0.005 | 249 |
+| p75 | 0.04 | 278 |
+| p90 | 0.04 | 302 |
+| p95 | 0.07 | 313 |
+| p99 | 0.10 | 329 |
+| max | 0.07 | 362 |
 
 ---
 
@@ -265,12 +260,154 @@ p75 = 278 vs 276 at theta = 0. The "best theta" shifts left for lower percentile
 
 Bonus rate drops 2.3% per 0.01 theta in [0, 0.10]. The upper section bonus is the most sensitive indicator of when the policy starts making different decisions.
 
-### Regime boundaries (refined with dense grid)
+### Risk-Averse theta: The Other Branch
 
-- **theta < 0.03** (|theta| \* sigma < 0.3): Near-EV behavior. Mean loss < 1.5 pts, all percentiles within 2 pts of baseline.
-- **0.03 < theta < 0.20** (|theta| \* sigma ~ 0.3-2): **Active tradeoff regime.** Upper percentiles (p95, p99) peak, mean declines ~1 pt per 0.01 theta.
-- **theta > 0.20** (|theta| \* sigma > 2): Diminishing returns. Policy changes slow down, all metrics decline monotonically.
-- **theta > 1.5** (|theta| \* sigma > 15): Full saturation. Policy frozen, no further change.
+The extended sweep to negative theta reveals the risk-averse side of the frontier, which has qualitatively different properties from risk-seeking:
+
+**Risk-averse play is surprisingly effective at compressing variance.** At theta=-0.05, std drops from 38.5 to 35.7 while mean only drops 3 points (248.4 to 245.1). This is a much better variance/mean tradeoff than risk-seeking achieves — at theta=+0.05, std *rises* from 38.5 to 43.2 while mean drops 3.9 points. Risk-averse buys variance reduction cheaply; risk-seeking buys variance inflation expensively.
+
+**p5 peaks at theta=-0.03 (183 vs 179 at theta=0).** Risk-averse play lifts the floor — the worst 5% of games improve by 4 points with only 1 point of mean cost. Similarly, p10 peaks at theta=-0.04 (204 vs 203 at theta=0).
+
+**The minimum score peaks at theta=-0.5 (107 vs 97).** Extremely risk-averse play protects the absolute worst case, raising the floor by 10 points. This comes at a steep mean cost (211.6 vs 248.4), but for applications where catastrophic scores are unacceptable, this tradeoff may be worthwhile.
+
+**Degenerate risk-averse (theta < -1)**: Mean drops to ~190, similar to extreme risk-seeking. The policy becomes symmetrically bad — refusing all variance is as costly as embracing all variance. At theta=-3, mean=188.5, comparable to theta=+3 at 186.5.
+
+**Asymmetric branches confirmed with full range**: Risk-averse achieves std=35-38 across its entire useful range, while risk-seeking peaks at std=48.6. At the same mean (~190), the risk-seeking branch (theta~1) has std~46 vs std~37 for risk-averse (theta~-1.5) — 9 points higher. The two branches trace distinct curves in (mean, std) space, confirming the two-branch structure first observed in the coarse sweep.
+
+### Regime boundaries (refined with full symmetric grid)
+
+- **theta < -1** (|theta| * sigma > 10): Degenerate risk-averse. Mean ~190, all metrics declining. Policy refuses nearly all variance.
+- **-1 < theta < -0.1** (|theta| * sigma ~ 1-4): Active risk-averse regime. Variance compresses substantially (std 35-38), lower percentiles improve.
+- **-0.1 < theta < -0.01**: Near-EV risk-averse. Small variance reduction, small mean cost. Sweet spot for floor protection.
+- **-0.01 < theta < 0.03** (|theta| * sigma < 0.3): Near-EV. Negligible differences from theta=0.
+- **0.03 < theta < 0.20** (|theta| * sigma ~ 0.3-2): **Active risk-seeking tradeoff.** Upper percentiles (p95, p99) peak, mean declines ~1 pt per 0.01 theta.
+- **theta > 0.20** (|theta| * sigma > 2): Diminishing returns. Policy changes slow down, all metrics decline monotonically.
+- **theta > 1.5** (|theta| * sigma > 15): Full saturation. Policy frozen, no further change.
+
+---
+
+## How theta Changes Decisions
+
+### Disagreement rate
+
+At each decision point (reroll mask or category choice), theta=0 and theta>0 may prescribe different actions. The disagreement rate scales with theta (measured over 100K games, following theta=0's game trajectory):
+
+| Comparison | Reroll disagree | Category disagree | Total | Per game (of 45) |
+|---|---|---|---|---|
+| θ=0 vs θ=0.07 | 12.5% | 12.4% | 12.5% | 5.6 |
+| θ=0 vs θ=0.50 | — | 32.0% | — | — |
+| θ=0 vs θ=1.10 | — | 40.3% | — | — |
+| θ=0 vs θ=3.00 | — | 44.2% | — | — |
+
+Even at the mild θ=0.07 (peak p95), 1 in 8 decisions differs. At extreme θ=3.0, nearly half of all category decisions differ.
+
+### The unified pattern: option value
+
+Every category disagreement has the same structure: θ=0 fills category X, θ>0 fills category Y — they differ on **which category to keep open for future turns**. θ>0 systematically assigns higher option value to keeping categories open, especially those with high scoring ceilings.
+
+θ=0 (EV-optimal) writes off hard-to-complete categories sooner and keeps flexible ones that score from many dice combinations. θ>0 (risk-seeking) preserves high-ceiling categories longer and dumps low-ceiling or easy-to-fill ones first.
+
+### Category disagreement breakdown (θ=0 vs θ=0.07, 100K games)
+
+Categorized by what θ=0.07 **preserves** (keeps open) that θ=0 gives up:
+
+| θ=0.07 preserves... | Count | % of disagreements | Avg immediate sacrifice |
+|---|---|---|---|
+| Yatzy (ceiling 50) | 48,598 | 26.1% | +3.0 pts |
+| Straights (ceiling 15/20) | 47,269 | 25.3% | -2.3 pts (gains) |
+| Chance (ceiling 30) | 10,933 | 5.9% | +2.9 pts |
+| Full House (ceiling 28) | 6,593 | 3.5% | -1.0 pts (gains) |
+| Two Pairs / Four of a Kind (ceiling 22/24) | 7,355 | 3.9% | -1.6 pts (gains) |
+| Upper category over lower | 58,065 | 31.1% | -0.2 pts (gains) |
+| Upper section reordering | 1,862 | 1.0% | -0.5 pts (gains) |
+| Lower category over upper | 4,837 | 2.6% | +0.5 pts |
+| **Total** | **186,520** | **100%** | **+0.2 pts** |
+
+The "immediate sacrifice" is the score difference on the current turn — positive means θ=0 scores more now. Negative ("gains") means θ=0.07 actually scores more now because it fills a scoring category instead of dumping a zero.
+
+### Detailed examples of each type
+
+**1. Preserve Yatzy (26.1%, costs +3.0 pts/decision)**
+
+The most costly preservation. Late game (avg turn 13), θ=0 fills Yatzy with a low or zero score. θ=0.07 dumps that score on another category to keep the 50-point jackpot alive.
+
+| θ=0.07 preserves | θ=0.07 dumps | Count | θ=0 scores | θ=0.07 scores |
+|---|---|---|---|---|
+| Yatzy | Large Straight | 14,492 | 5.6 | 0.0 |
+| Yatzy | Four of a Kind | 13,585 | 1.5 | 0.1 |
+| Yatzy | Small Straight | 5,487 | 5.3 | 0.0 |
+| Yatzy | Chance | 3,690 | 5.9 | 5.0 |
+| Yatzy | Full House | 2,513 | 1.3 | 0.0 |
+
+θ=0 writes off Yatzy because P(five-of-a-kind) ≈ 4.6% per turn — the EV of keeping Yatzy open (~2.3 pts) is usually less than the EV of keeping other categories open. θ=0.07 values the *upside* of 50 points more than its probability warrants under expected value.
+
+**2. Preserve Straights (25.3%, gains -2.3 pts/decision)**
+
+θ=0 dumps a zero on Small/Large Straight (gives up on completing it). θ=0.07 fills a different category (often Ones, Twos, One Pair) and keeps the straight alive. Because the dump target often scores 2-5 points, θ=0.07 typically gains immediate points.
+
+| θ=0.07 preserves | θ=0.07 dumps | Count | θ=0 scores | θ=0.07 scores |
+|---|---|---|---|---|
+| Small Straight | Ones | 14,640 | 0.0 | 2.9 |
+| Small Straight | Twos | 5,730 | 0.0 | 2.6 |
+| Small Straight | Threes | 5,417 | 0.0 | 0.0 |
+| Large Straight | Ones | 3,994 | 0.0 | 2.5 |
+| Small Straight | One Pair | 3,815 | 0.0 | 2.2 |
+| Large Straight | Chance | 2,431 | 0.0 | 5.0 |
+
+θ=0 writes off straights early (avg turn 5-8) because the probability of completing them declines as upper section categories fill. θ=0.07 keeps them alive, filling low-value categories as dump targets.
+
+**3. Preserve Upper Category over Lower (31.1%, near-zero cost)**
+
+The largest category. Both score ~0, but θ=0.07 dumps in a lower-section category (Three of a Kind, Four of a Kind) while θ=0 dumps in an upper-section category (Sixes, Fives).
+
+| θ=0.07 preserves | θ=0.07 dumps | Count | θ=0 scores | θ=0.07 scores |
+|---|---|---|---|---|
+| Sixes | Three of a Kind | 30,889 | 0.0 | 0.0 |
+| Sixes | Four of a Kind | 18,994 | 0.0 | 0.0 |
+
+θ=0 keeps Three of a Kind open because it's a flexible category that scores from many dice combinations. θ=0.07 keeps Sixes open (max 30, contributes to upper bonus) because it values the ceiling and bonus potential more than the scoring flexibility. This is about **probability of use vs ceiling of use**: θ=0 optimizes for the former, θ=0.07 for the latter.
+
+**4. Preserve Chance (5.9%, costs +2.9 pts/decision)**
+
+θ=0 fills Chance with a mediocre roll (avg 5 pts, the dice sum is low). θ=0.07 puts fewer points in One Pair or Ones and keeps Chance (max 30) open for a future high roll.
+
+**5. Preserve Full House / Two Pairs / Four of a Kind (7.4%, gains points)**
+
+θ=0.07 keeps harder multi-match categories open and fills easier ones. Since the dump target often has a non-zero score, θ=0.07 gains 1-2 points immediately while preserving upside.
+
+### Immediate cost vs compounding cost
+
+Net across all 186,520 disagreements: **θ=0.07 sacrifices only 0.3 total points per game** in immediate category scores (on 1.9 disagreeing decisions per game). Yet the overall mean difference is 7.5 points.
+
+The gap is explained by **compounding**. Preserving hard-to-complete categories means:
+- More turns spent with incomplete high-variance categories open
+- Those categories often end up scored at zero anyway (Yatzy ≈ 4.6% hit rate)
+- The upper bonus is hit less often (89.8% → 72.6%) because upper category slots are filled suboptimally
+- Reroll decisions also diverge (12.5% disagreement), chasing different targets
+
+The immediate sacrifice is small, but the downstream effects cascade: worse bonus rates, worse category utilization, and slightly worse reroll targeting. The 7.5-point mean loss is a systemic property of the strategy, not any single decision.
+
+### How disagreements scale with θ
+
+At higher θ, the same patterns intensify without changing character:
+
+| θ | Category disagree rate | Dominant pattern |
+|---|---|---|
+| 0.07 | 12.4% | Preserve Yatzy, Straights, Upper slots |
+| 0.50 | 32.0% | Same patterns + abandon all mid-value lower categories |
+| 1.10 | 40.3% | Same + Fours/Fives → Ones (dump low-value upper) |
+| 3.00 | 44.2% | Same + Full House/Two Pairs → One Pair (dump all low-ceiling) |
+
+The classification shifts at higher θ:
+
+| θ | Same score (swap) | θ=0 scores more | θ>0 scores more |
+|---|---|---|---|
+| 0.07 | 60% | 9% | 31% |
+| 0.50 | 43% | 10% | 47% |
+| 1.10 | 38% | 13% | 49% |
+| 3.00 | 44% | 16% | 40% |
+
+At moderate θ, most disagreements are swaps (same immediate score) or cases where θ>0 scores more (it fills a non-zero category while θ=0 dumps a zero). At extreme θ, the Yatzy preservation cases where θ=0 scores more become a larger fraction, but the overall pattern remains: preserve high ceiling, dump low ceiling.
 
 ---
 
@@ -440,16 +577,18 @@ A human who is risk-seeking only in the right moments could potentially get the 
 
 At each decision point in a game, the player chooses an action (reroll mask or category). For most decisions, all theta values agree -- keep Yatzy if you have it, reroll garbage, etc. But at **pivotal decisions**, different theta values prescribe different actions. These pivotal decisions reveal the player's risk preference.
 
-Rough estimate of pivotal decisions per game:
+Empirically measured disagreements per game (category decisions only, 100K games):
 
-| theta | Mean loss vs theta=0 | ~Pivotal decisions per game |
-| ----: | -------------------: | --------------------------: |
-| +0.01 |                  0.2 |                          ~0 |
-| +0.05 |                  3.9 |                        ~1-2 |
-| +0.10 |                 12.5 |                          ~4 |
-| +0.20 |                 24.6 |                          ~8 |
+| theta | Mean loss vs theta=0 | Category disagree rate | Category disagrees/game |
+| ----: | -------------------: | ---------------------: | ----------------------: |
+| +0.07 |                  7.5 |                  12.4% |                     1.9 |
+| +0.50 |                 43.7 |                  32.0% |                     4.8 |
+| +1.10 |                 54.7 |                  40.3% |                     6.0 |
+| +3.00 |                 62.0 |                  44.2% |                     6.6 |
 
-At theta = 0.05, only 1-2 decisions per game differ from theta = 0. This means we need many observed games to estimate a human's theta with any precision -- a single game has very little signal.
+Including reroll decisions, θ=0.07 disagrees on 12.5% of all 45 decisions per game (5.6 per game). See the "How theta Changes Decisions" section for a full breakdown of what these disagreements look like.
+
+At θ=0.07 (peak p95), only 1.9 category decisions per game differ. This means we need many observed games to estimate a human's θ with any precision — a single game has very little signal.
 
 ### Method: revealed theta per decision
 
@@ -532,6 +671,45 @@ The main challenge is **sample size**. With only 1-2 pivotal decisions per game 
 
 ---
 
+## theta Estimation Questionnaire
+
+### Approach: pivotal scenarios as a questionnaire
+
+Rather than requiring 50-100 observed games, we can estimate a player's theta directly by presenting **pivotal scenarios** — game states where different theta values prescribe different optimal categories — and asking the player to choose. This is a compressed version of the revealed-preference approach described above.
+
+### Generating pivotal scenarios
+
+Pivotal scenarios are generated by the `pivotal-scenarios` binary. It simulates games and finds decision points where different theta values prescribe different optimal categories. A scenario is "pivotal" if there exist at least two theta values in the grid that disagree on the best category to fill.
+
+Not all pivotal scenarios from optimal play are realistic — some arise in game states that no human would encounter (e.g., having scored zero in all upper categories by turn 12). A **realism filter** rejects scenarios that fail basic sanity checks:
+- Zero-dump limit: too many categories scored as zero
+- Upper section sanity: upper score consistent with turn number
+- Minimum scored sum: total score not implausibly low for the turn
+
+### Bayesian grid estimator
+
+The estimator uses a softmax choice model:
+
+```
+P(a | s, θ, β) = exp(β · V_θ(a, s)) / Σ_a' exp(β · V_θ(a', s))
+```
+
+where V_θ(a, s) is the value of choosing category a in state s under theta, and beta is a rationality parameter (higher beta = more decisive). Given observed answers, the posterior over theta is updated via Bayes' rule on a discrete grid.
+
+### Adaptive question selection
+
+Each question is selected to maximize expected information gain — the expected reduction in entropy of the theta posterior. After observing the answer, the posterior is updated and the next question is selected. This greedy strategy is equivalent to one-step-ahead Bayesian optimal experimental design.
+
+**15 questions are typically sufficient** for a theta estimate with confidence interval width < 0.05, based on validation experiments. The first 5-7 questions rapidly narrow the posterior; subsequent questions refine the estimate within the active region.
+
+### Answer format
+
+Answers are stored as `(scenario_id, category_id)` pairs for robustness across grid changes. This means saved questionnaire results remain valid even if the theta grid or scenario pool changes — the answers reference immutable scenario and category identifiers, not theta-dependent quantities.
+
+A `theta-replay` command re-estimates theta from saved answers, and `theta-validate` runs convergence validation (how CI width decreases with question count).
+
+---
+
 ## Adaptive θ Policies: Table-Switching Approximation
 
 ### Why fixed θ is suboptimal
@@ -602,7 +780,7 @@ Secondary metrics:
 
 ### Results
 
-_To be filled after running simulations. See `analytics/results/plots/efficiency_adaptive.png`._
+_To be filled after running simulations. See `outputs/plots/efficiency_adaptive.png`._
 
 ---
 
@@ -822,3 +1000,385 @@ All three approaches (A, B, C) failed to beat the fixed-θ Pareto frontier:
 2. **Approach B** (direct action) falls far below the frontier. Neural networks cannot approximate the precomputed tables with sufficient fidelity.
 
 **The theoretical gap for RL is ~0.** The accumulated-score conditioning that RL could exploit (running hot/cold) shifts optimal decisions by <1 point per game. This is below the noise floor for any practical RL algorithm. The precomputed solver, despite not conditioning on accumulated score, is empirically unbeatable — its mean-optimal decisions happen to be near-optimal for all reasonable risk preferences.
+
+---
+
+## Per-Category Statistics Across the θ Sweep
+
+### Method
+
+For each of the 37 θ values in the full sweep, simulated 1M games and computed five per-category statistics:
+
+1. **Mean score**: average points scored in that category
+2. **Zero rate**: fraction of games where the category scores 0 (either dumped or missed)
+3. **Mean fill turn**: average turn (1-indexed) when the category is filled
+4. **Score % of ceiling**: mean score as a percentage of the category's maximum
+5. **Hit rate**: 1 - zero rate (fraction of games where the category scores ≥ 1)
+
+Full data: `outputs/aggregates/csv/category_stats.csv` (555 rows = 37 θ values × 15 categories, generated by `yatzy-category-sweep`).
+
+### Category ceilings
+
+| Category | Ceiling | Notes |
+|---|---|---|
+| Ones | 5 | Upper section |
+| Twos | 10 | Upper section |
+| Threes | 15 | Upper section |
+| Fours | 20 | Upper section |
+| Fives | 25 | Upper section |
+| Sixes | 30 | Upper section |
+| One Pair | 12 | |
+| Two Pairs | 22 | |
+| Three of a Kind | 18 | |
+| Four of a Kind | 24 | |
+| Small Straight | 15 | All-or-nothing |
+| Large Straight | 20 | All-or-nothing |
+| Full House | 28 | |
+| Chance | 30 | Never zeros |
+| Yatzy | 50 | All-or-nothing |
+
+### Upper section: Ones is the dump category
+
+Ones absorbs more zeros than any other upper category, and this intensifies with θ:
+
+| θ | Ones mean | Ones zero% | Ones fill turn | Sixes mean | Sixes fill turn |
+|---|---|---|---|---|---|
+| 0.00 | 2.18 | 9.2% | 8.0 | 19.99 | 6.5 |
+| 0.07 | 1.75 | 14.8% | 7.0 | 19.05 | 9.9 |
+| 0.20 | 1.44 | 20.5% | 5.5 | 18.08 | 11.7 |
+| 1.00 | 1.37 | 30.9% | 3.1 | 16.86 | 12.6 |
+| 3.00 | 1.25 | 38.5% | 3.1 | 17.13 | 12.4 |
+
+θ>0 fills Ones early (turn 3 vs turn 8) and with low/zero scores, preserving high-value upper slots for later. Sixes migrates from turn 6.5 to turn 12.4 — filled late to maximize its ceiling of 30 and bonus contribution.
+
+### High-variance categories: Yatzy peaks at moderate θ
+
+| θ | Yatzy mean | Yatzy hit% | Yatzy fill turn |
+|---|---|---|---|
+| 0.00 | 19.36 | 38.7% | 10.6 |
+| 0.05 | 21.38 | 42.8% | 11.3 |
+| 0.07 | 21.42 | 42.8% | 11.4 |
+| 0.10 | 20.64 | 41.3% | 11.6 |
+| 0.20 | 16.94 | 33.9% | 12.1 |
+| 0.50 | 10.94 | 21.9% | 13.0 |
+| 3.00 | 7.47 | 14.9% | 13.4 |
+
+Yatzy mean score peaks at θ≈0.05-0.07, where the option-value preservation strategy maximizes the probability of eventually completing five-of-a-kind. Beyond θ≈0.10, the strategy over-commits to preserving Yatzy at the expense of other categories, and the cascading mean loss outweighs the improved hit rate.
+
+### Straights improve with moderate θ
+
+| θ | Sm.Str mean | Sm.Str hit% | Lg.Str mean | Lg.Str hit% |
+|---|---|---|---|---|
+| 0.00 | 3.96 | 26.4% | 9.73 | 48.7% |
+| 0.07 | 4.83 | 32.2% | 10.33 | 51.7% |
+| 0.15 | 6.02 | 40.2% | 11.37 | 56.8% |
+| 0.20 | 6.52 | 43.5% | 11.24 | 56.2% |
+| 0.50 | 6.56 | 43.7% | 10.26 | 51.3% |
+| 3.00 | 5.90 | 39.4% | 10.11 | 50.5% |
+
+Small Straight hit rate nearly doubles from 26% → 44% at θ=0.20. Large Straight peaks at 57% around θ=0.15-0.20. Both benefit from the option-value strategy keeping straight slots open longer.
+
+### Categories that degrade with θ
+
+| θ | Full House mean | Full House hit% | Four of a Kind mean | Chance mean |
+|---|---|---|---|---|
+| 0.00 | 21.47 | 91.5% | 13.77 | 23.10 |
+| 0.07 | 21.14 | 86.3% | 13.89 | 22.76 |
+| 0.20 | 20.16 | 77.9% | 15.39 | 23.14 |
+| 0.50 | 18.32 | 69.3% | 13.99 | 23.51 |
+| 1.00 | 16.17 | 61.5% | 13.29 | 23.02 |
+| 3.00 | 13.93 | 53.7% | 15.28 | 22.19 |
+
+Full House drops from 92% hit rate to 54% — θ>0 increasingly uses Full House as a dump target, sacrificing its 28-point ceiling to preserve other high-ceiling categories. Chance stays near 23 regardless of θ (it never zeros and acts as a universal dump/catch-all).
+
+Four of a Kind is interesting: its mean *increases* with moderate θ (13.77 → 15.39 at θ=0.20) because risk-seeking play more often results in four-of-a-kind combinations, but at extreme θ it becomes volatile.
+
+### Timing shifts: risk-seeking reorders category filling
+
+The most striking effect of θ is not the score per category but *when* each category gets filled. At θ=0, categories are filled roughly in order of flexibility (easiest-to-score first). At high θ, the ordering inverts for high-ceiling categories:
+
+| Category | Fill turn (θ=0) | Fill turn (θ=3.0) | Shift |
+|---|---|---|---|
+| One Pair | 7.1 | 2.8 | -4.3 earlier |
+| Three of a Kind | 8.7 | 4.8 | -3.9 earlier |
+| Ones | 8.0 | 3.1 | -4.9 earlier |
+| Twos | 7.6 | 5.3 | -2.3 earlier |
+| Full House | 7.2 | 10.2 | +3.0 later |
+| Fours | 6.6 | 9.6 | +3.0 later |
+| Fives | 6.1 | 11.7 | +5.6 later |
+| Sixes | 6.5 | 12.4 | +5.9 later |
+| Yatzy | 10.6 | 13.4 | +2.8 later |
+
+The pattern: θ>0 dumps low-ceiling categories early (One Pair, Ones, Three of a Kind) and preserves high-ceiling categories for late game (Sixes, Fives, Yatzy). This is the option-value framework in action — early turns are "investments" in preserving upside, late turns "cash in" whatever was achieved.
+
+---
+
+## Conditional Yatzy Hit Rate: Does Risk-Seeking Chase the Jackpot?
+
+### The puzzle
+
+As θ increases, the unconditional Yatzy hit rate drops from 38.8% (θ=0) to 17.6% (θ=1.1). This is counterintuitive — risk-seeking strategies should chase high-variance categories, and Yatzy is the highest-ceiling category at 50 points.
+
+Two competing explanations:
+
+- **Dump hypothesis (H0)**: The drop is driven by the solver dumping Yatzy in games already going poorly. In the right tail (top 5% of games), high-θ strategies hit Yatzy at equal or higher rates than θ=0.
+- **Sacrifice hypothesis (H1)**: The drop is fundamental — even in the right tail, high-θ hits Yatzy less often. The solver sacrifices Yatzy for other priorities regardless of game quality.
+
+### Definitions
+
+Every game fills all 15 categories exactly once. The Yatzy category is always used — the question is what you score in it:
+
+- **Hit** = scored 50 points in Yatzy (rolled five of a kind)
+- **Miss** = scored 0 points in Yatzy (used it as a dump slot for non-matching dice)
+
+### Method
+
+For each of 6 θ values (0, 0.05, 0.10, 0.20, 0.50, 1.10) plus max-policy, simulated 1M games and computed Yatzy hit rates conditioned on the game's total score falling in various bands. The `top5pct` band uses a dynamic threshold (p95 differs by θ).
+
+Full data: `outputs/aggregates/csv/yatzy_conditional.csv` (63 rows, generated by `yatzy-conditional`).
+
+### Result: H1 confirmed — the sacrifice is fundamental
+
+Three independent signals agree:
+
+**1. Top-5% tail hit rate drops monotonically**
+
+| θ | Unconditional | Top-5% tail | p95 threshold |
+|---|---|---|---|
+| 0.00 | 38.8% | **100.0%** | 309 |
+| 0.05 | 42.9% | **100.0%** | 312 |
+| 0.10 | 41.3% | **100.0%** | 312 |
+| 0.20 | 33.7% | **100.0%** | 308 |
+| 0.50 | 21.7% | **94.2%** | 287 |
+| 1.10 | 17.6% | **78.1%** | 275 |
+| max-policy | 4.9% | **24.4%** | 226 |
+
+For θ ≤ 0.20, every game in the top 5% contains Yatzy — it is a *necessary condition* for a high score. At θ=0.50, 6% of top-5% games achieve high scores without Yatzy. At θ=1.10, 22% of top games skip Yatzy. This directly falsifies H0: even the best games at high θ don't always include Yatzy.
+
+**2. Conditional hit rates drop in every score band**
+
+At high θ, Yatzy hit rate decreases in all bands, including 300+ and top5pct. Moderate θ (0.05-0.10) actually *increases* hit rates in most bands before the decline sets in.
+
+| Band | θ=0 | θ=0.05 | θ=0.10 | θ=0.50 | θ=1.10 |
+|---|---|---|---|---|---|
+| <200 | 12.1% | 11.9% | 9.3% | 6.1% | 6.1% |
+| 240-260 | 17.5% | 21.3% | 28.2% | 25.8% | 24.8% |
+| 280-300 | 96.2% | 97.7% | 95.6% | 73.8% | 76.4% |
+| 300+ | 100.0% | 100.0% | 100.0% | 99.6% | 99.5% |
+| top5pct | 100.0% | 100.0% | 100.0% | 94.2% | 78.1% |
+
+**3. The dump gap is constant**
+
+The mean score difference between Yatzy-hit games and Yatzy-miss games is ~50-54 points across all strategies:
+
+| Strategy | Mean (hit) | Mean (miss) | Gap |
+|---|---|---|---|
+| θ=0 (EV) | 278 | 229 | +49 |
+| θ=0.05 | 275 | 222 | +53 |
+| θ=0.10 | 267 | 214 | +54 |
+| θ=0.20 | 259 | 206 | +53 |
+| θ=0.50 | 247 | 193 | +54 |
+| θ=1.10 | 237 | 184 | +53 |
+| max-policy | 191 | 141 | +50 |
+
+If H0 were true (dumping only in bad games), the gap should widen at high θ — bad games would increasingly be the ones without Yatzy. Instead, the gap is remarkably stable, confirming the sacrifice is applied uniformly regardless of game quality.
+
+### The non-monotonic bump at moderate θ
+
+An unexpected finding: θ=0.05 *increases* the unconditional Yatzy hit rate from 38.8% to 42.9% before the decline begins. This is consistent with the per-category analysis (see "High-variance categories: Yatzy peaks at moderate θ" above) — mild risk-seeking enhances the option-value preservation strategy, keeping Yatzy open longer and increasing the probability of eventually completing five-of-a-kind. Only beyond θ≈0.10 does the solver begin sacrificing Yatzy for other high-variance paths.
+
+### Max-policy: overconfidence kills Yatzy
+
+Max-policy (maximax) is the worst Yatzy chaser of all strategies: 4.9% unconditional hit rate and only 24.4% in the top 5%. This is counterintuitive — the strategy that assumes the best possible dice outcome should love chasing five-of-a-kind.
+
+The explanation: under max-policy, *every* category looks easy to max. If you assume the best dice always come up, getting 30 in Sixes is guaranteed, completing a Large Straight is guaranteed, etc. Yatzy's 50 points don't stand out as special when every category promises its ceiling. The solver spreads its overconfidence equally rather than concentrating on the one big jackpot.
+
+| Max-policy metric | Value |
+|---|---|
+| Unconditional Yatzy hit | 4.9% (vs 38.8% at θ=0) |
+| Top-5% Yatzy hit | 24.4% (vs 100% at θ=0) |
+| Mean score overall | 143 (vs 248 at θ=0) |
+| Mean score (Yatzy hit) | 191 |
+| Mean score (Yatzy miss) | 141 |
+
+The conditional bars show a striking pattern for max-policy: hit rate rises sharply with score band (3.8% in <200, 62% in 240-260, 92% in 260-280, 100% in 280-300), but collapses to 24% in the top-5% band because the p95 threshold is only 226 — most "top" max-policy games are still mediocre by absolute standards.
+
+### What the solver actually does instead of Yatzy
+
+At high θ, the solver doesn't chase Yatzy because it finds more efficient paths to high scores:
+
+1. **Upper section optimization**: Preserving Sixes and Fives for late game to maximize ceiling and bonus potential (see timing shifts in per-category stats)
+2. **Straight completion**: Small Straight hit rate nearly doubles from 26% to 44% at θ=0.20 — the solver keeps straight slots open longer
+3. **Four of a Kind improvement**: Mean score increases from 13.8 to 15.4 at moderate θ as risk-seeking play more often yields four-of-a-kind combinations
+4. **Portfolio effect**: Instead of one 50-point lottery ticket (Yatzy at ~39% hit rate), the solver buys many smaller bets across categories that collectively produce more upper-tail mass
+
+The solver trades one big jackpot for many smaller but more reliable bets. At θ=0.05, the effect is harmonious — both Yatzy and other categories improve. At θ ≥ 0.20, Yatzy becomes a casualty of the aggressive portfolio reallocation.
+
+---
+
+## Board-State Frequency: Which Positions Occur Most Often?
+
+Simulating 100K games under optimal (θ=0) play and aggregating by board state (upper_score, scored_categories) — ignoring dice and decision type — reveals how play funnels through the 2M-state space.
+
+### The hourglass shape
+
+The state space has a pronounced hourglass structure. Every game starts at the same state (turn 1: 1 unique state), fans out to a peak of **33,029 unique board states at turn 9**, then collapses back to just **267 states by turn 15**. The full count across all 15 turns is 181,065 unique board states visited in 100K games.
+
+| Turn | Unique states | Top-10 concentration | Top-50 concentration |
+|------|--------------|---------------------|---------------------|
+| 1 | 1 | 100% | 100% |
+| 2 | 21 | 70.6% | 100% |
+| 3 | 236 | 15.9% | 51.3% |
+| 4 | 1,570 | 4.7% | 17.4% |
+| 5 | 6,275 | 1.9% | 7.2% |
+| 6 | 15,490 | 1.0% | 3.8% |
+| 7 | 25,598 | 1.0% | 3.0% |
+| 8 | 32,167 | 1.3% | 3.6% |
+| 9 | 33,029 | 1.9% | 5.3% |
+| 10 | 28,403 | 3.0% | 8.3% |
+| 11 | 20,376 | 5.2% | 13.8% |
+| 12 | 11,614 | 10.0% | 24.6% |
+| 13 | 4,762 | 20.8% | 43.6% |
+| 14 | 1,256 | 40.2% | 71.2% |
+| 15 | 267 | 82.1% | 95.5% |
+
+Mid-game (turns 6-9) is maximally diffuse — each board state is visited a handful of times at most. Late-game (turns 13-15) concentrates sharply: at turn 15, the top 10 states account for 82% of all games.
+
+### What categories get scored first?
+
+Turn 2 shows what optimal play fills on the very first turn (from 100K games × 3 decisions/turn = 300K visits):
+
+| First category | Visits | Share |
+|----------------|--------|-------|
+| Two Pairs | 31,431 | 10.5% |
+| Full House | 30,030 | 10.0% |
+| Three of a Kind | 23,412 | 7.8% |
+| Fives | 22,491 | 7.5% |
+| Fours | 20,022 | 6.7% |
+| One Pair | 19,788 | 6.6% |
+| Small Straight | 17,253 | 5.8% |
+| Chance | 16,875 | 5.6% |
+
+The solver opportunistically fills whatever hits. Two Pairs and Full House lead because they require specific patterns that either hit or miss — when they hit early, the solver takes them. Upper section categories (Fours, Fives) are also popular first fills because they contribute to the 63-point upper bonus.
+
+### What category gets left for last?
+
+Turn 15 shows which category remains unscored — the one the solver deliberately saves as the dump slot:
+
+| Last category | Games | Share |
+|---------------|-------|-------|
+| Four of a Kind | 61,839 | 20.6% |
+| Large Straight | 51,381 | 17.1% |
+| Yatzy | 34,434 | 11.5% |
+| Full House | 25,008 | 8.3% |
+| Three of a Kind | 22,047 | 7.3% |
+| Small Straight | 16,995 | 5.7% |
+| Chance | 15,465 | 5.2% |
+
+Four of a Kind and Large Straight dominate the dump slot because they're high-variance categories with specific requirements. The solver will sacrifice them (often zeroing them) rather than miss the upper bonus or leave easier categories unfilled. Yatzy is third — it's worth 50 points but requires all five dice matching, making it the hardest to fill on demand.
+
+One Pair is almost never left last (2.5%) — it's trivially easy to score at least 2 points, so the solver always fills it earlier.
+
+### Upper bonus: almost always achieved
+
+At turn 15, **83.6% of games reach the maximum upper score of 63** (guaranteeing the 50-point bonus). No other single upper score even reaches 2%. This confirms that the optimal solver prioritizes the upper bonus aggressively — it's worth 50 points, far more than any individual category score sacrificed to reach it.
+
+### The most common turn-15 board states
+
+The top 5 board states at turn 15 (what category is missing + upper score):
+
+| Missing category | Upper | Visits | Share |
+|-----------------|-------|--------|-------|
+| 4K | 63 | 61,242 | 20.4% |
+| LS | 63 | 51,222 | 17.1% |
+| SS | 63 | 34,320 | 11.4% |
+| FH | 63 | 24,513 | 8.2% |
+| 3K | 63 | 21,669 | 7.2% |
+
+All have upper=63. The most common final position — missing Four of a Kind with the bonus secured — accounts for 1 in 5 games. These are the positions where the last turn is essentially "roll dice and hope for quads (or zero it)."
+
+### Implications for decision sensitivity
+
+The hourglass structure explains why the decision sensitivity pipeline found flips concentrated at turns 1 and 15. Mid-game states are so diffuse that no individual state accumulates enough visits (≥100) to survive the dedup filter. The states that matter most for risk-sensitivity analysis — the ones players actually encounter repeatedly — cluster at the beginning and end of the game, exactly where the state space is narrow.
+
+## Why Humans Are Not Actually Good at Yatzy
+
+### The perception vs reality
+
+Experienced Yatzy players feel competent — they win games, develop intuitions, and can articulate strategies ("always go for the bonus," "don't waste Yatzy early"). This creates the impression that human play is close to optimal.
+
+It is not. The gap between a typical experienced human and the optimal solver is roughly **20-30 points per game** on average (mean ~220-230 vs solver's 248.4). This is a substantial deficit — equivalent to losing an entire category score every game.
+
+### What humans get right (~90% of decisions)
+
+Most Yatzy decisions are "obvious" in the sense that any reasonable heuristic produces the same answer as the optimal solver:
+
+1. **Keep matching dice for pairs/trips/quads**: When you have three 5s, keep them. No strategy required.
+2. **Fill high-scoring categories with good rolls**: Rolled [6,6,6,5,5]? Fill Full House. Trivial.
+3. **Reroll non-contributing dice**: Holding [4,4,4,2,1] for Three of a Kind? Reroll the 2 and 1. Obvious.
+4. **Take Yatzy when you get it**: Five of a kind → Yatzy. No thought needed.
+5. **Fill Chance with awkward rolls**: No good fits → Chance. Simple fallback.
+
+These easy decisions account for roughly 90% of all choices. A human who gets these right — which most players do after a few games — appears to play well. The remaining 10% of decisions, where the optimal choice is non-obvious, is where the 20-30 point gap lives.
+
+### The 10% that matters: where humans lose points
+
+**1. Upper bonus mismanagement (~7-10 points/game)**
+
+The upper bonus is a 50-point cliff at 63 upper points. The optimal solver tracks exact upper score and remaining upper categories to determine when to "invest" in the bonus vs. give up on it. Humans make systematic errors:
+
+- **Over-committing**: Filling Ones with 1 point "to keep working on the bonus" when the bonus is already unreachable given remaining categories. The solver would dump a zero on Ones and use the turn for a lower section category.
+- **Under-committing**: Putting 4 Fives in Fives (20 pts) when the bonus needs exactly those 5 points, then missing the bonus by 1. The solver calculates that accepting 3 Fours instead and saving Fives for later secures the bonus.
+- **Ignoring the threshold**: Not realizing that with upper=45 and only Ones/Twos left, the bonus is mathematically unreachable (max remaining = 5+10 = 15, but need 63-45 = 18). The solver knows this and switches to pure EV play.
+
+This is the costliest category of human errors because each mistake either loses the 50-point bonus or wastes a turn investing in an unreachable bonus.
+
+**2. Suboptimal reroll decisions (~5-8 points/game)**
+
+Reroll decisions have subtle interactions with game state that humans cannot compute:
+
+- **Keeping too many dice**: Holding [3,3,4,4,_] hoping for Full House when the solver knows rerolling all five dice for a fresh start has higher EV (because Three of a Kind and Two Pairs are both still open).
+- **Chasing the wrong target**: Rerolling [2,3,4,5,5] keeping the 5s for pairs, when the solver rerolls one 5 to chase a Large Straight (which has higher EV given the specific game state and remaining categories).
+- **Ignoring reroll information**: The second reroll should be conditioned on what happened in the first reroll, but humans often commit to a "plan" (e.g., "I'm going for Sixes") and don't reconsider.
+
+Humans cannot evaluate the ~32 possible reroll masks × 252 resulting dice distributions × remaining category interactions. They use heuristics ("keep the biggest matching set") that work most of the time but miss the EV-optimal choice when the game state creates unusual interactions.
+
+**3. Category ordering cascades (~3-5 points/game)**
+
+Which category to fill with an ambiguous roll creates cascading effects. Humans err on:
+
+- **Filling categories greedily**: Scoring 24 in Chance instead of 24 in Four of a Kind because "it's the same points." But Chance is more flexible (any dice scores) while Four of a Kind requires a specific pattern — filling the flexible category with an inflexible roll wastes future options.
+- **Timing mismatches**: Filling Small Straight on turn 3 when there are 12 turns left, vs. waiting for a Large Straight opportunity that has higher EV given the remaining categories. The solver makes these tradeoffs perfectly; humans rely on "fill it if you can."
+- **Ignoring state interactions**: With upper=55 and Sixes open, rolling [6,6,6,3,3] — the solver fills Sixes (18 pts, pushes upper to 63 for the 50-pt bonus = 68 pts total). A human might fill Full House (27 pts), not recognizing that the bonus interaction makes Sixes worth 68 points.
+
+**4. Chase errors (~1-3 points/game)**
+
+Deciding when to chase a rare combination (Yatzy, straights) vs. settling for a sure thing:
+
+- **Chasing too long**: Rerolling a good Three of a Kind hand trying for Yatzy on the last reroll when Three of a Kind is already a strong score.
+- **Not chasing enough**: Immediately filling One Pair when holding [4,4,4,_,_] because "a bird in the hand," when the solver would reroll the two non-4s for a ~35% chance at Full House (28 pts) vs. the guaranteed One Pair (8 pts).
+
+### Why these errors compound
+
+A critical insight: individual errors don't just lose their direct point value — they create **cascading suboptimality**. Filling category X suboptimally means later rolls that would have been perfect for X must now go somewhere else. This secondary misallocation is invisible to the player but typically costs as much as the original error.
+
+For example: filling Chance early with a mediocre 18-point roll seems harmless. But three turns later, rolling [2,3,4,1,1] with no good category available — the solver would have used Chance here (sum=11, bad but better than zeroing a category). Without Chance, the player zeros a category worth 5+ points in expected future value.
+
+### Why humans *feel* good despite the gap
+
+1. **No reference point**: Without a solver, humans compare against other humans. A mean of ~225 wins most games.
+2. **Variance hides the gap**: With std ~38, a human scoring 220 in expectation will score 260+ about 15% of the time. These memorable high games reinforce the feeling of competence.
+3. **Easy decisions dominate**: 90% of decisions are obvious, and humans get them right. The feeling of constant correct play masks the 10% of costly errors.
+4. **Yatzy is fun regardless**: The joy of rolling Yatzy or completing a straight provides satisfaction independent of optimality.
+
+### Implications for why RL struggles
+
+The human-play analysis reveals exactly why RL failed to beat the solver:
+
+**Humans solve a much easier problem than RL attempted.** A human playing at mean=225 needs to get ~90% of easy decisions right and be "reasonable" on the hard 10%. This is achievable with simple heuristics and basic pattern recognition — exactly what humans are good at.
+
+RL Approach B tried to learn the *entire* decision function from scratch. Getting from 90% accuracy (human level) to 99%+ accuracy (solver level) is exponentially harder than getting from 0% to 90%. The last 10% of decision accuracy requires precise computation across millions of states — exactly what lookup tables excel at and neural networks struggle with.
+
+**The gap RL was trying to exploit barely exists.** The hypothesis was that accumulated-score conditioning (knowing you're running hot or cold) could improve on the solver. But this signal is worth <1 point per game — smaller than the noise floor. Meanwhile, humans lose 20-30 points from basic computational limitations that RL shares (limited representational capacity, imprecise value estimation).
+
+**Compact heuristics vs. exact tables.** Human strategy can be captured in ~10 rules (always go for bonus, keep matching dice, etc.) totaling maybe 1KB of information. The optimal solver uses 8MB of state values — a 10,000× information advantage. Humans operate in the "heuristic regime" where compact rules cover the easy decisions. The solver operates in the "exact regime" where precise state-dependent calculations matter. RL with 66K parameters sits uncomfortably between these regimes — too large for simple heuristics, too small for exact computation.

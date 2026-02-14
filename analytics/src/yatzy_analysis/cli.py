@@ -13,9 +13,9 @@ def cli():
 
 
 @cli.command()
-@click.option("--base-path", default="analytics/results", help="Path to results directory.")
+@click.option("--base-path", default=".", help="Base path (repo root).")
 def extract(base_path: str):
-    """Step 1: Read raw binaries → scores.parquet."""
+    """[Legacy] Read raw binaries → scores.parquet. Prefer 'compute' instead."""
     from .config import analysis_dir, discover_thetas
     from .io import fmt_theta, read_all_scores
     from .store import save_scores
@@ -23,7 +23,7 @@ def extract(base_path: str):
     t0 = time.time()
     thetas = discover_thetas(base_path)
     if not thetas:
-        click.echo("No theta directories with simulation_raw.bin found.")
+        click.echo("No theta directories with simulation data found.")
         raise SystemExit(1)
 
     click.echo(f"Extracting scores for {len(thetas)} thetas...")
@@ -38,27 +38,32 @@ def extract(base_path: str):
 
 
 @cli.command()
-@click.option("--base-path", default="analytics/results", help="Path to results directory.")
+@click.option("--base-path", default=".", help="Base path (repo root).")
 def compute(base_path: str):
-    """Step 2: scores.parquet → summary.parquet + kde.parquet."""
+    """Read simulation binaries directly → summary.parquet + kde.parquet."""
     from .compute import compute_all
-    from .config import analysis_dir
-    from .store import load_scores, save_kde, save_summary
+    from .config import analysis_dir, discover_thetas
+    from .io import fmt_theta, read_all_scores
+    from .store import save_kde, save_summary
 
     t0 = time.time()
-    scores_path = analysis_dir(base_path) / "scores.parquet"
-    if not scores_path.exists():
-        click.echo(f"{scores_path} not found. Run 'yatzy-analyze extract' first.")
+
+    # Read scores directly from binary files (scores.bin or simulation_raw.bin)
+    thetas = discover_thetas(base_path)
+    if not thetas:
+        click.echo("No theta directories with simulation data found.")
         raise SystemExit(1)
 
-    click.echo("Loading scores.parquet...")
-    scores_dict = load_scores(scores_path)
-    click.echo(f"  {len(scores_dict)} thetas loaded.")
+    click.echo(f"Reading scores for {len(thetas)} thetas...")
+    scores_dict = read_all_scores(thetas, base_path)
+    for t in sorted(scores_dict.keys()):
+        click.echo(f"  theta={fmt_theta(t, base_path):>6s}: {len(scores_dict[t]):>10,d} games")
 
     click.echo("Computing summary stats + KDE...")
     summary_df, kde_df = compute_all(scores_dict)
 
     out_dir = analysis_dir(base_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
     save_summary(summary_df, out_dir / "summary.parquet")
     save_kde(kde_df, out_dir / "kde.parquet")
     click.echo(f"Saved summary.parquet ({len(summary_df)} rows)")
@@ -67,7 +72,7 @@ def compute(base_path: str):
 
 
 @cli.command()
-@click.option("--base-path", default="analytics/results", help="Path to results directory.")
+@click.option("--base-path", default=".", help="Base path (repo root).")
 @click.option(
     "--subset", default="all", type=click.Choice(["all", "dense", "sparse"]),
     help="Which theta subset to plot.",
@@ -124,6 +129,7 @@ def plot(base_path: str, subset: str, fmt: str, dpi: int):
     click.echo(f"  tails_zoomed.{fmt}")
     plot_percentiles(thetas, stats_df, out_dir, dpi=dpi, fmt=fmt)
     click.echo(f"  percentiles_vs_theta.{fmt}")
+    click.echo(f"  percentiles_vs_theta_zoomed.{fmt}")
     plot_mean_vs_std(thetas, stats_df, out_dir, dpi=dpi, fmt=fmt)
     click.echo(f"  mean_vs_std.{fmt}")
     plot_density(thetas, k_df, out_dir, dpi=dpi, fmt=fmt)
@@ -137,7 +143,7 @@ def plot(base_path: str, subset: str, fmt: str, dpi: int):
 
 
 @cli.command()
-@click.option("--base-path", default="analytics/results", help="Path to results directory.")
+@click.option("--base-path", default=".", help="Base path (repo root).")
 def efficiency(base_path: str):
     """Compute and display risk-seeking efficiency metrics (MER, SDVA, CVaR)."""
     from .compute import compute_all_sdva, compute_exchange_rates
@@ -240,18 +246,65 @@ def efficiency(base_path: str):
 
 
 @cli.command()
-@click.option("--base-path", default="analytics/results", help="Path to results directory.")
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--format", "fmt", default="png", type=click.Choice(["png", "svg"]))
+@click.option("--dpi", default=200, type=int)
+def categories(base_path: str, fmt: str, dpi: int):
+    """Plot per-category statistics from category_stats.csv."""
+    import matplotlib
+    matplotlib.use("Agg")
+
+    from .config import plots_dir
+    from .plots.categories import plot_all_category_stats
+
+    t0 = time.time()
+    csv_path = Path(base_path) / "outputs" / "aggregates" / "csv" / "category_stats.csv"
+    if not csv_path.exists():
+        click.echo(f"{csv_path} not found. Run yatzy-category-sweep first.")
+        raise SystemExit(1)
+
+    out_dir = plots_dir(base_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    plot_all_category_stats(csv_path, out_dir, dpi=dpi, fmt=fmt)
+    click.echo(f"Done in {time.time() - t0:.1f}s.")
+
+
+@cli.command("yatzy-hypothesis")
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--format", "fmt", default="png", type=click.Choice(["png", "svg"]))
+@click.option("--dpi", default=200, type=int)
+def yatzy_hypothesis(base_path: str, fmt: str, dpi: int):
+    """Plot Yatzy conditional hit-rate hypothesis tests from yatzy_conditional.csv."""
+    import matplotlib
+    matplotlib.use("Agg")
+
+    from .config import plots_dir
+    from .plots.yatzy_hypothesis import plot_all_yatzy_hypothesis
+
+    t0 = time.time()
+    csv_path = Path(base_path) / "outputs" / "aggregates" / "csv" / "yatzy_conditional.csv"
+    if not csv_path.exists():
+        click.echo(f"{csv_path} not found. Run yatzy-conditional first.")
+        raise SystemExit(1)
+
+    out_dir = plots_dir(base_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    plot_all_yatzy_hypothesis(csv_path, out_dir, dpi=dpi, fmt=fmt)
+    click.echo(f"Done in {time.time() - t0:.1f}s.")
+
+
+@cli.command()
+@click.option("--base-path", default=".", help="Base path (repo root).")
 def run(base_path: str):
-    """Run full pipeline: extract → compute → plot → efficiency."""
+    """Run full pipeline: compute → plot → efficiency."""
     ctx = click.get_current_context()
-    ctx.invoke(extract, base_path=base_path)
     ctx.invoke(compute, base_path=base_path)
     ctx.invoke(plot, base_path=base_path, subset="all", fmt="png", dpi=200)
     ctx.invoke(efficiency, base_path=base_path)
 
 
 @cli.command()
-@click.option("--base-path", default="analytics/results", help="Path to results directory.")
+@click.option("--base-path", default=".", help="Base path (repo root).")
 @click.option("--scores-bin", default=None, help="Direct path to scores.bin (old format).")
 def tail(base_path: str, scores_bin: str | None):
     """Tail distribution analysis for max-policy simulations."""
@@ -276,16 +329,15 @@ def tail(base_path: str, scores_bin: str | None):
 
         from .config import bin_files_dir
 
+        # Try compact format first
+        compact_path = bin_files_dir(base_path) / "max_policy" / "scores.bin"
         raw_path = bin_files_dir(base_path) / "max_policy" / "simulation_raw.bin"
-        if raw_path.exists():
+        if compact_path.exists():
+            click.echo(f"Loading scores from {compact_path}...")
+            scores = read_scores(compact_path)
+        elif raw_path.exists():
             click.echo(f"Loading scores from {raw_path}...")
             scores = read_scores(raw_path)
-        else:
-            # Try legacy fallback
-            legacy = bin_files_dir(base_path) / "max_policy" / "scores.bin"
-            if legacy.exists():
-                click.echo(f"Loading scores from {legacy} (legacy format)...")
-                scores = load_scores_bin(legacy)
 
     click.echo()
     click.echo("=" * 65)
@@ -369,7 +421,7 @@ def tail(base_path: str, scores_bin: str | None):
 
 
 @cli.command()
-@click.option("--base-path", default="analytics/results", help="Path to results directory.")
+@click.option("--base-path", default=".", help="Base path (repo root).")
 def adaptive(base_path: str):
     """Analyze adaptive θ policy simulations and compare to fixed-θ frontier."""
     from .adaptive import (
@@ -385,7 +437,7 @@ def adaptive(base_path: str):
 
     policies = discover_adaptive_policies(base_path)
     if not policies:
-        click.echo("No adaptive policy results found in bin_files/adaptive/.")
+        click.echo("No adaptive policy results found in data/simulations/adaptive/.")
         click.echo("Run simulations first:")
         click.echo("  yatzy-simulate --policy bonus-adaptive --games 1000000 --output ...")
         raise SystemExit(1)
@@ -497,8 +549,217 @@ def adaptive(base_path: str):
     click.echo(f"\nDone in {time.time() - t0:.1f}s.")
 
 
+@cli.command("theta-questionnaire")
+@click.option(
+    "--scenarios", default="outputs/scenarios/pivotal_scenarios.json",
+    help="Path to pivotal scenarios JSON.",
+)
+@click.option(
+    "--save", "save_path", default="outputs/scenarios/answers.json",
+    help="Path to save answers JSON.",
+)
+@click.option("--batch-size", default=15, type=int, help="Questions in first batch.")
+def theta_questionnaire(scenarios: str, save_path: str, batch_size: int):
+    """Interactive questionnaire to estimate your risk preference (θ)."""
+    from .theta_estimator import run_questionnaire
+
+    p = Path(scenarios)
+    if not p.exists():
+        click.echo(f"{p} not found. Generate scenarios first:")
+        click.echo("  YATZY_BASE_PATH=. solver/target/release/pivotal-scenarios \\")
+        click.echo("    --games 100000 --output outputs/scenarios/pivotal_scenarios.json")
+        raise SystemExit(1)
+
+    run_questionnaire(p, batch_size=batch_size, save_path=save_path)
+
+
+@cli.command("theta-replay")
+@click.option(
+    "--scenarios", default="outputs/scenarios/pivotal_scenarios.json",
+    help="Path to pivotal scenarios JSON.",
+)
+@click.option(
+    "--answers", default="outputs/scenarios/answers.json",
+    help="Path to saved answers JSON (scenario_id/category_id pairs or legacy indices).",
+)
+def theta_replay(scenarios: str, answers: str):
+    """Replay saved answers and print θ estimation results."""
+    from .theta_estimator import replay_answers
+
+    for name, path in [("Scenarios", scenarios), ("Answers", answers)]:
+        if not Path(path).exists():
+            click.echo(f"{name} file not found: {path}")
+            raise SystemExit(1)
+
+    replay_answers(scenarios, answers)
+
+
+@cli.command("theta-validate")
+@click.option(
+    "--scenarios", default="outputs/scenarios/pivotal_scenarios.json",
+    help="Path to pivotal scenarios JSON.",
+)
+@click.option("--trials", default=100, type=int, help="Number of trials per (θ, β) pair.")
+@click.option("--max-questions", default=30, type=int, help="Max questions per trial.")
+def theta_validate(scenarios: str, trials: int, max_questions: int):
+    """Validate θ estimator convergence with synthetic humans."""
+    from .theta_estimator import load_scenarios
+    from .theta_validation import print_validation_results, run_validation
+
+    p = Path(scenarios)
+    if not p.exists():
+        click.echo(f"{p} not found. Generate scenarios first:")
+        click.echo("  YATZY_BASE_PATH=. solver/target/release/pivotal-scenarios \\")
+        click.echo("    --games 100000 --output outputs/scenarios/pivotal_scenarios.json")
+        raise SystemExit(1)
+
+    click.echo(f"Loading scenarios from {p}...")
+    scenario_list = load_scenarios(p)
+    click.echo(f"  {len(scenario_list)} scenarios loaded")
+    click.echo()
+
+    click.echo(f"Running convergence validation ({trials} trials, up to {max_questions} questions)...")
+    results = run_validation(scenario_list, n_trials=trials, max_questions=max_questions)
+    print_validation_results(results)
+
+
 @cli.command()
-@click.option("--base-path", default="analytics/results", help="Path to results directory.")
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--format", "fmt", default="png", type=click.Choice(["png", "svg"]))
+@click.option("--dpi", default=200, type=int)
+def sensitivity(base_path: str, fmt: str, dpi: int):
+    """Plot decision sensitivity analysis from yatzy-decision-sensitivity output."""
+    import matplotlib
+    matplotlib.use("Agg")
+
+    from .config import plots_dir
+    from .plots.sensitivity import plot_all_sensitivity
+
+    t0 = time.time()
+    out_dir = plots_dir(base_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    plot_all_sensitivity(base_path=base_path, out_dir=out_dir, dpi=dpi, fmt=fmt)
+    click.echo(f"Done in {time.time() - t0:.1f}s.")
+
+
+@cli.command("state-flow")
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--dpi", default=200, type=int)
+def state_flow(base_path: str, dpi: int):
+    """Plot state-flow visualizations (alluvial, DAG, streamgraph) from state_frequency.csv."""
+    import matplotlib
+    matplotlib.use("Agg")
+
+    from .config import plots_dir
+    from .plots.state_flow import generate_state_flow_plots
+
+    t0 = time.time()
+    csv_path = Path(base_path) / "outputs" / "scenarios" / "state_frequency.csv"
+    if not csv_path.exists():
+        click.echo(f"{csv_path} not found. Run yatzy-decision-sensitivity first.")
+        raise SystemExit(1)
+
+    out_dir = plots_dir(base_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    paths = generate_state_flow_plots(csv_path, out_dir, dpi=dpi)
+    for p in paths:
+        click.echo(f"  {p.name}")
+    click.echo(f"Done in {time.time() - t0:.1f}s.")
+
+
+@cli.command("state-frequency")
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--top-n", default=10, type=int, help="Top N states per phase to show.")
+def state_frequency(base_path: str, top_n: int):
+    """Analyze board-state frequency distribution from decision_sensitivity output."""
+    import csv
+
+    t0 = time.time()
+    csv_path = Path(base_path) / "outputs" / "scenarios" / "state_frequency.csv"
+    if not csv_path.exists():
+        click.echo(f"{csv_path} not found. Run yatzy-decision-sensitivity first.")
+        raise SystemExit(1)
+
+    rows: list[dict] = []
+    with open(csv_path) as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            rows.append({
+                "turn": int(row["turn"]),
+                "scored_categories": int(row["scored_categories"]),
+                "upper_score": int(row["upper_score"]),
+                "visit_count": int(row["visit_count"]),
+                "fraction": float(row["fraction"]),
+            })
+
+    total_visits = sum(r["visit_count"] for r in rows)
+
+    # Per-turn summary
+    turn_data: dict[int, list[dict]] = {}
+    for r in rows:
+        turn_data.setdefault(r["turn"], []).append(r)
+
+    click.echo("=== Board-State Frequency by Turn ===")
+    click.echo()
+    click.echo(
+        f"{'Turn':>4s} | {'States':>7s} | {'Visits':>10s} | {'% Total':>8s} | "
+        f"{'Top-1%':>7s} | {'Top-10%':>8s}"
+    )
+    click.echo("-" * 60)
+
+    for turn in sorted(turn_data.keys()):
+        states = turn_data[turn]
+        n_states = len(states)
+        visits = sum(s["visit_count"] for s in states)
+        pct = 100 * visits / total_visits if total_visits else 0
+
+        # Concentration: what fraction of visits come from top 1% and 10% of states
+        sorted_states = sorted(states, key=lambda s: s["visit_count"], reverse=True)
+        top1_count = max(1, n_states // 100)
+        top10_count = max(1, n_states // 10)
+        top1_visits = sum(s["visit_count"] for s in sorted_states[:top1_count])
+        top10_visits = sum(s["visit_count"] for s in sorted_states[:top10_count])
+        top1_pct = 100 * top1_visits / visits if visits else 0
+        top10_pct = 100 * top10_visits / visits if visits else 0
+
+        click.echo(
+            f"{turn:>4d} | {n_states:>7,d} | {visits:>10,d} | {pct:>7.1f}% | "
+            f"{top1_pct:>6.1f}% | {top10_pct:>7.1f}%"
+        )
+
+    click.echo()
+    click.echo(f"Total: {len(rows):,d} unique board states, {total_visits:,d} visits")
+
+    # Top states per game phase
+    phases = [
+        ("early (turns 0-4)", lambda t: t < 5),
+        ("mid (turns 5-9)", lambda t: 5 <= t < 10),
+        ("late (turns 10-14)", lambda t: t >= 10),
+    ]
+
+    for label, pred in phases:
+        phase_rows = [r for r in rows if pred(r["turn"])]
+        if not phase_rows:
+            continue
+        phase_rows.sort(key=lambda r: r["visit_count"], reverse=True)
+        click.echo()
+        click.echo(f"=== Top {top_n} States: {label} ===")
+        click.echo(
+            f"{'Turn':>4s} | {'Scored':>6s} | {'Upper':>5s} | {'Visits':>10s} | {'Fraction':>10s}"
+        )
+        click.echo("-" * 45)
+        for r in phase_rows[:top_n]:
+            n_scored = bin(r["scored_categories"]).count("1")
+            click.echo(
+                f"{r['turn']:>4d} | {n_scored:>4d}/15 | {r['upper_score']:>5d} | "
+                f"{r['visit_count']:>10,d} | {r['fraction']:>9.4f}%"
+            )
+
+    click.echo(f"\nDone in {time.time() - t0:.1f}s.")
+
+
+@cli.command()
+@click.option("--base-path", default=".", help="Base path (repo root).")
 def summary(base_path: str):
     """Print summary table to console (from summary.parquet)."""
     from .config import analysis_dir

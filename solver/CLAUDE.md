@@ -1,4 +1,4 @@
-# CLAUDE.md — Backend
+# CLAUDE.md — Solver
 
 Instructions for Claude Code when working in this directory.
 
@@ -6,18 +6,18 @@ Instructions for Claude Code when working in this directory.
 
 ```bash
 cargo build --release         # Build
-cargo test                    # 29 unit + 20 integration = 49 tests
+cargo test                    # Unit + integration tests
 cargo fmt --check             # Formatting
 cargo clippy                  # Lints
 
-# Precompute state values (required once, ~2.3s)
-YATZY_BASE_PATH=. RAYON_NUM_THREADS=8 target/release/yatzy-precompute
+# Precompute state values (required once, ~2.3s, from repo root)
+YATZY_BASE_PATH=. target/release/yatzy-precompute
 
-# Start API server (port 9000)
+# Start API server (port 9000, from repo root)
 YATZY_BASE_PATH=. target/release/yatzy
 
-# Simulate games (output to analytics/results/bin_files/)
-YATZY_BASE_PATH=. target/release/yatzy-simulate --games 1000000 --output ../analytics/results/bin_files
+# Simulate games (from repo root)
+YATZY_BASE_PATH=. target/release/yatzy-simulate --games 1000000 --output data/simulations
 ```
 
 ## Source Layout
@@ -38,11 +38,11 @@ YATZY_BASE_PATH=. target/release/yatzy-simulate --games 1000000 --output ../anal
 | `simulation/statistics.rs` | — | Aggregate statistics from recorded games |
 | `simulation/raw_storage.rs` | — | Binary I/O for raw simulation data (mmap) |
 
-Entry points: `src/bin/precompute.rs`, `src/bin/server.rs`, `src/bin/simulate.rs`.
+Entry points: `src/bin/precompute.rs`, `src/bin/server.rs`, `src/bin/simulate.rs`, `src/bin/category_sweep.rs`, `src/bin/pivotal_scenarios.rs`, `src/bin/yatzy_conditional.rs`.
 
 ## Algorithm Reference
 
-The code implements `theory/optimal_yahtzee_pseudocode.md` (at repo root), adapted for Scandinavian Yatzy (15 categories, 50-point upper bonus, no Yahtzee bonus flag).
+The code implements `theory/pseudocode.md` (at repo root), adapted for Scandinavian Yatzy (15 categories, 50-point upper bonus, no Yahtzee bonus flag).
 
 ### Computation Pipeline
 
@@ -62,8 +62,8 @@ S = (m, C) where m = upper score [0,63], C = 15-bit scored-categories bitmask. I
 
 ## Important Notes
 
-- `data/` is a symlink to `../backend-legacy-c/data` (shared `all_states.bin`)
-- Simulation output goes to `../analytics/results/bin_files/` (gitignored)
-- Analytics package lives at `../analytics/` (repo root)
+- Strategy tables live at `data/strategy_tables/` (repo root)
+- Simulation output goes to `data/simulations/` (repo root)
+- Analytics package lives at `analytics/` (repo root)
 - All computation uses f32 throughout (storage + internal accumulation)
 - `RAYON_NUM_THREADS=8` is optimal on Apple Silicon

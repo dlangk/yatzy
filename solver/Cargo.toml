@@ -15,6 +15,22 @@ path = "src/bin/precompute.rs"
 name = "yatzy-simulate"
 path = "src/bin/simulate.rs"
 
+[[bin]]
+name = "yatzy-category-sweep"
+path = "src/bin/category_sweep.rs"
+
+[[bin]]
+name = "yatzy-conditional"
+path = "src/bin/yatzy_conditional.rs"
+
+[[bin]]
+name = "pivotal-scenarios"
+path = "src/bin/pivotal_scenarios.rs"
+
+[[bin]]
+name = "yatzy-decision-sensitivity"
+path = "src/bin/decision_sensitivity.rs"
+
 [dependencies]
 axum = "0.8"
 tokio = { version = "1", features = ["full"] }

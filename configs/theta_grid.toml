@@ -1,0 +1,46 @@
+# Canonical θ (risk parameter) grids for Yatzy solver.
+#
+# θ < 0: risk-averse (decision nodes minimize)
+# θ = 0: risk-neutral (standard EV)
+# θ > 0: risk-seeking (decision nodes maximize)
+#
+# Useful range: |θ| < 0.5 for Yatzy (score ~250). |θ| >= 1 is degenerate.
+#
+# Python loads this file. Rust keeps a hardcoded copy in category_sweep.rs
+# and pivotal_scenarios.rs (no TOML dep) — keep them in sync.
+
+[grids]
+# 37 values: progressive spacing, dense near 0, sparse at tails.
+all = [
+    -3.0, -2.0, -1.5, -1.0, -0.75, -0.5, -0.3,
+    -0.2, -0.15, -0.1, -0.07, -0.05, -0.04, -0.03, -0.02, -0.015, -0.01, -0.005,
+    0.0,
+    0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.07, 0.1, 0.15, 0.2,
+    0.3, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0,
+]
+
+# 19 values: dense near 0 only.
+dense = [
+    -0.1, -0.07, -0.05, -0.04, -0.03, -0.02, -0.015, -0.01, -0.005,
+    0.0,
+    0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.07, 0.1,
+]
+
+# 17 values: broad coverage.
+sparse = [
+    -3.0, -2.0, -1.5, -1.0, -0.5, -0.2, -0.1, -0.05,
+    0.0,
+    0.05, 0.1, 0.2, 0.5, 1.0, 1.5, 2.0, 3.0,
+]
+
+[simulation]
+default_games = 1_000_000
+default_seed = 42
+rayon_threads = 8
+
+[sweet_spots]
+# Best θ values per metric (from 1M-game simulations)
+best_p5 = -0.03
+best_p10 = -0.04
+best_p95 = 0.07
+best_p99 = 0.1

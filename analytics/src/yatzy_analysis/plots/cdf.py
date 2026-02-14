@@ -93,7 +93,7 @@ def plot_tails(
     ax_left.set_ylabel("Cumulative Probability", fontsize=12)
     ax_left.set_title("Left Tail (bottom 5%)", fontsize=13, fontweight="bold")
     ax_left.set_ylim(0, 0.05)
-    ax_left.set_xlim(100, 180)
+    ax_left.set_xlim(0, 200)
     ax_left.legend(fontsize=7, loc="upper left", framealpha=0.9)
 
     ax_right.set_xlabel("Total Score", fontsize=12)

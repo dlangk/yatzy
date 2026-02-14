@@ -168,6 +168,8 @@ def _build_state_text(scenario: dict, scenario_id: str = "") -> str:
         lines.append(f"  Flips at:      (none)")
         lines.append(f"  Risk-seeking:  (same)")
     lines.append(f"  Visit freq:    {scenario['visit_count']:,} / 100K")
+    if "state_frequency" in scenario:
+        lines.append(f"  Board freq:    {scenario['state_frequency']:,} / 100K decisions")
 
     return "\n".join(lines)
 
@@ -437,21 +439,51 @@ def generate_example_cards(
     with open(flips_path) as f:
         flips = json.load(f)
 
-    # Score scenarios: prefer small gap at theta=0 (tight decisions), high visit count,
+    # Score scenarios: prefer small gap at theta=0 (tight decisions), high state frequency,
     # and category decisions (most intuitive)
     def interest_score(s: dict) -> float:
         gap = s.get("gap_at_theta0", 999)
-        visits = s.get("visit_count", 1)
+        state_freq = s.get("state_frequency", s.get("visit_count", 1))
         type_bonus = {"category": 2.0, "reroll2": 1.0, "reroll1": 0.5}
         tb = type_bonus.get(s.get("decision_type", ""), 0)
         gap_score = 1.0 / (gap + 0.01) if gap > 0.001 else 0.5
-        return gap_score * (visits / 100) * (1 + tb)
+        return gap_score * (state_freq / 1000) * (1 + tb)
 
     ranked = sorted(flips, key=interest_score, reverse=True)
 
+    # Phase-diverse selection: pick top candidates from each game phase
+    import math
+    per_phase = math.ceil(n / 3)
+    phase_groups: dict[str, list[dict]] = {"early": [], "mid": [], "late": []}
+    for s in ranked:
+        phase = s.get("game_phase", "late")
+        if phase in phase_groups:
+            phase_groups[phase].append(s)
+
+    selected: list[dict] = []
+    seen_ids: set[str] = set()
+    for phase in ["early", "mid", "late"]:
+        for s in phase_groups[phase][:per_phase]:
+            sid = encode_scenario_id(s)
+            if sid not in seen_ids:
+                selected.append(s)
+                seen_ids.add(sid)
+
+    # Fill remaining slots from overall ranking (no duplicates)
+    for s in ranked:
+        if len(selected) >= n:
+            break
+        sid = encode_scenario_id(s)
+        if sid not in seen_ids:
+            selected.append(s)
+            seen_ids.add(sid)
+
+    # Re-sort by interest_score
+    selected.sort(key=interest_score, reverse=True)
+
     out_dir.mkdir(parents=True, exist_ok=True)
     paths = []
-    for i, scenario in enumerate(ranked[:n]):
+    for i, scenario in enumerate(selected[:n]):
         scenario_id = encode_scenario_id(scenario)
         out_path = out_dir / f"scenario_card_{scenario_id}.png"
         plot_scenario_card(scenario, out_path, scenario_id=scenario_id, dpi=dpi)

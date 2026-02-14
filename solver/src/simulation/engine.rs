@@ -685,6 +685,167 @@ pub fn simulate_game_with_recording(ctx: &YatzyContext, rng: &mut SmallRng) -> G
     record
 }
 
+/// Per-turn summary: just category + score + turn index (no dice/masks).
+#[derive(Clone, Copy, Default)]
+pub struct TurnSummary {
+    pub category: u8,
+    pub score: u8,
+}
+
+/// Lightweight game summary: 15 turn summaries + total.
+#[derive(Clone, Copy, Default)]
+pub struct GameSummary {
+    pub turns: [TurnSummary; 15],
+    pub total_score: i32,
+}
+
+/// Simulate one game, returning only category/score per turn (no dice recording).
+pub fn simulate_game_summary(ctx: &YatzyContext, rng: &mut SmallRng) -> GameSummary {
+    if ctx.max_policy {
+        return simulate_game_summary_max(ctx, rng);
+    }
+
+    let sv = ctx.state_values.as_slice();
+    let theta = ctx.theta;
+    let use_risk = theta != 0.0;
+    let minimize = theta < 0.0;
+    let mut up_score: i32 = 0;
+    let mut scored: i32 = 0;
+    let mut total_score: i32 = 0;
+    let mut summary = GameSummary::default();
+
+    let mut e_ds_0 = [0.0f32; 252];
+    let mut e_ds_1 = [0.0f32; 252];
+
+    for turn in 0..CATEGORY_COUNT {
+        let is_last_turn = turn == CATEGORY_COUNT - 1;
+        let mut dice = roll_dice(rng);
+
+        if use_risk {
+            compute_group6_risk(ctx, sv, up_score, scored, theta, minimize, &mut e_ds_0);
+            compute_opt_lse_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1, minimize);
+        } else {
+            compute_group6(ctx, sv, up_score, scored, &mut e_ds_0);
+            compute_max_ev_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1);
+        }
+
+        let mut best_ev = 0.0;
+        let mask1 = if use_risk {
+            choose_best_reroll_mask_risk(ctx, &e_ds_1, &dice, &mut best_ev, minimize)
+        } else {
+            choose_best_reroll_mask(ctx, &e_ds_1, &dice, &mut best_ev)
+        };
+        if mask1 != 0 {
+            apply_reroll(&mut dice, mask1, rng);
+        }
+
+        let mask2 = if use_risk {
+            choose_best_reroll_mask_risk(ctx, &e_ds_0, &dice, &mut best_ev, minimize)
+        } else {
+            choose_best_reroll_mask(ctx, &e_ds_0, &dice, &mut best_ev)
+        };
+        if mask2 != 0 {
+            apply_reroll(&mut dice, mask2, rng);
+        }
+
+        let ds_index = find_dice_set_index(ctx, &dice);
+        let (cat, scr) = if use_risk {
+            if is_last_turn {
+                find_best_category_final_risk(ctx, up_score, scored, ds_index, theta, minimize)
+            } else {
+                find_best_category_risk(ctx, sv, up_score, scored, ds_index, theta, minimize)
+            }
+        } else if is_last_turn {
+            find_best_category_final(ctx, up_score, scored, ds_index)
+        } else {
+            find_best_category(ctx, sv, up_score, scored, ds_index)
+        };
+
+        up_score = update_upper_score(up_score, cat, scr);
+        scored |= 1 << cat;
+        total_score += scr;
+
+        summary.turns[turn] = TurnSummary {
+            category: cat as u8,
+            score: scr as u8,
+        };
+    }
+
+    if up_score >= 63 {
+        total_score += 50;
+    }
+    summary.total_score = total_score;
+    summary
+}
+
+/// Max-policy summary: chance nodes use max instead of E[x] for reroll evaluation.
+fn simulate_game_summary_max(ctx: &YatzyContext, rng: &mut SmallRng) -> GameSummary {
+    let sv = ctx.state_values.as_slice();
+    let mut up_score: i32 = 0;
+    let mut scored: i32 = 0;
+    let mut total_score: i32 = 0;
+    let mut summary = GameSummary::default();
+
+    let mut e_ds_0 = [0.0f32; 252];
+    let mut e_ds_1 = [0.0f32; 252];
+
+    for turn in 0..CATEGORY_COUNT {
+        let is_last_turn = turn == CATEGORY_COUNT - 1;
+        let mut dice = roll_dice(rng);
+
+        compute_group6(ctx, sv, up_score, scored, &mut e_ds_0);
+        compute_max_outcome_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1);
+
+        let mut best_ev = 0.0;
+        let mask1 = choose_best_reroll_mask_max(ctx, &e_ds_1, &dice, &mut best_ev);
+        if mask1 != 0 {
+            apply_reroll(&mut dice, mask1, rng);
+        }
+
+        let mask2 = choose_best_reroll_mask_max(ctx, &e_ds_0, &dice, &mut best_ev);
+        if mask2 != 0 {
+            apply_reroll(&mut dice, mask2, rng);
+        }
+
+        let ds_index = find_dice_set_index(ctx, &dice);
+        let (cat, scr) = if is_last_turn {
+            find_best_category_final(ctx, up_score, scored, ds_index)
+        } else {
+            find_best_category(ctx, sv, up_score, scored, ds_index)
+        };
+
+        up_score = update_upper_score(up_score, cat, scr);
+        scored |= 1 << cat;
+        total_score += scr;
+
+        summary.turns[turn] = TurnSummary {
+            category: cat as u8,
+            score: scr as u8,
+        };
+    }
+
+    if up_score >= 63 {
+        total_score += 50;
+    }
+    summary.total_score = total_score;
+    summary
+}
+
+/// Simulate N games in parallel, returning lightweight summaries.
+pub fn simulate_batch_summaries(
+    ctx: &YatzyContext,
+    num_games: usize,
+    seed: u64,
+) -> Vec<GameSummary> {
+    (0..num_games)
+        .into_par_iter()
+        .map(|i| {
+            let mut rng = SmallRng::seed_from_u64(seed.wrapping_add(i as u64));
+            simulate_game_summary(ctx, &mut rng)
+        })
+        .collect()
+}
+
 /// Simulate N games in parallel, returning aggregate statistics.
 pub fn simulate_batch(ctx: &YatzyContext, num_games: usize, seed: u64) -> SimulationResult {
     let start = Instant::now();

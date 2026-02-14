@@ -12,34 +12,45 @@ from .config import HEADER_SIZE, RECORD_SIZE, TOTAL_SCORE_OFFSET, bin_files_dir
 from .io import read_scores
 
 
-def adaptive_base_dir(base_path: str = "analytics/results") -> Path:
+def adaptive_base_dir(base_path: str = ".") -> Path:
     """Return the adaptive policy results directory."""
     return bin_files_dir(base_path) / "adaptive"
 
 
-def discover_adaptive_policies(base_path: str = "analytics/results") -> list[str]:
-    """Scan bin_files/adaptive/ for policy subdirs containing simulation_raw.bin."""
+def discover_adaptive_policies(base_path: str = ".") -> list[str]:
+    """Scan bin_files/adaptive/ for policy subdirs containing scores.bin or simulation_raw.bin."""
     base = adaptive_base_dir(base_path)
     policies: list[str] = []
     if not base.is_dir():
         return policies
     for entry in sorted(base.iterdir()):
         if entry.is_dir():
-            raw = entry / "simulation_raw.bin"
-            if raw.exists():
+            has_data = (entry / "scores.bin").exists() or (entry / "simulation_raw.bin").exists()
+            if has_data:
                 policies.append(entry.name)
     return policies
 
 
 def read_adaptive_scores(
-    policies: list[str], base_path: str = "analytics/results"
+    policies: list[str], base_path: str = "."
 ) -> dict[str, NDArray[np.int32]]:
-    """Read scores for each adaptive policy. Returns {policy_name: sorted_scores}."""
+    """Read scores for each adaptive policy. Returns {policy_name: sorted_scores}.
+
+    Prefers scores.bin over simulation_raw.bin.
+    """
     result: dict[str, NDArray[np.int32]] = {}
     base = adaptive_base_dir(base_path)
     for name in policies:
-        path = base / name / "simulation_raw.bin"
-        scores = read_scores(path)
+        # Prefer compact format
+        scores_path = base / name / "scores.bin"
+        if scores_path.exists():
+            scores = read_scores(scores_path)
+            if scores is not None:
+                result[name] = scores
+                continue
+        # Fall back to old format
+        raw_path = base / name / "simulation_raw.bin"
+        scores = read_scores(raw_path)
         if scores is not None:
             result[name] = scores
     return result

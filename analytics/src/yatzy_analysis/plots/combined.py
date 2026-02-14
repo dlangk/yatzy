@@ -68,7 +68,7 @@ def plot_combined(
     ax_ltail.set_ylabel("Cumulative Probability", fontsize=12)
     ax_ltail.set_title("Left Tail (bottom 5%)", fontsize=13, fontweight="bold")
     ax_ltail.set_ylim(0, 0.05)
-    ax_ltail.set_xlim(100, 180)
+    ax_ltail.set_xlim(0, 200)
 
     ax_rtail.set_xlabel("Total Score", fontsize=12)
     ax_rtail.set_ylabel("P(Score > x)  [survival]", fontsize=12)

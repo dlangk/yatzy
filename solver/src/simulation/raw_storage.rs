@@ -123,6 +123,98 @@ pub fn load_raw_simulation(path: &str) -> Option<RawSimulation> {
     })
 }
 
+// ── Scores-only compact format ──────────────────────────────────────────────
+// 32-byte header + i16[num_games]. ~138x smaller than full GameRecord format.
+
+/// Magic number: "STSY" (Scores Yatzy) in little-endian.
+pub const SCORES_MAGIC: u32 = 0x59545353;
+pub const SCORES_VERSION: u32 = 1;
+
+/// Scores-only binary file header (32 bytes).
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct ScoresHeader {
+    pub magic: u32,          // 4
+    pub version: u32,        // 4
+    pub num_games: u32,      // 4
+    pub expected_value: f32, // 4
+    pub seed: u64,           // 8
+    pub theta: f32,          // 4
+    pub _reserved: [u8; 4],  // 4
+}
+
+const _SCORES_HEADER_SIZE: () = assert!(std::mem::size_of::<ScoresHeader>() == 32);
+
+/// Save scores as compact binary: 32-byte header + i16[num_games].
+pub fn save_scores(scores: &[i32], seed: u64, ev: f32, theta: f32, path: &str) {
+    if let Some(parent) = Path::new(path).parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+
+    let mut f = File::create(path).expect("Failed to create scores file");
+
+    let header = ScoresHeader {
+        magic: SCORES_MAGIC,
+        version: SCORES_VERSION,
+        num_games: scores.len() as u32,
+        expected_value: ev,
+        seed,
+        theta,
+        _reserved: [0u8; 4],
+    };
+
+    let header_bytes = unsafe {
+        std::slice::from_raw_parts(
+            &header as *const ScoresHeader as *const u8,
+            std::mem::size_of::<ScoresHeader>(),
+        )
+    };
+    f.write_all(header_bytes).unwrap();
+
+    // Convert i32 scores to i16 and write
+    let i16_scores: Vec<i16> = scores.iter().map(|&s| s as i16).collect();
+    let data_bytes = unsafe {
+        std::slice::from_raw_parts(
+            i16_scores.as_ptr() as *const u8,
+            i16_scores.len() * std::mem::size_of::<i16>(),
+        )
+    };
+    f.write_all(data_bytes).unwrap();
+}
+
+/// Load scores from compact binary format. Returns header + sorted i16 scores.
+pub fn load_scores(path: &str) -> Option<(ScoresHeader, Vec<i16>)> {
+    let file = File::open(path).ok()?;
+    let metadata = file.metadata().ok()?;
+    let file_size = metadata.len() as usize;
+
+    let header_size = std::mem::size_of::<ScoresHeader>();
+    if file_size < header_size {
+        return None;
+    }
+
+    let mmap = unsafe { Mmap::map(&file).ok()? };
+
+    let header_ptr = mmap.as_ptr() as *const ScoresHeader;
+    let header = unsafe { *header_ptr };
+
+    if header.magic != SCORES_MAGIC || header.version != SCORES_VERSION {
+        return None;
+    }
+
+    let data_size = file_size - header_size;
+    let num_scores = data_size / std::mem::size_of::<i16>();
+
+    if num_scores != header.num_games as usize {
+        return None;
+    }
+
+    let scores_ptr = unsafe { mmap.as_ptr().add(header_size) as *const i16 };
+    let scores = unsafe { std::slice::from_raw_parts(scores_ptr, num_scores) }.to_vec();
+
+    Some((header, scores))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -131,6 +223,11 @@ mod tests {
     #[test]
     fn test_header_size() {
         assert_eq!(std::mem::size_of::<RawSimulationHeader>(), 32);
+    }
+
+    #[test]
+    fn test_scores_header_size() {
+        assert_eq!(std::mem::size_of::<ScoresHeader>(), 32);
     }
 
     #[test]
@@ -182,5 +279,33 @@ mod tests {
     #[test]
     fn test_load_nonexistent() {
         assert!(load_raw_simulation("/tmp/nonexistent_yatzy_raw.bin").is_none());
+    }
+
+    #[test]
+    fn test_scores_round_trip() {
+        let test_path = "/tmp/yatzy_test_scores.bin";
+
+        let scores: Vec<i32> = (0..100).map(|i| 200 + i).collect();
+        save_scores(&scores, 42, 245.87, 0.01, test_path);
+
+        let (header, loaded) = load_scores(test_path).expect("Failed to load scores");
+        assert_eq!(header.magic, SCORES_MAGIC);
+        assert_eq!(header.version, SCORES_VERSION);
+        assert_eq!(header.num_games, 100);
+        assert_eq!(header.seed, 42);
+        assert!((header.expected_value - 245.87).abs() < 0.01);
+        assert!((header.theta - 0.01).abs() < 0.001);
+        assert_eq!(loaded.len(), 100);
+
+        for (i, &s) in loaded.iter().enumerate() {
+            assert_eq!(s, (200 + i) as i16);
+        }
+
+        let _ = std::fs::remove_file(test_path);
+    }
+
+    #[test]
+    fn test_scores_load_nonexistent() {
+        assert!(load_scores("/tmp/nonexistent_yatzy_scores.bin").is_none());
     }
 }

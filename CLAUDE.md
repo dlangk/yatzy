@@ -6,42 +6,39 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Delta Yatzy is a web-based implementation of the classic dice game with optimal action suggestions and multiplayer support. The project consists of:
 
-- **Backend**: `backend/` — Rust, axum-based API server with rayon parallelism and memmap2 for zero-copy I/O
+- **Solver**: `solver/` — Rust, axum-based API server + DP solver with rayon parallelism and memmap2 for zero-copy I/O
 - **Analytics**: `analytics/` — Python package for simulation data analysis, plotting, and risk-sweep pipelines
-- **Frontend**: Vanilla JavaScript single-page application with dynamic UI and Chart.js visualizations
+- **Frontend**: `frontend/` — Vanilla JavaScript single-page application with dynamic UI and Chart.js visualizations
 - **Theory**: `theory/` — Analytical insights about Yatzy strategy and score distributions
-- **Docker**: Containerized deployment for frontend + backend
+- **Data**: `data/` — Strategy tables (~300MB) and simulation binaries (~11GB), gitignored
+- **Outputs**: `outputs/` — Regenerable aggregates, plots, scenarios, gitignored
+- **Config**: `configs/theta_grid.toml` — Canonical θ grids and simulation defaults
 
-Results (simulation binaries, aggregated parquet/csv/json, plots) live inside `analytics/results/`.
-
-A legacy C implementation exists in `backend-legacy-c/` for reference only.
+A legacy C implementation exists in `legacy/` for reference only. Archived RL experiments are in `research/rl/`.
 
 ## Commands
 
 ### Convention: Run Everything from Repo Root
 
-All commands below assume you are at the repository root (`yatzy/`).
+All commands assume repo root (`yatzy/`). Use `just --list` to see all recipes.
 
-### Backend Development
+### Solver Development
 
 ```bash
-# Build the backend
-cd backend && cargo build --release
+# Build the solver
+cd solver && cargo build --release
 
-# Run unit tests (from backend/)
+# Run tests
 cargo test
 
-# Run precomputed integration tests (requires data/all_states.bin)
-cargo test --test test_precomputed
-
 # Precompute state values (required once, from repo root)
-YATZY_BASE_PATH=backend backend/target/release/yatzy-precompute
+YATZY_BASE_PATH=. solver/target/release/yatzy-precompute
 
-# Run the backend server (port 9000, from repo root)
-YATZY_BASE_PATH=backend backend/target/release/yatzy
+# Run the API server (port 9000, from repo root)
+YATZY_BASE_PATH=. solver/target/release/yatzy
 
-# Simulate games and generate statistics (from repo root)
-YATZY_BASE_PATH=backend backend/target/release/yatzy-simulate --games 1000000 --output analytics/results/bin_files
+# Simulate games (from repo root)
+YATZY_BASE_PATH=. solver/target/release/yatzy-simulate --games 1000000 --output data/simulations
 ```
 
 ### Analytics (Python)
@@ -60,32 +57,30 @@ analytics/.venv/bin/yatzy-analyze summary
 analytics/.venv/bin/yatzy-analyze efficiency
 ```
 
-### Frontend Development
+### Justfile (preferred)
 
 ```bash
-# Run frontend server (from frontend directory)
-python3 frontend/serve.py  # Serves on port 8090
-
-# Or using Docker
-docker-compose up
+just setup          # Build solver + install analytics
+just precompute     # θ=0 strategy table
+just simulate       # 1M games
+just pipeline       # extract → compute → plot → categories → efficiency
+just test           # Run solver tests
+just serve          # Start API server
 ```
 
-### Docker Development
+### Docker
 
 ```bash
-# Build and run both services
 docker-compose up --build
-
-# Access services
 # Frontend: http://localhost:8090
 # Backend: http://localhost:9000
 ```
 
 ## Architecture
 
-### Backend Structure (`backend/`)
+### Solver Structure (`solver/`)
 
-The backend is a multithreaded Rust application with precomputed game states:
+The solver is a multithreaded Rust application with precomputed game states:
 
 - **Entry Points**: `src/bin/server.rs` (API server), `src/bin/precompute.rs` (offline precomputation), `src/bin/simulate.rs` (simulation + statistics)
 - **Phase 0 — Precompute lookup tables**:
@@ -119,18 +114,21 @@ Python package (`yatzy-analysis`) with CLI entry point `yatzy-analyze`:
   - `store.py` - Parquet save/load
   - `plots/` - Plotting modules (cdf, density, efficiency, combined, etc.)
 
-### Results Layout (`analytics/results/`)
+### Data Layout
 
 ```
-analytics/results/
-  bin_files/                    # Raw simulation binaries
-    theta/theta_*/              # Per-theta simulation_raw.bin + game_statistics.json
+data/                           # Expensive artifacts (gitignored)
+  strategy_tables/              # Precomputed EV tables (all_states*.bin)
+  simulations/                  # Raw simulation binaries
+    theta/theta_*/              # Per-θ simulation_raw.bin + game_statistics.json
     max_policy/scores.bin       # Max-policy simulation
+
+outputs/                        # Cheap to regenerate (gitignored)
   aggregates/                   # Processed data by format
     parquet/                    # kde, summary, scores, mer, sdva
-    csv/                        # density_kde, scores_cdf, summary_stats
-    json/                       # game_statistics
-  plots/                        # Generated PNG visualizations (flat directory)
+    csv/                        # category_stats, yatzy_conditional
+  plots/                        # Generated PNG visualizations (flat)
+  scenarios/                    # pivotal_scenarios.json, answers
 ```
 
 ### Frontend Structure
@@ -149,7 +147,7 @@ The frontend uses ES6 modules for clean separation of concerns:
 
 ### Key Design Patterns
 
-1. **Precomputation**: Backend precomputes all 1.4M reachable game states offline. Runtime lookups are O(1).
+1. **Precomputation**: Solver precomputes all 1.4M reachable game states offline. Runtime lookups are O(1).
 
 2. **Keep-Multiset Dedup**: Multiple reroll masks can produce the same kept-dice multiset. The KeepTable collapses these into 462 unique keeps (avg 16.3 per dice set vs 31 masks), eliminating ~47% of redundant dot products in the DP hot path.
 
@@ -187,8 +185,9 @@ The `theory/` directory contains four documents:
 
 ## Important Considerations
 
-- Frontend assumes backend is running on port 9000 (configurable via environment or `js/config.js`)
-- Game state values are stored in `data/all_states.bin` (~8 MB) inside the backend directory
+- Frontend assumes solver is running on port 9000 (configurable via environment or `js/config.js`)
+- Game state values are stored in `data/strategy_tables/all_states.bin` (~8 MB)
 - Scandinavian Yatzy: 15 categories, 50-point upper bonus (not 35 as in American Yahtzee)
 - State representation: `upper_score` (0-63) and `scored_categories` (15-bit bitmask), total 2,097,152 states
 - Rayon thread count configurable via `RAYON_NUM_THREADS` env var (default: 8)
+- θ grids are defined canonically in `configs/theta_grid.toml`

@@ -26,7 +26,7 @@ async fn main() {
     let mut ctx = YatzyContext::new_boxed();
     phase0_tables::precompute_lookup_tables(&mut ctx);
 
-    if !load_all_state_values(&mut ctx, "data/all_states.bin") {
+    if !load_all_state_values(&mut ctx, "data/strategy_tables/all_states.bin") {
         println!("No precomputed data found, computing (run yatzy-precompute to avoid this)...");
         compute_all_state_values(&mut ctx);
     }

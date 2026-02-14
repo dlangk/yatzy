@@ -18,19 +18,22 @@ KDE_BANDWIDTH = 0.04
 MAX_SCORE = 374
 
 # ── Named theta grids ──────────────────────────────────────────────────────
+# Progressive spacing: dense near 0, sparse at tails. Symmetric around 0.
 THETA_GRIDS: dict[str, list[float]] = {
     "all": [
-        0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09,
-        0.10, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20,
-        0.3, 0.4, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, 1.7, 1.9, 2.0, 3.0,
+        -3.00, -2.00, -1.50, -1.00, -0.75, -0.50, -0.30,
+        -0.20, -0.15, -0.10, -0.07, -0.05, -0.04, -0.03, -0.02, -0.015, -0.01, -0.005,
+        0,
+        0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.07, 0.10, 0.15, 0.20,
+        0.30, 0.50, 0.75, 1.00, 1.50, 2.00, 3.00,
     ],
     "dense": [
-        0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09,
-        0.10, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20,
+        -0.10, -0.07, -0.05, -0.04, -0.03, -0.02, -0.015, -0.01, -0.005,
+        0, 0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.07, 0.10,
     ],
     "sparse": [
-        0, 0.05, 0.10, 0.20, 0.3, 0.4, 0.5, 0.7, 0.9,
-        1.1, 1.3, 1.5, 1.7, 1.9, 2.0, 3.0,
+        -3.00, -2.00, -1.50, -1.00, -0.50, -0.20, -0.10, -0.05,
+        0, 0.05, 0.10, 0.20, 0.50, 1.00, 1.50, 2.00, 3.00,
     ],
 }
 
@@ -43,36 +46,45 @@ PLOT_SUBSETS: dict[str, list[float]] = {
 
 
 # ── Path resolution ─────────────────────────────────────────────────────────
-# New layout:
-#   analytics/results/
-#     bin_files/theta/theta_*/simulation_raw.bin
-#     bin_files/max_policy/scores.bin
-#     aggregates/parquet/  (kde, summary, scores, mer, sdva)
-#     aggregates/csv/
-#     aggregates/json/
-#     plots/               (flat, no subfolders)
-
-def results_dir(base_path: str = "results") -> Path:
-    return Path(base_path)
+# Layout (base_path defaults to repo root "."):
+#   data/simulations/theta/theta_*/simulation_raw.bin
+#   data/simulations/max_policy/scores.bin
+#   outputs/aggregates/parquet/  (kde, summary, scores, mer, sdva)
+#   outputs/aggregates/csv/
+#   outputs/plots/               (flat, no subfolders)
+#   outputs/scenarios/           (pivotal_scenarios.json, answers)
 
 
-def aggregates_dir(base_path: str = "results") -> Path:
-    return results_dir(base_path) / "aggregates" / "parquet"
+def data_dir(base_path: str = ".") -> Path:
+    return Path(base_path) / "data"
 
 
-def plots_dir(base_path: str = "results") -> Path:
-    return results_dir(base_path) / "plots"
+def simulations_dir(base_path: str = ".") -> Path:
+    return data_dir(base_path) / "simulations"
 
 
-def bin_files_dir(base_path: str = "results") -> Path:
-    return results_dir(base_path) / "bin_files"
+def aggregates_dir(base_path: str = ".") -> Path:
+    return Path(base_path) / "outputs" / "aggregates" / "parquet"
 
 
-def theta_base_dir(base_path: str = "results") -> Path:
-    return bin_files_dir(base_path) / "theta"
+def plots_dir(base_path: str = ".") -> Path:
+    return Path(base_path) / "outputs" / "plots"
 
 
-def theta_dir(theta: float, base_path: str = "results") -> Path:
+def scenarios_dir(base_path: str = ".") -> Path:
+    return Path(base_path) / "outputs" / "scenarios"
+
+
+def bin_files_dir(base_path: str = ".") -> Path:
+    """Alias for simulations_dir (backwards compat)."""
+    return simulations_dir(base_path)
+
+
+def theta_base_dir(base_path: str = ".") -> Path:
+    return simulations_dir(base_path) / "theta"
+
+
+def theta_dir(theta: float, base_path: str = ".") -> Path:
     return theta_base_dir(base_path) / f"theta_{fmt_theta_dir(theta)}"
 
 
@@ -84,16 +96,16 @@ def fmt_theta_dir(t: float) -> str:
     return s
 
 
-def discover_thetas(base_path: str = "results") -> list[float]:
-    """Scan bin_files/theta/ directory for theta_* subdirs containing simulation_raw.bin."""
+def discover_thetas(base_path: str = ".") -> list[float]:
+    """Scan data/simulations/theta/ for theta_* subdirs containing scores.bin or simulation_raw.bin."""
     base = theta_base_dir(base_path)
     thetas = []
     if not base.is_dir():
         return thetas
     for entry in sorted(base.iterdir()):
         if entry.is_dir() and entry.name.startswith("theta_"):
-            raw = entry / "simulation_raw.bin"
-            if raw.exists():
+            has_data = (entry / "scores.bin").exists() or (entry / "simulation_raw.bin").exists()
+            if has_data:
                 try:
                     val = float(entry.name[len("theta_"):])
                     thetas.append(val)

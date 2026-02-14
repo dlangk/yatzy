@@ -16,8 +16,11 @@ pub use adaptive::{
     ThetaTable, POLICY_CONFIGS,
 };
 pub use engine::{
-    simulate_batch, simulate_batch_with_recording, simulate_game, GameRecord, SimulationResult,
-    TurnRecord,
+    simulate_batch, simulate_batch_summaries, simulate_batch_with_recording, simulate_game,
+    GameRecord, GameSummary, SimulationResult, TurnRecord, TurnSummary,
 };
-pub use raw_storage::{load_raw_simulation, save_raw_simulation};
+pub use raw_storage::{
+    load_raw_simulation, load_scores, save_raw_simulation, save_scores, ScoresHeader, SCORES_MAGIC,
+    SCORES_VERSION,
+};
 pub use statistics::{aggregate_statistics, save_statistics, GameStatistics};

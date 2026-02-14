@@ -1,0 +1,89 @@
+# Yatzy project orchestration
+# Run `just --list` to see all recipes.
+
+default:
+    @just --list
+
+# ── Setup ─────────────────────────────────────────────────────────────────
+
+# Build solver and install analytics package
+setup:
+    cd solver && cargo build --release
+    cd analytics && uv venv && uv pip install -e .
+
+# ── Stage 1: Compute (expensive) ─────────────────────────────────────────
+
+# Precompute state values for θ=0 (~2.3s)
+precompute:
+    YATZY_BASE_PATH=. solver/target/release/yatzy-precompute
+
+# Precompute state values for a specific θ (~7s)
+precompute-theta theta:
+    YATZY_BASE_PATH=. solver/target/release/yatzy-precompute --theta {{theta}}
+
+# Simulate games (default: 1M)
+simulate games="1000000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-simulate --games {{games}} --output data/simulations
+
+# Simulate games for a specific θ
+simulate-theta theta games="1000000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-simulate --theta {{theta}} --games {{games}} --output data/simulations/theta/theta_{{theta}}
+
+# Per-category statistics across all θ values
+category-sweep games="1000000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-category-sweep --games {{games}} --output outputs/aggregates/csv/category_stats.csv
+
+# Conditional Yatzy hit-rate analysis
+yatzy-conditional games="1000000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-conditional --games {{games}} --output outputs/aggregates/csv/yatzy_conditional.csv
+
+# Generate pivotal scenarios for θ questionnaire
+pivotal-scenarios games="100000":
+    YATZY_BASE_PATH=. solver/target/release/pivotal-scenarios --games {{games}} --output outputs/scenarios/pivotal_scenarios.json
+
+# Decision sensitivity analysis across θ ∈ [0, 0.2]
+decision-sensitivity games="100000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-decision-sensitivity --games {{games}} --output outputs/scenarios
+
+# ── Stage 2–3: Aggregate + Visualize (cheap) ─────────────────────────────
+
+# Compute summary stats + KDE (reads scores.bin directly)
+compute:
+    analytics/.venv/bin/yatzy-analyze compute
+
+# Generate plots
+plot:
+    analytics/.venv/bin/yatzy-analyze plot
+
+# Plot per-category statistics
+categories:
+    analytics/.venv/bin/yatzy-analyze categories
+
+# Compute efficiency metrics (MER, SDVA, CVaR)
+efficiency:
+    analytics/.venv/bin/yatzy-analyze efficiency
+
+# Full analytics pipeline: compute → plot → categories → efficiency
+pipeline: compute plot categories efficiency
+
+# ── Dev ───────────────────────────────────────────────────────────────────
+
+# Run solver tests
+test:
+    cd solver && cargo test
+
+# Check formatting and lints
+lint:
+    cd solver && cargo fmt --check && cargo clippy
+
+# Start API server on port 9000
+serve:
+    YATZY_BASE_PATH=. solver/target/release/yatzy
+
+# Print summary table
+summary:
+    analytics/.venv/bin/yatzy-analyze summary
+
+# Start frontend dev server
+frontend:
+    python3 frontend/serve.py

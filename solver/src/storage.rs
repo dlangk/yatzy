@@ -30,13 +30,13 @@ struct StateFileHeader {
 }
 
 /// Return the state file path for a given θ value.
-/// θ=0.0 uses the standard `data/all_states.bin`.
-/// Other θ values use `data/all_states_theta_{theta:.3}.bin`.
+/// θ=0.0 uses `data/strategy_tables/all_states.bin`.
+/// Other θ values use `data/strategy_tables/all_states_theta_{theta:.3}.bin`.
 pub fn state_file_path(theta: f32) -> String {
     if theta == 0.0 {
-        "data/all_states.bin".to_string()
+        "data/strategy_tables/all_states.bin".to_string()
     } else {
-        format!("data/all_states_theta_{:.3}.bin", theta)
+        format!("data/strategy_tables/all_states_theta_{:.3}.bin", theta)
     }
 }
 

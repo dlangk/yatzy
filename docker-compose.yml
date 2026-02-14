@@ -18,7 +18,7 @@ services:
       retries: 3
 
   yatzy-backend:
-    build: ./backend
+    build: ./solver
     container_name: yatzy-backend
     restart: always
     ports:
