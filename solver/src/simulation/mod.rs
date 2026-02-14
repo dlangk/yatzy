@@ -7,8 +7,10 @@
 
 pub mod adaptive;
 pub mod engine;
+pub mod multiplayer;
 pub mod raw_storage;
 pub mod statistics;
+pub mod strategy;
 
 // Re-export commonly used items
 pub use adaptive::{
@@ -19,8 +21,11 @@ pub use engine::{
     simulate_batch, simulate_batch_summaries, simulate_batch_with_recording, simulate_game,
     GameRecord, GameSummary, SimulationResult, TurnRecord, TurnSummary,
 };
+pub use multiplayer::{
+    aggregate_from_records, simulate_multiplayer_with_recording, MultiplayerGameRecord,
+};
 pub use raw_storage::{
-    load_raw_simulation, load_scores, save_raw_simulation, save_scores, ScoresHeader, SCORES_MAGIC,
-    SCORES_VERSION,
+    load_raw_simulation, load_scores, save_multiplayer_recording, save_raw_simulation, save_scores,
+    MultiplayerHeader, ScoresHeader, MULTIPLAYER_MAGIC, SCORES_MAGIC, SCORES_VERSION,
 };
 pub use statistics::{aggregate_statistics, save_statistics, GameStatistics};

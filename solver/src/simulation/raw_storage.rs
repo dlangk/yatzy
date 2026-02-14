@@ -215,6 +215,71 @@ pub fn load_scores(path: &str) -> Option<(ScoresHeader, Vec<i16>)> {
     Some((header, scores))
 }
 
+// ── Multiplayer recording format ─────────────────────────────────────────────
+// 32-byte header + MultiplayerGameRecord[num_games] (64 bytes each).
+// 1M games = ~61 MB.
+
+use super::multiplayer::MultiplayerGameRecord;
+
+/// Magic number: "MPLY" in little-endian.
+pub const MULTIPLAYER_MAGIC: u32 = 0x594C504D;
+pub const MULTIPLAYER_VERSION: u32 = 1;
+
+/// Multiplayer binary file header (32 bytes).
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct MultiplayerHeader {
+    pub magic: u32,          // 4
+    pub version: u32,        // 4
+    pub num_games: u32,      // 4
+    pub num_players: u8,     // 1
+    pub _reserved1: [u8; 3], // 3
+    pub seed: u64,           // 8
+    pub _reserved2: [u8; 8], // 8
+}
+
+const _MP_HEADER_SIZE: () = assert!(std::mem::size_of::<MultiplayerHeader>() == 32);
+
+/// Save multiplayer recording to binary file.
+pub fn save_multiplayer_recording(
+    records: &[MultiplayerGameRecord],
+    seed: u64,
+    num_players: u8,
+    path: &str,
+) {
+    if let Some(parent) = Path::new(path).parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+
+    let mut f = File::create(path).expect("Failed to create multiplayer recording file");
+
+    let header = MultiplayerHeader {
+        magic: MULTIPLAYER_MAGIC,
+        version: MULTIPLAYER_VERSION,
+        num_games: records.len() as u32,
+        num_players,
+        _reserved1: [0u8; 3],
+        seed,
+        _reserved2: [0u8; 8],
+    };
+
+    let header_bytes = unsafe {
+        std::slice::from_raw_parts(
+            &header as *const MultiplayerHeader as *const u8,
+            std::mem::size_of::<MultiplayerHeader>(),
+        )
+    };
+    f.write_all(header_bytes).unwrap();
+
+    let data_bytes = unsafe {
+        std::slice::from_raw_parts(
+            records.as_ptr() as *const u8,
+            std::mem::size_of_val(records),
+        )
+    };
+    f.write_all(data_bytes).unwrap();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -307,5 +372,62 @@ mod tests {
     #[test]
     fn test_scores_load_nonexistent() {
         assert!(load_scores("/tmp/nonexistent_yatzy_scores.bin").is_none());
+    }
+
+    #[test]
+    fn test_multiplayer_record_size() {
+        assert_eq!(std::mem::size_of::<MultiplayerGameRecord>(), 64);
+    }
+
+    #[test]
+    fn test_multiplayer_header_size() {
+        assert_eq!(std::mem::size_of::<MultiplayerHeader>(), 32);
+    }
+
+    #[test]
+    fn test_multiplayer_round_trip() {
+        let test_path = "/tmp/yatzy_test_mp_raw.bin";
+
+        let mut records = Vec::new();
+        for i in 0..10u16 {
+            let mut rec = MultiplayerGameRecord::default();
+            rec.scores = [200 + i as i16, 190 + i as i16];
+            rec.turn_totals[0][0] = 15 + i as i16;
+            rec.turn_totals[1][0] = 12 + i as i16;
+            records.push(rec);
+        }
+
+        save_multiplayer_recording(&records, 42, 2, test_path);
+
+        // Verify file size: 32 header + 10 * 64 = 672
+        let metadata = std::fs::metadata(test_path).unwrap();
+        assert_eq!(metadata.len(), 32 + 10 * 64);
+
+        // Read back and verify via mmap
+        let file = File::open(test_path).unwrap();
+        let mmap = unsafe { Mmap::map(&file).unwrap() };
+        let header_ptr = mmap.as_ptr() as *const MultiplayerHeader;
+        let header = unsafe { *header_ptr };
+        assert_eq!(header.magic, MULTIPLAYER_MAGIC);
+        assert_eq!(header.version, MULTIPLAYER_VERSION);
+        assert_eq!(header.num_games, 10);
+        assert_eq!(header.num_players, 2);
+        assert_eq!(header.seed, 42);
+
+        let records_ptr = unsafe {
+            mmap.as_ptr().add(std::mem::size_of::<MultiplayerHeader>())
+                as *const MultiplayerGameRecord
+        };
+        let loaded = unsafe { std::slice::from_raw_parts(records_ptr, 10) };
+        for (i, rec) in loaded.iter().enumerate() {
+            let scores = rec.scores;
+            let tt = rec.turn_totals;
+            assert_eq!(scores[0], 200 + i as i16);
+            assert_eq!(scores[1], 190 + i as i16);
+            assert_eq!(tt[0][0], 15 + i as i16);
+            assert_eq!(tt[1][0], 12 + i as i16);
+        }
+
+        let _ = std::fs::remove_file(test_path);
     }
 }

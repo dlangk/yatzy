@@ -45,6 +45,24 @@ pivotal-scenarios games="100000":
 decision-sensitivity games="100000":
     YATZY_BASE_PATH=. solver/target/release/yatzy-decision-sensitivity --games {{games}} --output outputs/scenarios
 
+# Multiplayer simulation (default: 2 ev players, 100K games)
+multiplayer *args:
+    YATZY_BASE_PATH=. solver/target/release/yatzy-multiplayer {{args}}
+
+# Multiplayer simulation with per-game recording
+multiplayer-record *args:
+    YATZY_BASE_PATH=. solver/target/release/yatzy-multiplayer --record {{args}}
+
+# 1v1 ev vs ev baseline (1M games with recording)
+multiplayer-ev-baseline games="1000000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-multiplayer \
+        --record --strategy ev --strategy ev \
+        --games {{games}} --output data/simulations/multiplayer/ev_vs_ev
+
+# Analyze multiplayer results → plots
+multiplayer-analyze *args:
+    analytics/.venv/bin/yatzy-analyze multiplayer {{args}}
+
 # ── Stage 2–3: Aggregate + Visualize (cheap) ─────────────────────────────
 
 # Compute summary stats + KDE (reads scores.bin directly)

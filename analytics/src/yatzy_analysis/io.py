@@ -12,6 +12,7 @@ from .config import HEADER_SIZE, RECORD_SIZE, TOTAL_SCORE_OFFSET, theta_base_dir
 # Magic numbers for format detection
 RAW_SIM_MAGIC = 0x59545352  # "RTSZ" — old full GameRecord format
 SCORES_MAGIC = 0x59545353  # "STSY" — new compact scores-only format
+MULTIPLAYER_MAGIC = 0x594C504D  # "MPLY" — multiplayer recording format
 
 
 def fmt_theta(t: float, base_path: str = "results") -> str:
@@ -87,6 +88,46 @@ def read_scores(path: Path) -> NDArray[np.int32] | None:
         return read_scores_raw(path)
     else:
         return None
+
+
+def read_multiplayer_recording(path: Path) -> dict | None:
+    """Read multiplayer recording binary.
+
+    Format: 32-byte header + MultiplayerGameRecord[N] (64 bytes each).
+    Each record: scores i16[2] + turn_totals i16[2][15].
+
+    Returns dict with keys: num_games, num_players, seed, scores (N,2), turn_totals (N,2,15).
+    """
+    if not path.exists():
+        return None
+    with open(path, "rb") as f:
+        header_data = f.read(32)
+        if len(header_data) < 32:
+            return None
+        magic = struct.unpack_from("<I", header_data, 0)[0]
+        if magic != MULTIPLAYER_MAGIC:
+            return None
+        version = struct.unpack_from("<I", header_data, 4)[0]
+        if version != 1:
+            return None
+        num_games = struct.unpack_from("<I", header_data, 8)[0]
+        num_players = struct.unpack_from("<B", header_data, 12)[0]
+        seed = struct.unpack_from("<Q", header_data, 16)[0]
+
+        # Read packed records: each is [scores i16[2], turn_totals i16[2][15]] = 64 bytes
+        record_dt = np.dtype([
+            ("scores", np.int16, (2,)),
+            ("turn_totals", np.int16, (2, 15)),
+        ])
+        data = np.frombuffer(f.read(num_games * 64), dtype=record_dt)
+
+    return {
+        "num_games": int(num_games),
+        "num_players": int(num_players),
+        "seed": int(seed),
+        "scores": data["scores"],          # (N, 2)
+        "turn_totals": data["turn_totals"],  # (N, 2, 15)
+    }
 
 
 def read_all_scores(

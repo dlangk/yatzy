@@ -760,6 +760,67 @@ def state_frequency(base_path: str, top_n: int):
 
 @cli.command()
 @click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option(
+    "--input-path", default=None,
+    help="Direct path to multiplayer_raw.bin. Default: data/simulations/multiplayer/ev_vs_ev/multiplayer_raw.bin",
+)
+@click.option("--format", "fmt", default="png", type=click.Choice(["png", "svg"]))
+@click.option("--dpi", default=200, type=int)
+def multiplayer(base_path: str, input_path: str | None, fmt: str, dpi: int):
+    """Analyze multiplayer recording and generate 5 plots."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import numpy as np
+
+    from .config import multiplayer_dir, plots_dir
+    from .io import read_multiplayer_recording
+    from .plots.multiplayer import plot_all_multiplayer
+
+    t0 = time.time()
+
+    if input_path is None:
+        input_path = str(multiplayer_dir(base_path) / "ev_vs_ev" / "multiplayer_raw.bin")
+
+    p = Path(input_path)
+    if not p.exists():
+        click.echo(f"{p} not found. Run multiplayer sim with --record first.")
+        raise SystemExit(1)
+
+    click.echo(f"Reading {p}...")
+    data = read_multiplayer_recording(p)
+    if data is None:
+        click.echo("Failed to read multiplayer recording (invalid format).")
+        raise SystemExit(1)
+
+    n = data["num_games"]
+    scores = data["scores"]
+    turn_totals = data["turn_totals"]
+
+    # Quick summary
+    s1 = scores[:, 0].astype(np.int32)
+    s2 = scores[:, 1].astype(np.int32)
+    p1_wins = int((s1 > s2).sum())
+    p2_wins = int((s2 > s1).sum())
+    draws = n - p1_wins - p2_wins
+
+    click.echo(f"  {n:,d} games, {data['num_players']} players")
+    click.echo(f"  P1 wins: {p1_wins:,d} ({100*p1_wins/n:.1f}%)")
+    click.echo(f"  P2 wins: {p2_wins:,d} ({100*p2_wins/n:.1f}%)")
+    click.echo(f"  Draws:   {draws:,d} ({100*draws/n:.1f}%)")
+    click.echo(f"  P1 mean: {s1.mean():.1f}, P2 mean: {s2.mean():.1f}")
+    click.echo()
+
+    out_dir = plots_dir(base_path)
+    click.echo(f"Generating plots → {out_dir}/")
+    filenames = plot_all_multiplayer(scores, turn_totals, out_dir, dpi=dpi, fmt=fmt)
+    for fn in filenames:
+        click.echo(f"  {fn}")
+
+    click.echo(f"Done in {time.time() - t0:.1f}s.")
+
+
+@cli.command()
+@click.option("--base-path", default=".", help="Base path (repo root).")
 def summary(base_path: str):
     """Print summary table to console (from summary.parquet)."""
     from .config import analysis_dir
