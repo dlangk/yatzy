@@ -1442,3 +1442,24 @@ No adaptive policy beats the constant-θ Pareto frontier. All four policies land
 The negative Δμ values have a clear explanation: table-switching between turns violates the Bellman equation. Each θ table was precomputed assuming the same θ for all future turns. When a policy switches from θ=0.10 in one turn to θ=0 in the next, the current turn's value estimates are slightly wrong — they assumed θ=0.10 would continue for all future turns. This small approximation error is directionally negative (the policy pays the switching cost without getting the corresponding benefit), which is why all adaptive policies land slightly below the frontier rather than exactly on it.
 
 This result, combined with the RL experiments, establishes a strong empirical case: **the single-player constant-θ Pareto frontier is tight**. No state-dependent policy — whether learned by RL or designed by hand — can beat it by more than the switching approximation cost (~0.2-1.0 points). The reason is fundamental: the constant-θ solver already implicitly conditions on all state features (upper score, scored categories) through the precomputed state-value table. Adding explicit state-dependent θ switching on top of this provides no new information — it only introduces approximation error from mismatched successor values.
+
+### Why table-switching violates the Bellman equation
+
+The Bellman equation for the risk-sensitive solver at a fixed θ is:
+
+    V_θ(s) = opt_a [ r(s,a) + E[ V_θ(s') ] ]
+
+where `opt` is max for θ>0 (risk-seeking) or min for θ<0 (risk-averse), and all quantities are in the log-domain (log of exponential utility). The key property is that the successor value `V_θ(s')` assumes the **same θ** will be used for all future decisions. This self-consistency is what makes the solution optimal — it's the fixed point of the Bellman operator.
+
+An adaptive policy that switches from θ₁ on turn t to θ₂ on turn t+1 consults `V_{θ₁}(s')` to evaluate its turn-t decisions, but then actually plays according to `V_{θ₂}` from turn t+1 onward. The value it consulted was wrong:
+
+    Consulted:  V_{θ₁}(s')  — "what's this state worth if I play θ₁ forever?"
+    Actual:     V_{θ₂}(s')  — "what's this state worth if I play θ₂ forever?"
+
+When θ₁ > θ₂ (switching from risk-seeking to conservative), the consulted value overestimates future risk-taking gains that won't materialize. When θ₁ < θ₂ (switching from conservative to aggressive), it underestimates them. In either case, the turn-t decision was made with incorrect future values.
+
+The magnitude of the error depends on how often decisions differ between θ₁ and θ₂, which is small for nearby θ values. From the decision sensitivity analysis, only ~5% of decisions flip between θ=0 and θ=0.10, and the affected decisions typically involve marginal tradeoffs worth <1 point each. This explains why the frontier gap is small (0.2-1.0 points) rather than catastrophic.
+
+Crucially, this error is **directionally negative**. An adaptive policy switches to higher θ in states where risk is "cheap" (bonus secured, nothing to protect). But the higher-θ value table was computed assuming high risk-tolerance in *all* states, including states where risk is expensive. The adaptive policy gets the cheap-risk benefit but doesn't pay the expensive-risk cost — yet the value table priced in both. The mismatch means the policy slightly overvalues the high-θ turns (because the consulted successors assumed expensive-risk turns that won't happen), leading to marginally suboptimal decisions. The net effect is a small but consistent mean penalty.
+
+To truly beat the frontier, one would need to solve a **non-stationary Bellman equation** where the successor values reflect the actual adaptive policy rather than a fixed θ. This is equivalent to computing a new 8MB state-value table for every possible policy — computationally feasible but combinatorially explosive in the space of policies. The RL experiments attempted this implicitly (learning a value function conditioned on policy parameters) but failed due to the signal-to-noise ratio. The frontier test confirms that even hand-designed policies cannot overcome the approximation cost, establishing that the constant-θ frontier is empirically tight.

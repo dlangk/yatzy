@@ -70,7 +70,7 @@ underdog-vs-ev games="1000000":
 
 # Test state-dependent θ vs constant-θ Pareto frontier
 frontier-test games="1000000":
-    YATZY_BASE_PATH=. solver/target/release/yatzy-frontier-test --games {{games}}
+    YATZY_BASE_PATH=. solver/target/release/yatzy-frontier-test --games {{games}} --output outputs/frontier
 
 # Analyze multiplayer results → plots
 multiplayer-analyze *args:
