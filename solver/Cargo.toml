@@ -35,6 +35,14 @@ path = "src/bin/decision_sensitivity.rs"
 name = "yatzy-multiplayer"
 path = "src/bin/multiplayer.rs"
 
+[[bin]]
+name = "yatzy-underdog-sweep"
+path = "src/bin/underdog_sweep.rs"
+
+[[bin]]
+name = "yatzy-frontier-test"
+path = "src/bin/frontier_test.rs"
+
 [dependencies]
 axum = "0.8"
 tokio = { version = "1", features = ["full"] }

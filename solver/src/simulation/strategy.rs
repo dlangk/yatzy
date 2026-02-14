@@ -6,6 +6,7 @@
 
 use std::path::Path;
 
+use crate::constants::state_index;
 use crate::storage::{load_state_values_standalone, state_file_path};
 use crate::types::{StateValues, YatzyContext};
 
@@ -93,6 +94,80 @@ impl MultiplayerPolicy for TrailingRisk {
     }
 }
 
+// ── UnderdogPolicy ───────────────────────────────────────────────────────
+
+/// Available θ values for the underdog ramp (must have precomputed tables).
+const UNDERDOG_THETAS: &[f32] = &[0.0, 0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07];
+
+/// Opponent-aware adaptive strategy with continuous θ ramp.
+///
+/// Uses **expected final scores** (current total + EV remaining from state-value
+/// table) rather than raw totals, so the deficit accounts for upper-bonus
+/// progress and which categories remain.
+///
+/// θ ramps linearly from 0 to θ_max as the EV deficit grows:
+///   `desired_θ = θ_max × clamp(ev_deficit / scale, 0, 1)`
+///
+/// Then snaps to the nearest precomputed table. When leading or even,
+/// ev_deficit ≤ 0 → θ = 0 (pure EV play). When the player catches up,
+/// ev_deficit shrinks → θ decreases automatically.
+pub struct UnderdogPolicy {
+    pub ev_idx: usize,  // index of θ=0 table (for EV lookups)
+    pub theta_max: f32, // maximum θ when deeply trailing
+    pub scale: f32,     // EV deficit at which θ reaches θ_max
+}
+
+impl UnderdogPolicy {
+    /// Compute the EV deficit: best opponent expected final − my expected final.
+    fn ev_deficit(view: &GameView, ev_sv: &[f32]) -> f32 {
+        let my = view.me();
+        let my_ev_remaining =
+            ev_sv[state_index(my.upper_score as usize, my.scored_categories as usize)];
+        let my_expected_final = my.total_score as f32 + my_ev_remaining;
+
+        let best_opp_expected = view
+            .opponents()
+            .map(|p| {
+                let ev_rem =
+                    ev_sv[state_index(p.upper_score as usize, p.scored_categories as usize)];
+                p.total_score as f32 + ev_rem
+            })
+            .fold(f32::NEG_INFINITY, f32::max);
+
+        best_opp_expected - my_expected_final
+    }
+}
+
+impl MultiplayerPolicy for UnderdogPolicy {
+    fn name(&self) -> &str {
+        "underdog"
+    }
+
+    fn select_theta_index(&self, view: &GameView, tables: &[ThetaTable]) -> usize {
+        if view.turn <= 1 {
+            return self.ev_idx; // too early, no signal
+        }
+        let ev_sv = tables[self.ev_idx].sv.as_slice();
+        let deficit = Self::ev_deficit(view, ev_sv);
+
+        // Linear ramp: 0 when even/leading, θ_max when deficit >= scale
+        let desired_theta = self.theta_max * (deficit / self.scale).clamp(0.0, 1.0);
+
+        // Snap to nearest precomputed table
+        tables
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| {
+                (a.theta - desired_theta)
+                    .abs()
+                    .partial_cmp(&(b.theta - desired_theta).abs())
+                    .unwrap()
+            })
+            .map(|(i, _)| i)
+            .unwrap_or(self.ev_idx)
+    }
+}
+
 // ── Strategy ──────────────────────────────────────────────────────────────
 
 /// Strategy kind — determines which state-value table to use.
@@ -167,6 +242,7 @@ impl Strategy {
                 "bonus" => "bonus-adaptive",
                 "phase" => "phase-based",
                 "combined" => "combined",
+                "upper-deficit" => "upper-deficit",
                 "ev" => "always-ev",
                 other => other,
             };
@@ -216,12 +292,61 @@ impl Strategy {
                         kind: StrategyKind::MultiplayerAdaptive { tables, policy },
                     });
                 }
+                "underdog" => {
+                    // mp:underdog[:theta_max[:scale]]
+                    let theta_max: f32 = if parts.len() > 1 {
+                        parts[1]
+                            .parse()
+                            .map_err(|_| format!("Invalid theta_max: {}", parts[1]))?
+                    } else {
+                        0.05
+                    };
+                    let scale: f32 = if parts.len() > 2 {
+                        parts[2]
+                            .parse()
+                            .map_err(|_| format!("Invalid scale: {}", parts[2]))?
+                    } else {
+                        50.0
+                    };
+
+                    // Load all available θ tables from 0 to theta_max
+                    let thetas: Vec<f32> = UNDERDOG_THETAS
+                        .iter()
+                        .copied()
+                        .filter(|&t| t <= theta_max + 1e-6)
+                        .collect();
+                    let tables = load_theta_tables(&thetas, base_path)?;
+
+                    let ev_idx = tables
+                        .iter()
+                        .position(|t| t.theta == 0.0)
+                        .expect("θ=0 table missing");
+
+                    let policy = Box::new(UnderdogPolicy {
+                        ev_idx,
+                        theta_max,
+                        scale,
+                    });
+
+                    let name = if parts.len() == 1 {
+                        "mp:underdog".to_string()
+                    } else if parts.len() == 2 {
+                        format!("mp:underdog:{}", parts[1])
+                    } else {
+                        format!("mp:underdog:{}:{}", parts[1], parts[2])
+                    };
+
+                    return Ok(Strategy {
+                        name,
+                        kind: StrategyKind::MultiplayerAdaptive { tables, policy },
+                    });
+                }
                 other => return Err(format!("Unknown multiplayer policy: {}", other)),
             }
         }
 
         Err(format!(
-            "Unknown strategy spec: '{}'. Expected: ev, theta:<f>, adaptive:<name>, mp:trailing[:<threshold>]",
+            "Unknown strategy spec: '{}'. Expected: ev, theta:<f>, adaptive:<name>, mp:trailing[:<threshold>], mp:underdog[:<theta_max>[:<scale>]]",
             spec
         ))
     }
@@ -344,6 +469,210 @@ mod tests {
         };
         let opp_scores: Vec<i32> = view.opponents().map(|p| p.total_score).collect();
         assert_eq!(opp_scores, vec![10, 30]);
+    }
+
+    /// Build fake tables with θ = [0.0, 0.01, 0.02, 0.03, 0.04, 0.05] and
+    /// uniform EV remaining for all states.
+    fn fake_ramp_tables(ev_remaining: f32) -> Vec<ThetaTable> {
+        use crate::constants::NUM_STATES;
+        [0.0, 0.01, 0.02, 0.03, 0.04, 0.05]
+            .iter()
+            .map(|&theta| ThetaTable {
+                theta,
+                sv: StateValues::Owned(vec![ev_remaining; NUM_STATES]),
+                minimize: false,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_underdog_continuous_ramp() {
+        let tables = fake_ramp_tables(100.0);
+        let policy = UnderdogPolicy {
+            ev_idx: 0, // θ=0 is at index 0
+            theta_max: 0.05,
+            scale: 50.0,
+        };
+
+        // Turn 0 → always ev (too early)
+        let players = vec![
+            PlayerState {
+                total_score: 100,
+                ..Default::default()
+            },
+            PlayerState {
+                total_score: 50,
+                ..Default::default()
+            },
+        ];
+        let view = GameView {
+            my_index: 1,
+            players: &players,
+            turn: 0,
+        };
+        assert_eq!(tables[policy.select_theta_index(&view, &tables)].theta, 0.0);
+
+        // Leading → deficit ≤ 0 → θ = 0
+        let players_leading = vec![
+            PlayerState {
+                total_score: 80,
+                ..Default::default()
+            },
+            PlayerState {
+                total_score: 120,
+                ..Default::default()
+            },
+        ];
+        let view_leading = GameView {
+            my_index: 1,
+            players: &players_leading,
+            turn: 7,
+        };
+        assert_eq!(
+            tables[policy.select_theta_index(&view_leading, &tables)].theta,
+            0.0
+        );
+
+        // Trailing by 25 pts (same EV remaining): desired_θ = 0.05 * 25/50 = 0.025 → snap to 0.02 or 0.03
+        let players_mid = vec![
+            PlayerState {
+                total_score: 125,
+                ..Default::default()
+            },
+            PlayerState {
+                total_score: 100,
+                ..Default::default()
+            },
+        ];
+        let view_mid = GameView {
+            my_index: 1,
+            players: &players_mid,
+            turn: 7,
+        };
+        let theta_mid = tables[policy.select_theta_index(&view_mid, &tables)].theta;
+        assert!(
+            (theta_mid - 0.02).abs() < 0.011 || (theta_mid - 0.03).abs() < 0.011,
+            "Expected θ near 0.025, got {}",
+            theta_mid
+        );
+
+        // Trailing by 60 pts: desired_θ = 0.05 * 60/50 = 0.06 → clamped to 0.05 (θ_max)
+        let players_badly = vec![
+            PlayerState {
+                total_score: 160,
+                ..Default::default()
+            },
+            PlayerState {
+                total_score: 100,
+                ..Default::default()
+            },
+        ];
+        let view_badly = GameView {
+            my_index: 1,
+            players: &players_badly,
+            turn: 7,
+        };
+        assert_eq!(
+            tables[policy.select_theta_index(&view_badly, &tables)].theta,
+            0.05
+        );
+
+        // Catches up: deficit shrinks → θ decreases
+        let players_close = vec![
+            PlayerState {
+                total_score: 105,
+                ..Default::default()
+            },
+            PlayerState {
+                total_score: 100,
+                ..Default::default()
+            },
+        ];
+        let view_close = GameView {
+            my_index: 1,
+            players: &players_close,
+            turn: 7,
+        };
+        let theta_close = tables[policy.select_theta_index(&view_close, &tables)].theta;
+        assert!(
+            theta_close <= 0.01,
+            "Expected θ near 0 for small deficit, got {}",
+            theta_close
+        );
+    }
+
+    #[test]
+    fn test_underdog_ev_aware() {
+        // Test that EV-remaining shifts the deficit.
+        // Player 0: state (0,0) → sv[0]=100
+        // Player 1: state (5,1) → sv[69]=50
+        // Same total but different EV remaining → deficit = 50
+        use crate::constants::NUM_STATES;
+        let mut sv_data = vec![0.0f32; NUM_STATES];
+        sv_data[0] = 100.0;
+        sv_data[69] = 50.0;
+
+        let tables: Vec<ThetaTable> = [0.0, 0.01, 0.02, 0.03, 0.04, 0.05]
+            .iter()
+            .map(|&theta| ThetaTable {
+                theta,
+                sv: StateValues::Owned(sv_data.clone()),
+                minimize: false,
+            })
+            .collect();
+
+        let policy = UnderdogPolicy {
+            ev_idx: 0,
+            theta_max: 0.05,
+            scale: 50.0,
+        };
+
+        // Same score but player 1 has worse EV remaining (50 vs 100)
+        // → deficit = (100+100) - (100+50) = 50 → desired_θ = 0.05 * 50/50 = 0.05
+        let players = vec![
+            PlayerState {
+                upper_score: 0,
+                scored_categories: 0,
+                total_score: 100,
+            },
+            PlayerState {
+                upper_score: 5,
+                scored_categories: 1,
+                total_score: 100,
+            },
+        ];
+        let view = GameView {
+            my_index: 1,
+            players: &players,
+            turn: 10,
+        };
+        assert_eq!(
+            tables[policy.select_theta_index(&view, &tables)].theta,
+            0.05
+        ); // max θ despite equal scores
+
+        // Flip: player 1 has better EV remaining → deficit = -50 → θ = 0
+        let players_flipped = vec![
+            PlayerState {
+                upper_score: 5,
+                scored_categories: 1,
+                total_score: 100,
+            },
+            PlayerState {
+                upper_score: 0,
+                scored_categories: 0,
+                total_score: 100,
+            },
+        ];
+        let view_flipped = GameView {
+            my_index: 1,
+            players: &players_flipped,
+            turn: 10,
+        };
+        assert_eq!(
+            tables[policy.select_theta_index(&view_flipped, &tables)].theta,
+            0.0
+        ); // θ=0 despite equal scores
     }
 
     #[test]

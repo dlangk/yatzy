@@ -89,6 +89,9 @@ fn parse_args() -> Args {
                 println!("  adaptive:combined Combined policy");
                 println!("  mp:trailing      Risk-seeking when trailing (threshold=15)");
                 println!("  mp:trailing:20   Custom trailing threshold");
+                println!("  mp:underdog      Continuous ramp: θ scales with EV deficit (default θ_max=0.05, scale=50)");
+                println!("  mp:underdog:0.07 Custom θ_max");
+                println!("  mp:underdog:0.05:60 Custom θ_max and scale");
                 println!();
                 println!("Example:");
                 println!(

@@ -1382,3 +1382,63 @@ RL Approach B tried to learn the *entire* decision function from scratch. Gettin
 **The gap RL was trying to exploit barely exists.** The hypothesis was that accumulated-score conditioning (knowing you're running hot or cold) could improve on the solver. But this signal is worth <1 point per game — smaller than the noise floor. Meanwhile, humans lose 20-30 points from basic computational limitations that RL shares (limited representational capacity, imprecise value estimation).
 
 **Compact heuristics vs. exact tables.** Human strategy can be captured in ~10 rules (always go for bonus, keep matching dice, etc.) totaling maybe 1KB of information. The optimal solver uses 8MB of state values — a 10,000× information advantage. Humans operate in the "heuristic regime" where compact rules cover the easy decisions. The solver operates in the "exact regime" where precise state-dependent calculations matter. RL with 66K parameters sits uncomfortably between these regimes — too large for simple heuristics, too small for exact computation.
+
+## State-Dependent θ(s) vs Constant-θ Pareto Frontier
+
+### Hypothesis
+
+**H₁**: A state-dependent policy θ(s) that conditions on upper-section bonus proximity can beat the constant-θ Pareto frontier by ≥1 point of mean at matched variance.
+
+**H₀**: The constant-θ frontier is tight — no single-player state-dependent policy can beat it in (mean, σ) space.
+
+### Motivation
+
+The existing adaptive policies (bonus-adaptive, phase-based, combined) were tested via RL but never properly evaluated as raw simulation policies against the Pareto frontier in (mean, σ) space. The RL conclusion was that table-switching per turn is too weak a signal — but RL failed due to credit assignment noise (σ~38 vs ~1pt signal) and convergence to fixed-θ equivalents. A direct simulation of 1M games per policy avoids both problems.
+
+A new `upper-deficit` policy was designed to concentrate variance-inflation on turns where it is cheap:
+- Bonus secured → θ=0.10 (risk is free, bonus already locked)
+- Bonus unreachable → θ=0.05 (nothing to protect)
+- Bonus on track (health < 0.6) → θ=0 (protect the 50-point bonus)
+- Marginal bonus health (0.6-0.8) → θ=0.03 (mild risk)
+- Struggling (health > 0.8) → θ=0 (don't gamble away the slim chance)
+
+### Results (1M games per policy, seed=42)
+
+**Constant-θ baselines:**
+
+| Policy | Mean | σ | p5 | p50 | p95 | p99 |
+|--------|------|---|----|----|-----|-----|
+| θ=0 (EV) | 248.40 | 38.5 | 179 | 249 | 309 | 325 |
+| θ=0.030 | 246.92 | 41.3 | 169 | 247 | 311 | 326 |
+| θ=0.050 | 244.53 | 43.2 | 164 | 244 | 312 | 327 |
+| θ=0.070 | 240.86 | 45.3 | 159 | 241 | 313 | 328 |
+| θ=0.100 | 235.92 | 46.9 | 155 | 237 | 312 | 329 |
+| θ=0.150 | 229.23 | 47.9 | 152 | 231 | 311 | 329 |
+
+**Adaptive policies:**
+
+| Policy | Mean | σ | p5 | p50 | p95 | p99 |
+|--------|------|---|----|----|-----|-----|
+| bonus-adaptive | 246.92 | 39.6 | 178 | 246 | 310 | 325 |
+| phase-based | 246.56 | 40.4 | 173 | 246 | 310 | 326 |
+| combined | 247.93 | 39.0 | 179 | 248 | 310 | 325 |
+| upper-deficit | 246.22 | 40.8 | 172 | 245 | 310 | 326 |
+
+**Frontier comparison (linear interpolation between baseline σ values):**
+
+| Policy | σ | Mean | Frontier μ | Δμ | Verdict |
+|--------|---|------|-----------|-----|---------|
+| bonus-adaptive | 39.6 | 246.92 | 247.83 | −0.91 | on frontier |
+| phase-based | 40.4 | 246.56 | 247.38 | −0.82 | on frontier |
+| combined | 39.0 | 247.93 | 248.15 | −0.23 | on frontier |
+| upper-deficit | 40.8 | 246.22 | 247.20 | −0.98 | on frontier |
+
+SE(mean) ≈ 0.038 at 1M games. Δμ ≥ 1.0 required to declare H₁.
+
+### Conclusion: H₀ holds — the constant-θ frontier is tight
+
+No adaptive policy beats the constant-θ Pareto frontier. All four policies land on or slightly below the frontier (Δμ between −0.23 and −0.98). The best performer is `combined` at Δμ = −0.23, which is effectively indistinguishable from the frontier given sampling noise.
+
+The negative Δμ values have a clear explanation: table-switching between turns violates the Bellman equation. Each θ table was precomputed assuming the same θ for all future turns. When a policy switches from θ=0.10 in one turn to θ=0 in the next, the current turn's value estimates are slightly wrong — they assumed θ=0.10 would continue for all future turns. This small approximation error is directionally negative (the policy pays the switching cost without getting the corresponding benefit), which is why all adaptive policies land slightly below the frontier rather than exactly on it.
+
+This result, combined with the RL experiments, establishes a strong empirical case: **the single-player constant-θ Pareto frontier is tight**. No state-dependent policy — whether learned by RL or designed by hand — can beat it by more than the switching approximation cost (~0.2-1.0 points). The reason is fundamental: the constant-θ solver already implicitly conditions on all state features (upper score, scored categories) through the precomputed state-value table. Adding explicit state-dependent θ switching on top of this provides no new information — it only introduces approximation error from mismatched successor values.

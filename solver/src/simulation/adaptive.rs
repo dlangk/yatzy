@@ -228,7 +228,58 @@ impl AdaptivePolicy for Combined {
     }
 }
 
-// ── Policy 4: Always-EV (verification baseline) ────────────────────────────
+// ── Policy 4: Upper-Deficit ────────────────────────────────────────────────
+
+/// State-dependent θ based on upper-section bonus proximity.
+///
+/// Concentrates variance-inflation on turns where it's cheap:
+/// - Bonus secured → θ_high (risk is free — bonus already locked)
+/// - Bonus unreachable → θ_moderate (nothing to protect)
+/// - Bonus in play → measure "health" = deficit / max_remaining
+///   - health < 0.6: on track → θ=0 (protect the 50-point bonus)
+///   - health 0.6-0.8: marginal → θ_mild
+///   - health > 0.8: struggling → θ=0 (don't gamble away the slim chance)
+pub struct UpperDeficit {
+    /// Index of θ=0 table
+    pub ev_idx: usize,
+    /// Index of θ_mild table (0.03)
+    pub mild_idx: usize,
+    /// Index of θ_moderate table (0.05)
+    pub moderate_idx: usize,
+    /// Index of θ_high table (0.10)
+    pub high_idx: usize,
+}
+
+impl AdaptivePolicy for UpperDeficit {
+    fn name(&self) -> &str {
+        "upper-deficit"
+    }
+
+    fn select_theta_index(&self, upper_score: i32, scored: i32, _turn: usize) -> usize {
+        if bonus_secured(upper_score) {
+            self.high_idx
+        } else if !bonus_reachable(upper_score, scored) {
+            self.moderate_idx
+        } else {
+            let deficit = 63 - upper_score;
+            let max_rem = max_remaining_upper(scored);
+            let health = if max_rem > 0 {
+                deficit as f32 / max_rem as f32
+            } else {
+                0.0
+            };
+            if health < 0.6 {
+                self.ev_idx
+            } else if health < 0.8 {
+                self.mild_idx
+            } else {
+                self.ev_idx // paradoxically: if bonus looks hard, don't gamble it away
+            }
+        }
+    }
+}
+
+// ── Policy 5: Always-EV (verification baseline) ────────────────────────────
 
 /// Always selects θ=0. Used to verify adaptive simulation matches standard simulation.
 pub struct AlwaysEv {
@@ -834,6 +885,10 @@ pub const POLICY_CONFIGS: &[PolicyThetas] = &[
         name: "combined",
         thetas: &[0.0, 0.03, 0.05, 0.08],
     },
+    PolicyThetas {
+        name: "upper-deficit",
+        thetas: &[0.0, 0.03, 0.05, 0.10],
+    },
 ];
 
 /// Look up the θ values needed for a given policy name.
@@ -873,6 +928,12 @@ pub fn make_policy(name: &str, tables: &[ThetaTable]) -> Option<Box<dyn Adaptive
             mild_idx: find_idx(0.03),
             moderate_idx: find_idx(0.05),
             high_idx: find_idx(0.08),
+        })),
+        "upper-deficit" => Some(Box::new(UpperDeficit {
+            ev_idx: find_idx(0.0),
+            mild_idx: find_idx(0.03),
+            moderate_idx: find_idx(0.05),
+            high_idx: find_idx(0.10),
         })),
         _ => None,
     }
@@ -935,6 +996,10 @@ mod tests {
         assert_eq!(
             policy_thetas("combined"),
             Some(&[0.0, 0.03, 0.05, 0.08][..])
+        );
+        assert_eq!(
+            policy_thetas("upper-deficit"),
+            Some(&[0.0, 0.03, 0.05, 0.10][..])
         );
         assert_eq!(policy_thetas("nonexistent"), None);
     }

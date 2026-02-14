@@ -59,6 +59,19 @@ multiplayer-ev-baseline games="1000000":
         --record --strategy ev --strategy ev \
         --games {{games}} --output data/simulations/multiplayer/ev_vs_ev
 
+# Underdog parameter sweep
+underdog-sweep games="100000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-underdog-sweep --games {{games}}
+
+# Quick underdog vs EV matchup
+underdog-vs-ev games="1000000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-multiplayer \
+        --strategy ev --strategy mp:underdog --games {{games}}
+
+# Test state-dependent θ vs constant-θ Pareto frontier
+frontier-test games="1000000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-frontier-test --games {{games}}
+
 # Analyze multiplayer results → plots
 multiplayer-analyze *args:
     analytics/.venv/bin/yatzy-analyze multiplayer {{args}}
