@@ -195,6 +195,77 @@ def plot_density_3d(
     return out_path
 
 
+def plot_density_3d_gif(
+    thetas: list[float],
+    kde_df: pd.DataFrame,
+    out_dir: Path,
+    *,
+    elev: int = 45,
+    n_frames: int = 180,
+    fps: int = 24,
+    dpi: int = 120,
+) -> Path:
+    """Rotating 360-degree GIF of the 3D density surface.
+
+    elev=45 gives a slightly-above perspective that shows the surface
+    shape while keeping all θ slices visible during the full rotation.
+    """
+    from matplotlib.animation import FuncAnimation
+
+    setup_theme()
+    norm = make_norm(thetas)
+    sorted_thetas = sorted(thetas)
+    score_min, score_max = 50, MAX_SCORE
+    score_grid = np.linspace(score_min, score_max, 400)
+
+    Z = np.zeros((len(sorted_thetas), len(score_grid)))
+    for i, t in enumerate(sorted_thetas):
+        subset = kde_df[kde_df["theta"] == t].sort_values("score")
+        if len(subset) > 2:
+            Z[i, :] = np.interp(score_grid, subset["score"].values, subset["density"].values)
+
+    X, Y = np.meshgrid(score_grid, sorted_thetas)
+    theta_colors = CMAP(norm(Y))
+
+    fig = plt.figure(figsize=(8, 8))
+    ax = fig.add_subplot(111, projection="3d")
+
+    ax.plot_surface(
+        X, Y, Z,
+        facecolors=theta_colors,
+        rstride=1, cstride=4,
+        shade=True, alpha=1.0,
+        linewidth=0, antialiased=True,
+    )
+
+    key_thetas = [t for t in [-1.0, -0.1, 0.0, 0.1, 1.0] if t in sorted_thetas]
+    for t in key_thetas:
+        idx = sorted_thetas.index(t)
+        color = CMAP(norm(t))
+        lw = 2.5 if t == 0 else 1.5
+        ax.plot(score_grid, [t] * len(score_grid), Z[idx, :],
+                color=color, linewidth=lw, zorder=5)
+
+    ax.set_xlabel("Score", fontsize=FONT_AXIS_LABEL, labelpad=8)
+    ax.set_ylabel("θ", fontsize=FONT_AXIS_LABEL, labelpad=8)
+    ax.set_zlabel("Density", fontsize=FONT_AXIS_LABEL, labelpad=6)
+    ax.set_xlim(score_min, score_max)
+    ax.tick_params(axis="both", labelsize=8)
+    ax.view_init(elev=elev, azim=0)
+
+    fig.subplots_adjust(left=0.15, right=0.85, bottom=0.1, top=0.9)
+
+    def _update(frame: int):
+        ax.view_init(elev=elev, azim=frame * (360 / n_frames))
+        return []
+
+    anim = FuncAnimation(fig, _update, frames=n_frames, blit=False)
+    out_path = out_dir / "density_3d_rotate.gif"
+    anim.save(str(out_path), writer="pillow", fps=fps, dpi=dpi)
+    plt.close(fig)
+    return out_path
+
+
 def plot_density_3d_interactive(
     thetas: list[float],
     kde_df: pd.DataFrame,

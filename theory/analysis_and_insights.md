@@ -52,9 +52,54 @@ The failure is instructive: under max-policy assumptions, every category looks t
 **Tail behavior.** The max-policy's score distribution follows log-linear tail decay: log₁₀(P(X ≥ t)) ≈ 5.544 − 0.0380t for t ∈ [220, 310]. Each additional point reduces survival probability by ~8.4%. Extrapolating to 374 gives P ~ 10⁻⁹, but the true probability is ~10⁻¹⁹ — the log-linear fit captures the smooth middle tail, not the combinatorial cliff where all 15 categories must simultaneously achieve their maxima. The seven categories requiring five-of-a-specific-face (each P ≈ 0.013) contribute (1/75)⁷ ~ 10⁻¹³ alone.
 
 
-## 3. Risk-Sensitive Play
+## 3. Why the Score Distribution Is Not Normal
 
-### 3.1 The θ Parameter
+The total score is a sum of 15 category scores plus a binary bonus. By the Central Limit Theorem, sums of many independent random variables converge to a normal distribution. Yatzy violates both assumptions — independence and continuity — producing a multimodal mixture distribution.
+
+### 3.1 Binary Categories Create Mixture Sub-Populations
+
+Several categories are all-or-nothing: the player either hits the pattern (scoring a fixed value) or misses (scoring zero). The most impactful are:
+
+| Category | Score if hit | Hit rate (θ=0) |
+|---|---:|---:|
+| Upper Bonus | 50 | 90% |
+| Yatzy | 50 | 39% |
+| Large Straight | 20 | 49% |
+| Small Straight | 15 | 26% |
+
+The two dominant binary events — bonus and Yatzy — divide games into four sub-populations. Each is approximately normal with σ ≈ 15–21, but their means are separated by ~50 points:
+
+| Group | Fraction | Mean | Std |
+|---|---:|---:|---:|
+| No bonus, no Yatzy | 6.1% | 164 | 19.7 |
+| No bonus, Yatzy | 4.1% | 213 | 19.6 |
+| Bonus, no Yatzy | 55.1% | 237 | 20.3 |
+| Bonus + Yatzy | 34.7% | 288 | 21.1 |
+
+The overall distribution is a weighted mixture of these four near-Gaussians. The two dominant groups (bonus-only at 237 and bonus+Yatzy at 288) create the bimodal shape visible in the histogram. Further subdivision by straights produces 16 sub-populations, all approximately normal, confirming that the non-normality is entirely explained by the mixture structure.
+
+### 3.2 Correlations Under Optimal Play
+
+The CLT requires independence. Under optimal play, category scores are correlated: pursuing Yatzy affects Three/Four of a Kind scores; chasing the upper bonus distorts how upper categories are played. The 16×16 covariance matrix (15 categories + bonus) decomposes as:
+
+$$\text{Var}(\text{Total}) = \sum_i \text{Var}(X_i) + 2\sum_{i < j} \text{Cov}(X_i, X_j)$$
+
+Empirically: Var(Total) = 1,481, of which 1,195 (80.7%) comes from individual category variances and 286 (19.3%) from cross-category covariances. The covariance term is positive — categories are positively correlated on average, meaning good games tend to be good across the board, amplifying total variance beyond what independent categories would produce.
+
+### 3.3 Variance Decomposition by Category
+
+Yatzy alone accounts for 40% of total score variance (Var = 594), driven by the coin-flip between 0 and 50. Upper Bonus contributes 15% (Var = 229). The remaining 13 categories collectively contribute 25% of variance, with Large Straight (Var = 100) and Four of a Kind (Var = 93) being the largest.
+
+The covariance contributions reveal that Upper Bonus has the largest positive correlation with other categories — games that achieve the bonus tend to score higher across the board, not just from the 50-point bonus itself. The mean score difference between bonus-hit and bonus-miss games is +72 points, exceeding the 50-point bonus value by 22 points of correlated improvement in other categories.
+
+### 3.4 KDE Bandwidth Artifacts
+
+The standard KDE bandwidth (0.04) used elsewhere in this analysis is narrower than the integer spacing of score values, producing artificial per-integer spikes in density plots. These spikes are not genuine modes. At bandwidths of 1–3 (or Scott's rule), the true shape emerges: a bimodal distribution with peaks near 237 and 288, corresponding to the two dominant (bonus, Yatzy) sub-populations. All multi-peaked structure visible at bw=0.04 is a smoothing artifact on discrete integer data.
+
+
+## 4. Risk-Sensitive Play
+
+### 4.1 The θ Parameter
 
 We generalize the solver to optimize exponential utility rather than expected value:
 
@@ -64,7 +109,7 @@ where θ > 0 is risk-seeking, θ < 0 is risk-averse, and θ → 0 recovers the E
 
 This is CARA (constant absolute risk aversion) utility: the risk premium for a given gamble is independent of current wealth. The parameter θ controls how the solver weights upside vs downside at every decision point.
 
-### 3.2 The θ Sweep
+### 4.2 The θ Sweep
 
 We solved the full DP for 37 θ values from −3.0 to +3.0 with progressive spacing (dense near zero: Δθ = 0.005 in [−0.015, +0.015], widening to Δθ = 1.0 at extremes). Each strategy was evaluated over 1M simulated games.
 
@@ -94,7 +139,7 @@ We solved the full DP for 37 θ values from −3.0 to +3.0 with progressive spac
 
 The optimal θ shifts from negative (risk-averse) for lower quantiles to positive (risk-seeking) for upper quantiles. This is a fundamental property of the risk-return tradeoff: protecting the floor requires different decisions than lifting the ceiling.
 
-### 3.3 Two-Branch Structure in Mean-Variance Space
+### 4.3 Two-Branch Structure in Mean-Variance Space
 
 The (mean, σ) curve is not a single curve. It traces two distinct branches:
 
@@ -105,7 +150,7 @@ At the same mean (~190), the risk-seeking branch (θ ≈ 1) has σ ≈ 46 vs σ 
 
 This is analogous to a mean-variance frontier in portfolio theory, except the classical efficient frontier is a single hyperbola. The two-branch structure arises because risk-averse and risk-seeking policies achieve the same mean loss through fundamentally different mechanisms.
 
-### 3.4 Near-Origin Behavior
+### 4.4 Near-Origin Behavior
 
 Near θ = 0, both mean and std are well-approximated by quadratics:
 
@@ -116,9 +161,9 @@ Mean loss is quadratic (second-order around the optimum, as expected from pertur
 
 For p95 specifically: the Gaussian approximation p95 ≈ μ + 1.645σ predicts the peak location (θ ≈ 0.05) but overpredicts the level by ~4 points (predicted 316 vs actual 313). The Gaussian model fails because the score distribution's skewness changes with θ: mildly thin-tailed near θ = 0, increasingly heavy-tailed for θ > 0.2. Mean and σ locate the p95 peak; the third moment determines its height.
 
-### 3.5 The Asymmetry of Risk
+### 4.5 The Asymmetry of Risk
 
-**The two directions are asymmetric.** At θ = −0.05, σ drops 2.8 for a mean cost of 3.3. At θ = +0.05, σ rises 4.7 for a mean cost of 3.9. Risk-seeking buys more σ per mean point (1.21 vs 0.85) but also costs more mean in absolute terms. The asymmetry is further visible in the branch structure (Section 3.3): the risk-averse branch compresses σ into a narrow band (35–38) regardless of mean, while the risk-seeking branch first expands σ (peaking at 48.4) then slowly contracts it.
+**The two directions are asymmetric.** At θ = −0.05, σ drops 2.8 for a mean cost of 3.3. At θ = +0.05, σ rises 4.7 for a mean cost of 3.9. Risk-seeking buys more σ per mean point (1.21 vs 0.85) but also costs more mean in absolute terms. The asymmetry is further visible in the branch structure (Section 4.3): the risk-averse branch compresses σ into a narrow band (35–38) regardless of mean, while the risk-seeking branch first expands σ (peaking at 48.4) then slowly contracts it.
 
 **Both extremes degenerate symmetrically.** At θ = −3 (mean 188.5) and θ = +3 (mean 186.5), strategies are comparably poor. Refusing all variance is as costly as embracing all variance.
 
@@ -132,7 +177,7 @@ For p95 specifically: the Gaussian approximation p95 ≈ μ + 1.645σ predicts t
 | Diminishing returns | \|θ\| > 0.2 | Policy changes slow, all metrics decline |
 | Degenerate | \|θ\| > 1.5 | Policy frozen, no further change |
 
-### 3.6 Three Efficiency Metrics
+### 4.6 Three Efficiency Metrics
 
 **Marginal Exchange Rate (MER).** MER_q(θ) = [mean(0) − mean(θ)] / [q(θ) − q(0)]: mean points sacrificed per point of quantile gain.
 
@@ -168,9 +213,9 @@ At θ = 0.08, you must score above ~285 (≈ p80 of baseline) for the risk-seeki
 At θ = 0.08, the CVaR deficit (−13.2) exceeds the mean deficit (−9.3). Risk-seeking hurts the worst games disproportionately.
 
 
-## 4. How θ Changes Decisions
+## 5. How θ Changes Decisions
 
-### 4.1 Disagreement Rates
+### 5.1 Disagreement Rates
 
 At each decision point, θ = 0 and θ > 0 may prescribe different actions. Measured over 100K games following θ = 0's trajectory:
 
@@ -182,7 +227,7 @@ At each decision point, θ = 0 and θ > 0 may prescribe different actions. Measu
 
 At the mild θ = 0.07 (peak p95), 1 in 8 decisions differs.
 
-### 4.2 The Unified Pattern: Option Value
+### 5.2 The Unified Pattern: Option Value
 
 Every category disagreement follows one pattern: θ > 0 preserves high-ceiling categories and dumps low-ceiling ones. θ = 0 optimizes for probability of use; θ > 0 optimizes for ceiling of use.
 
@@ -199,13 +244,13 @@ Every category disagreement follows one pattern: θ > 0 preserves high-ceiling c
 
 The net immediate sacrifice across all disagreements is **0.3 points per game** (on 1.9 disagreeing decisions). The overall mean difference is 7.5 points. The gap is explained by compounding: preserving hard-to-complete categories means more turns with high-variance slots open, lower bonus rates (89.8% → 72.6%), and suboptimal reroll targeting downstream.
 
-### 4.3 Yatzy Preservation: The Costliest Disagreement
+### 5.3 Yatzy Preservation: The Costliest Disagreement
 
 The largest single category of disagreement. Late game (avg turn 13), θ = 0 fills Yatzy with zero; θ = 0.07 dumps on another category to keep the 50-point jackpot alive.
 
 θ = 0 writes off Yatzy because P(five-of-a-kind) ≈ 4.6% per turn — the EV of keeping it open (~2.3 pts) is usually less than the EV of keeping other categories. θ > 0 values the upside of 50 points beyond what its probability warrants under EV.
 
-### 4.4 Per-Category Effects Across θ
+### 5.4 Per-Category Effects Across θ
 
 **Upper section: Ones is the dump category.** Ones absorbs zeros increasingly with θ: zero rate rises from 9.2% (θ = 0) to 38.5% (θ = 3), filled at turn 3 rather than turn 8. Sixes migrates from turn 6.5 to turn 12.4.
 
@@ -225,7 +270,7 @@ The largest single category of disagreement. Late game (avg turn 13), θ = 0 fil
 | Sixes | 6.5 | 12.4 | +5.9 |
 | Yatzy | 10.6 | 13.4 | +2.8 |
 
-### 4.5 Conditional Yatzy Hit Rate
+### 5.5 Conditional Yatzy Hit Rate
 
 **Puzzle:** As θ increases, unconditional Yatzy hit rate drops from 38.8% to 17.6% (θ = 1.1). Risk-seeking strategies should chase high-variance categories. Why does the highest-ceiling category suffer?
 
@@ -243,7 +288,7 @@ The largest single category of disagreement. Late game (avg turn 13), θ = 0 fil
 
 **What the solver does instead of Yatzy.** At high θ, the solver trades one 50-point lottery ticket (39% hit rate) for many smaller bets: upper-section optimization, straight completion, four-of-a-kind improvement. At θ = 0.05, both Yatzy and other categories improve. Beyond θ ≈ 0.10, Yatzy becomes a casualty of portfolio reallocation.
 
-### 4.6 Decision Sensitivity: Where θ Flips the Optimal Action
+### 5.6 Decision Sensitivity: Where θ Flips the Optimal Action
 
 Simulating 100K games under θ = 0 and re-evaluating every decision (4.5M total: two rerolls + one category per turn) across 12 θ values in [0, 0.2] identifies **239 flip decisions** — game states where some θ > 0 prescribes a different optimal action than θ = 0.
 
@@ -268,7 +313,7 @@ Out of 1,384 frequently visited decisions (≥100 visits in realistic board stat
 These flip decisions form a natural diagnostic for estimating a player's risk preference. A player's choices across 15–20 such scenarios — selected by Fisher information to maximize discrimination power — can estimate their revealed θ within the empirically relevant range [−0.05, +0.15].
 
 
-## 5. Board-State Frequency
+## 6. Board-State Frequency
 
 Simulating 100K games under θ = 0 reveals an hourglass structure in the state space. Every game starts at one state (turn 1), fans out to a peak of 33,029 unique board states at turn 9, then collapses to 267 states by turn 15.
 
@@ -289,13 +334,13 @@ Mid-game is maximally diffuse. Late-game concentrates sharply: at turn 15, the t
 **Bonus achievement.** 83.6% of games reach upper score 63 at turn 15. The optimal solver prioritizes the bonus aggressively.
 
 
-## 6. Where Human Play Diverges from Optimal
+## 7. Where Human Play Diverges from Optimal
 
-### 6.1 The Gap
+### 7.1 The Gap
 
-No human study has been conducted to measure the exact deficit, but the structure of the game constrains it. The disagreement analysis (Section 4.1) shows that even θ = 0.07 — a mild perturbation of the optimal policy — disagrees on 12.5% of decisions and loses 7.5 points of mean. A human heuristic policy would disagree on substantially more decisions. The error sources below are hypothesized categories, ordered by conjectured severity; validating them requires simulating a human-heuristic baseline policy.
+No human study has been conducted to measure the exact deficit, but the structure of the game constrains it. The disagreement analysis (Section 5.1) shows that even θ = 0.07 — a mild perturbation of the optimal policy — disagrees on 12.5% of decisions and loses 7.5 points of mean. A human heuristic policy would disagree on substantially more decisions. The error sources below are hypothesized categories, ordered by conjectured severity; validating them requires simulating a human-heuristic baseline policy.
 
-### 6.2 Hypothesized Sources of Error
+### 7.2 Hypothesized Sources of Error
 
 **Upper bonus mismanagement.** The 50-point bonus at 63 upper points creates a cliff that humans misjudge. Common errors: investing in the bonus when it is already unreachable (remaining upper categories cannot sum to the deficit), and under-investing when it is marginal (e.g., scoring 20 in Fives for immediate points when scoring 12 in Fours and saving Fives would secure the bonus).
 
@@ -305,15 +350,15 @@ No human study has been conducted to measure the exact deficit, but the structur
 
 **Chase errors.** Humans both over-chase (rerolling a strong Three of a Kind for Yatzy on the last reroll) and under-chase (banking One Pair from [4,4,4,\_,\_] instead of rerolling for Full House at ~35%).
 
-### 6.3 Why Errors Compound
+### 7.3 Why Errors Compound
 
 Individual errors create cascading suboptimality. Filling category X suboptimally means later rolls suited for X must go elsewhere. This secondary misallocation is invisible to the player and may rival the original error in cost, though the compounding magnitude has not been measured.
 
-### 6.4 Why Humans Feel Competent Despite the Gap
+### 7.4 Why Humans Feel Competent Despite the Gap
 
 Without a solver as reference, humans compare against other humans. With σ ≈ 38 even under optimal play, any suboptimal player will occasionally score well above their mean. These memorable highs reinforce the feeling of competence. The gap between human and optimal play is invisible without a baseline to measure against.
 
-### 6.5 Estimating Human Risk Preference
+### 7.5 Estimating Human Risk Preference
 
 **From observed play.** At each decision, we compute the set of θ values for which the observed action is optimal. Over many decisions, the intersection of compatible θ ranges estimates the player's risk preference.
 
@@ -328,9 +373,9 @@ where β is a rationality parameter (β → ∞: perfectly optimal; β → 0: ra
 **Questionnaire approach.** We compress the estimation into ~15 pivotal scenarios — game states where different θ values prescribe different optimal categories. A Bayesian adaptive design selects each question to maximize expected information gain (entropy reduction over the θ posterior). Questions are selected greedily, equivalent to one-step-ahead Bayesian optimal experimental design. A pool of 200 Fisher-scored pivotal scenarios has been generated, filtered by a realism criterion that rejects implausible game states (too many zeros, upper score inconsistent with turn number, implausibly low total score). The questionnaire has been tested on one subject (15 questions), but the design target of CI width < 0.05 has not been validated via Monte Carlo.
 
 
-## 7. Negative Results
+## 8. Negative Results
 
-### 7.1 State-Dependent θ(s): The Bellman Equation Already Handles It
+### 8.1 State-Dependent θ(s): The Bellman Equation Already Handles It
 
 **Hypothesis.** A state-dependent policy θ(s), varying risk attitude based on upper-section bonus proximity, can beat the constant-θ Pareto frontier by ≥1 point of mean at matched variance.
 
@@ -362,7 +407,7 @@ The error is directionally negative. The adaptive policy switches to higher θ i
 
 **The constant-θ solver already exhibits state-dependent behavior.** V\*(s) at turn 5 already encodes that certain upper-section placements lead to high bonus probability. The solver plays "conservatively" near the threshold and "aggressively" when the bonus is lost — not because θ varies, but because the value function captures all downstream consequences. Varying θ mid-game adds no new information; it only introduces inconsistency.
 
-### 7.2 RL Approaches
+### 8.2 RL Approaches
 
 Three RL architectures attempted to beat the fixed-θ Pareto frontier.
 
@@ -388,18 +433,18 @@ Online RL fine-tuning degraded the BC policy catastrophically (mean 190 → 123 
 | C (PPO) | Turn-level table switch | 246.9 | 310 | On frontier |
 | B (IQN+BC) | Per-decision neural | 205.3 | 281 | Far below |
 
-The constant-θ Pareto frontier is empirically tight. The state-dependent θ experiments (Section 7.1) provide the strongest evidence: four adaptive policies that explicitly condition on game state all land within 1 point of the frontier (Δμ between −0.23 and −0.98). The RL results are consistent with this but do not independently establish it — the RL algorithms may have failed for reasons unrelated to the size of the exploitable gap.
+The constant-θ Pareto frontier is empirically tight. The state-dependent θ experiments (Section 8.1) provide the strongest evidence: four adaptive policies that explicitly condition on game state all land within 1 point of the frontier (Δμ between −0.23 and −0.98). The RL results are consistent with this but do not independently establish it — the RL algorithms may have failed for reasons unrelated to the size of the exploitable gap.
 
 
-## 8. Open Questions
+## 9. Open Questions
 
 **Head-to-head win rate.** Maximizing E[score] and maximizing P(my\_score > opponent\_score) are different objectives. Against an opponent playing θ = 0, does there exist a θ that wins > 50% of head-to-head games? The opponent's full score distribution is computable from existing simulations; win rate for any challenger θ is an O(n²) convolution. The interesting case is whether distributional shape (skewness from the bonus cliff) can be exploited beyond what mean advantage predicts. An EV-vs-EV baseline (1M games, two θ=0 players) confirms the null: 49.5% vs 49.7% wins (0.76% draws), avg winning margin 43.5 points.
 
-**θ-sensitive decisions as diagnostics.** The decision sensitivity analysis (Section 4.6) identifies 239 flip decisions where different θ values prescribe different actions. These form a natural basis for risk-preference estimation. Remaining work: validating via Monte Carlo that 15–20 Fisher-optimal scenarios achieve CI(θ) width < 0.05, and testing the adaptive questionnaire on human subjects.
+**θ-sensitive decisions as diagnostics.** The decision sensitivity analysis (Section 5.6) identifies 239 flip decisions where different θ values prescribe different actions. These form a natural basis for risk-preference estimation. Remaining work: validating via Monte Carlo that 15–20 Fisher-optimal scenarios achieve CI(θ) width < 0.05, and testing the adaptive questionnaire on human subjects.
 
 **Non-exponential utility.** The constant-θ frontier is tight under exponential utility. Whether strategies optimal under other utility classes (prospect-theoretic, rank-dependent) reach points inaccessible to any θ remains open.
 
-**Optimal θ\* per percentile.** The coarse θ sweep (Section 3.2) identifies approximate peak-θ values per quantile, but the grid spacing (Δθ = 0.005–0.01) limits precision. A two-phase adaptive sweep — coarse grid to locate peaks, fine grid (Δθ = 0.002) around each peak — would pin down θ\* to ±0.002 for each percentile from p1 through p99.99.
+**Optimal θ\* per percentile.** The coarse θ sweep (Section 4.2) identifies approximate peak-θ values per quantile, but the grid spacing (Δθ = 0.005–0.01) limits precision. A two-phase adaptive sweep — coarse grid to locate peaks, fine grid (Δθ = 0.002) around each peak — would pin down θ\* to ±0.002 for each percentile from p1 through p99.99.
 
 
 ---
@@ -492,6 +537,13 @@ The constant-θ Pareto frontier is empirically tight. The state-dependent θ exp
 - `mp_trajectories.png` — Sample game score trajectories
 - `mp_win_margin.png` — Win margin distribution
 
+**Modality (why scores aren't normal):**
+- `modality_histogram_vs_kde.png` — Histogram vs KDE at narrow and reasonable bandwidths
+- `modality_bonus_yatzy.png` — 2×2 decomposition by (bonus, Yatzy) sub-populations with normal fits
+- `modality_category_pmf.png` — 3×5 per-category score PMF grid (orange = binary categories)
+- `modality_variance_decomposition.png` — Variance and covariance contribution per category
+- `modality_mixture_waterfall.png` — Impact of binary categories on total score (hit rate × Δmean)
+
 **Other:**
 - `quantile.png` — Quantile-quantile or quantile function plot
 # Changelog
@@ -502,12 +554,13 @@ The original document was organized by analysis chronology (max-policy, θ sweep
 
 1. **Game and state space** — notation needed by everything else
 2. **EV-optimal solver** — the baseline (was scattered across sections)
-3. **Risk-sensitive play** — merged θ sweep, two-branch analysis, quadratic fits, efficiency metrics, and asymmetry discussion into one section with subsections
-4. **How θ changes decisions** — merged disagreement analysis, option value pattern, per-category stats, and conditional Yatzy analysis (previously four separate sections)
-5. **Board-state frequency** — moved earlier as descriptive infrastructure
-6. **Human play** — merged "Why Humans Are Not Good" with "Adaptive θ / estimation" material
-7. **Negative results** — merged state-dependent θ frontier test, RL Approaches A/C/B, and the Bellman explanation into one coherent section
-8. **Open questions** — new section collecting forward-looking material
+3. **Why the score distribution is not normal** — mixture decomposition, variance analysis, KDE artifacts
+4. **Risk-sensitive play** — merged θ sweep, two-branch analysis, quadratic fits, efficiency metrics, and asymmetry discussion into one section with subsections
+5. **How θ changes decisions** — merged disagreement analysis, option value pattern, per-category stats, and conditional Yatzy analysis (previously four separate sections)
+6. **Board-state frequency** — moved earlier as descriptive infrastructure
+7. **Human play** — merged "Why Humans Are Not Good" with "Adaptive θ / estimation" material
+8. **Negative results** — merged state-dependent θ frontier test, RL Approaches A/C/B, and the Bellman explanation into one coherent section
+9. **Open questions** — new section collecting forward-looking material
 
 ## Material Cut
 
@@ -520,7 +573,7 @@ The original document was organized by analysis chronology (max-policy, θ sweep
 - **"What we would need to log" JSON examples**: Implementation detail for a future frontend feature, not a research finding. Cut.
 - **"Why humans feel good despite the gap" section**: Points 2-4 restate point 1 (no reference point). Compressed to one paragraph.
 - **"Implications for why RL struggles" in the human play section**: Forward reference to RL results. Deleted; the RL section now stands alone.
-- **"Implications for Approaches B and C" in RL-A section**: Forward references. The summary table in Section 7.2 now covers all approaches.
+- **"Implications for Approaches B and C" in RL-A section**: Forward references. The summary table in Section 8.2 now covers all approaches.
 - **Quadratic fit residual table**: Six rows of residuals for a descriptive fit. The R² values and equations are sufficient.
 - **Repeated regime boundary definitions**: Appeared in both the sweep section and the asymmetry discussion. Consolidated into one table.
 - **"Three implemented policies" code blocks**: Pseudocode for bonus-adaptive, phase-based, combined. The results table makes these unnecessary.
@@ -543,14 +596,14 @@ The original document was organized by analysis chronology (max-policy, θ sweep
 
 The following unsupported claims were identified in the first revision. All have been addressed:
 
-1. **"Typical experienced human scores mean ~220-230."** Removed. Section 6.1 now frames the gap via the θ = 0.07 disagreement analysis (7.5 pts from 12.5% disagreement rate) as the only data-backed lower bound.
+1. **"Typical experienced human scores mean ~220-230."** Removed. Section 7.1 now frames the gap via the θ = 0.07 disagreement analysis (7.5 pts from 12.5% disagreement rate) as the only data-backed lower bound.
 
-2. **"The remaining 10% of decisions... is where the 20-30 point gap lives."** Removed. Section 6.1 no longer claims a specific gap size or decision split.
+2. **"The remaining 10% of decisions... is where the 20-30 point gap lives."** Removed. Section 7.1 no longer claims a specific gap size or decision split.
 
-3. **"Upper bonus mismanagement (~7-10 pts/game)" and other point estimates.** Removed. Section 6.2 retitled "Hypothesized Sources of Error" with no point costs.
+3. **"Upper bonus mismanagement (~7-10 pts/game)" and other point estimates.** Removed. Section 7.2 retitled "Hypothesized Sources of Error" with no point costs.
 
 4. **"15 questions are typically sufficient for θ estimate with CI width < 0.05."** Rewritten as unvalidated design target.
 
 5. **Risk-averse buys variance reduction "cheaply."** Replaced with quantified ratios (0.85 vs 1.21 σ per mean point) and corrected the interpretive claim — risk-seeking actually gets more σ per mean point, not less.
 
-6. **"The accumulated-score conditioning gap is smaller than hypothesized."** Attribution corrected: the state-dependent θ experiments (Section 7.1) provide the evidence, not the RL failures. RL failure is noted as consistent but not independently probative.
+6. **"The accumulated-score conditioning gap is smaller than hypothesized."** Attribution corrected: the state-dependent θ experiments (Section 8.1) provide the evidence, not the RL failures. RL failure is noted as consistent but not independently probative.
