@@ -43,6 +43,26 @@ path = "src/bin/underdog_sweep.rs"
 name = "yatzy-frontier-test"
 path = "src/bin/frontier_test.rs"
 
+[[bin]]
+name = "yatzy-winrate"
+path = "src/bin/winrate.rs"
+
+[[bin]]
+name = "yatzy-percentile-sweep"
+path = "src/bin/percentile_sweep.rs"
+
+[[bin]]
+name = "yatzy-human-baseline"
+path = "src/bin/human_baseline.rs"
+
+[[bin]]
+name = "yatzy-difficult-scenarios"
+path = "src/bin/difficult_scenarios.rs"
+
+[[bin]]
+name = "yatzy-scenario-sensitivity"
+path = "src/bin/scenario_sensitivity.rs"
+
 [dependencies]
 axum = "0.8"
 tokio = { version = "1", features = ["full"] }

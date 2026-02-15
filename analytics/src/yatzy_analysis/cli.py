@@ -821,6 +821,22 @@ def multiplayer(base_path: str, input_path: str | None, fmt: str, dpi: int):
 
 @cli.command()
 @click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--format", "fmt", default="png", type=click.Choice(["png", "svg"]))
+@click.option("--dpi", default=200, type=int)
+def winrate(base_path: str, fmt: str, dpi: int):
+    """Plot head-to-head win rate analysis."""
+    import matplotlib
+    matplotlib.use("Agg")
+
+    from .plots.winrate import generate_winrate_plots
+
+    t0 = time.time()
+    generate_winrate_plots(base_path, fmt=fmt, dpi=dpi)
+    click.echo(f"Done in {time.time() - t0:.1f}s.")
+
+
+@cli.command()
+@click.option("--base-path", default=".", help="Base path (repo root).")
 def summary(base_path: str):
     """Print summary table to console (from summary.parquet)."""
     from .config import analysis_dir
@@ -865,3 +881,74 @@ def summary(base_path: str):
         tstr = f"{best_row['theta']:g}"
         vstr = f"{val:.1f}" if isinstance(val, float) and val != int(val) else str(int(val))
         click.echo(f"  {metric:>8s}: theta = {tstr:>6s} (score = {vstr})")
+
+
+@cli.command("percentile-sweep-plots")
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--dpi", default=200, help="DPI for output images.")
+def percentile_sweep_plots(base_path: str, dpi: int):
+    """Plot percentile sweep results (curves, heatmap, cost-benefit)."""
+    import matplotlib
+    matplotlib.use("Agg")
+
+    from .plots.percentile_sweep import plot_percentile_sweep
+
+    csv_dir = Path(base_path) / "outputs" / "aggregates" / "csv"
+    sweep_path = csv_dir / "percentile_sweep.csv"
+    peaks_path = csv_dir / "percentile_peaks.csv"
+
+    for p in [sweep_path, peaks_path]:
+        if not p.exists():
+            click.echo(f"{p} not found. Run yatzy-percentile-sweep first.")
+            raise SystemExit(1)
+
+    coarse_path = Path(base_path) / "outputs" / "aggregates" / "parquet" / "summary.parquet"
+    out_dir = Path(base_path) / "outputs" / "plots"
+    t0 = time.time()
+    paths = plot_percentile_sweep(sweep_path, peaks_path, out_dir, coarse_path=coarse_path, dpi=dpi)
+    click.echo(f"Done in {time.time() - t0:.1f}s — {len(paths)} plots in {out_dir}")
+
+
+@cli.command("difficult-sensitivity-cards")
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--dpi", default=150, help="DPI for output images.")
+@click.option("--max-theta-rows", default=20, type=int, help="Max θ rows in table.")
+def difficult_sensitivity_cards(base_path: str, dpi: int, max_theta_rows: int):
+    """Generate sensitivity cards for difficult scenarios across all θ values."""
+    import matplotlib
+    matplotlib.use("Agg")
+
+    from .plots.difficult_sensitivity_cards import generate_difficult_sensitivity_cards
+
+    json_path = Path(base_path) / "outputs" / "scenarios" / "difficult_scenarios_sensitivity.json"
+    if not json_path.exists():
+        click.echo(f"{json_path} not found. Run yatzy-scenario-sensitivity first.")
+        raise SystemExit(1)
+
+    out_dir = Path(base_path) / "outputs" / "plots" / "scenarios"
+    t0 = time.time()
+    paths = generate_difficult_sensitivity_cards(
+        json_path, out_dir, max_theta_rows=max_theta_rows, dpi=dpi,
+    )
+    click.echo(f"Done in {time.time() - t0:.1f}s — {len(paths)} cards in {out_dir}")
+
+
+@cli.command("difficult-cards")
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--dpi", default=150, help="DPI for output images.")
+def difficult_cards(base_path: str, dpi: int):
+    """Generate scenario cards for all difficult scenarios."""
+    import matplotlib
+    matplotlib.use("Agg")
+
+    from .plots.difficult_cards import generate_difficult_cards
+
+    json_path = Path(base_path) / "outputs" / "scenarios" / "difficult_scenarios.json"
+    if not json_path.exists():
+        click.echo(f"{json_path} not found. Run yatzy-difficult-scenarios first.")
+        raise SystemExit(1)
+
+    out_dir = Path(base_path) / "outputs" / "plots" / "scenarios"
+    t0 = time.time()
+    paths = generate_difficult_cards(json_path, out_dir, dpi=dpi)
+    click.echo(f"Done in {time.time() - t0:.1f}s — {len(paths)} cards in {out_dir}")

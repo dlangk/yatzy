@@ -7,6 +7,7 @@
 
 pub mod adaptive;
 pub mod engine;
+pub mod heuristic;
 pub mod multiplayer;
 pub mod raw_storage;
 pub mod statistics;

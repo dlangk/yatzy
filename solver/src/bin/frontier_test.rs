@@ -198,11 +198,7 @@ fn main() {
     }
     all_thetas.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-    println!(
-        "  Checking {} θ tables: {:?}",
-        all_thetas.len(),
-        all_thetas
-    );
+    println!("  Checking {} θ tables: {:?}", all_thetas.len(), all_thetas);
     for &theta in &all_thetas {
         let file = state_file_path(theta);
         if !std::path::Path::new(&file).exists() {
@@ -453,8 +449,7 @@ fn main() {
                 r.max,
                 r.frontier_mean
                     .map_or("".to_string(), |v| format!("{:.4}", v)),
-                r.delta_mu
-                    .map_or("".to_string(), |v| format!("{:.4}", v)),
+                r.delta_mu.map_or("".to_string(), |v| format!("{:.4}", v)),
                 num_games,
                 seed,
             )

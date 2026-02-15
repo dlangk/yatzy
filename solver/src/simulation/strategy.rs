@@ -188,6 +188,8 @@ pub enum StrategyKind {
         tables: Vec<ThetaTable>,
         policy: Box<dyn MultiplayerPolicy>,
     },
+    /// Heuristic (human-like) strategy — no state-value tables needed.
+    Heuristic,
 }
 
 pub struct Strategy {
@@ -201,10 +203,18 @@ impl Strategy {
     /// Supported specs:
     /// - `"ev"` — EV-optimal (θ=0)
     /// - `"theta:0.05"` — fixed θ
+    /// - `"human"` — heuristic (human-like) strategy, no tables needed
     /// - `"adaptive:bonus"` / `"adaptive:phase"` / `"adaptive:combined"` — existing adaptive policies
     /// - `"mp:trailing"` — multiplayer-aware trailing-risk policy
     /// - `"mp:trailing:20"` — trailing-risk with custom threshold (default 15)
     pub fn from_spec(spec: &str, base_path: &Path, _ctx: &YatzyContext) -> Result<Self, String> {
+        if spec == "human" {
+            return Ok(Strategy {
+                name: "human".to_string(),
+                kind: StrategyKind::Heuristic,
+            });
+        }
+
         if spec == "ev" {
             let path = base_path.join(state_file_path(0.0));
             let sv = load_state_values_standalone(path.to_str().unwrap())
@@ -346,12 +356,20 @@ impl Strategy {
         }
 
         Err(format!(
-            "Unknown strategy spec: '{}'. Expected: ev, theta:<f>, adaptive:<name>, mp:trailing[:<threshold>], mp:underdog[:<theta_max>[:<scale>]]",
+            "Unknown strategy spec: '{}'. Expected: ev, human, theta:<f>, adaptive:<name>, mp:trailing[:<threshold>], mp:underdog[:<theta_max>[:<scale>]]",
             spec
         ))
     }
 
+    /// Returns true if this strategy is heuristic (no state-value tables).
+    pub fn is_heuristic(&self) -> bool {
+        matches!(self.kind, StrategyKind::Heuristic)
+    }
+
     /// Resolve the turn configuration for this strategy given the game view.
+    ///
+    /// Panics if called on a `Heuristic` strategy — the caller should check
+    /// `is_heuristic()` first and use the heuristic code path.
     pub fn resolve_turn<'a>(&'a self, view: &GameView) -> TurnConfig<'a> {
         match &self.kind {
             StrategyKind::FixedTheta {
@@ -381,6 +399,9 @@ impl Strategy {
                     sv: table.sv.as_slice(),
                     minimize: table.minimize,
                 }
+            }
+            StrategyKind::Heuristic => {
+                panic!("resolve_turn() called on Heuristic strategy — use is_heuristic() check")
             }
         }
     }

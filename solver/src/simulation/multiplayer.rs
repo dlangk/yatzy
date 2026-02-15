@@ -12,7 +12,7 @@ use rayon::prelude::*;
 use serde::Serialize;
 
 use crate::constants::*;
-use crate::dice_mechanics::{find_dice_set_index, sort_dice_set};
+use crate::dice_mechanics::{count_faces, find_dice_set_index, sort_dice_set};
 use crate::game_mechanics::update_upper_score;
 use crate::types::YatzyContext;
 use crate::widget_solver::{
@@ -21,6 +21,7 @@ use crate::widget_solver::{
 };
 
 use super::adaptive::TurnConfig;
+use super::heuristic::{heuristic_pick_category, heuristic_reroll_mask};
 use super::strategy::{GameView, PlayerState, Strategy};
 
 // ── Inline helpers (duplicated for perf, same as engine.rs / adaptive.rs) ─
@@ -404,6 +405,41 @@ fn play_single_turn(
     }
 }
 
+/// Play one turn using the heuristic (human-like) strategy.
+/// Returns (category, score, new_upper_score).
+#[inline]
+fn play_single_turn_heuristic(
+    state: &PlayerState,
+    rng: &mut SmallRng,
+) -> (usize, i32, i32) {
+    let scored = state.scored_categories;
+    let upper_score = state.upper_score;
+
+    let mut dice = roll_dice(rng);
+
+    // Reroll 1
+    let fc1 = count_faces(&dice);
+    let mask1 = heuristic_reroll_mask(&dice, &fc1, scored, upper_score);
+    if mask1 != 0 {
+        apply_reroll(&mut dice, mask1, rng);
+    }
+
+    // Reroll 2
+    let fc2 = count_faces(&dice);
+    let mask2 = heuristic_reroll_mask(&dice, &fc2, scored, upper_score);
+    if mask2 != 0 {
+        apply_reroll(&mut dice, mask2, rng);
+    }
+
+    // Pick category
+    let fc_final = count_faces(&dice);
+    let cat = heuristic_pick_category(&dice, &fc_final, scored, upper_score);
+    let scr = crate::game_mechanics::calculate_category_score(&dice, cat);
+    let new_upper = update_upper_score(upper_score, cat, scr);
+
+    (cat, scr, new_upper)
+}
+
 // ── Recording ────────────────────────────────────────────────────────────
 
 /// Packed per-game record for binary storage (64 bytes for 2 players).
@@ -450,15 +486,17 @@ fn play_one_game(ctx: &YatzyContext, strategies: &[Strategy], rng: &mut SmallRng
 
     for turn in 0..CATEGORY_COUNT {
         for player_idx in 0..n {
-            let view = GameView {
-                my_index: player_idx,
-                players: &states,
-                turn,
+            let (cat, scr, new_upper) = if strategies[player_idx].is_heuristic() {
+                play_single_turn_heuristic(&states[player_idx], rng)
+            } else {
+                let view = GameView {
+                    my_index: player_idx,
+                    players: &states,
+                    turn,
+                };
+                let config = strategies[player_idx].resolve_turn(&view);
+                play_single_turn(ctx, &config, &states[player_idx], turn, rng)
             };
-            let config = strategies[player_idx].resolve_turn(&view);
-
-            let (cat, scr, new_upper) =
-                play_single_turn(ctx, &config, &states[player_idx], turn, rng);
 
             states[player_idx].upper_score = new_upper;
             states[player_idx].scored_categories |= 1 << cat;
@@ -606,15 +644,17 @@ fn play_one_game_with_recording(
 
     for turn in 0..CATEGORY_COUNT {
         for player_idx in 0..2 {
-            let view = GameView {
-                my_index: player_idx,
-                players: &states,
-                turn,
+            let (cat, scr, new_upper) = if strategies[player_idx].is_heuristic() {
+                play_single_turn_heuristic(&states[player_idx], rng)
+            } else {
+                let view = GameView {
+                    my_index: player_idx,
+                    players: &states,
+                    turn,
+                };
+                let config = strategies[player_idx].resolve_turn(&view);
+                play_single_turn(ctx, &config, &states[player_idx], turn, rng)
             };
-            let config = strategies[player_idx].resolve_turn(&view);
-
-            let (cat, scr, new_upper) =
-                play_single_turn(ctx, &config, &states[player_idx], turn, rng);
 
             states[player_idx].upper_score = new_upper;
             states[player_idx].scored_categories |= 1 << cat;

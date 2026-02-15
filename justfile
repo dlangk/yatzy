@@ -72,6 +72,26 @@ underdog-vs-ev games="1000000":
 frontier-test games="1000000":
     YATZY_BASE_PATH=. solver/target/release/yatzy-frontier-test --games {{games}} --output outputs/frontier
 
+# Head-to-head win rate: constant-θ vs θ=0
+winrate games="10000000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-winrate --games {{games}} --output outputs/winrate
+
+# Adaptive percentile sweep: find θ* for each percentile
+percentile-sweep coarse="1000000" fine="10000000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-percentile-sweep --games-coarse {{coarse}} --games-fine {{fine}} --output outputs/aggregates/csv
+
+# Human baseline: heuristic vs EV-optimal comparison
+human-baseline games="100000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-human-baseline --games {{games}} --output outputs/human_baseline
+
+# Collect difficult scenarios for human skill estimation
+difficult-scenarios games="1000000" top="200":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-difficult-scenarios --games {{games}} --top {{top}} --output outputs/scenarios
+
+# Re-evaluate difficult scenarios across all θ strategy tables
+scenario-sensitivity:
+    YATZY_BASE_PATH=. solver/target/release/yatzy-scenario-sensitivity --output outputs/scenarios
+
 # Analyze multiplayer results → plots
 multiplayer-analyze *args:
     analytics/.venv/bin/yatzy-analyze multiplayer {{args}}
