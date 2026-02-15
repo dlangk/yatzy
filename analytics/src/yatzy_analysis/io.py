@@ -130,6 +130,69 @@ def read_multiplayer_recording(path: Path) -> dict | None:
     }
 
 
+def read_full_recording(path: Path) -> dict | None:
+    """Read per-game category data from simulation_raw.bin (full GameRecord format).
+
+    Binary layout per game (289 bytes):
+      turns[15]: each 19 bytes (dice[5], mask1, dice[5], mask2, dice[5], category u8, score u8)
+      total_score: u16 LE at offset 285
+      upper_total: u8 at offset 287
+      got_bonus: u8 at offset 288
+
+    Returns dict with:
+      num_games: int
+      total_scores: NDArray[np.uint16]   (N,)
+      got_bonus: NDArray[np.bool_]       (N,)
+      upper_totals: NDArray[np.uint8]    (N,)
+      category_scores: NDArray[np.uint8] (N, 15) — score per category id
+    """
+    if not path.exists():
+        return None
+    data = np.fromfile(path, dtype=np.uint8)
+    if len(data) < HEADER_SIZE + RECORD_SIZE:
+        return None
+
+    magic = int(np.frombuffer(data[0:4], dtype=np.uint32)[0])
+    if magic != RAW_SIM_MAGIC:
+        return None
+
+    n = int(np.frombuffer(data[8:12], dtype=np.uint32)[0])
+    if len(data) < HEADER_SIZE + n * RECORD_SIZE:
+        return None
+
+    # Vectorized extraction using strided offsets
+    game_offsets = HEADER_SIZE + np.arange(n, dtype=np.int64) * RECORD_SIZE
+
+    # total_score: u16 LE at offset 285 within record
+    ts_off = game_offsets + TOTAL_SCORE_OFFSET
+    total_scores = data[ts_off].astype(np.uint16) | (data[ts_off + 1].astype(np.uint16) << 8)
+
+    # upper_total: u8 at offset 287
+    upper_totals = data[game_offsets + 287]
+
+    # got_bonus: u8 at offset 288
+    got_bonus = data[game_offsets + 288].astype(np.bool_)
+
+    # Per-category scores: scatter from temporal turns into category slots
+    # Turn t: category at offset t*19+17, score at offset t*19+18
+    category_scores = np.zeros((n, 15), dtype=np.uint8)
+    for t in range(15):
+        cat_off = game_offsets + t * 19 + 17
+        score_off = game_offsets + t * 19 + 18
+        cats = data[cat_off]      # (N,) category ids 0-14
+        scores = data[score_off]  # (N,) scores
+        # Scatter: category_scores[game_i, cats[game_i]] = scores[game_i]
+        category_scores[np.arange(n), cats] = scores
+
+    return {
+        "num_games": n,
+        "total_scores": total_scores,
+        "got_bonus": got_bonus,
+        "upper_totals": upper_totals,
+        "category_scores": category_scores,
+    }
+
+
 def read_all_scores(
     thetas: list[float], base_path: str = "results"
 ) -> dict[float, NDArray[np.int32]]:

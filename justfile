@@ -92,6 +92,18 @@ difficult-scenarios games="1000000" top="200":
 scenario-sensitivity:
     YATZY_BASE_PATH=. solver/target/release/yatzy-scenario-sensitivity --output outputs/scenarios
 
+# Sweep: simulate all thetas in grid, store scores (resumable)
+sweep grid="all" games="1000000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-sweep --grid {{grid}} --games {{games}}
+
+# Add specific thetas to the sweep
+sweep-add thetas games="1000000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-sweep --thetas {{thetas}} --games {{games}}
+
+# Compute stats from stored scores → parquet + CSV
+sweep-stats:
+    analytics/.venv/bin/yatzy-analyze compute --csv
+
 # Analyze multiplayer results → plots
 multiplayer-analyze *args:
     analytics/.venv/bin/yatzy-analyze multiplayer {{args}}
@@ -113,6 +125,10 @@ categories:
 # Compute efficiency metrics (MER, SDVA, CVaR)
 efficiency:
     analytics/.venv/bin/yatzy-analyze efficiency
+
+# Score distribution modality analysis
+modality:
+    analytics/.venv/bin/yatzy-analyze modality
 
 # Full analytics pipeline: compute → plot → categories → efficiency
 pipeline: compute plot categories efficiency

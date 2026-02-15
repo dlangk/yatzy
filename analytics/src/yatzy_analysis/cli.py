@@ -39,7 +39,8 @@ def extract(base_path: str):
 
 @cli.command()
 @click.option("--base-path", default=".", help="Base path (repo root).")
-def compute(base_path: str):
+@click.option("--csv", "write_csv", is_flag=True, help="Also write sweep_summary.csv.")
+def compute(base_path: str, write_csv: bool):
     """Read simulation binaries directly → summary.parquet + kde.parquet."""
     from .compute import compute_all
     from .config import analysis_dir, discover_thetas
@@ -68,6 +69,12 @@ def compute(base_path: str):
     save_kde(kde_df, out_dir / "kde.parquet")
     click.echo(f"Saved summary.parquet ({len(summary_df)} rows)")
     click.echo(f"Saved kde.parquet ({len(kde_df)} rows)")
+
+    if write_csv:
+        csv_path = out_dir / "sweep_summary.csv"
+        summary_df.to_csv(csv_path, index=False, float_format="%.6f")
+        click.echo(f"Saved {csv_path} ({len(summary_df)} rows)")
+
     click.echo(f"Done in {time.time() - t0:.1f}s.")
 
 
@@ -87,7 +94,7 @@ def plot(base_path: str, subset: str, fmt: str, dpi: int):
     from .config import PLOT_SUBSETS, analysis_dir, plots_dir
     from .plots.cdf import plot_cdf, plot_tails
     from .plots.combined import plot_combined
-    from .plots.density import plot_density
+    from .plots.density import plot_density, plot_density_3d, plot_density_3d_interactive
     from .plots.mean_std import plot_mean_vs_std
     from .plots.percentiles import plot_percentiles
     from .plots.quantile import plot_quantile
@@ -134,6 +141,10 @@ def plot(base_path: str, subset: str, fmt: str, dpi: int):
     click.echo(f"  mean_vs_std.{fmt}")
     plot_density(thetas, k_df, out_dir, dpi=dpi, fmt=fmt)
     click.echo(f"  density.{fmt}")
+    plot_density_3d(thetas, k_df, out_dir, dpi=dpi, fmt=fmt)
+    click.echo(f"  density_3d.{fmt}")
+    plot_density_3d_interactive(thetas, k_df, out_dir)
+    click.echo("  density_3d_interactive.html")
     plot_quantile(thetas, cdf_df, out_dir, dpi=dpi, fmt=fmt)
     click.echo(f"  quantile.{fmt}")
     plot_combined(thetas, cdf_df, stats_df, k_df, out_dir, dpi=dpi, fmt=fmt)
@@ -885,8 +896,9 @@ def summary(base_path: str):
 
 @cli.command("percentile-sweep-plots")
 @click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--format", "fmt", default="png", type=click.Choice(["png", "svg"]))
 @click.option("--dpi", default=200, help="DPI for output images.")
-def percentile_sweep_plots(base_path: str, dpi: int):
+def percentile_sweep_plots(base_path: str, fmt: str, dpi: int):
     """Plot percentile sweep results (curves, heatmap, cost-benefit)."""
     import matplotlib
     matplotlib.use("Agg")
@@ -905,7 +917,7 @@ def percentile_sweep_plots(base_path: str, dpi: int):
     coarse_path = Path(base_path) / "outputs" / "aggregates" / "parquet" / "summary.parquet"
     out_dir = Path(base_path) / "outputs" / "plots"
     t0 = time.time()
-    paths = plot_percentile_sweep(sweep_path, peaks_path, out_dir, coarse_path=coarse_path, dpi=dpi)
+    paths = plot_percentile_sweep(sweep_path, peaks_path, out_dir, coarse_path=coarse_path, dpi=dpi, fmt=fmt)
     click.echo(f"Done in {time.time() - t0:.1f}s — {len(paths)} plots in {out_dir}")
 
 
@@ -931,6 +943,96 @@ def difficult_sensitivity_cards(base_path: str, dpi: int, max_theta_rows: int):
         json_path, out_dir, max_theta_rows=max_theta_rows, dpi=dpi,
     )
     click.echo(f"Done in {time.time() - t0:.1f}s — {len(paths)} cards in {out_dir}")
+
+
+@cli.command()
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--format", "fmt", default="png", type=click.Choice(["png", "svg"]))
+@click.option("--dpi", default=200, type=int)
+def modality(base_path: str, fmt: str, dpi: int):
+    """Score distribution modality analysis: why Yatzy scores aren't normal."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import numpy as np
+
+    from .compute import compute_covariance_matrix, compute_mixture_decomposition
+    from .config import plots_dir, simulations_dir
+    from .io import read_full_recording
+
+    t0 = time.time()
+
+    # Try full recording first (needed for per-category data)
+    sim_dir = simulations_dir(base_path)
+    raw_path = sim_dir / "theta" / "theta_0" / "simulation_raw.bin"
+    if not raw_path.exists():
+        raw_path = sim_dir / "simulation_raw.bin"
+
+    game_data = None
+    if raw_path.exists():
+        click.echo(f"Reading full recording: {raw_path}...")
+        game_data = read_full_recording(raw_path)
+
+    if game_data is None:
+        click.echo("No simulation_raw.bin found. Need full recording for modality analysis.")
+        click.echo("Run: just simulate  (with --full-recording)")
+        raise SystemExit(1)
+
+    n = game_data["num_games"]
+    click.echo(f"  {n:,d} games loaded")
+
+    # Also get sorted scores for histogram
+    scores = game_data["total_scores"].astype(np.int32)
+    scores.sort()
+
+    # Compute mixture decomposition
+    click.echo("Computing mixture decomposition...")
+    mixture_df = compute_mixture_decomposition(game_data)
+
+    # Compute covariance matrix
+    click.echo("Computing covariance matrix...")
+    cov_matrix, means, labels = compute_covariance_matrix(game_data)
+
+    # Print mixture table
+    click.echo()
+    click.echo("=== Score Distribution by (Bonus, Yatzy) ===")
+    click.echo(
+        f"{'Bonus':>5s} | {'Yatzy':>5s} | {'SmStr':>5s} | {'LgStr':>5s} | "
+        f"{'Count':>10s} | {'Frac':>6s} | {'Mean':>7s} | {'Std':>5s} | "
+        f"{'Min':>5s} | {'Max':>5s}"
+    )
+    click.echo("-" * 80)
+    for _, row in mixture_df.iterrows():
+        click.echo(
+            f"{row['bonus']:>5s} | {row['yatzy']:>5s} | "
+            f"{row['small_straight']:>5s} | {row['large_straight']:>5s} | "
+            f"{row['count']:>10,d} | {row['fraction']:>5.1%} | "
+            f"{row['mean']:>7.1f} | {row['std']:>5.1f} | "
+            f"{row['min']:>5d} | {row['max']:>5d}"
+        )
+
+    # Print variance decomposition summary
+    click.echo()
+    total_var = cov_matrix.sum()
+    sum_diag = np.diag(cov_matrix).sum()
+    click.echo(f"=== Variance Decomposition ===")
+    click.echo(f"Var(Total Score) = {total_var:.1f}")
+    click.echo(f"  Sum of Var(X_i) = {sum_diag:.1f} ({100*sum_diag/total_var:.1f}%)")
+    click.echo(f"  Sum of Cov(X_i,X_j) = {total_var - sum_diag:.1f} ({100*(total_var-sum_diag)/total_var:.1f}%)")
+
+    # Generate plots
+    out_dir = plots_dir(base_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    click.echo(f"\nGenerating plots → {out_dir}/")
+    from .plots.modality import plot_all_modality
+    paths = plot_all_modality(
+        game_data, scores, mixture_df, cov_matrix, means, labels,
+        out_dir, dpi=dpi, fmt=fmt,
+    )
+    for p in paths:
+        click.echo(f"  {p.name}")
+
+    click.echo(f"Done in {time.time() - t0:.1f}s.")
 
 
 @cli.command("difficult-cards")
