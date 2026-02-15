@@ -39,6 +39,14 @@ YATZY_BASE_PATH=. solver/target/release/yatzy
 
 # Simulate games (from repo root)
 YATZY_BASE_PATH=. solver/target/release/yatzy-simulate --games 1000000 --output data/simulations
+
+# Simulate with full turn-by-turn recording (289 B/game vs 2 B/game)
+YATZY_BASE_PATH=. solver/target/release/yatzy-simulate --full-recording --games 1000000 --output data/simulations
+
+# Theta sweep: simulate all thetas in grid, store scores (resumable)
+YATZY_BASE_PATH=. solver/target/release/yatzy-sweep --grid all --games 1000000
+YATZY_BASE_PATH=. solver/target/release/yatzy-sweep --thetas 0.1,0.2 --games 1000000
+YATZY_BASE_PATH=. solver/target/release/yatzy-sweep --list  # show existing inventory
 ```
 
 ### Analytics (Python)
@@ -49,6 +57,9 @@ cd analytics && uv venv && uv pip install -e .
 
 # Run analytics pipeline (from repo root)
 analytics/.venv/bin/yatzy-analyze run
+
+# Compute stats with CSV output (34-column sweep_summary.csv)
+analytics/.venv/bin/yatzy-analyze compute --csv
 
 # Print summary table
 analytics/.venv/bin/yatzy-analyze summary
@@ -63,7 +74,10 @@ analytics/.venv/bin/yatzy-analyze efficiency
 just setup          # Build solver + install analytics
 just precompute     # θ=0 strategy table
 just simulate       # 1M games
-just pipeline       # extract → compute → plot → categories → efficiency
+just sweep          # Simulate all 37 thetas (resumable)
+just sweep-add thetas=0.1,0.2  # Add specific thetas
+just sweep-stats    # Compute stats → parquet + CSV
+just pipeline       # compute → plot → categories → efficiency
 just test           # Run solver tests
 just serve          # Start API server
 ```
@@ -82,7 +96,7 @@ docker-compose up --build
 
 The solver is a multithreaded Rust application with precomputed game states:
 
-- **Entry Points**: `src/bin/server.rs` (API server), `src/bin/precompute.rs` (offline precomputation), `src/bin/simulate.rs` (simulation + statistics)
+- **Entry Points**: `src/bin/server.rs` (API server), `src/bin/precompute.rs` (offline precomputation), `src/bin/simulate.rs` (simulation + statistics), `src/bin/sweep.rs` (theta sweep: simulate all thetas in grid)
 - **Phase 0 — Precompute lookup tables**:
   - `phase0_tables.rs` - Builds all static lookup tables (scores, keep-multiset table, probabilities)
   - `game_mechanics.rs` - Yatzy scoring rules: s(S, r, c)
@@ -97,6 +111,7 @@ The solver is a multithreaded Rust application with precomputed game states:
   - `engine.rs` - Simulate games with optimal strategy, with/without recording
   - `statistics.rs` - Aggregate statistics from recorded games
   - `raw_storage.rs` - Binary I/O for raw simulation data (mmap)
+  - `sweep.rs` - Theta sweep infrastructure: inventory scan, grid resolution, ensure_strategy_table
 - **Infrastructure**:
   - `types.rs` - YatzyContext, KeepTable, StateValues (owned/mmap)
   - `constants.rs` - Category enum, state_index, NUM_STATES
@@ -107,8 +122,8 @@ The solver is a multithreaded Rust application with precomputed game states:
 Python package (`yatzy-analysis`) with CLI entry point `yatzy-analyze`:
 
 - **Source**: `analytics/src/yatzy_analysis/`
-  - `cli.py` - CLI commands: extract, compute, plot, efficiency, run, summary, tail
-  - `compute.py` - Summary stats, KDE, MER, SDVA, CVaR
+  - `cli.py` - CLI commands: extract, compute (--csv), plot, efficiency, run, summary, tail
+  - `compute.py` - Summary stats (34 columns), KDE, MER, SDVA, CVaR
   - `config.py` - Path resolution, binary format constants, theta grids
   - `io.py` - Binary file reading (simulation_raw.bin)
   - `store.py` - Parquet save/load
@@ -120,12 +135,12 @@ Python package (`yatzy-analysis`) with CLI entry point `yatzy-analyze`:
 data/                           # Expensive artifacts (gitignored)
   strategy_tables/              # Precomputed EV tables (all_states*.bin)
   simulations/                  # Raw simulation binaries
-    theta/theta_*/              # Per-θ simulation_raw.bin + game_statistics.json
+    theta/theta_*/              # Per-θ scores.bin (32B header + i16[N], ~1.91 MB/1M games)
     max_policy/scores.bin       # Max-policy simulation
 
 outputs/                        # Cheap to regenerate (gitignored)
   aggregates/                   # Processed data by format
-    parquet/                    # kde, summary, scores, mer, sdva
+    parquet/                    # kde, summary, scores, mer, sdva, sweep_summary.csv
     csv/                        # category_stats, yatzy_conditional
   plots/                        # Generated PNG visualizations (flat)
   scenarios/                    # pivotal_scenarios.json, answers

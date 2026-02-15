@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from .style import make_norm, setup_theme, theta_color, theta_colorbar
+from .style import FONT_AXIS_LABEL, FONT_LEGEND, FONT_SUPTITLE, FONT_TITLE, GRID_ALPHA, make_norm, setup_theme, theta_color, theta_colorbar
 
 # Shared axis ranges for all adaptive frontier plots (individual + combined).
 # Data ranges: Mean 186–248, p95 266–314, p99 300–329, p999 328–341.
@@ -33,7 +33,7 @@ def plot_efficiency(
     fig, axes = plt.subplots(2, 2, figsize=(18, 14))
     fig.suptitle(
         "The Cost of Risk-Seeking in Yatzy",
-        fontsize=18, fontweight="bold", y=0.98,
+        fontsize=FONT_SUPTITLE, fontweight="bold", y=0.98,
     )
 
     # Filter to available thetas and positive-theta only for MER
@@ -55,14 +55,14 @@ def plot_efficiency(
             ax.plot(valid["theta"], valid[col], marker="o", markersize=4,
                     linewidth=1.8, color=color, label=label)
 
-    ax.set_xlabel("θ", fontsize=12)
-    ax.set_ylabel("Mean points lost per point gained", fontsize=12)
-    ax.set_title("Marginal Exchange Rate (MER)", fontsize=13, fontweight="bold")
+    ax.set_xlabel("θ", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Mean points lost per point gained", fontsize=FONT_AXIS_LABEL)
+    ax.set_title("Marginal Exchange Rate (MER)", fontsize=FONT_TITLE, fontweight="bold")
     ax.axhline(0, color="gray", linewidth=0.8, linestyle="--")
     ax.set_xlim(0, 0.25)
     ax.set_ylim(-5, 30)
-    ax.legend(fontsize=9, loc="upper left")
-    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=FONT_LEGEND, loc="upper left")
+    ax.grid(True, alpha=GRID_ALPHA)
 
     # Panel 2: Efficient frontier in (mean, p95) space
     ax = axes[0, 1]
@@ -89,11 +89,11 @@ def plot_efficiency(
         ax.axvspan(ax.get_xlim()[0], b["mean"], alpha=0.03, color="red")
         ax.axhspan(ax.get_ylim()[0], b["p95"], alpha=0.03, color="red")
 
-    ax.set_xlabel("Mean Score", fontsize=12)
-    ax.set_ylabel("p95 Score", fontsize=12)
-    ax.set_title("Efficient Frontier: Mean vs p95", fontsize=13, fontweight="bold")
-    ax.legend(fontsize=9, loc="lower right")
-    ax.grid(True, alpha=0.3)
+    ax.set_xlabel("Mean Score", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("p95 Score", fontsize=FONT_AXIS_LABEL)
+    ax.set_title("Efficient Frontier: Mean vs p95", fontsize=FONT_TITLE, fontweight="bold")
+    ax.legend(fontsize=FONT_LEGEND, loc="lower right")
+    ax.grid(True, alpha=GRID_ALPHA)
     theta_colorbar(ax, norm, label="θ")
 
     # Panel 3: CDF difference D(x) for representative thetas
@@ -113,11 +113,11 @@ def plot_efficiency(
             ax.fill_between(scores, d, 0, where=d < 0, alpha=0.15, color="green")
 
     ax.axhline(0, color="black", linewidth=0.8)
-    ax.set_xlabel("Total Score", fontsize=12)
-    ax.set_ylabel("F_θ(x) - F_0(x)", fontsize=12)
-    ax.set_title("CDF Difference (red=worse, green=better)", fontsize=13, fontweight="bold")
-    ax.legend(fontsize=9, loc="upper left")
-    ax.grid(True, alpha=0.3)
+    ax.set_xlabel("Total Score", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("F_θ(x) - F_0(x)", fontsize=FONT_AXIS_LABEL)
+    ax.set_title("CDF Difference (red=worse, green=better)", fontsize=FONT_TITLE, fontweight="bold")
+    ax.legend(fontsize=FONT_LEGEND, loc="upper left")
+    ax.grid(True, alpha=GRID_ALPHA)
 
     # Add crossing points from SDVA
     for t in representative:
@@ -139,11 +139,11 @@ def plot_efficiency(
     ax.plot(pos["theta"], pos["cvar_1"], color="darkred", linewidth=1.5, label="CVaR 1%",
             marker="v", markersize=4, alpha=0.8)
 
-    ax.set_xlabel("θ", fontsize=12)
-    ax.set_ylabel("Score", fontsize=12)
-    ax.set_title("Mean and CVaR vs θ (downside severity)", fontsize=13, fontweight="bold")
-    ax.legend(fontsize=9, loc="upper right")
-    ax.grid(True, alpha=0.3)
+    ax.set_xlabel("θ", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Score", fontsize=FONT_AXIS_LABEL)
+    ax.set_title("Mean and CVaR vs θ (downside severity)", fontsize=FONT_TITLE, fontweight="bold")
+    ax.legend(fontsize=FONT_LEGEND, loc="upper right")
+    ax.grid(True, alpha=GRID_ALPHA)
 
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     fig.savefig(out_dir / f"efficiency.{fmt}", dpi=dpi, bbox_inches="tight")
@@ -181,7 +181,7 @@ def _plot_adaptive_frontier(
         fig, ax = plt.subplots(figsize=(12, 8))
         fig.suptitle(
             f"Adaptive θ Policies vs Fixed-θ Frontier (Mean vs {percentile_label})",
-            fontsize=16, fontweight="bold", y=0.98,
+            fontsize=FONT_SUPTITLE, fontweight="bold", y=0.98,
         )
 
     norm = make_norm(thetas)
@@ -236,11 +236,11 @@ def _plot_adaptive_frontier(
                    zorder=15, edgecolors="black", linewidths=1.0,
                    label=f"{name}")
 
-    ax.set_xlabel("Mean Score", fontsize=13)
-    ax.set_ylabel(f"{percentile_label} Score", fontsize=13)
-    ax.set_title(f"Mean vs {percentile_label}", fontsize=13, fontweight="bold")
-    ax.legend(fontsize=9, loc="lower left")
-    ax.grid(True, alpha=0.3)
+    ax.set_xlabel("Mean Score", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel(f"{percentile_label} Score", fontsize=FONT_AXIS_LABEL)
+    ax.set_title(f"Mean vs {percentile_label}", fontsize=FONT_TITLE, fontweight="bold")
+    ax.legend(fontsize=FONT_LEGEND, loc="lower left")
+    ax.grid(True, alpha=GRID_ALPHA)
     theta_colorbar(ax, norm, label="θ (fixed policies)")
 
     if xlim is not None:
@@ -334,7 +334,7 @@ def plot_efficiency_adaptive_combined(
         )
     fig.suptitle(
         "Adaptive θ Policies vs Fixed-θ Frontier",
-        fontsize=18, fontweight="bold", y=0.98,
+        fontsize=FONT_SUPTITLE, fontweight="bold", y=0.98,
     )
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     fig.savefig(out_dir / f"efficiency_adaptive_combined.{fmt}", dpi=dpi, bbox_inches="tight")

@@ -18,6 +18,10 @@ YATZY_BASE_PATH=. target/release/yatzy
 
 # Simulate games (from repo root)
 YATZY_BASE_PATH=. target/release/yatzy-simulate --games 1000000 --output data/simulations
+
+# Theta sweep: simulate all thetas, resumable (from repo root)
+YATZY_BASE_PATH=. target/release/yatzy-sweep --grid all --games 1000000
+YATZY_BASE_PATH=. target/release/yatzy-sweep --list   # show inventory
 ```
 
 ## Source Layout
@@ -37,8 +41,9 @@ YATZY_BASE_PATH=. target/release/yatzy-simulate --games 1000000 --output data/si
 | `simulation/engine.rs` | — | Game simulation with optimal strategy, recording |
 | `simulation/statistics.rs` | — | Aggregate statistics from recorded games |
 | `simulation/raw_storage.rs` | — | Binary I/O for raw simulation data (mmap) |
+| `simulation/sweep.rs` | — | Theta sweep: inventory scan, grid resolution, ensure_strategy_table |
 
-Entry points: `src/bin/precompute.rs`, `src/bin/server.rs`, `src/bin/simulate.rs`, `src/bin/category_sweep.rs`, `src/bin/pivotal_scenarios.rs`, `src/bin/yatzy_conditional.rs`.
+Entry points: `src/bin/precompute.rs`, `src/bin/server.rs`, `src/bin/simulate.rs`, `src/bin/sweep.rs`, `src/bin/category_sweep.rs`, `src/bin/pivotal_scenarios.rs`, `src/bin/yatzy_conditional.rs`.
 
 ## Algorithm Reference
 

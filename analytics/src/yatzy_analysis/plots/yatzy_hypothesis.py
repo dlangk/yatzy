@@ -16,7 +16,7 @@ import matplotlib.ticker as mticker
 import numpy as np
 import pandas as pd
 
-from .style import CMAP, setup_theme
+from .style import CMAP, FONT_AXIS_LABEL, FONT_LEGEND, FONT_TITLE, GRID_ALPHA, setup_theme
 
 # Max-policy gets a distinct color (green)
 MAX_POLICY_COLOR = "#2CA02C"
@@ -109,13 +109,13 @@ def plot_conditional_hit_rate(
 
     ax.set_xticks(x)
     ax.set_xticklabels(score_bands, fontsize=11)
-    ax.set_xlabel("Score Band", fontsize=12)
-    ax.set_ylabel("Yatzy Hit Rate (%)", fontsize=12)
+    ax.set_xlabel("Score Band", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Yatzy Hit Rate (%)", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "Conditional Yatzy Hit Rate by Score Band",
-        fontsize=14, fontweight="bold",
+        fontsize=FONT_TITLE, fontweight="bold",
     )
-    ax.legend(title="", loc="upper left", fontsize=9, ncol=2)
+    ax.legend(title="", loc="upper left", fontsize=FONT_LEGEND, ncol=2)
     ax.yaxis.set_major_formatter(mticker.PercentFormatter(decimals=0))
 
     # Vertical separator before top5pct
@@ -125,7 +125,7 @@ def plot_conditional_hit_rate(
         ha="center", fontsize=9, alpha=0.5, style="italic",
     )
 
-    ax.grid(axis="y", alpha=0.3)
+    ax.grid(axis="y", alpha=GRID_ALPHA)
     plt.tight_layout()
     path = out_dir / f"yatzy_conditional_bars.{fmt}"
     fig.savefig(path, dpi=dpi, bbox_inches="tight")
@@ -193,15 +193,15 @@ def plot_unconditional_vs_tail(
                 color=MAX_POLICY_COLOR, fontweight="bold",
             )
 
-    ax.set_xlabel("θ (risk parameter)", fontsize=12)
-    ax.set_ylabel("Yatzy Hit Rate (%)", fontsize=12)
+    ax.set_xlabel("θ (risk parameter)", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Yatzy Hit Rate (%)", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "Unconditional vs Top-5% Tail Yatzy Hit Rate",
-        fontsize=14, fontweight="bold",
+        fontsize=FONT_TITLE, fontweight="bold",
     )
     ax.legend(fontsize=11, loc="best")
     ax.yaxis.set_major_formatter(mticker.PercentFormatter(decimals=0))
-    ax.grid(True, alpha=0.3)
+    ax.grid(True, alpha=GRID_ALPHA)
 
     # Annotate θ endpoints
     if len(all_df) >= 2:
@@ -286,14 +286,14 @@ def plot_dump_gap(
 
     ax.set_xticks(x)
     ax.set_xticklabels(labels, fontsize=11)
-    ax.set_xlabel("Strategy", fontsize=12)
-    ax.set_ylabel("Mean Total Score", fontsize=12)
+    ax.set_xlabel("Strategy", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Mean Total Score", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "The Dump Gap: Mean Score When Yatzy Hit vs Missed",
-        fontsize=14, fontweight="bold",
+        fontsize=FONT_TITLE, fontweight="bold",
     )
     ax.legend(fontsize=11, loc="lower left")
-    ax.grid(axis="y", alpha=0.3)
+    ax.grid(axis="y", alpha=GRID_ALPHA)
 
     # Set y-axis to start from a reasonable minimum
     all_vals = np.concatenate([hit_scores, miss_scores])

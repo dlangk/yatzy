@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 
-from .style import setup_theme
+from .style import COLOR_BLUE, COLOR_ORANGE, COLOR_RED, FONT_AXIS_LABEL, FONT_TITLE, GRID_ALPHA, setup_theme
 
 
 def plot_score_difference_per_turn(
@@ -32,9 +32,9 @@ def plot_score_difference_per_turn(
     p25 = np.percentile(diff, 25, axis=0)
     p75 = np.percentile(diff, 75, axis=0)
 
-    ax.fill_between(turns, p5, p95, alpha=0.15, color="#3b4cc0", label="5th–95th pctl")
-    ax.fill_between(turns, p25, p75, alpha=0.3, color="#3b4cc0", label="25th–75th pctl")
-    ax.plot(turns, mean, color="#3b4cc0", linewidth=2, label="Mean diff")
+    ax.fill_between(turns, p5, p95, alpha=0.15, color=COLOR_BLUE, label="5th–95th pctl")
+    ax.fill_between(turns, p25, p75, alpha=0.3, color=COLOR_BLUE, label="25th–75th pctl")
+    ax.plot(turns, mean, color=COLOR_BLUE, linewidth=2, label="Mean diff")
     ax.axhline(0, color="gray", linewidth=0.8, linestyle="--")
 
     ax.set_xlabel("Turn")
@@ -63,7 +63,7 @@ def plot_score_scatter(
     s2 = scores[:, 1].astype(np.int32)
 
     # Color by winner
-    colors = np.where(s1 > s2, "#3b4cc0", np.where(s2 > s1, "#b40426", "#888888"))
+    colors = np.where(s1 > s2, COLOR_BLUE, np.where(s2 > s1, COLOR_RED, "#888888"))
 
     ax.scatter(s1, s2, c=colors, s=0.3, alpha=0.15, rasterized=True, edgecolors="none")
 
@@ -96,9 +96,9 @@ def plot_score_difference_histogram(
     diff = scores[:, 0].astype(np.int32) - scores[:, 1].astype(np.int32)
     mean_diff = diff.mean()
 
-    ax.hist(diff, bins=120, color="#3b4cc0", alpha=0.7, edgecolor="white", linewidth=0.3)
+    ax.hist(diff, bins=120, color=COLOR_BLUE, alpha=0.7, edgecolor="white", linewidth=0.3)
     ax.axvline(0, color="gray", linewidth=1.2, linestyle="--", label="Zero")
-    ax.axvline(mean_diff, color="#b40426", linewidth=1.5, linestyle="-", label=f"Mean = {mean_diff:+.1f}")
+    ax.axvline(mean_diff, color=COLOR_RED, linewidth=1.5, linestyle="-", label=f"Mean = {mean_diff:+.1f}")
 
     ax.set_xlabel("Score Difference (P1 − P2)")
     ax.set_ylabel("Count")
@@ -127,9 +127,9 @@ def plot_win_margin_distribution(
     mean_m = margins.mean()
     median_m = np.median(margins)
 
-    ax.hist(margins, bins=100, color="#F37021", alpha=0.7, edgecolor="white", linewidth=0.3)
-    ax.axvline(mean_m, color="#b40426", linewidth=1.5, linestyle="-", label=f"Mean = {mean_m:.1f}")
-    ax.axvline(median_m, color="#3b4cc0", linewidth=1.5, linestyle="--", label=f"Median = {median_m:.1f}")
+    ax.hist(margins, bins=100, color=COLOR_ORANGE, alpha=0.7, edgecolor="white", linewidth=0.3)
+    ax.axvline(mean_m, color=COLOR_RED, linewidth=1.5, linestyle="-", label=f"Mean = {mean_m:.1f}")
+    ax.axvline(median_m, color=COLOR_BLUE, linewidth=1.5, linestyle="--", label=f"Median = {median_m:.1f}")
 
     ax.set_xlabel("Win Margin (|P1 − P2|)")
     ax.set_ylabel("Count")
@@ -178,10 +178,10 @@ def plot_winner_loser_trajectories(
     l_p25 = np.percentile(loser_traj, 25, axis=0)
     l_p75 = np.percentile(loser_traj, 75, axis=0)
 
-    ax.fill_between(turns, w_p25, w_p75, alpha=0.2, color="#3b4cc0")
-    ax.plot(turns, w_mean, color="#3b4cc0", linewidth=2, label="Winner (mean)")
-    ax.fill_between(turns, l_p25, l_p75, alpha=0.2, color="#b40426")
-    ax.plot(turns, l_mean, color="#b40426", linewidth=2, label="Loser (mean)")
+    ax.fill_between(turns, w_p25, w_p75, alpha=0.2, color=COLOR_BLUE)
+    ax.plot(turns, w_mean, color=COLOR_BLUE, linewidth=2, label="Winner (mean)")
+    ax.fill_between(turns, l_p25, l_p75, alpha=0.2, color=COLOR_RED)
+    ax.plot(turns, l_mean, color=COLOR_RED, linewidth=2, label="Loser (mean)")
 
     ax.set_xlabel("Turn")
     ax.set_ylabel("Cumulative Score (excl. bonus)")

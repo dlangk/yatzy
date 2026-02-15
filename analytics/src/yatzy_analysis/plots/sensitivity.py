@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from .style import setup_theme
+from .style import COLOR_BLUE, COLOR_GREEN, COLOR_ORANGE, FONT_AXIS_LABEL, FONT_LEGEND, FONT_TITLE, GRID_ALPHA, setup_theme
 
 
 def load_sensitivity_data(
@@ -60,7 +60,7 @@ def plot_flip_rates(df: pd.DataFrame, out_dir: Path, dpi: int = 200, fmt: str = 
     dtypes = ["reroll1", "reroll2", "category"]
     x = np.arange(len(phases))
     width = 0.25
-    colors = ["#3b4cc0", "#F37021", "#2ca02c"]
+    colors = [COLOR_BLUE, COLOR_ORANGE, COLOR_GREEN]
 
     for i, dt in enumerate(dtypes):
         rates = []
@@ -96,7 +96,7 @@ def plot_flip_theta_distribution(
     fig, ax = plt.subplots(figsize=(10, 5))
 
     dtypes = ["reroll1", "reroll2", "category"]
-    colors = ["#3b4cc0", "#F37021", "#2ca02c"]
+    colors = [COLOR_BLUE, COLOR_ORANGE, COLOR_GREEN]
 
     # Get unique theta values for bin edges
     thetas = sorted(flips["flip_theta"].unique())
@@ -147,7 +147,7 @@ def plot_gap_distributions(
 
     # Gap at flip point
     dtypes = ["reroll1", "reroll2", "category"]
-    colors = ["#3b4cc0", "#F37021", "#2ca02c"]
+    colors = [COLOR_BLUE, COLOR_ORANGE, COLOR_GREEN]
     palette = dict(zip(dtypes, colors))
 
     present_dtypes = [dt for dt in dtypes if dt in flips["decision_type"].values]

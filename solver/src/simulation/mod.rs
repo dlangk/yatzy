@@ -12,6 +12,7 @@ pub mod multiplayer;
 pub mod raw_storage;
 pub mod statistics;
 pub mod strategy;
+pub mod sweep;
 
 // Re-export commonly used items
 pub use adaptive::{

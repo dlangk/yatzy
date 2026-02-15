@@ -16,6 +16,8 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 
+from .style import CATEGORY_NAMES
+
 # All sorted 5d6 combinations (252 entries, index 0–251)
 SORTED_DICE = list(combinations_with_replacement(range(1, 7), 5))
 
@@ -53,12 +55,6 @@ def decode_scenario_id(sid: str) -> dict:
         "dice": list(SORTED_DICE[dice_idx]),
         "decision_type": _DTYPE_INT_TO_STR[dtype],
     }
-
-CATEGORY_NAMES = [
-    "Ones", "Twos", "Threes", "Fours", "Fives", "Sixes",
-    "One Pair", "Two Pairs", "Three of a Kind", "Four of a Kind",
-    "Small Straight", "Large Straight", "Full House", "Chance", "Yatzy",
-]
 
 # Unicode die faces: index 1-6
 DIE_FACES = {1: "\u2680", 2: "\u2681", 3: "\u2682", 4: "\u2683", 5: "\u2684", 6: "\u2685"}

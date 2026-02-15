@@ -7,12 +7,18 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from .style import setup_theme
+from .style import (
+    FONT_AXIS_LABEL,
+    FONT_LEGEND,
+    FONT_TITLE,
+    GRID_ALPHA,
+    PERCENTILES_CORE,
+    PERCENTILES_EXTRA,
+    setup_theme,
+)
 
-# All percentiles to plot, ordered low→high.
-# "extra" ones (p1, p999, p9999) are plotted with dashed style if available.
-_CORE = ["p5", "p10", "p25", "p50", "p75", "p90", "p95", "p99"]
-_EXTRA = ["p1", "p999", "p9999"]
+_CORE = PERCENTILES_CORE
+_EXTRA = PERCENTILES_EXTRA
 
 
 def _plot_percentile_curves(
@@ -64,11 +70,11 @@ def plot_percentiles(
 
     _plot_percentile_curves(stats_df, ax)
 
-    ax.set_xlabel("θ", fontsize=13)
-    ax.set_ylabel("Score", fontsize=13)
-    ax.set_title("Score Percentiles vs Risk Parameter θ", fontsize=15, fontweight="bold")
-    ax.legend(loc="lower left", fontsize=9, ncol=3, framealpha=0.9)
-    ax.grid(True, alpha=0.3)
+    ax.set_xlabel("θ", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Score", fontsize=FONT_AXIS_LABEL)
+    ax.set_title("Score Percentiles vs Risk Parameter θ", fontsize=FONT_TITLE, fontweight="bold")
+    ax.legend(loc="lower left", fontsize=FONT_LEGEND, ncol=3, framealpha=0.9)
+    ax.grid(True, alpha=GRID_ALPHA)
 
     if standalone:
         fig.tight_layout()
@@ -80,14 +86,14 @@ def plot_percentiles(
         if len(zoomed_df) > 0:
             fig_z, ax_z = plt.subplots(figsize=(14, 8))
             _plot_percentile_curves(zoomed_df, ax_z)
-            ax_z.set_xlabel("θ", fontsize=13)
-            ax_z.set_ylabel("Score", fontsize=13)
+            ax_z.set_xlabel("θ", fontsize=FONT_AXIS_LABEL)
+            ax_z.set_ylabel("Score", fontsize=FONT_AXIS_LABEL)
             ax_z.set_title(
                 "Score Percentiles vs θ (zoomed: peaks region)",
-                fontsize=15, fontweight="bold",
+                fontsize=FONT_TITLE, fontweight="bold",
             )
-            ax_z.legend(loc="lower left", fontsize=9, ncol=3, framealpha=0.9)
-            ax_z.grid(True, alpha=0.3)
+            ax_z.legend(loc="lower left", fontsize=FONT_LEGEND, ncol=3, framealpha=0.9)
+            ax_z.grid(True, alpha=GRID_ALPHA)
             fig_z.tight_layout()
             fig_z.savefig(out_dir / f"percentiles_vs_theta_zoomed.{fmt}", dpi=dpi)
             plt.close(fig_z)

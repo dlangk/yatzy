@@ -8,7 +8,19 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from ..config import MAX_SCORE
-from .style import fmt_theta, make_norm, setup_theme, theta_color, theta_colorbar
+from .style import (
+    FONT_AXIS_LABEL,
+    FONT_LEGEND,
+    FONT_SUPTITLE,
+    FONT_TITLE,
+    GRID_ALPHA,
+    fmt_theta,
+    make_norm,
+    save_fig,
+    setup_theme,
+    theta_color,
+    theta_colorbar,
+)
 
 
 def plot_cdf(
@@ -38,12 +50,12 @@ def plot_cdf(
             color=color, linewidth=lw, alpha=alpha, label=f"θ={fmt_theta(t)}",
         )
 
-    ax.set_xlabel("Total Score", fontsize=13)
-    ax.set_ylabel("Cumulative Probability", fontsize=13)
-    ax.set_title("Score CDF by Risk Parameter θ", fontsize=15, fontweight="bold")
+    ax.set_xlabel("Total Score", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Cumulative Probability", fontsize=FONT_AXIS_LABEL)
+    ax.set_title("Score CDF by Risk Parameter θ", fontsize=FONT_TITLE, fontweight="bold")
     ax.set_xlim(50, MAX_SCORE)
     ax.set_ylim(0, 1)
-    ax.legend(loc="upper left", fontsize=8, ncol=2, framealpha=0.9)
+    ax.legend(loc="upper left", fontsize=FONT_LEGEND, ncol=2, framealpha=0.9)
     theta_colorbar(ax, norm)
 
     if standalone:
@@ -89,23 +101,23 @@ def plot_tails(
             color=color, linewidth=lw, alpha=alpha, label=f"θ={fmt_theta(t)}",
         )
 
-    ax_left.set_xlabel("Total Score", fontsize=12)
-    ax_left.set_ylabel("Cumulative Probability", fontsize=12)
-    ax_left.set_title("Left Tail (bottom 5%)", fontsize=13, fontweight="bold")
+    ax_left.set_xlabel("Total Score", fontsize=FONT_AXIS_LABEL)
+    ax_left.set_ylabel("Cumulative Probability", fontsize=FONT_AXIS_LABEL)
+    ax_left.set_title("Left Tail (bottom 5%)", fontsize=FONT_TITLE, fontweight="bold")
     ax_left.set_ylim(0, 0.05)
     ax_left.set_xlim(0, 200)
-    ax_left.legend(fontsize=7, loc="upper left", framealpha=0.9)
+    ax_left.legend(fontsize=FONT_LEGEND, loc="upper left", framealpha=0.9)
 
-    ax_right.set_xlabel("Total Score", fontsize=12)
-    ax_right.set_ylabel("P(Score > x)  [survival]", fontsize=12)
-    ax_right.set_title("Right Tail (top 3%)", fontsize=13, fontweight="bold")
+    ax_right.set_xlabel("Total Score", fontsize=FONT_AXIS_LABEL)
+    ax_right.set_ylabel("P(Score > x)  [survival]", fontsize=FONT_AXIS_LABEL)
+    ax_right.set_title("Right Tail (top 3%)", fontsize=FONT_TITLE, fontweight="bold")
     ax_right.set_ylim(0, 0.03)
     ax_right.set_xlim(300, MAX_SCORE)
-    ax_right.legend(fontsize=7, loc="upper right", framealpha=0.9)
+    ax_right.legend(fontsize=FONT_LEGEND, loc="upper right", framealpha=0.9)
 
     if standalone:
         fig.suptitle(
-            "Tail Behavior by Risk Parameter θ", fontsize=15, fontweight="bold", y=1.02,
+            "Tail Behavior by Risk Parameter θ", fontsize=FONT_SUPTITLE, fontweight="bold", y=1.02,
         )
         fig.tight_layout()
         fig.savefig(out_dir / f"tails_zoomed.{fmt}", dpi=dpi, bbox_inches="tight")

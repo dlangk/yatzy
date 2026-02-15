@@ -19,20 +19,11 @@ import numpy as np
 from matplotlib.path import Path as MplPath
 from scipy.interpolate import PchipInterpolator
 
+from .style import CATEGORY_NAMES as CAT_NAMES, CATEGORY_SHORT as CAT_SHORT
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-
-CAT_NAMES = [
-    "Ones", "Twos", "Threes", "Fours", "Fives", "Sixes",
-    "One Pair", "Two Pairs", "3-of-a-Kind", "4-of-a-Kind",
-    "Sm. Straight", "Lg. Straight", "Full House", "Chance", "Yatzy",
-]
-
-CAT_SHORT = [
-    "1s", "2s", "3s", "4s", "5s", "6s",
-    "1P", "2P", "3K", "4K", "SS", "LS", "FH", "Ch", "Ya",
-]
 
 META_GROUPS: dict[str, list[int]] = {
     "Upper low (1-3)": [0, 1, 2],

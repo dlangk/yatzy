@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from ..config import MAX_SCORE
-from .style import fmt_theta, make_norm, setup_theme, theta_color
+from .style import FONT_AXIS_LABEL, FONT_LEGEND, FONT_TITLE, GRID_ALPHA, fmt_theta, make_norm, setup_theme, theta_color
 
 
 def plot_quantile(
@@ -37,13 +37,13 @@ def plot_quantile(
             color=color, linewidth=lw, alpha=0.85, label=f"θ={fmt_theta(t)}",
         )
 
-    ax.set_xlabel("Cumulative Probability", fontsize=13)
-    ax.set_ylabel("Total Score", fontsize=13)
-    ax.set_title("Quantile Function (Inverse CDF) by θ", fontsize=15, fontweight="bold")
+    ax.set_xlabel("Cumulative Probability", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Total Score", fontsize=FONT_AXIS_LABEL)
+    ax.set_title("Quantile Function (Inverse CDF) by θ", fontsize=FONT_TITLE, fontweight="bold")
     ax.set_xlim(0, 1)
     ax.set_ylim(50, MAX_SCORE)
-    ax.legend(fontsize=9, framealpha=0.9, ncol=2)
-    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=FONT_LEGEND, framealpha=0.9, ncol=2)
+    ax.grid(True, alpha=GRID_ALPHA)
 
     if standalone:
         fig.tight_layout()

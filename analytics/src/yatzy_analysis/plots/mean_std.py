@@ -7,7 +7,7 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from .style import fmt_theta, make_norm, setup_theme, theta_color, theta_colorbar
+from .style import FONT_AXIS_LABEL, FONT_TITLE, GRID_ALPHA, fmt_theta, make_norm, setup_theme, theta_color, theta_colorbar
 
 
 def plot_mean_vs_std(
@@ -40,10 +40,10 @@ def plot_mean_vs_std(
             textcoords="offset points", xytext=offset, fontsize=8, alpha=0.8,
         )
 
-    ax.set_xlabel("Standard Deviation", fontsize=13)
-    ax.set_ylabel("Mean Score", fontsize=13)
-    ax.set_title("Mean–Variance Tradeoff by θ", fontsize=15, fontweight="bold")
-    ax.grid(True, alpha=0.3)
+    ax.set_xlabel("Standard Deviation", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Mean Score", fontsize=FONT_AXIS_LABEL)
+    ax.set_title("Mean–Variance Tradeoff by θ", fontsize=FONT_TITLE, fontweight="bold")
+    ax.grid(True, alpha=GRID_ALPHA)
     theta_colorbar(ax, norm, label="θ")
 
     if standalone:

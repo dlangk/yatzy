@@ -7,16 +7,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from .style import setup_theme
+from .style import ADAPTIVE_COLORS as _STYLE_ADAPTIVE_COLORS, FONT_AXIS_LABEL, FONT_LEGEND, FONT_TITLE, GRID_ALPHA, setup_theme
 
 
 # Consistent colors for adaptive policies
-ADAPTIVE_COLORS = {
-    "bonus-adaptive": "#e74c3c",
-    "phase-based": "#2ecc71",
-    "combined": "#9b59b6",
-    "upper-deficit": "#e67e22",
-}
+ADAPTIVE_COLORS = {**_STYLE_ADAPTIVE_COLORS, "upper-deficit": "#e67e22"}
 
 BASELINE_COLOR = "#3498db"
 
@@ -108,15 +103,15 @@ def plot_pareto_frontier(
                 alpha=0.5,
             )
 
-    ax.set_xlabel("Standard Deviation (σ)", fontsize=13)
-    ax.set_ylabel("Mean Score", fontsize=13)
+    ax.set_xlabel("Standard Deviation (σ)", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Mean Score", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "Adaptive θ(s) Policies vs Constant-θ Pareto Frontier",
-        fontsize=14,
+        fontsize=FONT_TITLE,
         fontweight="bold",
     )
-    ax.legend(loc="upper right", fontsize=9, framealpha=0.9)
-    ax.grid(True, alpha=0.3)
+    ax.legend(loc="upper right", fontsize=FONT_LEGEND, framealpha=0.9)
+    ax.grid(True, alpha=GRID_ALPHA)
 
     fig.tight_layout()
     fig.savefig(out_dir / f"frontier_pareto.{fmt}", dpi=dpi)
@@ -160,17 +155,17 @@ def plot_frontier_cdf(
         cdf = np.arange(1, len(s) + 1) / len(s)
         ax.plot(s, cdf, color=color, linewidth=2.2, label=name)
 
-    ax.set_xlabel("Total Score", fontsize=13)
-    ax.set_ylabel("Cumulative Probability", fontsize=13)
+    ax.set_xlabel("Total Score", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Cumulative Probability", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "Score CDF: Adaptive Policies vs Constant-θ Baselines",
-        fontsize=14,
+        fontsize=FONT_TITLE,
         fontweight="bold",
     )
     ax.set_xlim(80, 370)
     ax.set_ylim(0, 1)
     ax.legend(loc="upper left", fontsize=8, ncol=2, framealpha=0.9)
-    ax.grid(True, alpha=0.3)
+    ax.grid(True, alpha=GRID_ALPHA)
 
     fig.tight_layout()
     fig.savefig(out_dir / f"frontier_cdf.{fmt}", dpi=dpi)
@@ -211,15 +206,15 @@ def plot_frontier_delta(
 
     ax.axvline(x=0, color="black", linewidth=0.8)
     ax.axvline(x=1.0, color="red", linewidth=1.2, linestyle="--", alpha=0.6, label="H1 threshold")
-    ax.set_xlabel("Δμ (Mean − Frontier Mean at matched σ)", fontsize=12)
+    ax.set_xlabel("Δμ (Mean − Frontier Mean at matched σ)", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "Distance from Constant-θ Pareto Frontier",
-        fontsize=14,
+        fontsize=FONT_TITLE,
         fontweight="bold",
     )
-    ax.legend(fontsize=9)
+    ax.legend(fontsize=FONT_LEGEND)
     ax.set_xlim(min(adaptive["delta_mu"].min() - 0.3, -1.5), 1.5)
-    ax.grid(True, alpha=0.3, axis="x")
+    ax.grid(True, alpha=GRID_ALPHA, axis="x")
 
     fig.tight_layout()
     fig.savefig(out_dir / f"frontier_delta.{fmt}", dpi=dpi)

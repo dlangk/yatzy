@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from .style import setup_theme
+from .style import FONT_AXIS_LABEL, FONT_LEGEND, FONT_TITLE, GRID_ALPHA, setup_theme
 
 
 def load_winrate_data(
@@ -87,15 +87,15 @@ def plot_winrate_curve(
     ax.axhline(y=51, color="#e74c3c", linewidth=1.2, linestyle=":", alpha=0.7, label="51% (H₁ threshold)")
     ax.axvline(x=0, color="gray", linewidth=0.8, alpha=0.5)
 
-    ax.set_xlabel("θ (risk parameter)", fontsize=13)
-    ax.set_ylabel("Win Rate vs θ=0 (%)", fontsize=13)
+    ax.set_xlabel("θ (risk parameter)", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Win Rate vs θ=0 (%)", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "Head-to-Head Win Rate: Constant-θ vs EV-Optimal (θ=0)",
-        fontsize=14,
+        fontsize=FONT_TITLE,
         fontweight="bold",
     )
     ax.legend(loc="lower left", fontsize=10, framealpha=0.9)
-    ax.grid(True, alpha=0.3)
+    ax.grid(True, alpha=GRID_ALPHA)
 
     fig.tight_layout()
     fig.savefig(out_dir / f"winrate_vs_theta.{fmt}", dpi=dpi)
@@ -157,17 +157,17 @@ def plot_conditional_winrate(
         )
 
     ax.axhline(y=50, color="gray", linewidth=1.5, linestyle="--", alpha=0.7)
-    ax.set_xlabel("Opponent Score Band", fontsize=13)
-    ax.set_ylabel("Win Rate (%)", fontsize=13)
+    ax.set_xlabel("Opponent Score Band", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Win Rate (%)", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "Conditional Win Rate by Opponent Score Band",
-        fontsize=14,
+        fontsize=FONT_TITLE,
         fontweight="bold",
     )
     ax.set_xticks(x)
     ax.set_xticklabels(bands, fontsize=10)
     ax.legend(fontsize=10, framealpha=0.9)
-    ax.grid(True, alpha=0.3, axis="y")
+    ax.grid(True, alpha=GRID_ALPHA, axis="y")
 
     fig.tight_layout()
     fig.savefig(out_dir / f"winrate_conditional.{fmt}", dpi=dpi)
@@ -221,15 +221,15 @@ def plot_pmf_comparison(
     ax.fill_between(x, y_bl, y_best, where=higher, alpha=0.3, color="#27ae60",
                      label="Challenger > Baseline density")
 
-    ax.set_xlabel("Total Score", fontsize=13)
-    ax.set_ylabel("Probability Density", fontsize=13)
+    ax.set_xlabel("Total Score", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Probability Density", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         f"Score Distribution: θ=0 vs Best Win-Rate θ={best['theta']:+.3f}",
-        fontsize=14,
+        fontsize=FONT_TITLE,
         fontweight="bold",
     )
     ax.legend(loc="upper left", fontsize=10, framealpha=0.9)
-    ax.grid(True, alpha=0.3)
+    ax.grid(True, alpha=GRID_ALPHA)
 
     fig.tight_layout()
     fig.savefig(out_dir / f"winrate_pmf_overlay.{fmt}", dpi=dpi)

@@ -9,10 +9,10 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from .style import CMAP, setup_theme
+from .style import CMAP, FONT_AXIS_LABEL, FONT_LEGEND, FONT_SUPTITLE, FONT_TICK, FONT_TITLE, GRID_ALPHA, PERCENTILES_CORE, PERCENTILES_EXTRA, setup_theme
 
-_CORE = ["p5", "p10", "p25", "p50", "p75", "p90", "p95", "p99"]
-_EXTRA = ["p1", "p999", "p9999"]
+_CORE = PERCENTILES_CORE
+_EXTRA = PERCENTILES_EXTRA
 _ALL = _EXTRA[:1] + _CORE + _EXTRA[1:]  # p1, p5..p99, p999, p9999
 
 
@@ -100,6 +100,7 @@ def plot_percentile_sweep(
     *,
     coarse_path: Path | None = None,
     dpi: int = 200,
+    fmt: str = "png",
 ) -> list[Path]:
     """Generate all percentile sweep plots. Returns list of output paths."""
     setup_theme()
@@ -113,25 +114,25 @@ def plot_percentile_sweep(
     paths = []
 
     # --- Plot 1: Dense sweep only ---
-    paths.append(_plot_full(df, peaks, out_dir, dpi=dpi))
+    paths.append(_plot_full(df, peaks, out_dir, dpi=dpi, fmt=fmt))
 
     # --- Plot 2: Wide range (±1), merged with coarse ---
-    paths.append(_plot_wide(df_wide, peaks, out_dir, dpi=dpi))
+    paths.append(_plot_wide(df_wide, peaks, out_dir, dpi=dpi, fmt=fmt))
 
     # --- Plot 3: Mean vs theta with std band ---
-    paths.append(_plot_mean_std(df, out_dir, dpi=dpi))
+    paths.append(_plot_mean_std(df, out_dir, dpi=dpi, fmt=fmt))
 
     # --- Plot 4: Heatmap ---
-    paths.append(_plot_heatmap(df, out_dir, dpi=dpi))
+    paths.append(_plot_heatmap(df, out_dir, dpi=dpi, fmt=fmt))
 
     # --- Plot 5: Cost-benefit scatter ---
-    paths.append(_plot_mean_cost(df, peaks, out_dir, dpi=dpi))
+    paths.append(_plot_mean_cost(df, peaks, out_dir, dpi=dpi, fmt=fmt))
 
     # --- Plot 6: Mean–Std frontier (dense sweep + coarse extensions) ---
-    paths.append(_plot_frontier(df, df_wide, peaks, out_dir, dpi=dpi))
+    paths.append(_plot_frontier(df, df_wide, peaks, out_dir, dpi=dpi, fmt=fmt))
 
     # --- Plot 7: Multi-percentile frontiers in (mean, p) space ---
-    paths.append(_plot_percentile_frontiers(df, peaks, out_dir, dpi=dpi))
+    paths.append(_plot_percentile_frontiers(df, peaks, out_dir, dpi=dpi, fmt=fmt))
 
     print(f"  Generated {len(paths)} percentile sweep plots in {out_dir}")
     return paths
@@ -143,6 +144,7 @@ def _plot_full(
     out_dir: Path,
     *,
     dpi: int = 200,
+    fmt: str = "png",
 ) -> Path:
     fig, ax = plt.subplots(figsize=(14, 8))
 
@@ -150,14 +152,14 @@ def _plot_full(
     _add_peak_stars(ax, df, peaks)
 
     ax.axvline(0, color="black", linewidth=0.8, linestyle="-", alpha=0.4)
-    ax.set_xlabel("θ", fontsize=13)
-    ax.set_ylabel("Score", fontsize=13)
-    ax.set_title("Score Percentiles vs Risk Parameter θ", fontsize=15, fontweight="bold")
-    ax.legend(loc="lower left", fontsize=9, ncol=3, framealpha=0.9)
-    ax.grid(True, alpha=0.3)
+    ax.set_xlabel("θ", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Score", fontsize=FONT_AXIS_LABEL)
+    ax.set_title("Score Percentiles vs Risk Parameter θ", fontsize=FONT_TITLE, fontweight="bold")
+    ax.legend(loc="lower left", fontsize=FONT_LEGEND, ncol=3, framealpha=0.9)
+    ax.grid(True, alpha=GRID_ALPHA)
 
     fig.tight_layout()
-    path = out_dir / "percentile_sweep_curves.png"
+    path = out_dir / f"percentile_sweep_curves.{fmt}"
     fig.savefig(path, dpi=dpi)
     plt.close(fig)
     return path
@@ -169,6 +171,7 @@ def _plot_wide(
     out_dir: Path,
     *,
     dpi: int = 200,
+    fmt: str = "png",
 ) -> Path:
     """Wide range: θ ∈ [-1.0, +1.0], merging dense sweep + coarse grid."""
     wdf = df[(df["theta"] >= -1.0) & (df["theta"] <= 1.0)].copy()
@@ -181,17 +184,17 @@ def _plot_wide(
     _add_peak_stars(ax, wdf, peaks, theta_range=(-1.0, 1.0))
 
     ax.axvline(0, color="black", linewidth=0.8, linestyle="-", alpha=0.4)
-    ax.set_xlabel("θ", fontsize=13)
-    ax.set_ylabel("Score", fontsize=13)
+    ax.set_xlabel("θ", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Score", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "Score Percentiles vs θ  (|θ| ≤ 1)",
-        fontsize=15, fontweight="bold",
+        fontsize=FONT_TITLE, fontweight="bold",
     )
-    ax.legend(loc="lower left", fontsize=9, ncol=3, framealpha=0.9)
-    ax.grid(True, alpha=0.3)
+    ax.legend(loc="lower left", fontsize=FONT_LEGEND, ncol=3, framealpha=0.9)
+    ax.grid(True, alpha=GRID_ALPHA)
 
     fig.tight_layout()
-    path = out_dir / "percentile_sweep_wide.png"
+    path = out_dir / f"percentile_sweep_wide.{fmt}"
     fig.savefig(path, dpi=dpi)
     plt.close(fig)
     return path
@@ -202,6 +205,7 @@ def _plot_mean_std(
     out_dir: Path,
     *,
     dpi: int = 200,
+    fmt: str = "png",
 ) -> Path:
     """Mean score vs θ with ±1 std band."""
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -218,14 +222,14 @@ def _plot_mean_std(
     ax.plot(ev_row["theta"], ev_row["mean"], marker="*", markersize=14, color="#e53e3e", zorder=5)
 
     ax.axvline(0, color="black", linewidth=0.8, linestyle="-", alpha=0.4)
-    ax.set_xlabel("θ  (risk parameter)", fontsize=13)
-    ax.set_ylabel("Mean Score", fontsize=13)
-    ax.set_title("Mean Score vs θ  (risk-averse ← 0 → risk-seeking)", fontsize=15, fontweight="bold")
+    ax.set_xlabel("θ  (risk parameter)", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Mean Score", fontsize=FONT_AXIS_LABEL)
+    ax.set_title("Mean Score vs θ  (risk-averse ← 0 → risk-seeking)", fontsize=FONT_TITLE, fontweight="bold")
     ax.legend(fontsize=11)
-    ax.grid(True, alpha=0.3)
+    ax.grid(True, alpha=GRID_ALPHA)
 
     fig.tight_layout()
-    path = out_dir / "percentile_sweep_mean.png"
+    path = out_dir / f"percentile_sweep_mean.{fmt}"
     fig.savefig(path, dpi=dpi)
     plt.close(fig)
     return path
@@ -236,6 +240,7 @@ def _plot_heatmap(
     out_dir: Path,
     *,
     dpi: int = 200,
+    fmt: str = "png",
 ) -> Path:
     """Heatmap: rows = percentiles, columns = θ, cells = score values."""
     if len(df) > 40:
@@ -252,17 +257,17 @@ def _plot_heatmap(
     im = ax.imshow(matrix, aspect="auto", cmap="RdYlGn")
 
     ax.set_yticks(range(len(pcts_available)))
-    ax.set_yticklabels(pcts_available, fontsize=10)
+    ax.set_yticklabels(pcts_available, fontsize=FONT_TICK)
     ax.set_xticks(range(len(theta_labels)))
     ax.set_xticklabels(theta_labels, fontsize=7, rotation=45, ha="right")
-    ax.set_xlabel("θ", fontsize=12)
-    ax.set_title("Score Percentile Heatmap across θ", fontsize=14, fontweight="bold")
+    ax.set_xlabel("θ", fontsize=FONT_AXIS_LABEL)
+    ax.set_title("Score Percentile Heatmap across θ", fontsize=FONT_TITLE, fontweight="bold")
 
     cbar = plt.colorbar(im, ax=ax, pad=0.02)
     cbar.set_label("Score", fontsize=11)
 
     fig.tight_layout()
-    path = out_dir / "percentile_sweep_heatmap.png"
+    path = out_dir / f"percentile_sweep_heatmap.{fmt}"
     fig.savefig(path, dpi=dpi)
     plt.close(fig)
     return path
@@ -274,6 +279,7 @@ def _plot_mean_cost(
     out_dir: Path,
     *,
     dpi: int = 200,
+    fmt: str = "png",
 ) -> Path:
     """For each percentile peak θ*, show the percentile gain vs mean cost."""
     ev_row = df.iloc[(df["theta"].abs()).argmin()]
@@ -308,13 +314,13 @@ def _plot_mean_cost(
 
     ax.axhline(0, color="gray", linewidth=0.8, linestyle="--", alpha=0.5)
     ax.axvline(0, color="gray", linewidth=0.8, linestyle="--", alpha=0.5)
-    ax.set_xlabel("Mean Score Cost  (EV-optimal mean − mean@θ*)", fontsize=12)
-    ax.set_ylabel("Percentile Gain  (value@θ* − value@θ=0)", fontsize=12)
-    ax.set_title("Cost-Benefit: Tail Optimization vs Mean Score", fontsize=14, fontweight="bold")
-    ax.grid(True, alpha=0.3)
+    ax.set_xlabel("Mean Score Cost  (EV-optimal mean − mean@θ*)", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Percentile Gain  (value@θ* − value@θ=0)", fontsize=FONT_AXIS_LABEL)
+    ax.set_title("Cost-Benefit: Tail Optimization vs Mean Score", fontsize=FONT_TITLE, fontweight="bold")
+    ax.grid(True, alpha=GRID_ALPHA)
 
     fig.tight_layout()
-    path = out_dir / "percentile_sweep_cost_benefit.png"
+    path = out_dir / f"percentile_sweep_cost_benefit.{fmt}"
     fig.savefig(path, dpi=dpi)
     plt.close(fig)
     return path
@@ -327,6 +333,7 @@ def _plot_frontier(
     out_dir: Path,
     *,
     dpi: int = 200,
+    fmt: str = "png",
 ) -> Path:
     """Mean–Std Pareto frontier using dense sweep for a smooth curve.
 
@@ -460,19 +467,19 @@ def _plot_frontier(
     sm = plt.cm.ScalarMappable(cmap=CMAP, norm=norm)
     sm.set_array([])
     cbar = plt.colorbar(sm, ax=ax, pad=0.02, aspect=30)
-    cbar.set_label("θ  (risk-averse ← 0 → risk-seeking)", fontsize=12)
+    cbar.set_label("θ  (risk-averse ← 0 → risk-seeking)", fontsize=FONT_AXIS_LABEL)
 
-    ax.set_xlabel("Standard Deviation", fontsize=14)
-    ax.set_ylabel("Mean Score", fontsize=14)
+    ax.set_xlabel("Standard Deviation", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Mean Score", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "Mean–Variance Frontier across Risk Parameter θ",
-        fontsize=17, fontweight="bold",
+        fontsize=FONT_SUPTITLE, fontweight="bold",
     )
     ax.legend(loc="lower left", fontsize=11, framealpha=0.9)
-    ax.grid(True, alpha=0.3)
+    ax.grid(True, alpha=GRID_ALPHA)
 
     fig.tight_layout()
-    path = out_dir / "mean_std_frontier.png"
+    path = out_dir / f"mean_std_frontier.{fmt}"
     fig.savefig(path, dpi=dpi)
     plt.close(fig)
     return path
@@ -484,6 +491,7 @@ def _plot_percentile_frontiers(
     out_dir: Path,
     *,
     dpi: int = 200,
+    fmt: str = "png",
 ) -> Path:
     """Mean–Std frontier with each percentile's θ* marked along the curve.
 
@@ -577,21 +585,21 @@ def _plot_percentile_frontiers(
     )
     sm.set_array([])
     cbar = plt.colorbar(sm, ax=ax, pad=0.02, aspect=30)
-    cbar.set_label("Optimized percentile (blue=low, red=high)", fontsize=12)
+    cbar.set_label("Optimized percentile (blue=low, red=high)", fontsize=FONT_AXIS_LABEL)
     cbar.set_ticks(range(len(pcts)))
     cbar.set_ticklabels(pcts)
 
     ax.legend(loc="lower left", fontsize=11, framealpha=0.9)
-    ax.set_xlabel("Standard Deviation", fontsize=14)
-    ax.set_ylabel("Mean Score", fontsize=14)
+    ax.set_xlabel("Standard Deviation", fontsize=FONT_AXIS_LABEL)
+    ax.set_ylabel("Mean Score", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "Mean–Std Frontier: Where Each Percentile's Optimal θ* Lands",
-        fontsize=17, fontweight="bold",
+        fontsize=FONT_SUPTITLE, fontweight="bold",
     )
-    ax.grid(True, alpha=0.3)
+    ax.grid(True, alpha=GRID_ALPHA)
 
     fig.tight_layout()
-    path = out_dir / "percentile_frontiers.png"
+    path = out_dir / f"percentile_frontiers.{fmt}"
     fig.savefig(path, dpi=dpi)
     plt.close(fig)
     return path

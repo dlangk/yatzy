@@ -6,12 +6,11 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from ..config import MAX_SCORE
-from .cdf import plot_cdf
+from .cdf import plot_cdf, plot_tails
 from .density import plot_density
 from .mean_std import plot_mean_vs_std
 from .percentiles import plot_percentiles
-from .style import fmt_theta, make_norm, setup_theme, theta_color
+from .style import FONT_AXIS_LABEL, FONT_SUPTITLE, FONT_TITLE, fmt_theta, make_norm, setup_theme, theta_color
 
 
 def plot_combined(
@@ -46,37 +45,13 @@ def plot_combined(
     ax_ltail = fig.add_subplot(gs_tails[0, 0])
     ax_rtail = fig.add_subplot(gs_tails[0, 1])
 
-    for t in thetas:
-        subset = cdf_df[cdf_df["theta"] == t]
-        color = theta_color(t, norm)
-        lw = 2.5 if t == 0 else 1.4
-        alpha = 1.0 if t == 0 else 0.85
+    plot_tails(thetas, cdf_df, out_dir, norm=norm, axes=(ax_ltail, ax_rtail))
 
-        left = subset[subset["cdf"] <= 0.05]
-        ax_ltail.plot(
-            left["score"], left["cdf"],
-            color=color, linewidth=lw, alpha=alpha, label=f"θ={fmt_theta(t)}",
-        )
-
-        right = subset[subset["cdf"] >= 0.97]
-        ax_rtail.plot(
-            right["score"], right["survival"],
-            color=color, linewidth=lw, alpha=alpha,
-        )
-
-    ax_ltail.set_xlabel("Total Score", fontsize=12)
-    ax_ltail.set_ylabel("Cumulative Probability", fontsize=12)
-    ax_ltail.set_title("Left Tail (bottom 5%)", fontsize=13, fontweight="bold")
-    ax_ltail.set_ylim(0, 0.05)
-    ax_ltail.set_xlim(0, 200)
-
-    ax_rtail.set_xlabel("Total Score", fontsize=12)
-    ax_rtail.set_ylabel("P(Score > x)  [survival]", fontsize=12)
-    ax_rtail.set_title("Right Tail (top 3%)", fontsize=13, fontweight="bold")
-    ax_rtail.set_ylim(0, 0.03)
-    ax_rtail.set_xlim(300, MAX_SCORE)
-
+    # Shared legend for the tails row
     handles, labels = ax_ltail.get_legend_handles_labels()
+    # Remove per-axis legends (plot_tails adds them)
+    ax_ltail.get_legend().remove()
+    ax_rtail.get_legend().remove()
     fig.legend(
         handles, labels, loc="upper center",
         bbox_to_anchor=(0.5, 0.635), ncol=8, fontsize=8, framealpha=0.9,

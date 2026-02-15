@@ -63,6 +63,10 @@ path = "src/bin/difficult_scenarios.rs"
 name = "yatzy-scenario-sensitivity"
 path = "src/bin/scenario_sensitivity.rs"
 
+[[bin]]
+name = "yatzy-sweep"
+path = "src/bin/sweep.rs"
+
 [dependencies]
 axum = "0.8"
 tokio = { version = "1", features = ["full"] }
