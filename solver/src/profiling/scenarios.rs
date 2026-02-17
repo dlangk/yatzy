@@ -150,6 +150,9 @@ pub struct ScoredCandidate {
     pub bucket: SemanticBucket,
     pub scores: DiagnosticScores,
     pub ev_gap: f32,
+    /// Functional fingerprint: identifies scenarios that are decision-equivalent.
+    /// Two scenarios with the same fingerprint present identical choices to the player.
+    pub fingerprint: String,
 }
 
 /// A selected profiling scenario with all metadata.
@@ -172,6 +175,49 @@ pub struct ActionInfo {
     pub id: i32,
     pub label: String,
     pub ev_theta0: f32,
+}
+
+/// Compute a functional fingerprint for a decision scenario.
+///
+/// Two scenarios with the same fingerprint present effectively the same
+/// dilemma to the player. The fingerprint captures the decision-relevant
+/// features: the top action EVs (rounded), board state, and decision type.
+///
+/// For category decisions: different dice can yield different raw scores
+/// on irrelevant categories while the actual choice (top 2-3 actions) is
+/// identical. So we fingerprint on rounded top-3 EVs rather than all scores.
+///
+/// For reroll decisions: the dice directly determine outcomes, so we include them.
+fn compute_fingerprint(
+    _ctx: &YatzyContext,
+    _sv: &[f32],
+    d: &RawDecision,
+    actions: &[ActionInfo],
+) -> String {
+    // Top-3 action EVs rounded to 0.5 — captures the decision structure
+    let top_evs: Vec<i32> = actions
+        .iter()
+        .take(3)
+        .map(|a| (a.ev_theta0 * 2.0).round() as i32) // round to nearest 0.5
+        .collect();
+    let top_ids: Vec<i32> = actions.iter().take(3).map(|a| a.id).collect();
+
+    match d.decision_type {
+        DecisionType::Category => {
+            // Board state + top action IDs + rounded EVs
+            format!(
+                "cat:s{},u{},ids{:?},evs{:?}",
+                d.scored, d.upper_score, top_ids, top_evs
+            )
+        }
+        _ => {
+            // For rerolls, include dice (different dice → different reroll outcomes)
+            format!(
+                "{:?}:s{},u{},{:?},ids{:?},evs{:?}",
+                d.decision_type, d.scored, d.upper_score, d.dice, top_ids, top_evs
+            )
+        }
+    }
 }
 
 // ── Simulation helpers ──
@@ -1057,12 +1103,15 @@ pub fn build_master_pool(
             continue;
         }
 
+        let fingerprint = compute_fingerprint(ctx, sv, d, &actions);
+
         scored_candidates.push(ScoredCandidate {
             decision: d.clone(),
             visit_count: *count,
             bucket,
             scores: diag_scores,
             ev_gap: gap,
+            fingerprint,
         });
     }
 
@@ -1215,6 +1264,15 @@ pub fn assemble_quiz(
         let sc = &pool[idx];
         selected.push(idx);
         used[idx] = true;
+
+        // Block all functionally-equivalent candidates (same fingerprint)
+        let fp = &sc.fingerprint;
+        for j in 0..pool.len() {
+            if !used[j] && pool[j].fingerprint == *fp {
+                used[j] = true;
+            }
+        }
+
         phase_count[phase_idx(sc.bucket.phase)] += 1;
         dtype_count[dtype_idx(sc.bucket.dtype)] += 1;
         if sc.scores.s_theta >= theta_thresh {
