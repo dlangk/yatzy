@@ -177,7 +177,10 @@ fn main() {
     let t0 = Instant::now();
     let mut ctx = YatzyContext::new_boxed();
     phase0_tables::precompute_lookup_tables(&mut ctx);
-    println!("Phase 0 tables: {:.1} ms", t0.elapsed().as_secs_f64() * 1000.0);
+    println!(
+        "Phase 0 tables: {:.1} ms",
+        t0.elapsed().as_secs_f64() * 1000.0
+    );
 
     // Load EV-optimal state values
     let t1 = Instant::now();
@@ -185,7 +188,10 @@ fn main() {
         eprintln!("Failed to load state values. Run yatzy-precompute first.");
         std::process::exit(1);
     }
-    println!("State values loaded: {:.1} ms", t1.elapsed().as_secs_f64() * 1000.0);
+    println!(
+        "State values loaded: {:.1} ms",
+        t1.elapsed().as_secs_f64() * 1000.0
+    );
     println!();
 
     let n = args.num_games;
@@ -193,7 +199,10 @@ fn main() {
     // ── 1. Solo simulations ──────────────────────────────────────────────
 
     println!("=== Human Baseline Experiment ===");
-    println!("Games: {} | Seed: {} | Threads: {}", n, args.seed, num_threads);
+    println!(
+        "Games: {} | Seed: {} | Threads: {}",
+        n, args.seed, num_threads
+    );
     println!();
 
     // Heuristic (human) games

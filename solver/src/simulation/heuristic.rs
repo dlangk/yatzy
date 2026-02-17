@@ -371,11 +371,7 @@ fn straight_chase_mask(dice: &[i32; 5], face_count: &[i32; 7], target: &[i32; 5]
 /// Convenience wrapper around `heuristic_pick_category` that also computes
 /// the score and updated upper score.
 /// Returns (category, score, new_upper_score).
-pub fn heuristic_score_dice(
-    dice: &[i32; 5],
-    scored: i32,
-    upper_score: i32,
-) -> (usize, i32, i32) {
+pub fn heuristic_score_dice(dice: &[i32; 5], scored: i32, upper_score: i32) -> (usize, i32, i32) {
     let face_count = count_faces(dice);
     let cat = heuristic_pick_category(dice, &face_count, scored, upper_score);
     let scr = calculate_category_score(dice, cat);
@@ -418,8 +414,8 @@ mod tests {
         // Should keep 2,3,4,5 and reroll the extra 5
         // After Yatzy check (no ≥3 of a kind), tries large straight
         assert_ne!(mask, 0); // should reroll something
-        // The extra 5 at position 4 (or 3) should be rerolled
-        // Positions: [2,3,4,5,5] → keep 2(pos0), 3(pos1), 4(pos2), 5(pos3), reroll 5(pos4)
+                             // The extra 5 at position 4 (or 3) should be rerolled
+                             // Positions: [2,3,4,5,5] → keep 2(pos0), 3(pos1), 4(pos2), 5(pos3), reroll 5(pos4)
         assert_eq!(mask, 0b10000);
     }
 
@@ -500,9 +496,8 @@ mod tests {
     fn test_pick_full_house() {
         let dice = [2, 2, 5, 5, 5];
         let fc = count_faces(&dice);
-        let scored = (1 << CATEGORY_YATZY)
-            | (1 << CATEGORY_LARGE_STRAIGHT)
-            | (1 << CATEGORY_SMALL_STRAIGHT);
+        let scored =
+            (1 << CATEGORY_YATZY) | (1 << CATEGORY_LARGE_STRAIGHT) | (1 << CATEGORY_SMALL_STRAIGHT);
         assert_eq!(
             heuristic_pick_category(&dice, &fc, scored, 0),
             CATEGORY_FULL_HOUSE

@@ -408,10 +408,7 @@ fn play_single_turn(
 /// Play one turn using the heuristic (human-like) strategy.
 /// Returns (category, score, new_upper_score).
 #[inline]
-fn play_single_turn_heuristic(
-    state: &PlayerState,
-    rng: &mut SmallRng,
-) -> (usize, i32, i32) {
+fn play_single_turn_heuristic(state: &PlayerState, rng: &mut SmallRng) -> (usize, i32, i32) {
     let scored = state.scored_categories;
     let upper_score = state.upper_score;
 

@@ -7,8 +7,8 @@ use std::time::Instant;
 
 use yatzy::phase0_tables;
 use yatzy::simulation::sweep::{
-    ensure_strategy_table, format_theta_dir, range_grid, resolve_grid, scan_inventory,
-    theta_eq, theta_scores_path,
+    ensure_strategy_table, format_theta_dir, range_grid, resolve_grid, scan_inventory, theta_eq,
+    theta_scores_path,
 };
 use yatzy::simulation::{save_scores, simulate_batch};
 use yatzy::storage::load_all_state_values;
@@ -77,10 +77,7 @@ fn main() {
         if inventory.is_empty() {
             println!("No existing scores found.");
         } else {
-            println!(
-                "{:>8}  {:>10}  {:>6}  path",
-                "theta", "games", "seed"
-            );
+            println!("{:>8}  {:>10}  {:>6}  path", "theta", "games", "seed");
             println!("{}", "-".repeat(70));
             for e in &inventory {
                 println!(
@@ -114,7 +111,12 @@ fn main() {
     };
 
     println!("=== yatzy-sweep ===");
-    println!("Grid: {} thetas, {} games/theta, seed={}", thetas.len(), games, seed);
+    println!(
+        "Grid: {} thetas, {} games/theta, seed={}",
+        thetas.len(),
+        games,
+        seed
+    );
 
     // Scan existing inventory
     let inventory = scan_inventory();
@@ -139,7 +141,10 @@ fn main() {
         to_simulate.len()
     );
     if skip_count > 0 {
-        println!("Skipping {} thetas (already have >= {} games)", skip_count, games);
+        println!(
+            "Skipping {} thetas (already have >= {} games)",
+            skip_count, games
+        );
     }
 
     if to_simulate.is_empty() {

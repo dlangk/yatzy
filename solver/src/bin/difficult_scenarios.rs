@@ -770,14 +770,9 @@ fn main() {
                     compute_group6(&ctx, sv, d.upper_score, d.scored, &mut e_ds_0);
                     enumerate_reroll_actions(&ctx, &e_ds_0, &d.dice)
                 }
-                DecisionType::Category => enumerate_category_actions(
-                    &ctx,
-                    sv,
-                    d.upper_score,
-                    d.scored,
-                    ds_index,
-                    is_last,
-                ),
+                DecisionType::Category => {
+                    enumerate_category_actions(&ctx, sv, d.upper_score, d.scored, ds_index, is_last)
+                }
             };
 
             // Skip trivial decisions (only 1 legal action)
@@ -812,11 +807,7 @@ fn main() {
     }
     // Sort each turn's entries by difficulty_score descending
     for entries in by_turn.values_mut() {
-        entries.sort_by(|a, b| {
-            b.difficulty_score
-                .partial_cmp(&a.difficulty_score)
-                .unwrap()
-        });
+        entries.sort_by(|a, b| b.difficulty_score.partial_cmp(&a.difficulty_score).unwrap());
     }
 
     let active_turns = by_turn.len();
@@ -854,19 +845,11 @@ fn main() {
     }
 
     // Second pass: fill remainder from leftover pool, sorted by difficulty_score
-    leftover.sort_by(|a, b| {
-        b.difficulty_score
-            .partial_cmp(&a.difficulty_score)
-            .unwrap()
-    });
+    leftover.sort_by(|a, b| b.difficulty_score.partial_cmp(&a.difficulty_score).unwrap());
     selected.extend(leftover.into_iter().take(remainder));
 
     // Final sort by difficulty_score for ranking
-    selected.sort_by(|a, b| {
-        b.difficulty_score
-            .partial_cmp(&a.difficulty_score)
-            .unwrap()
-    });
+    selected.sort_by(|a, b| b.difficulty_score.partial_cmp(&a.difficulty_score).unwrap());
     selected.truncate(top_n);
     let sorted_entries = selected;
 
@@ -876,7 +859,11 @@ fn main() {
         for e in &sorted_entries {
             *turn_counts.entry(e.raw.turn).or_default() += 1;
         }
-        println!("Stratified selection: {} scenarios across {} turns", sorted_entries.len(), turn_counts.len());
+        println!(
+            "Stratified selection: {} scenarios across {} turns",
+            sorted_entries.len(),
+            turn_counts.len()
+        );
         let mut tc: Vec<_> = turn_counts.iter().collect();
         tc.sort_by_key(|(t, _)| *t);
         for (t, n) in tc {
@@ -1005,10 +992,7 @@ fn main() {
     let gap_stats: Vec<f32> = scenarios.iter().map(|s| s.ev_gap).collect();
     if !gap_stats.is_empty() {
         let min_gap = gap_stats.iter().cloned().fold(f32::INFINITY, f32::min);
-        let max_gap = gap_stats
-            .iter()
-            .cloned()
-            .fold(f32::NEG_INFINITY, f32::max);
+        let max_gap = gap_stats.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
         let mean_gap = gap_stats.iter().sum::<f32>() / gap_stats.len() as f32;
         println!(
             "\nEV gap: min={:.4}, max={:.4}, mean={:.4}",

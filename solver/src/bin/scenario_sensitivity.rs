@@ -400,14 +400,20 @@ fn evaluate_scenario_at_theta(
             let mut e_ds_0 = [0.0f32; 252];
             let mut e_ds_1 = [0.0f32; 252];
             if is_risk {
-                compute_group6_risk(ctx, sv, s.upper_score, s.scored_categories, theta, &mut e_ds_0);
+                compute_group6_risk(
+                    ctx,
+                    sv,
+                    s.upper_score,
+                    s.scored_categories,
+                    theta,
+                    &mut e_ds_0,
+                );
                 compute_opt_lse_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1, false);
             } else {
                 compute_group6(ctx, sv, s.upper_score, s.scored_categories, &mut e_ds_0);
                 compute_max_ev_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1);
             }
-            let (bm, bv, rm, rv) =
-                find_best_and_runner_up_mask(ctx, &e_ds_1, &s.dice, is_risk);
+            let (bm, bv, rm, rv) = find_best_and_runner_up_mask(ctx, &e_ds_1, &s.dice, is_risk);
             (
                 format_mask(bm, &s.dice),
                 bm,
@@ -420,12 +426,18 @@ fn evaluate_scenario_at_theta(
         "reroll2" => {
             let mut e_ds_0 = [0.0f32; 252];
             if is_risk {
-                compute_group6_risk(ctx, sv, s.upper_score, s.scored_categories, theta, &mut e_ds_0);
+                compute_group6_risk(
+                    ctx,
+                    sv,
+                    s.upper_score,
+                    s.scored_categories,
+                    theta,
+                    &mut e_ds_0,
+                );
             } else {
                 compute_group6(ctx, sv, s.upper_score, s.scored_categories, &mut e_ds_0);
             }
-            let (bm, bv, rm, rv) =
-                find_best_and_runner_up_mask(ctx, &e_ds_0, &s.dice, is_risk);
+            let (bm, bv, rm, rv) = find_best_and_runner_up_mask(ctx, &e_ds_0, &s.dice, is_risk);
             (
                 format_mask(bm, &s.dice),
                 bm,
@@ -707,10 +719,7 @@ fn main() {
         })
         .collect();
 
-    println!(
-        "  Done in {:.1}s",
-        eval_start.elapsed().as_secs_f64(),
-    );
+    println!("  Done in {:.1}s", eval_start.elapsed().as_secs_f64(),);
 
     // Stats
     let flip_count = output_scenarios.iter().filter(|s| s.has_flip).count();
@@ -724,7 +733,8 @@ fn main() {
     let _ = std::fs::create_dir_all(&output_dir);
     let json_path = format!("{}/difficult_scenarios_sensitivity.json", output_dir);
     {
-        let json = serde_json::to_string_pretty(&output_scenarios).expect("JSON serialization failed");
+        let json =
+            serde_json::to_string_pretty(&output_scenarios).expect("JSON serialization failed");
         let mut f = std::fs::File::create(&json_path).expect("Failed to create JSON");
         f.write_all(json.as_bytes()).unwrap();
     }

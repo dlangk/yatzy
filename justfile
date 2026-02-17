@@ -92,6 +92,62 @@ difficult-scenarios games="1000000" top="200":
 scenario-sensitivity:
     YATZY_BASE_PATH=. solver/target/release/yatzy-scenario-sensitivity --output outputs/scenarios
 
+# Heuristic gap analysis: per-decision comparison vs optimal
+heuristic-gap games="100000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-heuristic-gap --games {{games}} --output outputs/heuristic_gap
+
+# Export training data for surrogate models
+export-training-data games="200000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-export-training-data --games {{games}} --output data/surrogate
+
+# Run surrogate diagnostics: label noise + error distribution
+surrogate-diagnose:
+    analytics/.venv/bin/yatzy-analyze surrogate-diagnose
+
+# Data scaling experiment: dt_full on increasing data subsets
+surrogate-scaling:
+    analytics/.venv/bin/yatzy-analyze surrogate-scaling
+
+# Feature experiments: ablation, forward selection, augmented training
+surrogate-features *args:
+    analytics/.venv/bin/yatzy-analyze surrogate-features {{args}}
+
+# Train surrogate models (DTs + MLPs) on exported data
+surrogate-train:
+    analytics/.venv/bin/yatzy-analyze surrogate-train
+
+# Plot surrogate model results
+surrogate-plot:
+    analytics/.venv/bin/yatzy-analyze surrogate-plot
+
+# Evaluate surrogate models via full game simulation
+surrogate-eval games="100000":
+    analytics/.venv/bin/yatzy-analyze surrogate-eval --games {{games}}
+
+# Plot game-level surrogate evaluation results
+surrogate-eval-plot:
+    analytics/.venv/bin/yatzy-analyze surrogate-eval-plot
+
+# Compute decision gaps + policy compression stats
+decision-gaps games="100000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-decision-gaps --games {{games}} --output outputs/policy_compression
+
+# Plot policy compression results
+compression-plots:
+    analytics/.venv/bin/yatzy-analyze compression
+
+# Generate profiling scenarios (40 diagnostic scenarios + Q-value grids)
+profile-generate games="100000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-profile-scenarios --games {{games}} --output outputs/profiling
+
+# Validate profiling parameter recovery
+profile-validate trials="100":
+    analytics/.venv/bin/yatzy-analyze profile-validate --trials {{trials}}
+
+# Copy profiling scenarios to blog for frontend consumption
+profile-deploy:
+    cp outputs/profiling/scenarios.json blog/data/scenarios.json
+
 # Sweep: simulate all thetas in grid, store scores (resumable)
 sweep grid="all" games="1000000":
     YATZY_BASE_PATH=. solver/target/release/yatzy-sweep --grid {{grid}} --games {{games}}

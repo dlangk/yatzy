@@ -67,6 +67,22 @@ path = "src/bin/scenario_sensitivity.rs"
 name = "yatzy-sweep"
 path = "src/bin/sweep.rs"
 
+[[bin]]
+name = "yatzy-decision-gaps"
+path = "src/bin/decision_gaps.rs"
+
+[[bin]]
+name = "yatzy-export-training-data"
+path = "src/bin/export_training_data.rs"
+
+[[bin]]
+name = "yatzy-heuristic-gap"
+path = "src/bin/heuristic_gap.rs"
+
+[[bin]]
+name = "yatzy-profile-scenarios"
+path = "src/bin/generate_profile_scenarios.rs"
+
 [dependencies]
 axum = "0.8"
 tokio = { version = "1", features = ["full"] }
