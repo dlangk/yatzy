@@ -48,6 +48,7 @@ pub mod constants;
 pub mod dice_mechanics;
 pub mod game_mechanics;
 pub mod phase0_tables;
+pub mod profiling;
 pub mod server;
 pub mod simulation;
 pub mod state_computation;
