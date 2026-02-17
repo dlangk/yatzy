@@ -1,6 +1,6 @@
 //! Generate profiling scenarios for cognitive player profiling.
 //!
-//! Produces `outputs/profiling/scenarios.json` with 20 diagnostic scenarios
+//! Produces `outputs/profiling/scenarios.json` with 30 diagnostic scenarios
 //! selected via diversity-constrained stratified sampling, plus pre-computed
 //! Q-value grids. Also writes `master_pool.json` with ~200-400 candidates.
 //!
@@ -131,7 +131,7 @@ fn main() {
     let mut num_games = 100_000usize;
     let mut seed = 42u64;
     let mut output_dir = String::from("outputs/profiling");
-    let mut quiz_size = 20usize;
+    let mut quiz_size = 30usize;
     let mut pool_size = 20usize; // max per bucket
     let mut use_noisy = true;
 
@@ -346,7 +346,7 @@ fn main() {
 
     let q_theta_values: Vec<f32> = vec![-0.05, -0.02, 0.0, 0.02, 0.05, 0.1];
     let q_gamma_values: Vec<f32> = vec![0.3, 0.6, 0.8, 0.9, 0.95, 1.0];
-    let q_d_values: Vec<u32> = vec![5, 8, 10, 15, 20, 999];
+    let q_d_values: Vec<u32> = vec![8, 20, 999];
 
     let grid_theta_tables: Vec<(f32, StateValues)> = {
         let mut tables: Vec<(f32, StateValues)> = Vec::new();

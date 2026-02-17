@@ -9,7 +9,12 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.optimize import minimize
 
-D_GRID = [5, 8, 10, 15, 20, 999]
+# Collapsed d grid: 3 levels (weak / strong / optimal)
+# Fewer levels = better identifiability with limited observations
+D_GRID = [8, 20, 999]
+
+# Number of random restarts for the optimizer
+N_RESTARTS = 8
 
 
 @dataclass
@@ -37,6 +42,9 @@ def _lookup_q(scenario: dict, theta: float, gamma: float, d: int) -> np.ndarray 
         return None
 
     q_values = grid.get("q_values", {})
+    if not q_values:
+        return None
+
     theta_vals = grid.get("theta_values", [])
     gamma_vals = grid.get("gamma_values", [])
     d_vals = grid.get("d_values", [])
@@ -45,10 +53,25 @@ def _lookup_q(scenario: dict, theta: float, gamma: float, d: int) -> np.ndarray 
     nearest_gamma = _find_nearest(gamma_vals, gamma) if gamma_vals else 1.0
     nearest_d = _find_nearest(d_vals, d) if d_vals else 999
 
-    key = f"{nearest_theta},{nearest_gamma},{nearest_d}"
-    vals = q_values.get(key)
-    if vals is None:
+    # Find the key by matching nearest values (handles float formatting differences)
+    best_key = None
+    best_dist = float("inf")
+    for key in q_values:
+        parts = key.split(",")
+        if len(parts) != 3:
+            continue
+        try:
+            kt, kg, kd = float(parts[0]), float(parts[1]), int(float(parts[2]))
+        except ValueError:
+            continue
+        dist = abs(kt - nearest_theta) + abs(kg - nearest_gamma) + (0 if kd == int(nearest_d) else 1e6)
+        if dist < best_dist:
+            best_dist = dist
+            best_key = key
+
+    if best_key is None or best_dist > 0.1:
         return None
+    vals = q_values[best_key]
     return np.array(vals, dtype=np.float64)
 
 
@@ -90,40 +113,56 @@ def estimate_profile(
     scenarios: list[dict],
     answers: list[dict],
 ) -> ProfileEstimate:
-    """Estimate profile parameters using L-BFGS-B optimization."""
-    # Optimize over [theta, log(beta), gamma, d_idx]
-    # We try all d values and pick the best
+    """Estimate profile parameters using L-BFGS-B with multiple restarts."""
+    beta_max = 10.0
+    bounds = [(-0.1, 0.1), (np.log(0.1), np.log(beta_max)), (0.1, 1.0)]
+
+    # Weak log-normal prior on β: penalizes extreme values.
+    # Centered at log(3) with σ=1.0 → very mild pull toward β≈3.
+    # This prevents the optimizer from drifting to β=20 when NLL is flat.
+    beta_prior_mu = np.log(3.0)
+    beta_prior_sigma = 1.0
+
+    # Diverse starting points for multi-start optimization
+    start_points = [
+        np.array([0.0, np.log(2.0), 0.9]),       # default center
+        np.array([0.0, np.log(5.0), 0.95]),       # high β, high γ
+        np.array([0.0, np.log(1.0), 0.5]),        # low β, low γ
+        np.array([-0.05, np.log(3.0), 0.85]),     # risk-averse
+        np.array([0.05, np.log(1.5), 0.7]),       # risk-seeking
+        np.array([0.0, np.log(8.0), 0.95]),       # very precise
+        np.array([0.0, np.log(0.5), 0.6]),        # very noisy
+        np.array([0.03, np.log(4.0), 0.8]),       # moderate risk-seek
+    ]
 
     best_result = None
     best_nll = float("inf")
     best_d = D_GRID[-1]
 
     for d in D_GRID:
-
-        def objective(x: np.ndarray) -> float:
+        def objective(x: np.ndarray, _d=d) -> float:
             theta = np.clip(x[0], -0.1, 0.1)
-            beta = np.clip(np.exp(x[1]), 0.1, 20.0)
+            beta = np.clip(np.exp(x[1]), 0.1, beta_max)
             gamma = np.clip(x[2], 0.1, 1.0)
-            return neg_log_likelihood(scenarios, answers, theta, beta, gamma, d)
+            nll = neg_log_likelihood(scenarios, answers, theta, beta, gamma, _d)
+            # Add weak log-normal prior on log(β)
+            nll += 0.5 * ((x[1] - beta_prior_mu) / beta_prior_sigma) ** 2
+            return nll
 
-        x0 = np.array([0.0, np.log(2.0), 0.9])
-        bounds = [(-0.1, 0.1), (np.log(0.1), np.log(20.0)), (0.1, 1.0)]
-
-        result = minimize(objective, x0, method="L-BFGS-B", bounds=bounds)
-
-        if result.fun < best_nll:
-            best_nll = result.fun
-            best_result = result
-            best_d = d
+        for x0 in start_points:
+            result = minimize(objective, x0, method="L-BFGS-B", bounds=bounds)
+            if result.fun < best_nll:
+                best_nll = result.fun
+                best_result = result
+                best_d = d
 
     if best_result is None:
-        # Fallback
         return ProfileEstimate(
             theta=0.0, beta=2.0, gamma=0.9, d=999, nll=0.0, bic=0.0
         )
 
     theta = np.clip(best_result.x[0], -0.1, 0.1)
-    beta = np.clip(np.exp(best_result.x[1]), 0.1, 20.0)
+    beta = np.clip(np.exp(best_result.x[1]), 0.1, beta_max)
     gamma = np.clip(best_result.x[2], 0.1, 1.0)
 
     # BIC
@@ -136,19 +175,19 @@ def estimate_profile(
     ci_beta = None
     ci_gamma = None
     try:
-        from scipy.optimize import approx_fprime
-
         eps = 1e-5
 
         def _obj(x):
-            return neg_log_likelihood(
+            nll = neg_log_likelihood(
                 scenarios,
                 answers,
                 np.clip(x[0], -0.1, 0.1),
-                np.clip(np.exp(x[1]), 0.1, 20.0),
+                np.clip(np.exp(x[1]), 0.1, beta_max),
                 np.clip(x[2], 0.1, 1.0),
                 best_d,
             )
+            nll += 0.5 * ((x[1] - beta_prior_mu) / beta_prior_sigma) ** 2
+            return nll
 
         # Numerical Hessian diagonal
         x_opt = best_result.x

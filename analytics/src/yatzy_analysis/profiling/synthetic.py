@@ -62,6 +62,8 @@ class SyntheticPlayer:
             return None
 
         q_values = grid.get("q_values", {})
+        if not q_values:
+            return None
 
         # Find nearest grid point
         theta_vals = grid.get("theta_values", [])
@@ -72,8 +74,25 @@ class SyntheticPlayer:
         nearest_gamma = _find_nearest(gamma_vals, self.gamma) if gamma_vals else 1.0
         nearest_d = _find_nearest(d_vals, self.d) if d_vals else 999
 
-        key = f"{nearest_theta},{nearest_gamma},{nearest_d}"
-        return q_values.get(key)
+        # Find key by matching nearest values (handles float formatting differences)
+        best_key = None
+        best_dist = float("inf")
+        for key in q_values:
+            parts = key.split(",")
+            if len(parts) != 3:
+                continue
+            try:
+                kt, kg, kd = float(parts[0]), float(parts[1]), int(float(parts[2]))
+            except ValueError:
+                continue
+            dist = abs(kt - nearest_theta) + abs(kg - nearest_gamma) + (0 if kd == int(nearest_d) else 1e6)
+            if dist < best_dist:
+                best_dist = dist
+                best_key = key
+
+        if best_key is None or best_dist > 0.1:
+            return None
+        return q_values[best_key]
 
 
 def _find_nearest(arr: list, target: float) -> float:
@@ -83,14 +102,17 @@ def _find_nearest(arr: list, target: float) -> float:
     return min(arr, key=lambda x: abs(x - target))
 
 
-# Standard archetypes for validation
+# Standard archetypes for validation.
+# d values must match D_GRID in estimator.py: {8, 20, 999}
+# β values kept in identifiable range (0.5-5): β>5 approaches deterministic,
+# making it indistinguishable from any higher value with limited observations.
 ARCHETYPES: list[SyntheticPlayer] = [
-    SyntheticPlayer(theta=0.0, beta=5.0, gamma=0.95, d=999, name="expert_neutral"),
-    SyntheticPlayer(theta=-0.05, beta=3.0, gamma=0.9, d=20, name="cautious_strong"),
-    SyntheticPlayer(theta=0.05, beta=2.0, gamma=0.8, d=15, name="risky_decent"),
-    SyntheticPlayer(theta=0.0, beta=1.0, gamma=0.5, d=8, name="sloppy_myopic"),
-    SyntheticPlayer(theta=-0.03, beta=8.0, gamma=0.95, d=999, name="precise_cautious"),
-    SyntheticPlayer(theta=0.03, beta=1.5, gamma=0.7, d=10, name="gambler_mid"),
+    SyntheticPlayer(theta=0.0, beta=4.0, gamma=0.95, d=999, name="expert_neutral"),
+    SyntheticPlayer(theta=-0.05, beta=2.5, gamma=0.9, d=20, name="cautious_strong"),
+    SyntheticPlayer(theta=0.05, beta=2.0, gamma=0.8, d=20, name="risky_decent"),
+    SyntheticPlayer(theta=0.0, beta=0.8, gamma=0.5, d=8, name="sloppy_myopic"),
+    SyntheticPlayer(theta=-0.03, beta=5.0, gamma=0.9, d=999, name="precise_cautious"),
+    SyntheticPlayer(theta=0.03, beta=1.5, gamma=0.7, d=8, name="gambler_mid"),
 ]
 
 

@@ -2,7 +2,7 @@
 //!
 //! Generates candidate scenarios from noisy-simulated games, classifies them
 //! into a 3D semantic grid (phase × dtype × tension), scores diagnostic value,
-//! and assembles a 20-scenario quiz with diversity constraints.
+//! and assembles a 30-scenario quiz with diversity constraints.
 
 #![allow(clippy::needless_range_loop)]
 
@@ -153,6 +153,8 @@ pub struct ScoredCandidate {
     /// Functional fingerprint: identifies scenarios that are decision-equivalent.
     /// Two scenarios with the same fingerprint present identical choices to the player.
     pub fingerprint: String,
+    /// Top-2 action labels for action-fatigue tracking.
+    pub top_action_labels: Vec<String>,
 }
 
 /// A selected profiling scenario with all metadata.
@@ -1104,6 +1106,7 @@ pub fn build_master_pool(
         }
 
         let fingerprint = compute_fingerprint(ctx, sv, d, &actions);
+        let top_action_labels: Vec<String> = actions.iter().take(2).map(|a| a.label.clone()).collect();
 
         scored_candidates.push(ScoredCandidate {
             decision: d.clone(),
@@ -1112,6 +1115,7 @@ pub fn build_master_pool(
             scores: diag_scores,
             ev_gap: gap,
             fingerprint,
+            top_action_labels,
         });
     }
 
@@ -1198,25 +1202,30 @@ pub fn assemble_quiz(
         }
     };
 
-    // Minimum quotas
-    let min_per_phase = 2usize;
-    let min_per_dtype = 4usize;
-    let min_theta = 3usize;
-    let min_gamma = 3usize;
-    let min_depth = 3usize;
-    let min_beta = 3usize;
-    let max_theta = 8usize;
-    let max_gamma = 8usize;
+    // Minimum quotas (scaled for 30 scenarios)
+    let min_per_phase = 4usize;
+    let min_per_dtype = 6usize;
+    let min_theta = 5usize;
+    let min_gamma = 5usize;
+    let min_depth = 4usize;
+    let min_beta = 4usize;
+    let max_theta = 12usize;
+    let max_gamma = 12usize;
+
+    // Action-fatigue: no action label in top-2 more than max_action_fatigue times
+    let max_action_fatigue = 4usize;
+    let mut action_label_count: HashMap<String, usize> = HashMap::new();
 
     // Threshold for "diagnostic" classification
     let theta_thresh = 0.5;
     let gamma_thresh = 0.5;
     let beta_thresh = 0.15; // ev_gap > 3 pts — lowered to get more β candidates
 
-    // Helper: find best candidate satisfying a predicate, with turn-diversity bonus
-    // and quadrant cap penalties
+    // Helper: find best candidate satisfying a predicate, with turn-diversity bonus,
+    // quadrant cap penalties, and action-fatigue check
     let find_best =
         |used: &[bool], turn_set: &[usize], theta_count: usize, gamma_count: usize,
+         action_label_count: &HashMap<String, usize>,
          pred: &dyn Fn(usize) -> bool| -> Option<usize> {
             let mut best_idx: Option<usize> = None;
             let mut best_score = f32::NEG_INFINITY;
@@ -1232,6 +1241,13 @@ pub fn assemble_quiz(
                     continue;
                 }
                 if is_gamma_dominant && gamma_count >= max_gamma {
+                    continue;
+                }
+                // Action-fatigue: skip if any top-2 action label is over the limit
+                let fatigued = pool[i].top_action_labels.iter().any(|lbl| {
+                    *action_label_count.get(lbl).unwrap_or(&0) >= max_action_fatigue
+                });
+                if fatigued {
                     continue;
                 }
                 let mut score = pool[i].scores.total_score();
@@ -1260,7 +1276,8 @@ pub fn assemble_quiz(
                       phase_count: &mut [usize; 3], dtype_count: &mut [usize; 3],
                       theta_count: &mut usize, gamma_count: &mut usize,
                       depth_count: &mut usize, beta_count: &mut usize,
-                      turn_set: &mut Vec<usize>| {
+                      turn_set: &mut Vec<usize>,
+                      action_label_count: &mut HashMap<String, usize>| {
         let sc = &pool[idx];
         selected.push(idx);
         used[idx] = true;
@@ -1289,6 +1306,10 @@ pub fn assemble_quiz(
         }
         if !turn_set.contains(&sc.decision.turn) {
             turn_set.push(sc.decision.turn);
+        }
+        // Track action-fatigue
+        for lbl in &sc.top_action_labels {
+            *action_label_count.entry(lbl.clone()).or_insert(0) += 1;
         }
     };
 
@@ -1359,7 +1380,7 @@ pub fn assemble_quiz(
                     1 => GamePhase::Mid,
                     _ => GamePhase::Late,
                 };
-                find_best(&used, &turn_set, theta_count, gamma_count, &|i| pool[i].bucket.phase == target_phase)
+                find_best(&used, &turn_set, theta_count, gamma_count, &action_label_count, &|i| pool[i].bucket.phase == target_phase)
             }
             2 => {
                 let target_dtype = match worst_param {
@@ -1367,12 +1388,12 @@ pub fn assemble_quiz(
                     1 => DecisionType::Reroll2,
                     _ => DecisionType::Category,
                 };
-                find_best(&used, &turn_set, theta_count, gamma_count, &|i| pool[i].bucket.dtype == target_dtype)
+                find_best(&used, &turn_set, theta_count, gamma_count, &action_label_count, &|i| pool[i].bucket.dtype == target_dtype)
             }
-            3 => find_best(&used, &turn_set, theta_count, gamma_count, &|i| pool[i].scores.s_theta >= theta_thresh),
-            4 => find_best(&used, &turn_set, theta_count, gamma_count, &|i| pool[i].scores.s_gamma >= gamma_thresh),
-            5 => find_best(&used, &turn_set, theta_count, gamma_count, &|i| pool[i].scores.s_d > 0.0),
-            6 => find_best(&used, &turn_set, theta_count, gamma_count, &|i| pool[i].scores.s_beta >= beta_thresh),
+            3 => find_best(&used, &turn_set, theta_count, gamma_count, &action_label_count, &|i| pool[i].scores.s_theta >= theta_thresh),
+            4 => find_best(&used, &turn_set, theta_count, gamma_count, &action_label_count, &|i| pool[i].scores.s_gamma >= gamma_thresh),
+            5 => find_best(&used, &turn_set, theta_count, gamma_count, &action_label_count, &|i| pool[i].scores.s_d > 0.0),
+            6 => find_best(&used, &turn_set, theta_count, gamma_count, &action_label_count, &|i| pool[i].scores.s_beta >= beta_thresh),
             _ => None,
         };
 
@@ -1382,6 +1403,7 @@ pub fn assemble_quiz(
                 &mut phase_count, &mut dtype_count,
                 &mut theta_count, &mut gamma_count, &mut depth_count,
                 &mut beta_count, &mut turn_set,
+                &mut action_label_count,
             ),
             None => break, // Can't fill this constraint, move on
         }
@@ -1407,6 +1429,13 @@ pub fn assemble_quiz(
                 continue;
             }
             if is_gamma_dominant && gamma_count >= max_gamma {
+                continue;
+            }
+            // Action-fatigue: skip if any top-2 action label is over the limit
+            let fatigued = sc.top_action_labels.iter().any(|lbl| {
+                *action_label_count.get(lbl).unwrap_or(&0) >= max_action_fatigue
+            });
+            if fatigued {
                 continue;
             }
 
@@ -1461,6 +1490,7 @@ pub fn assemble_quiz(
                 &mut phase_count, &mut dtype_count,
                 &mut theta_count, &mut gamma_count, &mut depth_count,
                 &mut beta_count, &mut turn_set,
+                &mut action_label_count,
             ),
             None => break,
         }

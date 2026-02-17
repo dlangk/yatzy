@@ -12,9 +12,9 @@ const PARAMS = [
     ticks: [{ val: 0, label: '0' }],
   },
   {
-    key: 'beta', ci: 'ci_beta', label: 'Precision (β)', min: 0.1, max: 20,
+    key: 'beta', ci: 'ci_beta', label: 'Precision (β)', min: 0.1, max: 10,
     fmt: v => v.toFixed(1),
-    minLabel: '0', maxLabel: '20',
+    minLabel: '0', maxLabel: '10',
   },
   {
     key: 'gamma', ci: 'ci_gamma', label: 'Horizon (γ)', min: 0.1, max: 1.0,
@@ -22,12 +22,11 @@ const PARAMS = [
     minLabel: '0', maxLabel: '1',
   },
   {
-    key: 'd', ci: null, label: 'Depth (d)', min: 5, max: 999,
+    key: 'd', ci: null, label: 'Depth (d)', min: 8, max: 999,
     fmt: v => v === 999 ? '∞' : String(v),
-    minLabel: '5', maxLabel: '∞',
+    minLabel: '8', maxLabel: '∞',
     steps: [
-      { val: 5, label: '5' }, { val: 8, label: '8' }, { val: 10, label: '10' },
-      { val: 15, label: '15' }, { val: 20, label: '20' }, { val: 999, label: '∞' },
+      { val: 8, label: '8' }, { val: 20, label: '20' }, { val: 999, label: '∞' },
     ],
   },
 ];
@@ -56,7 +55,7 @@ const CONCEPT_HTML = {
   `,
   beta: `
     <h2>Decision Precision (β)</h2>
-    <p><strong>Range:</strong> 0.1 to 20</p>
+    <p><strong>Range:</strong> 0.1 to 10</p>
     <p>β is the <strong>inverse temperature</strong> of a softmax choice model:
        P(action) ∝ e<sup>β·Q(action)</sup>. It measures how reliably you pick the
        highest-value option.</p>
@@ -95,18 +94,15 @@ const CONCEPT_HTML = {
   `,
   d: `
     <h2>Strategic Depth (d)</h2>
-    <p><strong>Values:</strong> 5, 8, 10, 15, 20, ∞ (optimal)</p>
+    <p><strong>Values:</strong> 8, 20, ∞ (optimal)</p>
     <p>d models the player's <strong>resolution</strong> for evaluating game states.
        Higher d means the player can distinguish fine differences in position value.
        It's calibrated from decision tree models trained on the exact solver.</p>
     <h3>Calibration</h3>
     <table>
       <tr><th>d</th><th>Mean Score</th><th>EV Loss</th><th>Level</th></tr>
-      <tr><td>5</td><td>157</td><td>91 pts</td><td>Novice</td></tr>
       <tr><td>8</td><td>192</td><td>56 pts</td><td>Developing</td></tr>
-      <tr><td>10</td><td>216</td><td>32 pts</td><td>Intermediate</td></tr>
-      <tr><td>15</td><td>239</td><td>9 pts</td><td>Advanced</td></tr>
-      <tr><td>20</td><td>245</td><td>3 pts</td><td>Expert</td></tr>
+      <tr><td>20</td><td>245</td><td>3 pts</td><td>Strong</td></tr>
       <tr><td>∞</td><td>248</td><td>0 pts</td><td>Optimal</td></tr>
     </table>
     <h3>How it works</h3>
@@ -124,7 +120,7 @@ const CONCEPT_HTML = {
 
 function normalizePct(key, v, min, max) {
   if (key === 'd') {
-    const dMap = { 5: 10, 8: 25, 10: 40, 15: 60, 20: 80, 999: 100 };
+    const dMap = { 8: 15, 20: 65, 999: 100 };
     return dMap[v] || 50;
   }
   return ((v - min) / (max - min)) * 100;

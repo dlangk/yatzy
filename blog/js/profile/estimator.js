@@ -7,16 +7,16 @@
  *   θ ∈ [-0.1, 0.1]  — risk attitude (0 = neutral)
  *   β ∈ [0.1, 20]    — precision / inverse temperature
  *   γ ∈ [0.1, 1.0]   — discount factor (myopia)
- *   d ∈ {5, 8, 10, 15, 20, 999} — depth (resolution)
+ *   d ∈ {8, 20, 999} — depth (weak / strong / optimal)
  *
- * Uses Nelder-Mead simplex optimization on the negative log-likelihood.
- * Q-values are looked up from pre-computed grids with interpolation.
+ * Uses Nelder-Mead simplex optimization with multiple restarts.
+ * Q-values are looked up from pre-computed grids with nearest-neighbor.
  */
 
 // Parameter grid values (must match scenarios.json)
 const THETA_GRID = [-0.05, -0.02, 0, 0.02, 0.05, 0.1];
 const GAMMA_GRID = [0.3, 0.6, 0.8, 0.9, 0.95, 1.0];
-const D_GRID = [5, 8, 10, 15, 20, 999];
+const D_GRID = [8, 20, 999];
 
 const DEFAULT_PARAMS = { theta: 0, beta: 2, gamma: 0.9, d: 999 };
 
@@ -169,9 +169,9 @@ function nelderMead(f, x0, { maxIter = 500, tol = 1e-6 } = {}) {
 function clampParams(theta, beta, gamma, d) {
   return {
     theta: Math.max(-0.1, Math.min(0.1, theta)),
-    beta: Math.max(0.1, Math.min(20, beta)),
+    beta: Math.max(0.1, Math.min(10, beta)),
     gamma: Math.max(0.1, Math.min(1.0, gamma)),
-    d: findNearest(D_GRID, Math.max(5, Math.min(999, d))),
+    d: findNearest(D_GRID, Math.max(8, Math.min(999, d))),
   };
 }
 
@@ -183,34 +183,67 @@ function clampParams(theta, beta, gamma, d) {
 export function estimateProfile(scenarios, answers) {
   if (answers.length < 1) return null;
 
-  // Optimize over [theta, log(beta), gamma, log(d_continuous)]
-  const objective = (x) => {
-    const theta = Math.max(-0.1, Math.min(0.1, x[0]));
-    const beta = Math.max(0.1, Math.min(20, Math.exp(x[1])));
-    const gamma = Math.max(0.1, Math.min(1.0, x[2]));
-    const d = findNearest(D_GRID, Math.exp(x[3]));
-    return negLogLikelihood(scenarios, answers, theta, beta, gamma, d);
-  };
+  // Try each d value with multiple starting points — pick best overall
+  const BETA_MAX = 10;
+  const BETA_PRIOR_MU = Math.log(3);
+  const BETA_PRIOR_SIGMA = 1.0;
 
-  // Initial point
-  const x0 = [0, Math.log(2), 0.9, Math.log(20)];
+  const startPoints = [
+    [0, Math.log(2), 0.9],
+    [0, Math.log(5), 0.95],
+    [0, Math.log(1), 0.5],
+    [-0.05, Math.log(3), 0.85],
+    [0.05, Math.log(1.5), 0.7],
+    [0, Math.log(8), 0.95],
+  ];
 
-  const result = nelderMead(objective, x0, { maxIter: 800, tol: 1e-8 });
+  let bestResult = null;
+  let bestNll = Infinity;
+  let bestD = 999;
 
-  const theta = Math.max(-0.1, Math.min(0.1, result.x[0]));
-  const beta = Math.max(0.1, Math.min(20, Math.exp(result.x[1])));
-  const gamma = Math.max(0.1, Math.min(1.0, result.x[2]));
-  const d = findNearest(D_GRID, Math.exp(result.x[3]));
+  for (const dVal of D_GRID) {
+    const objective = (x) => {
+      const theta = Math.max(-0.1, Math.min(0.1, x[0]));
+      const beta = Math.max(0.1, Math.min(BETA_MAX, Math.exp(x[1])));
+      const gamma = Math.max(0.1, Math.min(1.0, x[2]));
+      let nll = negLogLikelihood(scenarios, answers, theta, beta, gamma, dVal);
+      // Weak log-normal prior on β to prevent drift at flat NLL regions
+      nll += 0.5 * ((x[1] - BETA_PRIOR_MU) / BETA_PRIOR_SIGMA) ** 2;
+      return nll;
+    };
 
-  // Confidence intervals via numerical Hessian
+    for (const x0 of startPoints) {
+      const result = nelderMead(objective, x0, { maxIter: 800, tol: 1e-8 });
+      if (result.fx < bestNll) {
+        bestNll = result.fx;
+        bestResult = result;
+        bestD = dVal;
+      }
+    }
+  }
+
+  if (!bestResult) return null;
+
+  const theta = Math.max(-0.1, Math.min(0.1, bestResult.x[0]));
+  const beta = Math.max(0.1, Math.min(BETA_MAX, Math.exp(bestResult.x[1])));
+  const gamma = Math.max(0.1, Math.min(1.0, bestResult.x[2]));
+  const d = bestD;
+
+  // Confidence intervals via numerical Hessian (3 continuous params)
   const eps = 1e-4;
-  const hessian = numericalHessian(objective, result.x, eps);
-  const ci = computeCI(hessian, result.x);
+  const ciObjective = (x) => {
+    const t = Math.max(-0.1, Math.min(0.1, x[0]));
+    const b = Math.max(0.1, Math.min(20, Math.exp(x[1])));
+    const g = Math.max(0.1, Math.min(1.0, x[2]));
+    return negLogLikelihood(scenarios, answers, t, b, g, d);
+  };
+  const hessian = numericalHessian(ciObjective, bestResult.x, eps);
+  const ci = computeCI(hessian, bestResult.x);
 
   // BIC
   const k = 4; // number of parameters
   const n = answers.length;
-  const bic = k * Math.log(n) + 2 * result.fx;
+  const bic = k * Math.log(n) + 2 * bestNll;
 
   return {
     theta,
@@ -221,7 +254,7 @@ export function estimateProfile(scenarios, answers) {
     ci_beta: [Math.exp(ci[1][0]), Math.exp(ci[1][1])],
     ci_gamma: ci[2],
     ci_d: d, // discrete, no CI
-    nll: result.fx,
+    nll: bestNll,
     bic,
   };
 }
@@ -301,12 +334,12 @@ export function describeProfile(profile) {
   }
 
   // Depth / resolution
-  const dLabels = { 5: 'novice', 8: 'developing', 10: 'intermediate', 15: 'advanced', 20: 'expert', 999: 'optimal' };
+  const dLabels = { 8: 'developing', 20: 'strong', 999: 'optimal' };
   const label = dLabels[profile.d] || 'unknown';
   parts.push(`Your strategic resolution is **${label}** (d=${profile.d}).`);
 
   // Score impact estimate
-  const sigmaD = { 5: 25, 8: 15, 10: 10, 15: 4, 20: 2, 999: 0 }[profile.d] || 10;
+  const sigmaD = { 8: 15, 20: 2, 999: 0 }[profile.d] || 10;
   const evLoss = sigmaD * 0.4 + (1 - profile.gamma) * 30 + Math.abs(profile.theta) * 50;
   parts.push(`Estimated impact: ~**${evLoss.toFixed(0)} points/game** below optimal.`);
 
