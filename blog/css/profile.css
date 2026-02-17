@@ -79,7 +79,7 @@
 /* Two-column layout: decision (left) + scorecard (right) */
 .profile-scenario-layout {
   display: grid;
-  grid-template-columns: 1fr 240px;
+  grid-template-columns: 1fr 260px;
   gap: 16px;
   align-items: start;
 }
@@ -92,7 +92,7 @@
   padding-left: 16px;
 }
 .profile-scenario-right .scorecard {
-  font-size: 12px;
+  font-size: 13px;
 }
 .profile-scenario-right .scorecard-cell {
   height: 24px;
@@ -102,7 +102,7 @@
   height: 20px;
 }
 .profile-scenario-right .scorecard th {
-  font-size: 11px;
+  font-size: 12px;
   padding: 2px 6px;
 }
 
@@ -111,22 +111,37 @@
   margin: 16px 0;
 }
 
-/* Reroll indicator (lives in right column above scorecard) */
+/* Reroll indicator bar (lives in right column above scorecard) */
 .profile-reroll-indicator {
+  margin-bottom: 10px;
+}
+.profile-reroll-bar {
+  position: relative;
+  height: 28px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.profile-reroll-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--accent);
+  opacity: 0.18;
+  transition: width 0.3s ease;
+}
+.profile-reroll-bar-label {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 10px;
-}
-.profile-reroll-badge {
   font-family: var(--font-mono);
-  font-size: 14px;
-  font-weight: bold;
-  padding: 6px 18px;
-  background: var(--bg);
-  border: 2px solid var(--accent);
-  border-radius: 6px;
-  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
 }
 
 .profile-confirm-btn {
@@ -138,22 +153,32 @@
   text-align: center;
 }
 .profile-scorecard-check {
-  font-size: 16px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--text-muted);
 }
 .profile-scorecard-action {
-  font-size: 14px;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--accent);
 }
 .profile-scorecard-bonus-yes {
-  font-weight: bold;
+  font-weight: 600;
   color: #28a745;
 }
 .profile-scorecard-bonus-no {
-  font-size: 10px;
   color: var(--text-muted);
+}
+/* Delta vs par column */
+.profile-scorecard-delta {
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.profile-scorecard-delta.delta-pos {
+  color: #28a745;
+}
+.profile-scorecard-delta.delta-neg {
+  color: #dc3545;
 }
 
 .profile-description {

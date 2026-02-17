@@ -11,6 +11,9 @@ const CATEGORY_NAMES = [
 const UPPER_CATEGORIES = 6;
 const BONUS_THRESHOLD = 63;
 
+// Par = 3 × face value (3 of each gives 63 total)
+const UPPER_PAR = [3, 6, 9, 12, 15, 18];
+
 // Typical lower-category scores for display (cosmetic only, not used in estimation)
 const TYPICAL_LOWER = {
   6: 10,   // One Pair
@@ -25,35 +28,55 @@ const TYPICAL_LOWER = {
 };
 
 /**
- * Generate plausible fake scores for scored categories.
- * Upper categories: distribute upper_score proportionally by face value.
- * Lower categories: use typical values.
- * These are cosmetic — they don't affect parameter estimation.
+ * Generate valid scores for scored upper categories.
+ * Each upper category i scores a multiple of (i+1), range [0, 5*(i+1)].
+ * The scores must sum to exactly upperScore.
+ *
+ * Strategy: assign each category its par value (3×face), then adjust
+ * to hit the exact upperScore sum using valid increments/decrements.
  */
 function fakeScores(scored, upperScore) {
   const scores = new Array(15).fill(null);
 
-  // Upper: distribute proportionally by face value (1-6)
-  let weightSum = 0;
+  // Collect which upper categories are scored
+  const scoredUpper = [];
   for (let i = 0; i < UPPER_CATEGORIES; i++) {
-    if (scored & (1 << i)) weightSum += (i + 1);
+    if (scored & (1 << i)) scoredUpper.push(i);
   }
-  if (weightSum > 0) {
-    let assigned = 0;
-    const scoredUpper = [];
-    for (let i = 0; i < UPPER_CATEGORIES; i++) {
-      if (scored & (1 << i)) scoredUpper.push(i);
-    }
-    for (let j = 0; j < scoredUpper.length; j++) {
-      const i = scoredUpper[j];
-      if (j === scoredUpper.length - 1) {
-        // Last one gets the remainder to ensure exact sum
-        scores[i] = upperScore - assigned;
-      } else {
-        const val = Math.round(upperScore * (i + 1) / weightSum);
-        scores[i] = val;
-        assigned += val;
+
+  if (scoredUpper.length > 0) {
+    // Start at par (3 × face value)
+    const vals = scoredUpper.map(i => UPPER_PAR[i]);
+    let currentSum = vals.reduce((a, b) => a + b, 0);
+    let deficit = upperScore - currentSum;
+
+    // Adjust values to hit exact sum, respecting valid range [0, 5*(i+1)]
+    // Iterate in random-ish order to spread adjustments
+    let attempts = 0;
+    while (deficit !== 0 && attempts < 100) {
+      for (let j = 0; j < scoredUpper.length && deficit !== 0; j++) {
+        const i = scoredUpper[j];
+        const face = i + 1;
+        if (deficit > 0 && vals[j] + face <= 5 * face) {
+          vals[j] += face;
+          deficit -= face;
+        } else if (deficit < 0 && vals[j] - face >= 0) {
+          vals[j] -= face;
+          deficit += face;
+        }
       }
+      attempts++;
+    }
+
+    // If we still can't hit exact sum (rare edge case), clamp
+    if (deficit !== 0) {
+      // Force last category to absorb remainder (may be slightly off-multiple)
+      vals[vals.length - 1] += deficit;
+      vals[vals.length - 1] = Math.max(0, vals[vals.length - 1]);
+    }
+
+    for (let j = 0; j < scoredUpper.length; j++) {
+      scores[scoredUpper[j]] = vals[j];
     }
   }
 
@@ -66,24 +89,35 @@ function fakeScores(scored, upperScore) {
 }
 
 /**
+ * Format a delta value as "+N" or "−N" or "±0".
+ */
+function fmtDelta(d) {
+  if (d > 0) return `+${d}`;
+  if (d < 0) return `\u2212${Math.abs(d)}`;
+  return '\u00b10';
+}
+
+/**
  * Create a read-only scorecard element.
  * Call update(scenario) to refresh it for each new scenario.
  */
 export function createProfileScorecard() {
   const table = document.createElement('table');
-  table.className = 'scorecard';
+  table.className = 'scorecard profile-scorecard';
 
   const colgroup = document.createElement('colgroup');
   const col1 = document.createElement('col');
-  col1.style.width = '70%';
+  col1.style.width = '55%';
   const col2 = document.createElement('col');
-  col2.style.width = '30%';
-  colgroup.append(col1, col2);
+  col2.style.width = '25%';
+  const col3 = document.createElement('col');
+  col3.style.width = '20%';
+  colgroup.append(col1, col2, col3);
   table.appendChild(colgroup);
 
   const thead = document.createElement('thead');
   const headerRow = document.createElement('tr');
-  ['Category', ''].forEach(text => {
+  ['Category', '', ''].forEach(text => {
     const th = document.createElement('th');
     th.textContent = text;
     headerRow.appendChild(th);
@@ -105,9 +139,11 @@ export function createProfileScorecard() {
     nameCell.textContent = CATEGORY_NAMES[i];
     const statusCell = document.createElement('td');
     statusCell.className = 'scorecard-cell profile-scorecard-status';
-    tr.append(nameCell, statusCell);
+    const deltaCell = document.createElement('td');
+    deltaCell.className = 'scorecard-cell profile-scorecard-delta';
+    tr.append(nameCell, statusCell, deltaCell);
     tbody.appendChild(tr);
-    rows.push({ tr, nameCell, statusCell });
+    rows.push({ tr, nameCell, statusCell, deltaCell });
 
     // Bonus separator after last upper category
     if (i === UPPER_CATEGORIES - 1) {
@@ -117,9 +153,11 @@ export function createProfileScorecard() {
       sepName.className = 'scorecard-cell';
       const sepVal = document.createElement('td');
       sepVal.className = 'scorecard-cell profile-scorecard-status';
-      sep.append(sepName, sepVal);
+      const sepDelta = document.createElement('td');
+      sepDelta.className = 'scorecard-cell profile-scorecard-delta';
+      sep.append(sepName, sepVal, sepDelta);
       tbody.appendChild(sep);
-      bonusRow = { sepName, sepVal };
+      bonusRow = { sepName, sepVal, sepDelta };
     }
   }
 
@@ -128,15 +166,33 @@ export function createProfileScorecard() {
     const upperScore = scenario.upper_score;
     const scores = fakeScores(scored, upperScore);
 
+    // Compute total par for scored upper categories
+    let parSum = 0;
+    for (let i = 0; i < UPPER_CATEGORIES; i++) {
+      if (scored & (1 << i)) parSum += UPPER_PAR[i];
+    }
+    const totalDelta = upperScore - parSum;
+
     for (let i = 0; i < 15; i++) {
       const isScored = (scored & (1 << i)) !== 0;
       const row = rows[i];
 
       row.tr.className = '';
+      row.deltaCell.textContent = '';
+      row.deltaCell.className = 'scorecard-cell profile-scorecard-delta';
+
       if (isScored) {
         row.tr.classList.add('scorecard-row--scored');
         row.statusCell.textContent = scores[i] != null ? scores[i] : '\u2713';
         row.statusCell.className = 'scorecard-cell profile-scorecard-status profile-scorecard-check';
+
+        // Show delta vs par for upper categories
+        if (i < UPPER_CATEGORIES && scores[i] != null) {
+          const delta = scores[i] - UPPER_PAR[i];
+          row.deltaCell.textContent = `(${fmtDelta(delta)})`;
+          row.deltaCell.className = 'scorecard-cell profile-scorecard-delta'
+            + (delta > 0 ? ' delta-pos' : delta < 0 ? ' delta-neg' : '');
+        }
       } else {
         row.statusCell.textContent = '';
         row.statusCell.className = 'scorecard-cell profile-scorecard-status';
@@ -152,13 +208,22 @@ export function createProfileScorecard() {
       }
     }
 
-    // Bonus row — just show upper score progress
+    // Bonus row — upper score progress + total delta
     if (bonusRow) {
       bonusRow.sepName.textContent = 'Bonus';
       bonusRow.sepVal.textContent = `${upperScore}/${BONUS_THRESHOLD}`;
       bonusRow.sepVal.className = upperScore >= BONUS_THRESHOLD
         ? 'scorecard-cell profile-scorecard-status profile-scorecard-bonus-yes'
         : 'scorecard-cell profile-scorecard-status profile-scorecard-bonus-no';
+
+      // Show total delta vs par for all scored upper cats
+      if (parSum > 0) {
+        bonusRow.sepDelta.textContent = `(${fmtDelta(totalDelta)})`;
+        bonusRow.sepDelta.className = 'scorecard-cell profile-scorecard-delta'
+          + (totalDelta > 0 ? ' delta-pos' : totalDelta < 0 ? ' delta-neg' : '');
+      } else {
+        bonusRow.sepDelta.textContent = '';
+      }
     }
   }
 

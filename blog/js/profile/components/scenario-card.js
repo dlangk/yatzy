@@ -140,9 +140,14 @@ export function initScenarioCard(container) {
     scorecard.update(scenario);
     isRerollDecision = scenario.decision_type !== 'category';
 
-    // Reroll indicator
+    // Reroll indicator — bar fills based on remaining rerolls
+    const rr = scenario.rerolls_remaining;
+    const pct = rr === 2 ? 100 : rr === 1 ? 50 : 0;
     rerollIndicator.innerHTML = `
-      <span class="profile-reroll-badge">Rerolls remaining: ${scenario.rerolls_remaining}</span>
+      <div class="profile-reroll-bar">
+        <div class="profile-reroll-bar-fill" style="width:${pct}%"></div>
+        <span class="profile-reroll-bar-label">${rr} reroll${rr !== 1 ? 's' : ''} left</span>
+      </div>
     `;
 
     // Dice legend — show for reroll decisions, hide for category
