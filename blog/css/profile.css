@@ -1,0 +1,469 @@
+/* Profile quiz styles */
+
+/* Intro */
+.profile-intro-content {
+  text-align: center;
+  padding: 2rem 0;
+}
+.profile-intro-content h2 {
+  font-size: 1.6rem;
+  margin-bottom: 1rem;
+}
+.profile-intro-content p {
+  color: var(--text-muted);
+  max-width: 500px;
+  margin: 0 auto 1rem;
+}
+.profile-loading {
+  text-align: center;
+  padding: 3rem 0;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* Progress bar */
+.profile-progress {
+  margin: 12px 0;
+  min-height: 28px;
+}
+.profile-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.profile-reset-btn {
+  font-size: 12px;
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+.profile-progress-track {
+  height: 6px;
+  background: var(--bg-alt);
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.profile-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+.profile-progress-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* Scenario card */
+.profile-scenario-card {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 12px 0;
+  min-height: 280px;
+}
+.profile-scenario-meta {
+  display: flex;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+/* Two-column layout: decision (left) + scorecard (right) */
+.profile-scenario-layout {
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  gap: 16px;
+  align-items: start;
+}
+.profile-scenario-left {
+  display: flex;
+  flex-direction: column;
+}
+.profile-scenario-right {
+  border-left: 1px solid var(--border);
+  padding-left: 16px;
+}
+.profile-scenario-right .scorecard {
+  font-size: 12px;
+}
+.profile-scenario-right .scorecard-cell {
+  height: 24px;
+  padding: 2px 6px;
+}
+.profile-scenario-right .scorecard-separator .scorecard-cell {
+  height: 20px;
+}
+.profile-scenario-right .scorecard th {
+  font-size: 11px;
+  padding: 2px 6px;
+}
+
+/* Dice row reuses game-dice-row + die--interactive from game.css */
+.profile-scenario-left .game-dice-row {
+  margin: 16px 0;
+}
+
+/* Reroll indicator (lives in right column above scorecard) */
+.profile-reroll-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+.profile-reroll-badge {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: bold;
+  padding: 6px 18px;
+  background: var(--bg);
+  border: 2px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+}
+
+.profile-confirm-btn {
+  min-width: 160px;
+}
+
+/* Scorecard status cells */
+.profile-scorecard-status {
+  text-align: center;
+}
+.profile-scorecard-check {
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--text-muted);
+}
+.profile-scorecard-action {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--accent);
+}
+.profile-scorecard-bonus-yes {
+  font-weight: bold;
+  color: #28a745;
+}
+.profile-scorecard-bonus-no {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.profile-description {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  font-style: italic;
+}
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.profile-action-btn {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 8px 16px;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s;
+  min-width: 100px;
+}
+.profile-action-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+.profile-action-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.profile-btn-optimal {
+  border-color: #28a745 !important;
+  background: rgba(40, 167, 69, 0.1) !important;
+}
+.profile-feedback {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  min-height: 24px;
+  margin-top: 8px;
+  transition: opacity 0.2s;
+}
+.profile-feedback-correct {
+  color: #28a745;
+  font-weight: bold;
+}
+.profile-feedback-wrong {
+  color: var(--text-muted);
+}
+
+/* Selected answer highlight (user's previous pick) */
+.profile-btn-selected {
+  border-color: var(--accent) !important;
+  background: var(--accent-light) !important;
+}
+.profile-change-btn {
+  font-size: 12px;
+  padding: 4px 12px;
+  margin-left: 8px;
+}
+
+/* Navigation */
+.profile-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 12px;
+  min-height: 36px;
+}
+.profile-nav-btn {
+  font-size: 13px;
+  padding: 6px 14px;
+  min-width: 100px;
+}
+.profile-nav-label {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-muted);
+  min-width: 60px;
+  text-align: center;
+}
+
+/* Parameter chart */
+.profile-params {
+  margin: 16px 0;
+  transition: opacity 0.3s;
+}
+.profile-params-title {
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+.profile-params-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.profile-param-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 60px;
+  align-items: start;
+  gap: 8px;
+}
+.profile-param-bar-wrap {
+  display: flex;
+  flex-direction: column;
+}
+.profile-param-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 3px;
+  transition: background 0.15s;
+  padding: 1px 3px;
+  border-radius: 2px;
+}
+.profile-param-label:hover,
+.profile-param-label.active {
+  background: var(--accent-light);
+}
+.profile-param-bar-track {
+  height: 12px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  position: relative;
+  overflow: visible;
+}
+.profile-param-ci {
+  position: absolute;
+  top: 1px;
+  height: calc(100% - 2px);
+  background: var(--accent);
+  opacity: 0.25;
+  border-radius: 5px;
+  transition: left 0.3s ease, width 0.3s ease;
+  display: none;
+}
+.profile-param-marker {
+  position: absolute;
+  top: -1px;
+  width: 3px;
+  height: calc(100% + 2px);
+  background: var(--accent);
+  border-radius: 2px;
+  transform: translateX(-50%);
+  transition: left 0.3s ease;
+  display: none;
+  z-index: 1;
+}
+.profile-param-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  padding-top: 1px;
+}
+
+/* Axis labels below the track */
+.profile-param-axis {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  padding: 2px 2px 0;
+  opacity: 0.7;
+}
+.profile-param-axis-spacer {
+  height: 14px; /* room for tick labels below the track */
+}
+
+/* Center line (e.g. zero for theta) */
+.profile-param-center {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: var(--text-muted);
+  opacity: 0.4;
+  transform: translateX(-50%);
+  z-index: 0;
+}
+
+/* Tick marks for discrete steps */
+.profile-param-tick {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  transform: translateX(-50%);
+  z-index: 0;
+  pointer-events: none;
+}
+.profile-param-tick-line {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 1px;
+  height: 100%;
+  background: var(--text-muted);
+  opacity: 0.3;
+}
+.profile-param-tick-label {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+/* Result panel */
+.profile-result {
+  margin: 24px 0;
+  padding: 20px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.profile-result-placeholder {
+  min-height: 200px;
+}
+.profile-result-title {
+  font-size: 1.4rem;
+  margin: 0 0 16px;
+  text-align: center;
+}
+.profile-result-score {
+  text-align: center;
+  margin-bottom: 20px;
+}
+.profile-result-correct {
+  font-family: var(--font-mono);
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--accent);
+}
+.profile-result-pct {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-left: 8px;
+}
+.profile-result-params {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.profile-result-param {
+  text-align: center;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.profile-result-param-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.profile-result-param-value {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+.profile-result-description {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+.profile-result-description p {
+  margin: 0 0 0.8rem;
+}
+.profile-retry-btn {
+  display: block;
+  margin: 0 auto;
+}
+
+/* Responsive */
+@media (max-width: 720px) {
+  .profile-scenario-layout {
+    grid-template-columns: 1fr;
+  }
+  .profile-scenario-right {
+    border-left: none;
+    border-top: 1px solid var(--border);
+    padding-left: 0;
+    padding-top: 12px;
+  }
+  .profile-result-params {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .profile-param-row {
+    grid-template-columns: 100px 1fr 50px;
+  }
+}

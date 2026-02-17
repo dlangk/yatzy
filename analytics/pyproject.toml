@@ -13,6 +13,9 @@ dependencies = [
     "plotly>=6.0",
 ]
 
+[project.optional-dependencies]
+surrogate = ["scikit-learn>=1.3", "torch>=2.0", "joblib>=1.3"]
+
 [project.scripts]
 yatzy-analyze = "yatzy_analysis.cli:cli"
 

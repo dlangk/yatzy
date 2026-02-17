@@ -1035,6 +1035,382 @@ def modality(base_path: str, fmt: str, dpi: int):
     click.echo(f"Done in {time.time() - t0:.1f}s.")
 
 
+@cli.command()
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--format", "fmt", default="png", type=click.Choice(["png", "svg"]))
+@click.option("--dpi", default=200, type=int)
+def compression(base_path: str, fmt: str, dpi: int):
+    """Plot policy compression analysis (gap distributions, coverage)."""
+    import matplotlib
+    matplotlib.use("Agg")
+
+    from .plots.compression import plot_all_compression
+
+    t0 = time.time()
+    data_dir = Path(base_path) / "outputs" / "policy_compression"
+    if not data_dir.exists():
+        click.echo(f"{data_dir} not found. Run yatzy-decision-gaps first.")
+        raise SystemExit(1)
+
+    out_dir = Path(base_path) / "outputs" / "plots"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    paths = plot_all_compression(out_dir, data_dir, dpi=dpi, fmt=fmt)
+    for p in paths:
+        click.echo(f"  {p.name}")
+    click.echo(f"Done in {time.time() - t0:.1f}s — {len(paths)} plots")
+
+
+@cli.command("surrogate-diagnose")
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--data-dir", default=None, help="Path to training data dir.")
+@click.option("--format", "fmt", default="png", type=click.Choice(["png", "svg"]))
+@click.option("--dpi", default=200, type=int)
+def surrogate_diagnose(base_path: str, data_dir: str | None, fmt: str, dpi: int):
+    """Run surrogate diagnostics: label noise + error distribution analysis."""
+    import matplotlib
+    matplotlib.use("Agg")
+
+    from .surrogate import (
+        accuracy,
+        analyze_error_distribution,
+        ev_loss_per_game,
+        load_training_data,
+        quantify_label_noise,
+    )
+    from .plots.surrogate import plot_error_analysis
+
+    t0 = time.time()
+    data_path = Path(data_dir) if data_dir else Path(base_path) / "data" / "surrogate"
+    models_dir = Path(base_path) / "outputs" / "surrogate" / "models"
+
+    decision_configs = [
+        ("category", "category_decisions.bin", 29, 15),
+        ("reroll1", "reroll1_decisions.bin", 30, 32),
+        ("reroll2", "reroll2_decisions.bin", 30, 32),
+    ]
+
+    error_data: dict[str, dict] = {}
+
+    for dtype, filename, n_features, n_classes in decision_configs:
+        path = data_path / filename
+        if not path.exists():
+            click.echo(f"  [skip] {path} not found")
+            continue
+
+        click.echo(f"\n{'='*50}")
+        click.echo(f"  {dtype} ({n_features} features)")
+        click.echo(f"{'='*50}")
+
+        features, labels, gaps = load_training_data(path)
+
+        # Exp 1: Label noise
+        click.echo("\n  --- Label Noise Quantification ---")
+        noise = quantify_label_noise(features, labels, gaps)
+        click.echo(f"    Records: {noise['n_records']:,d}")
+        click.echo(f"    Unique feature vectors: {noise['n_unique_vectors']:,d}")
+        click.echo(f"    Conflicting vectors: {noise['n_conflicting']:,d}")
+        click.echo(f"    Conflict fraction: {noise['conflict_fraction']:.4%}")
+        click.echo(f"    Conflict records: {noise['total_conflict_records']:,d}")
+        click.echo(f"    Total conflict gap: {noise['total_conflict_gap']:.3f}")
+
+        # Exp 2: Error distribution (requires trained dt_full)
+        model_path = models_dir / f"{dtype}_dt_full.pkl"
+        if model_path.exists():
+            import joblib
+            model = joblib.load(model_path)
+
+            records_per_game = 15
+            n_total_games = len(features) // records_per_game
+            n_train_games = int(n_total_games * 0.8)
+            n_test_games = n_total_games - n_train_games
+            train_end = n_train_games * records_per_game
+
+            X_test = features[train_end:]
+            y_test = labels[train_end:]
+            gaps_test = gaps[train_end:]
+
+            click.echo("\n  --- Error Distribution Analysis ---")
+            error = analyze_error_distribution(
+                X_test, y_test, gaps_test, model, n_test_games, dtype,
+            )
+            error_data[dtype] = error
+            click.echo(f"    Errors: {error['n_wrong']:,d} / {error['n_total']:,d}")
+            click.echo(f"    Error rate: {error['error_rate']:.2%}")
+            if error['n_wrong'] > 0:
+                gs = error["gap_stats"]
+                click.echo(f"    Mean gap of errors: {gs['mean']:.3f}")
+                click.echo(f"    Near-zero gap (<0.1): {gs['near_zero_frac']:.1%}")
+                click.echo(f"    Near bonus threshold: {error['near_bonus_fraction']:.1%}")
+        else:
+            click.echo(f"\n  [skip] {model_path} not found. Run surrogate-train first for error analysis.")
+
+    # Generate error analysis plot
+    if error_data:
+        out_dir = Path(base_path) / "outputs" / "plots"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        p = plot_error_analysis(error_data, out_dir, dpi=dpi, fmt=fmt)
+        click.echo(f"\n  Saved {p.name}")
+
+    click.echo(f"\nDone in {time.time() - t0:.1f}s.")
+
+
+@cli.command("surrogate-scaling")
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--data-dir", default=None, help="Path to training data dir.")
+@click.option("--format", "fmt", default="png", type=click.Choice(["png", "svg"]))
+@click.option("--dpi", default=200, type=int)
+def surrogate_scaling(base_path: str, data_dir: str | None, fmt: str, dpi: int):
+    """Data scaling experiment: train dt_full on increasing data subsets."""
+    import matplotlib
+    matplotlib.use("Agg")
+
+    from .surrogate import load_training_data, run_data_scaling_experiment
+    from .plots.surrogate import plot_data_scaling_curves
+
+    t0 = time.time()
+    data_path = Path(data_dir) if data_dir else Path(base_path) / "data" / "surrogate"
+
+    decision_configs = [
+        ("category", "category_decisions.bin", 29, 15),
+        ("reroll1", "reroll1_decisions.bin", 30, 32),
+        ("reroll2", "reroll2_decisions.bin", 30, 32),
+    ]
+
+    scaling_data: dict[str, list[dict]] = {}
+
+    for dtype, filename, n_features, n_classes in decision_configs:
+        path = data_path / filename
+        if not path.exists():
+            click.echo(f"  [skip] {path} not found")
+            continue
+
+        click.echo(f"\n  Scaling experiment: {dtype}")
+        features, labels, gaps = load_training_data(path)
+        n_total_games = len(features) // 15
+
+        results = run_data_scaling_experiment(
+            features, labels, gaps, dtype, n_total_games,
+        )
+        scaling_data[dtype] = results
+
+    # Generate plot
+    if scaling_data:
+        out_dir = Path(base_path) / "outputs" / "plots"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        p = plot_data_scaling_curves(scaling_data, out_dir, dpi=dpi, fmt=fmt)
+        click.echo(f"\n  Saved {p.name}")
+
+    click.echo(f"\nDone in {time.time() - t0:.1f}s.")
+
+
+@cli.command("surrogate-features")
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--data-dir", default=None, help="Path to training data dir.")
+@click.option("--ablation", is_flag=True, help="Run feature ablation (Exp 4).")
+@click.option("--forward-select", is_flag=True, help="Run forward selection (Exp 5).")
+@click.option("--augment", is_flag=True, help="Train with augmented features (Exp 6).")
+@click.option("--all-experiments", "run_all", is_flag=True, help="Run all feature experiments.")
+@click.option("--format", "fmt", default="png", type=click.Choice(["png", "svg"]))
+@click.option("--dpi", default=200, type=int)
+def surrogate_features(
+    base_path: str, data_dir: str | None,
+    ablation: bool, forward_select: bool, augment: bool, run_all: bool,
+    fmt: str, dpi: int,
+):
+    """Feature engineering experiments: ablation, forward selection, augmented training."""
+    import matplotlib
+    matplotlib.use("Agg")
+
+    from .surrogate import (
+        load_training_data,
+        run_feature_ablation,
+        run_forward_selection,
+        train_with_augmented_features,
+    )
+    from .plots.surrogate import plot_feature_ablation_bars, plot_forward_selection_elbow
+
+    if run_all:
+        ablation = forward_select = augment = True
+
+    if not (ablation or forward_select or augment):
+        click.echo("Specify at least one experiment: --ablation, --forward-select, --augment, or --all-experiments")
+        raise SystemExit(1)
+
+    t0 = time.time()
+    data_path = Path(data_dir) if data_dir else Path(base_path) / "data" / "surrogate"
+    out_dir = Path(base_path) / "outputs" / "plots"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    decision_configs = [
+        ("category", "category_decisions.bin", 29, 15),
+        ("reroll1", "reroll1_decisions.bin", 30, 32),
+        ("reroll2", "reroll2_decisions.bin", 30, 32),
+    ]
+
+    ablation_data: dict[str, list[dict]] = {}
+    selection_data: dict[str, list[dict]] = {}
+
+    for dtype, filename, n_features, n_classes in decision_configs:
+        path = data_path / filename
+        if not path.exists():
+            click.echo(f"  [skip] {path} not found")
+            continue
+
+        features, labels, gaps = load_training_data(path)
+        records_per_game = 15
+        n_total_games = len(features) // records_per_game
+        n_train_games = int(n_total_games * 0.8)
+        n_test_games = n_total_games - n_train_games
+        train_end = n_train_games * records_per_game
+
+        X_train, X_test = features[:train_end], features[train_end:]
+        y_train, y_test = labels[:train_end], labels[train_end:]
+        gaps_train, gaps_test = gaps[:train_end], gaps[train_end:]
+
+        if ablation:
+            click.echo(f"\n  Feature ablation: {dtype}")
+            ablation_data[dtype] = run_feature_ablation(
+                X_train, y_train, gaps_train,
+                X_test, y_test, gaps_test,
+                n_train_games, n_test_games, dtype,
+            )
+
+        if forward_select:
+            click.echo(f"\n  Forward selection: {dtype}")
+            selection_data[dtype] = run_forward_selection(
+                X_train, y_train, gaps_train,
+                X_test, y_test, gaps_test,
+                n_train_games, n_test_games, dtype,
+            )
+
+    if ablation and ablation_data:
+        p = plot_feature_ablation_bars(ablation_data, out_dir, dpi=dpi, fmt=fmt)
+        click.echo(f"\n  Saved {p.name}")
+
+    if forward_select and selection_data:
+        p = plot_forward_selection_elbow(selection_data, out_dir, dpi=dpi, fmt=fmt)
+        click.echo(f"\n  Saved {p.name}")
+
+    if augment:
+        click.echo("\n  Training with augmented features...")
+        output_path = Path(base_path) / "outputs" / "surrogate"
+        results = train_with_augmented_features(data_path, output_path)
+        for dtype, models in results.items():
+            click.echo(f"\n    {dtype}:")
+            for m in models:
+                click.echo(f"      {m.name}: ev_loss={m.ev_loss:.4f}, acc={m.accuracy:.4f}")
+
+    click.echo(f"\nDone in {time.time() - t0:.1f}s.")
+
+
+@cli.command("surrogate-train")
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--data-dir", default=None, help="Path to training data dir (default: data/surrogate).")
+def surrogate_train(base_path: str, data_dir: str | None):
+    """Train surrogate models (DTs + MLPs) on exported training data."""
+    from .surrogate import run_training_pipeline
+
+    t0 = time.time()
+    data_path = Path(data_dir) if data_dir else Path(base_path) / "data" / "surrogate"
+    if not data_path.exists():
+        click.echo(f"{data_path} not found. Run yatzy-export-training-data first.")
+        raise SystemExit(1)
+
+    output_path = Path(base_path) / "outputs" / "surrogate"
+    results = run_training_pipeline(data_path, output_path)
+
+    total = sum(len(v) for v in results.values())
+    click.echo(f"\nTrained {total} models across {len(results)} decision types.")
+    click.echo(f"Results saved to {output_path}/")
+    click.echo(f"Done in {time.time() - t0:.1f}s.")
+
+
+@cli.command("surrogate-plot")
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--format", "fmt", default="png", type=click.Choice(["png", "svg"]))
+@click.option("--dpi", default=200, type=int)
+def surrogate_plot(base_path: str, fmt: str, dpi: int):
+    """Plot surrogate model results (Pareto frontier, accuracy)."""
+    import matplotlib
+    matplotlib.use("Agg")
+
+    from .plots.surrogate import plot_all_surrogate
+
+    t0 = time.time()
+    results_dir = Path(base_path) / "outputs" / "surrogate"
+    if not results_dir.exists():
+        click.echo(f"{results_dir} not found. Run 'yatzy-analyze surrogate-train' first.")
+        raise SystemExit(1)
+
+    out_dir = Path(base_path) / "outputs" / "plots"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    paths = plot_all_surrogate(out_dir, results_dir, dpi=dpi, fmt=fmt)
+    for p in paths:
+        click.echo(f"  {p.name}")
+    click.echo(f"Done in {time.time() - t0:.1f}s — {len(paths)} plots")
+
+
+@cli.command("surrogate-eval")
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--games", default=100_000, type=int, help="Games per model combo.")
+@click.option("--seed", default=42, type=int, help="Random seed.")
+def surrogate_eval(base_path: str, games: int, seed: int):
+    """Simulate full games with surrogate models, report mean scores."""
+    from .surrogate_eval import run_evaluation
+
+    t0 = time.time()
+    models_dir = Path(base_path) / "outputs" / "surrogate" / "models"
+    results_dir = Path(base_path) / "outputs" / "surrogate"
+    if not models_dir.exists():
+        click.echo(f"{models_dir} not found. Run 'yatzy-analyze surrogate-train' first.")
+        raise SystemExit(1)
+
+    output_dir = Path(base_path) / "outputs" / "surrogate"
+    results = run_evaluation(models_dir, results_dir, output_dir, n_games=games, seed=seed)
+
+    # Print summary table
+    click.echo()
+    click.echo("=== Game-Level Evaluation Summary ===")
+    header = (
+        f"{'Model':>20s} | {'Params':>10s} | {'Mean':>7s} | {'Std':>5s} | "
+        f"{'p5':>5s} | {'p50':>5s} | {'p95':>5s} | {'Bonus':>6s}"
+    )
+    click.echo(header)
+    click.echo("-" * len(header))
+    for r in sorted(results, key=lambda r: r.total_params):
+        click.echo(
+            f"{r.name:>20s} | {r.total_params:>10,d} | {r.mean:>7.1f} | {r.std:>5.1f} | "
+            f"{r.p5:>5d} | {r.p50:>5d} | {r.p95:>5d} | {r.bonus_rate:>5.1%}"
+        )
+
+    click.echo(f"\nDone in {time.time() - t0:.1f}s.")
+
+
+@cli.command("surrogate-eval-plot")
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--format", "fmt", default="png", type=click.Choice(["png", "svg"]))
+@click.option("--dpi", default=200, type=int)
+def surrogate_eval_plot(base_path: str, fmt: str, dpi: int):
+    """Plot game-level results: params vs mean score."""
+    import matplotlib
+    matplotlib.use("Agg")
+
+    from .plots.surrogate import plot_game_level_results
+
+    t0 = time.time()
+    csv_path = Path(base_path) / "outputs" / "surrogate" / "game_eval_results.csv"
+    if not csv_path.exists():
+        click.echo(f"{csv_path} not found. Run 'yatzy-analyze surrogate-eval' first.")
+        raise SystemExit(1)
+
+    out_dir = Path(base_path) / "outputs" / "plots"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    paths = plot_game_level_results(csv_path, out_dir, dpi=dpi, fmt=fmt)
+    for p in paths:
+        click.echo(f"  {p.name}")
+    click.echo(f"Done in {time.time() - t0:.1f}s — {len(paths)} plots")
+
+
 @cli.command("difficult-cards")
 @click.option("--base-path", default=".", help="Base path (repo root).")
 @click.option("--dpi", default=150, help="DPI for output images.")
@@ -1054,3 +1430,27 @@ def difficult_cards(base_path: str, dpi: int):
     t0 = time.time()
     paths = generate_difficult_cards(json_path, out_dir, dpi=dpi)
     click.echo(f"Done in {time.time() - t0:.1f}s — {len(paths)} cards in {out_dir}")
+
+
+@cli.command("profile-validate")
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--trials", default=100, help="Number of trials per archetype.")
+@click.option("--seed", default=0, help="Base random seed.")
+def profile_validate(base_path: str, trials: int, seed: int):
+    """Run parameter recovery validation for cognitive profiling."""
+    from .profiling.synthetic import load_scenarios
+    from .profiling.validation import print_validation_report, run_full_validation
+
+    scenarios_path = Path(base_path) / "outputs" / "profiling" / "scenarios.json"
+    if not scenarios_path.exists():
+        click.echo(f"{scenarios_path} not found. Run yatzy-profile-scenarios first.")
+        raise SystemExit(1)
+
+    t0 = time.time()
+    scenarios = load_scenarios(scenarios_path)
+    click.echo(f"Loaded {len(scenarios)} scenarios")
+    click.echo(f"Running {trials} trials per archetype...")
+
+    summaries = run_full_validation(scenarios, n_trials=trials, base_seed=seed)
+    print_validation_report(summaries)
+    click.echo(f"\nDone in {time.time() - t0:.1f}s")

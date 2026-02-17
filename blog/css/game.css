@@ -1,0 +1,352 @@
+/* Game layout */
+.game-header {
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.game-header h1 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.back-link {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  display: inline-block;
+  margin-bottom: 1rem;
+}
+
+.back-link:hover {
+  color: var(--accent);
+}
+
+/* Action bar */
+.game-action-bar {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  margin: 12px 0;
+  min-height: 40px;
+}
+
+.game-btn-primary {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  padding: 6px 20px;
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.game-btn-primary:hover {
+  opacity: 0.85;
+}
+
+.game-btn-primary:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.game-btn-secondary {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 4px 10px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text);
+  opacity: 0.6;
+}
+
+.game-btn-secondary:hover {
+  opacity: 1;
+  background: var(--accent-light);
+}
+
+.game-btn-small {
+  font-size: 14px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  cursor: pointer;
+  border-radius: 3px;
+  line-height: 22px;
+  color: var(--text);
+}
+
+.game-btn-small:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Dice */
+.game-dice-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.die-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.die-arrow {
+  width: 56px;
+  height: 16px;
+  font-size: 10px;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  cursor: pointer;
+  border-radius: 3px;
+  line-height: 14px;
+  color: var(--text);
+}
+
+.die--interactive {
+  width: 56px;
+  height: 56px;
+  font-size: 28px;
+  font-weight: bold;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  color: var(--text);
+  transition: border-color 0.15s, opacity 0.15s;
+}
+
+.die--interactive:disabled {
+  cursor: default;
+}
+
+.die--held {
+  background: var(--bg);
+}
+
+.die--will-reroll {
+  background: var(--bg-alt);
+}
+
+.die--optimal-keep {
+  border: 3px solid #28a745;
+}
+
+.die--optimal-reroll {
+  border: 3px solid #e74c3c;
+}
+
+.die--faded {
+  opacity: 0.5;
+}
+
+/* Dice legend */
+.game-dice-legend {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 4px 0 8px;
+  transition: opacity 0.2s;
+  min-height: 16px;
+}
+
+.game-dice-legend .legend-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+/* Eval panel */
+.game-eval-panel {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  margin: 12px 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.game-eval-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.game-eval-grid .eval-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.eval-positive { color: #28a745; }
+.eval-negative { color: #dc3545; }
+
+/* Scorecard */
+.scorecard {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin-top: 12px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+.scorecard colgroup col:nth-child(1) { width: 45%; }
+.scorecard colgroup col:nth-child(2) { width: 20%; }
+.scorecard colgroup col:nth-child(3) { width: 15%; }
+.scorecard colgroup col:nth-child(4) { width: 20%; }
+
+.scorecard thead tr {
+  border-bottom: 2px solid var(--text);
+}
+
+.scorecard thead th {
+  text-align: left;
+  padding: 4px 8px;
+  font-size: 14px;
+  border-bottom: 2px solid var(--text);
+}
+
+.scorecard thead th:nth-child(2),
+.scorecard thead th:nth-child(3),
+.scorecard thead th:nth-child(4) {
+  text-align: center;
+}
+
+.scorecard thead th:nth-child(3) {
+  font-size: 12px;
+}
+
+.scorecard-cell {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  height: 32px;
+  box-sizing: border-box;
+}
+
+.scorecard-row--optimal {
+  background: rgba(40, 167, 69, 0.12);
+}
+
+.dark .scorecard-row--optimal {
+  background: rgba(40, 167, 69, 0.15);
+}
+
+.scorecard-row--scored {
+  background: var(--bg-alt);
+}
+
+.scorecard-row--dimmed {
+  color: var(--text-muted);
+}
+
+.scorecard .score-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  padding: 0;
+  height: 24px;
+  color: inherit;
+  -moz-appearance: textfield;
+}
+
+.scorecard .score-input::-webkit-outer-spin-button,
+.scorecard .score-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.scorecard-action-btn {
+  font-size: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  border-radius: 3px;
+  color: var(--text);
+}
+
+.scorecard-action-btn:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+
+.scorecard-action-btn--scored {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.scorecard-separator {
+  background: var(--bg-alt);
+  font-weight: bold;
+}
+
+.scorecard-separator td {
+  padding: 4px 8px;
+  border-bottom: 2px solid var(--text);
+}
+
+.scorecard-total {
+  font-weight: bold;
+}
+
+.scorecard-total td {
+  padding: 6px 8px;
+  border-top: 2px solid var(--text);
+}
+
+/* Debug panel */
+.game-debug-panel {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 12px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 400px;
+  overflow: auto;
+}
+
+.game-debug-panel .debug-label {
+  color: #569cd6;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+/* Responsive */
+@media (max-width: 720px) {
+  .die--interactive { width: 48px; height: 48px; font-size: 24px; }
+  .die-arrow { width: 48px; }
+  .game-dice-row { gap: 6px; }
+  .game-dice-legend { gap: 10px; font-size: 10px; }
+  .scorecard { font-size: 12px; }
+}

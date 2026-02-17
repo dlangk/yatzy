@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delta Yatzy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/charts.css">
+  <link rel="stylesheet" href="css/game.css">
+</head>
+<body>
+
+<button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+  <span id="theme-icon">&#9790;</span>
+</button>
+
+<div class="container">
+  <a href="index.html" class="back-link">&larr; Back to the article</a>
+  <div class="game-header">
+    <h1>Delta Yatzy</h1>
+    <div style="text-align:center;margin-bottom:8px">
+      <a href="profile.html" class="game-btn-secondary" style="text-decoration:none">Profile Me</a>
+    </div>
+  </div>
+  <div id="game-root"></div>
+  <div id="game-charts"></div>
+</div>
+
+<script type="module" src="js/game/render.js"></script>
+<script type="module">
+  import { initTheme } from './js/theme.js';
+  initTheme();
+</script>
+
+</body>
+</html>

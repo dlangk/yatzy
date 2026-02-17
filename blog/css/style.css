@@ -1,0 +1,421 @@
+:root {
+  --bg: #f6f5ef;
+  --bg-alt: #eae9e3;
+  --text: #050505;
+  --text-muted: #555;
+  --accent: rgba(255, 77, 0, 0.8);
+  --accent-light: rgba(255, 77, 0, 0.15);
+  --border: #d4d3cd;
+  --font-serif: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --content-width: 675px;
+}
+
+.dark {
+  --bg: #1a1a1a;
+  --bg-alt: #252525;
+  --text: #e0ddd5;
+  --text-muted: #999;
+  --accent: rgba(255, 110, 50, 0.9);
+  --accent-light: rgba(255, 110, 50, 0.15);
+  --border: #3a3a3a;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-serif);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.3s, color 0.3s;
+}
+
+.container {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+/* Header */
+.post-header {
+  margin-bottom: 3rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.post-header h1 {
+  font-size: 2.2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.post-subtitle {
+  font-size: 1.15rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0.5rem 0 1.25rem;
+  line-height: 1.5;
+}
+
+.post-meta {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.post-meta a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* Dark mode toggle */
+.theme-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  transition: background 0.3s;
+}
+
+.theme-toggle:hover {
+  background: var(--accent-light);
+}
+
+/* Sections */
+section {
+  margin-bottom: 3rem;
+}
+
+h2 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin: 2.5rem 0 1rem;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.75rem;
+}
+
+p {
+  margin: 0 0 1rem;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+/* Big stat callouts */
+.stat-row {
+  display: flex;
+  gap: 1rem;
+  margin: 1.5rem 0;
+  flex-wrap: wrap;
+}
+
+.stat-card {
+  flex: 1;
+  min-width: 140px;
+  background: var(--bg-alt);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  font-size: 0.9rem;
+}
+
+thead th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 2px solid var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+tbody td {
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+tbody tr:hover {
+  background: var(--accent-light);
+}
+
+td.num, th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Code */
+code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--bg-alt);
+  padding: 0.15em 0.4em;
+  border-radius: 3px;
+}
+
+/* Blockquotes */
+blockquote {
+  margin: 1.5rem 0;
+  padding: 1rem 1.25rem;
+  background: var(--bg-alt);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 6px 6px 0;
+  font-style: italic;
+}
+
+blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* Footnotes / asides */
+.aside {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 1rem 0;
+  padding-left: 1rem;
+  border-left: 2px solid var(--border);
+}
+
+/* Section dividers */
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 3rem 0;
+}
+
+/* ToC */
+.toc {
+  background: var(--bg-alt);
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  margin: 2rem 0;
+}
+
+.toc h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.toc ol {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.toc li {
+  margin-bottom: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.toc a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.toc a:hover {
+  color: var(--accent);
+}
+
+/* Concept terms */
+.concept {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.concept:hover {
+  background: var(--accent-light);
+  border-radius: 2px;
+}
+
+.concept.active {
+  background: var(--accent-light);
+  border-radius: 2px;
+}
+
+/* Concept drawer */
+.concept-drawer {
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 380px;
+  height: 100vh;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  z-index: 200;
+  transform: translateX(100%);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
+}
+
+.dark .concept-drawer {
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+}
+
+.concept-drawer.open {
+  transform: translateX(0);
+}
+
+.concept-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.concept-drawer-title {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.concept-drawer-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0 0.25rem;
+  line-height: 1;
+}
+
+.concept-drawer-close:hover {
+  color: var(--accent);
+}
+
+.concept-drawer-body {
+  overflow-y: auto;
+  padding: 1.25rem;
+  flex: 1;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.concept-drawer-body h2 {
+  font-size: 1.1rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.concept-drawer-body h3 {
+  font-size: 1rem;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.concept-drawer-body p {
+  margin: 0 0 0.75rem;
+}
+
+.concept-drawer-body ul,
+.concept-drawer-body ol {
+  padding-left: 1.25rem;
+  margin: 0 0 0.75rem;
+}
+
+.concept-drawer-body li {
+  margin-bottom: 0.3rem;
+}
+
+.concept-drawer-body blockquote {
+  margin: 0.75rem 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.concept-drawer-body table {
+  font-size: 0.8rem;
+  margin: 0.75rem 0;
+}
+
+.concept-drawer-body code {
+  font-size: 0.8em;
+}
+
+.concept-drawer-backdrop {
+  display: none;
+}
+
+/* Responsive */
+@media (max-width: 720px) {
+  html { font-size: 16px; }
+  .post-header h1 { font-size: 1.8rem; }
+  .stat-card { min-width: 100px; }
+  .stat-value { font-size: 1.5rem; }
+  table { font-size: 0.8rem; }
+  thead th, tbody td { padding: 0.3rem 0.5rem; }
+
+  .concept-drawer {
+    width: 100%;
+  }
+
+  .concept-drawer-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 199;
+  }
+
+  .concept-drawer-backdrop.open {
+    display: block;
+  }
+}

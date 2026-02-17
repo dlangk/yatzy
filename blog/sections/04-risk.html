@@ -3,9 +3,9 @@
 
     <p>The standard solver maximizes expected value, which treats every point equally whether it's your 100th point or your 300th. But what if you value consistency differently? What if you'd trade some upside to protect your floor &mdash; or accept more variance to chase a high score?</p>
 
-    <p>We can formalize this with a single parameter &theta; (theta) using exponential utility: instead of maximizing E[score], we maximize E[e<sup>&theta;&middot;score</sup>] (computed in the log domain for numerical stability). When &theta;=0, this recovers the standard EV-optimal strategy. When &theta;&lt;0, the player is risk-averse, preferring consistent scores. When &theta;&gt;0, the player is risk-seeking, chasing high scores at the cost of more bad games.</p>
+    <p>We can formalize this with a single parameter &theta; (theta) using <span class="concept" data-concept="exponential-utility">exponential utility</span>: instead of maximizing E[score], we maximize E[e<sup>&theta;&middot;score</sup>] (computed in the log domain for numerical stability). When &theta;=0, this recovers the standard EV-optimal strategy. When &theta;&lt;0, the player is risk-averse, preferring consistent scores. When &theta;&gt;0, the player is risk-seeking, chasing high scores at the cost of more bad games.</p>
 
-    <p>We can visualize the tradeoff as a mean-variance frontier. Each point on the curve is a different &theta;, plotting its mean score against its standard deviation. The frontier reveals the efficient boundary: how much return (mean) you must sacrifice for each unit of reduced risk (std dev), and vice versa.</p>
+    <p>We can visualize the tradeoff as a <span class="concept" data-concept="mean-variance-frontier">mean-variance frontier</span>. Each point on the curve is a different &theta;, plotting its mean score against its standard deviation. The frontier reveals the efficient boundary: how much return (mean) you must sacrifice for each unit of reduced risk (std dev), and vice versa.</p>
 
     <!-- Chart: Mean-Variance Frontier -->
     <div class="chart-container" id="chart-mean-variance">

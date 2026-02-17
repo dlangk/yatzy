@@ -3,7 +3,7 @@
 
     <p>The optimal solver uses an 8 MB lookup table &mdash; 2 million states, each storing a single float. But do you actually need all that information to play well? We trained small machine learning models to approximate the solver's decisions, using only the information visible during a game: the dice, which categories remain, the upper section progress, and the turn number.</p>
 
-    <p>We tried decision trees (DTs) at various depths and multi-layer perceptrons (MLPs) with different architectures, then played 10,000 games with each model to measure actual performance.</p>
+    <p>We tried <span class="concept" data-concept="decision-tree">decision trees</span> (DTs) at various depths and multi-layer perceptrons (MLPs) with different architectures, then played 10,000 games with each model to measure actual performance.</p>
 
     <!-- Chart 5: Surrogate Pareto -->
     <div class="chart-container" id="chart-surrogate-pareto">
