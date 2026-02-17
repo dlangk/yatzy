@@ -499,7 +499,11 @@ fn main() {
     }
     std::fs::write(&csv_path, csv).unwrap();
     println!();
-    println!("Saved {} disagreements to {}", all_disagreements.len().min(100_000), csv_path);
+    println!(
+        "Saved {} disagreements to {}",
+        all_disagreements.len().min(100_000),
+        csv_path
+    );
 
     // JSON summary
     let json_path = format!("{}/heuristic_gap_summary.json", args.output);

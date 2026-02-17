@@ -433,8 +433,9 @@ fn simulate_game_collecting_noisy(
             find_best_category_final(ctx, up_score, scored, ds_index)
         } else {
             // Use softmax for category selection with γ-discounting
-            let cat_qs =
-                compute_q_categories(ctx, sv, up_score, scored, ds_index, gamma_sim, sigma_d, false);
+            let cat_qs = compute_q_categories(
+                ctx, sv, up_score, scored, ds_index, gamma_sim, sigma_d, false,
+            );
             let chosen_cat = softmax_sample(
                 &cat_qs
                     .iter()
@@ -670,12 +671,11 @@ fn enumerate_category_actions(
 ///
 /// For reroll decisions, compute Q-values at θ=−0.05 and θ=+0.05.
 /// Score = rank-change magnitude of top actions.
-fn compute_s_theta(
-    ctx: &YatzyContext,
-    d: &RawDecision,
-    theta_tables: &[(f32, &[f32])],
-) -> f32 {
-    if !matches!(d.decision_type, DecisionType::Reroll1 | DecisionType::Reroll2) {
+fn compute_s_theta(ctx: &YatzyContext, d: &RawDecision, theta_tables: &[(f32, &[f32])]) -> f32 {
+    if !matches!(
+        d.decision_type,
+        DecisionType::Reroll1 | DecisionType::Reroll2
+    ) {
         return 0.0;
     }
 
@@ -688,7 +688,14 @@ fn compute_s_theta(
 
         if is_risk {
             compute_group6_risk_profiling(
-                ctx, sv, d.upper_score, d.scored, theta, 1.0, 0.0, &mut e_ds_0,
+                ctx,
+                sv,
+                d.upper_score,
+                d.scored,
+                theta,
+                1.0,
+                0.0,
+                &mut e_ds_0,
             );
             compute_opt_lse_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1, false);
         } else {
@@ -720,10 +727,7 @@ fn compute_s_theta(
             // Score = 1.0 if top action flips, 0.5 if top-2 swap, 0.0 if same
             if rank_neg[0] != rank_pos[0] {
                 1.0
-            } else if rank_neg.len() >= 2
-                && rank_pos.len() >= 2
-                && rank_neg[1] != rank_pos[1]
-            {
+            } else if rank_neg.len() >= 2 && rank_pos.len() >= 2 && rank_neg[1] != rank_pos[1] {
                 0.5
             } else {
                 0.0
@@ -736,11 +740,7 @@ fn compute_s_theta(
 /// Compute S_γ: how much greedy differs from optimal.
 ///
 /// For category decisions, compare greedy ranking vs DP-optimal ranking.
-fn compute_s_gamma(
-    ctx: &YatzyContext,
-    sv: &[f32],
-    d: &RawDecision,
-) -> f32 {
+fn compute_s_gamma(ctx: &YatzyContext, sv: &[f32], d: &RawDecision) -> f32 {
     if d.decision_type != DecisionType::Category {
         // Reroll decisions get reduced S_γ based on how many categories
         // are affected by γ at this state. Simple proxy: 0.2 if mid-game.
@@ -791,11 +791,7 @@ fn compute_s_gamma(
 }
 
 /// Compute S_d: does heuristic disagree with optimal? (0 or 1)
-fn compute_s_d(
-    ctx: &YatzyContext,
-    sv: &[f32],
-    d: &RawDecision,
-) -> f32 {
+fn compute_s_d(ctx: &YatzyContext, sv: &[f32], d: &RawDecision) -> f32 {
     let ds_index = find_dice_set_index(ctx, &d.dice);
     let face_count = count_faces(&d.dice);
 
@@ -832,8 +828,7 @@ fn compute_s_d(
             }
             let heuristic_cat =
                 heuristic_pick_category(&d.dice, &face_count, d.scored, d.upper_score);
-            let (optimal_cat, _) =
-                find_best_category(ctx, sv, d.upper_score, d.scored, ds_index);
+            let (optimal_cat, _) = find_best_category(ctx, sv, d.upper_score, d.scored, ds_index);
             if heuristic_cat != optimal_cat {
                 1.0
             } else {
@@ -1043,15 +1038,15 @@ pub fn build_master_pool(
                 GamePhase::Mid => min_visits_mid,
                 _ => min_visits_early_late,
             };
-            *count >= min_visits
-                && d.turn > 0
-                && d.turn < CATEGORY_COUNT - 1
+            *count >= min_visits && d.turn > 0 && d.turn < CATEGORY_COUNT - 1
         })
         .collect();
 
     println!(
         "  {} viable candidates (visits >= {}/{})",
-        viable.len(), min_visits_early_late, min_visits_mid,
+        viable.len(),
+        min_visits_early_late,
+        min_visits_mid,
     );
 
     // Prepare theta table slices
@@ -1106,7 +1101,8 @@ pub fn build_master_pool(
         }
 
         let fingerprint = compute_fingerprint(ctx, sv, d, &actions);
-        let top_action_labels: Vec<String> = actions.iter().take(2).map(|a| a.label.clone()).collect();
+        let top_action_labels: Vec<String> =
+            actions.iter().take(2).map(|a| a.label.clone()).collect();
 
         scored_candidates.push(ScoredCandidate {
             decision: d.clone(),
@@ -1120,9 +1116,15 @@ pub fn build_master_pool(
     }
 
     if skipped_few_actions > 0 {
-        println!("  Skipped {} candidates with < 2 actions", skipped_few_actions);
+        println!(
+            "  Skipped {} candidates with < 2 actions",
+            skipped_few_actions
+        );
     }
-    println!("  {} candidates with diagnostic scores", scored_candidates.len());
+    println!(
+        "  {} candidates with diagnostic scores",
+        scored_candidates.len()
+    );
 
     // Group by bucket, keep top N per bucket
     let mut buckets: HashMap<SemanticBucket, Vec<usize>> = HashMap::new();
@@ -1147,7 +1149,9 @@ pub fn build_master_pool(
         if indices.len() > 0 {
             println!(
                 "    {:?}: {} candidates, keeping {}",
-                bucket, indices.len(), take
+                bucket,
+                indices.len(),
+                take
             );
         }
     }
@@ -1167,10 +1171,7 @@ pub fn build_master_pool(
 }
 
 /// Assemble quiz of N scenarios from the master pool with diversity constraints.
-pub fn assemble_quiz(
-    pool: &[ScoredCandidate],
-    n_scenarios: usize,
-) -> Vec<usize> {
+pub fn assemble_quiz(pool: &[ScoredCandidate], n_scenarios: usize) -> Vec<usize> {
     if pool.len() <= n_scenarios {
         return (0..pool.len()).collect();
     }
@@ -1223,61 +1224,70 @@ pub fn assemble_quiz(
 
     // Helper: find best candidate satisfying a predicate, with turn-diversity bonus,
     // quadrant cap penalties, and action-fatigue check
-    let find_best =
-        |used: &[bool], turn_set: &[usize], theta_count: usize, gamma_count: usize,
-         action_label_count: &HashMap<String, usize>,
-         pred: &dyn Fn(usize) -> bool| -> Option<usize> {
-            let mut best_idx: Option<usize> = None;
-            let mut best_score = f32::NEG_INFINITY;
-            for i in 0..pool.len() {
-                if used[i] || !pred(i) {
-                    continue;
-                }
-                let is_theta_dominant = pool[i].scores.s_theta >= theta_thresh;
-                let is_gamma_dominant = pool[i].scores.s_gamma >= gamma_thresh
-                    && pool[i].scores.s_theta < theta_thresh;
-                // Hard skip when over cap
-                if is_theta_dominant && theta_count >= max_theta {
-                    continue;
-                }
-                if is_gamma_dominant && gamma_count >= max_gamma {
-                    continue;
-                }
-                // Action-fatigue: skip if any top-2 action label is over the limit
-                let fatigued = pool[i].top_action_labels.iter().any(|lbl| {
-                    *action_label_count.get(lbl).unwrap_or(&0) >= max_action_fatigue
-                });
-                if fatigued {
-                    continue;
-                }
-                let mut score = pool[i].scores.total_score();
-                // Bonus for covering a new turn number
-                if !turn_set.contains(&pool[i].decision.turn) {
-                    score += 3.0;
-                }
-                // Penalty when approaching caps
-                if is_theta_dominant && theta_count >= max_theta.saturating_sub(2) {
-                    score -= 2.0;
-                }
-                if is_gamma_dominant && gamma_count >= max_gamma.saturating_sub(2) {
-                    score -= 2.0;
-                }
-                // Small tiebreak by visit count
-                score += 0.001 * pool[i].visit_count as f32;
-                if score > best_score {
-                    best_score = score;
-                    best_idx = Some(i);
-                }
+    let find_best = |used: &[bool],
+                     turn_set: &[usize],
+                     theta_count: usize,
+                     gamma_count: usize,
+                     action_label_count: &HashMap<String, usize>,
+                     pred: &dyn Fn(usize) -> bool|
+     -> Option<usize> {
+        let mut best_idx: Option<usize> = None;
+        let mut best_score = f32::NEG_INFINITY;
+        for i in 0..pool.len() {
+            if used[i] || !pred(i) {
+                continue;
             }
-            best_idx
-        };
+            let is_theta_dominant = pool[i].scores.s_theta >= theta_thresh;
+            let is_gamma_dominant =
+                pool[i].scores.s_gamma >= gamma_thresh && pool[i].scores.s_theta < theta_thresh;
+            // Hard skip when over cap
+            if is_theta_dominant && theta_count >= max_theta {
+                continue;
+            }
+            if is_gamma_dominant && gamma_count >= max_gamma {
+                continue;
+            }
+            // Action-fatigue: skip if any top-2 action label is over the limit
+            let fatigued = pool[i]
+                .top_action_labels
+                .iter()
+                .any(|lbl| *action_label_count.get(lbl).unwrap_or(&0) >= max_action_fatigue);
+            if fatigued {
+                continue;
+            }
+            let mut score = pool[i].scores.total_score();
+            // Bonus for covering a new turn number
+            if !turn_set.contains(&pool[i].decision.turn) {
+                score += 3.0;
+            }
+            // Penalty when approaching caps
+            if is_theta_dominant && theta_count >= max_theta.saturating_sub(2) {
+                score -= 2.0;
+            }
+            if is_gamma_dominant && gamma_count >= max_gamma.saturating_sub(2) {
+                score -= 2.0;
+            }
+            // Small tiebreak by visit count
+            score += 0.001 * pool[i].visit_count as f32;
+            if score > best_score {
+                best_score = score;
+                best_idx = Some(i);
+            }
+        }
+        best_idx
+    };
 
-    let select = |idx: usize, selected: &mut Vec<usize>, used: &mut Vec<bool>,
-                      phase_count: &mut [usize; 3], dtype_count: &mut [usize; 3],
-                      theta_count: &mut usize, gamma_count: &mut usize,
-                      depth_count: &mut usize, beta_count: &mut usize,
-                      turn_set: &mut Vec<usize>,
-                      action_label_count: &mut HashMap<String, usize>| {
+    let select = |idx: usize,
+                  selected: &mut Vec<usize>,
+                  used: &mut Vec<bool>,
+                  phase_count: &mut [usize; 3],
+                  dtype_count: &mut [usize; 3],
+                  theta_count: &mut usize,
+                  gamma_count: &mut usize,
+                  depth_count: &mut usize,
+                  beta_count: &mut usize,
+                  turn_set: &mut Vec<usize>,
+                  action_label_count: &mut HashMap<String, usize>| {
         let sc = &pool[idx];
         selected.push(idx);
         used[idx] = true;
@@ -1380,7 +1390,14 @@ pub fn assemble_quiz(
                     1 => GamePhase::Mid,
                     _ => GamePhase::Late,
                 };
-                find_best(&used, &turn_set, theta_count, gamma_count, &action_label_count, &|i| pool[i].bucket.phase == target_phase)
+                find_best(
+                    &used,
+                    &turn_set,
+                    theta_count,
+                    gamma_count,
+                    &action_label_count,
+                    &|i| pool[i].bucket.phase == target_phase,
+                )
             }
             2 => {
                 let target_dtype = match worst_param {
@@ -1388,21 +1405,62 @@ pub fn assemble_quiz(
                     1 => DecisionType::Reroll2,
                     _ => DecisionType::Category,
                 };
-                find_best(&used, &turn_set, theta_count, gamma_count, &action_label_count, &|i| pool[i].bucket.dtype == target_dtype)
+                find_best(
+                    &used,
+                    &turn_set,
+                    theta_count,
+                    gamma_count,
+                    &action_label_count,
+                    &|i| pool[i].bucket.dtype == target_dtype,
+                )
             }
-            3 => find_best(&used, &turn_set, theta_count, gamma_count, &action_label_count, &|i| pool[i].scores.s_theta >= theta_thresh),
-            4 => find_best(&used, &turn_set, theta_count, gamma_count, &action_label_count, &|i| pool[i].scores.s_gamma >= gamma_thresh),
-            5 => find_best(&used, &turn_set, theta_count, gamma_count, &action_label_count, &|i| pool[i].scores.s_d > 0.0),
-            6 => find_best(&used, &turn_set, theta_count, gamma_count, &action_label_count, &|i| pool[i].scores.s_beta >= beta_thresh),
+            3 => find_best(
+                &used,
+                &turn_set,
+                theta_count,
+                gamma_count,
+                &action_label_count,
+                &|i| pool[i].scores.s_theta >= theta_thresh,
+            ),
+            4 => find_best(
+                &used,
+                &turn_set,
+                theta_count,
+                gamma_count,
+                &action_label_count,
+                &|i| pool[i].scores.s_gamma >= gamma_thresh,
+            ),
+            5 => find_best(
+                &used,
+                &turn_set,
+                theta_count,
+                gamma_count,
+                &action_label_count,
+                &|i| pool[i].scores.s_d > 0.0,
+            ),
+            6 => find_best(
+                &used,
+                &turn_set,
+                theta_count,
+                gamma_count,
+                &action_label_count,
+                &|i| pool[i].scores.s_beta >= beta_thresh,
+            ),
             _ => None,
         };
 
         match idx {
             Some(i) => select(
-                i, &mut selected, &mut used,
-                &mut phase_count, &mut dtype_count,
-                &mut theta_count, &mut gamma_count, &mut depth_count,
-                &mut beta_count, &mut turn_set,
+                i,
+                &mut selected,
+                &mut used,
+                &mut phase_count,
+                &mut dtype_count,
+                &mut theta_count,
+                &mut gamma_count,
+                &mut depth_count,
+                &mut beta_count,
+                &mut turn_set,
                 &mut action_label_count,
             ),
             None => break, // Can't fill this constraint, move on
@@ -1423,8 +1481,8 @@ pub fn assemble_quiz(
 
             // Hard skip: over-represented quadrants
             let is_theta_dominant = sc.scores.s_theta >= theta_thresh;
-            let is_gamma_dominant = sc.scores.s_gamma >= gamma_thresh
-                && sc.scores.s_theta < theta_thresh;
+            let is_gamma_dominant =
+                sc.scores.s_gamma >= gamma_thresh && sc.scores.s_theta < theta_thresh;
             if is_theta_dominant && theta_count >= max_theta {
                 continue;
             }
@@ -1432,9 +1490,10 @@ pub fn assemble_quiz(
                 continue;
             }
             // Action-fatigue: skip if any top-2 action label is over the limit
-            let fatigued = sc.top_action_labels.iter().any(|lbl| {
-                *action_label_count.get(lbl).unwrap_or(&0) >= max_action_fatigue
-            });
+            let fatigued = sc
+                .top_action_labels
+                .iter()
+                .any(|lbl| *action_label_count.get(lbl).unwrap_or(&0) >= max_action_fatigue);
             if fatigued {
                 continue;
             }
@@ -1486,10 +1545,16 @@ pub fn assemble_quiz(
 
         match best_idx {
             Some(i) => select(
-                i, &mut selected, &mut used,
-                &mut phase_count, &mut dtype_count,
-                &mut theta_count, &mut gamma_count, &mut depth_count,
-                &mut beta_count, &mut turn_set,
+                i,
+                &mut selected,
+                &mut used,
+                &mut phase_count,
+                &mut dtype_count,
+                &mut theta_count,
+                &mut gamma_count,
+                &mut depth_count,
+                &mut beta_count,
+                &mut turn_set,
                 &mut action_label_count,
             ),
             None => break,

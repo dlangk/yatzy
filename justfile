@@ -144,6 +144,11 @@ profile-generate games="100000":
 profile-validate trials="100":
     analytics/.venv/bin/yatzy-analyze profile-validate --trials {{trials}}
 
+# Pre-compute player card simulation grid (648 combos × N games)
+player-card-grid games="10000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-player-card-grid \
+      --games {{games}} --output blog/data/player_card_grid.json
+
 # Copy profiling scenarios to blog for frontend consumption
 profile-deploy:
     cp outputs/profiling/scenarios.json blog/data/scenarios.json

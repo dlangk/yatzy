@@ -54,12 +54,7 @@ struct GameRecords {
 /// Build shared features (indices 0-28) that are common across all decision types.
 /// Returns 29 features for category decisions, 30 for reroll (caller appends rerolls_remaining).
 #[inline(always)]
-fn build_shared_features(
-    turn: usize,
-    up_score: i32,
-    scored: i32,
-    dice: &[i32; 5],
-) -> Vec<f32> {
+fn build_shared_features(turn: usize, up_score: i32, scored: i32, dice: &[i32; 5]) -> Vec<f32> {
     let face_count = count_faces(dice);
     let dice_sum: i32 = dice.iter().sum();
     let max_face = face_count[1..=6].iter().max().copied().unwrap_or(0);
@@ -99,7 +94,11 @@ fn build_shared_features(
     features.push(num_distinct as f32 / 6.0);
     // 14-28: category availability
     for c in 0..CATEGORY_COUNT {
-        features.push(if is_category_scored(scored, c) { 0.0 } else { 1.0 });
+        features.push(if is_category_scored(scored, c) {
+            0.0
+        } else {
+            1.0
+        });
     }
 
     features
@@ -162,11 +161,7 @@ fn best_category_with_gap(
 /// Find best and second-best keep mask. Returns (best_mask, gap).
 /// best_mask is the raw 5-bit reroll mask (0-31).
 #[inline(always)]
-fn best_keep_with_gap(
-    ctx: &YatzyContext,
-    e_ds: &[f32; 252],
-    dice: &[i32; 5],
-) -> (i32, f32) {
+fn best_keep_with_gap(ctx: &YatzyContext, e_ds: &[f32; 252], dice: &[i32; 5]) -> (i32, f32) {
     let ds_index = find_dice_set_index(ctx, dice);
     let kt = &ctx.keep_table;
 
@@ -599,8 +594,7 @@ fn main() {
     ] {
         let total_gap: f64 = recs.iter().map(|r| r.gap as f64).sum();
         let mean_gap = total_gap / recs.len() as f64;
-        let zero_gap_frac =
-            recs.iter().filter(|r| r.gap < 0.01).count() as f64 / recs.len() as f64;
+        let zero_gap_frac = recs.iter().filter(|r| r.gap < 0.01).count() as f64 / recs.len() as f64;
         let record_bytes = (n_feat as usize * 4 + 2 + 4) * recs.len() + 32;
         println!(
             "  {:<10}: {:>10} records, {:<2} features, {:<2} actions, mean_gap={:.3}, zero_gap={:.1}%, ~{:.1} MB",
@@ -643,8 +637,5 @@ fn main() {
         println!("Wrote {} ({:.1} MB)", path, size as f64 / 1e6);
     }
 
-    println!(
-        "\nTotal time: {:.1}s",
-        total_start.elapsed().as_secs_f64()
-    );
+    println!("\nTotal time: {:.1}s", total_start.elapsed().as_secs_f64());
 }

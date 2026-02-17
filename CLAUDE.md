@@ -9,6 +9,7 @@ Delta Yatzy is a web-based implementation of the classic dice game with optimal 
 - **Solver**: `solver/` — Rust, axum-based API server + DP solver with rayon parallelism and memmap2 for zero-copy I/O
 - **Analytics**: `analytics/` — Python package for simulation data analysis, plotting, and risk-sweep pipelines
 - **Frontend**: `frontend/` — Vanilla JavaScript single-page application with dynamic UI and Chart.js visualizations
+- **Blog**: `blog/` — Static site with interactive profiling quiz, game analysis articles, and data visualizations
 - **Theory**: `theory/` — Analytical insights about Yatzy strategy and score distributions
 - **Data**: `data/` — Strategy tables (~300MB) and simulation binaries (~11GB), gitignored
 - **Outputs**: `outputs/` — Regenerable aggregates, plots, scenarios, gitignored
@@ -80,6 +81,15 @@ just sweep-stats    # Compute stats → parquet + CSV
 just pipeline       # compute → plot → categories → efficiency
 just test           # Run solver tests
 just serve          # Start API server
+# Profiling
+just profile-generate     # Generate 30 quiz scenarios + Q-grids
+just profile-validate     # Monte Carlo validation (100 trials, ~15min)
+just profile-deploy       # Copy scenarios.json to blog/data/
+just player-card-grid     # Pre-compute 648 simulation grid (10K games/combo, ~2.5min)
+# Surrogate
+just export-training-data # Export 200K games for surrogate training
+just surrogate-train      # Train DT + MLP surrogate models
+just surrogate-eval       # Full game simulation with surrogates
 ```
 
 ### Docker
@@ -96,7 +106,7 @@ docker-compose up --build
 
 The solver is a multithreaded Rust application with precomputed game states:
 
-- **Entry Points**: `src/bin/server.rs` (API server), `src/bin/precompute.rs` (offline precomputation), `src/bin/simulate.rs` (simulation + statistics), `src/bin/sweep.rs` (theta sweep: simulate all thetas in grid)
+- **Entry Points**: `src/bin/server.rs` (API), `src/bin/precompute.rs` (DP), `src/bin/simulate.rs` (simulation), `src/bin/sweep.rs` (θ sweep), `src/bin/generate_profile_scenarios.rs` (profiling quiz), `src/bin/player_card_grid.rs` (player card grid), `src/bin/export_training_data.rs` (surrogate data), `src/bin/decision_sensitivity.rs` (flip analysis), plus 10+ analysis binaries
 - **Phase 0 — Precompute lookup tables**:
   - `phase0_tables.rs` - Builds all static lookup tables (scores, keep-multiset table, probabilities)
   - `game_mechanics.rs` - Yatzy scoring rules: s(S, r, c)
@@ -112,6 +122,10 @@ The solver is a multithreaded Rust application with precomputed game states:
   - `statistics.rs` - Aggregate statistics from recorded games
   - `raw_storage.rs` - Binary I/O for raw simulation data (mmap)
   - `sweep.rs` - Theta sweep infrastructure: inventory scan, grid resolution, ensure_strategy_table
+- **Profiling** (`profiling/`):
+  - `qvalues.rs` - Q-value computation with (θ, γ, d) parameters, softmax sampling, depth noise
+  - `scenarios.rs` - Scenario generation: candidate pool, diversity-constrained selection, Q-grid computation
+  - `player_card.rs` - Streamlined noisy simulation (`simulate_game_profiled`) for grid pre-computation
 - **Infrastructure**:
   - `types.rs` - YatzyContext, KeepTable, StateValues (owned/mmap)
   - `constants.rs` - Category enum, state_index, NUM_STATES
@@ -144,11 +158,18 @@ outputs/                        # Cheap to regenerate (gitignored)
     csv/                        # category_stats, yatzy_conditional
   plots/                        # Generated PNG visualizations (flat)
   scenarios/                    # pivotal_scenarios.json, answers
+  profiling/                    # scenarios.json (30 quiz scenarios + Q-grids)
+  surrogate/                    # Surrogate model training results
+  policy_compression/           # Decision gap analysis
+
+blog/data/                      # Pre-computed data for static blog
+  scenarios.json                # Profiling quiz scenarios (copied from outputs/)
+  player_card_grid.json         # 648 simulation grid entries (~82 KB)
 ```
 
-### Frontend Structure
+### Frontend Structure (`frontend/`)
 
-The frontend uses ES6 modules for clean separation of concerns:
+The game-playing frontend uses ES6 modules for clean separation of concerns:
 
 - **Entry Point**: `js/app.js` - Initializes game state and UI
 - **Module Organization**:
@@ -159,6 +180,28 @@ The frontend uses ES6 modules for clean separation of concerns:
     - `refreshers.js` - Periodic UI updates and API polling
     - `endpoints.js` - Backend API communication
     - `chartConfig.js` - Chart.js histogram configuration
+
+### Blog Structure (`blog/`)
+
+Static site with interactive profiling quiz and analysis articles:
+
+- **Pages**: `index.html` (article), `profile.html` (quiz), `play.html` (embedded game)
+- **Profile Quiz** (`js/profile/`):
+  - `store.js` - Flux-like state management (actions: ANSWER, CLEAR_ANSWER, ADVANCE, GO_TO, etc.)
+  - `estimator.js` - Multi-start Nelder-Mead MLE for (θ, β, γ, d) estimation
+  - `render.js` - Quiz orchestrator: builds DOM, initializes all components, runs estimation
+  - `api.js` - Scenario data loading
+  - `player-card-data.js` - Grid loader, nearest-neighbor lookup, counterfactual computation
+  - `components/scenario-card.js` - Interactive quiz question (dice, scorecard, actions)
+  - `components/question-list.js` - Clickable sidebar listing all questions with status
+  - `components/result-panel.js` - Parameter estimates display (visible once all answered)
+  - `components/parameter-chart.js` - Real-time parameter convergence chart
+  - `components/progress-bar.js` - Quiz progress indicator
+  - `components/player-card.js` - Simulation-backed performance analytics
+  - `components/profile-scorecard.js` - Game state scorecard for quiz scenarios
+- **Layout**: Quiz area uses `position: relative` with the question list as an absolutely-positioned sidecar to the left of the 675px container. The sidecar is sticky while scrolling and hidden below 1020px viewport width.
+- **Styles**: `css/profile.css` - All profiling quiz styles
+- **Data**: `data/scenarios.json`, `data/player_card_grid.json`
 
 ### Key Design Patterns
 

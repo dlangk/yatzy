@@ -120,7 +120,7 @@ export function initScenarioCard(container) {
   }
 
   function render(state) {
-    if (state.phase !== 'answering' || !state.scenarios.length) {
+    if ((state.phase !== 'answering' && state.phase !== 'complete') || !state.scenarios.length) {
       el.style.visibility = 'hidden';
       return;
     }
@@ -198,9 +198,8 @@ export function initScenarioCard(container) {
         changeBtn.className = 'game-btn-secondary profile-confirm-btn';
         changeBtn.textContent = 'Change Answer';
         changeBtn.addEventListener('click', () => {
-          answered = false;
           currentScenarioId = null; // force re-render
-          render(getState());
+          dispatch({ type: 'CLEAR_ANSWER', scenarioId: scenario.id });
         });
         actionsEl.appendChild(changeBtn);
       } else {
@@ -222,9 +221,8 @@ export function initScenarioCard(container) {
         changeBtn.className = 'game-btn-secondary profile-change-btn';
         changeBtn.textContent = 'Change Answer';
         changeBtn.addEventListener('click', () => {
-          answered = false;
           currentScenarioId = null;
-          render(getState());
+          dispatch({ type: 'CLEAR_ANSWER', scenarioId: scenario.id });
         });
         actionsEl.appendChild(changeBtn);
       }
@@ -348,12 +346,14 @@ export function initScenarioCard(container) {
       feedbackEl.className = 'profile-feedback profile-feedback-wrong';
     }
 
-    // Auto-advance after feedback
-    advanceTimeout = setTimeout(() => {
-      advanceTimeout = null;
-      currentScenarioId = null;
-      dispatch({ type: 'ADVANCE' });
-    }, 1500);
+    // Auto-advance after feedback (skip if quiz already complete — user is reviewing)
+    if (getState().phase !== 'complete') {
+      advanceTimeout = setTimeout(() => {
+        advanceTimeout = null;
+        currentScenarioId = null;
+        dispatch({ type: 'ADVANCE' });
+      }, 1500);
+    }
   }
 
   render(getState());

@@ -315,7 +315,16 @@ pub fn compute_eds_for_scenario(
     let is_risk = theta != 0.0 && theta != 1.0;
 
     if is_risk {
-        compute_group6_risk_profiling(ctx, sv, up_score, scored, theta, gamma, sigma_d, &mut e_ds_0);
+        compute_group6_risk_profiling(
+            ctx,
+            sv,
+            up_score,
+            scored,
+            theta,
+            gamma,
+            sigma_d,
+            &mut e_ds_0,
+        );
         compute_opt_lse_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1, false);
     } else {
         compute_group6_profiling(ctx, sv, up_score, scored, gamma, sigma_d, &mut e_ds_0);

@@ -42,8 +42,11 @@ YATZY_BASE_PATH=. target/release/yatzy-sweep --list   # show inventory
 | `simulation/statistics.rs` | — | Aggregate statistics from recorded games |
 | `simulation/raw_storage.rs` | — | Binary I/O for raw simulation data (mmap) |
 | `simulation/sweep.rs` | — | Theta sweep: inventory scan, grid resolution, ensure_strategy_table |
+| `profiling/qvalues.rs` | — | Q-value computation with (θ, γ, d) params, softmax sampling, depth noise |
+| `profiling/scenarios.rs` | — | Scenario generation: candidate pool, diversity-constrained selection, Q-grid |
+| `profiling/player_card.rs` | — | Streamlined noisy simulation for player card grid pre-computation |
 
-Entry points: `src/bin/precompute.rs`, `src/bin/server.rs`, `src/bin/simulate.rs`, `src/bin/sweep.rs`, `src/bin/category_sweep.rs`, `src/bin/pivotal_scenarios.rs`, `src/bin/yatzy_conditional.rs`.
+Entry points: `src/bin/precompute.rs`, `src/bin/server.rs`, `src/bin/simulate.rs`, `src/bin/sweep.rs`, `src/bin/category_sweep.rs`, `src/bin/pivotal_scenarios.rs`, `src/bin/yatzy_conditional.rs`, `src/bin/generate_profile_scenarios.rs` (profiling quiz), `src/bin/player_card_grid.rs` (player card), `src/bin/export_training_data.rs` (surrogate data), `src/bin/decision_sensitivity.rs` (flip analysis), `src/bin/multiplayer.rs`, `src/bin/winrate.rs`, `src/bin/heuristic_gap.rs`, `src/bin/decision_gaps.rs`.
 
 ## Algorithm Reference
 

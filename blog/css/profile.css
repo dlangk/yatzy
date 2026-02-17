@@ -58,6 +58,94 @@
   margin-top: 4px;
 }
 
+/* Quiz area: main content in normal flow, question list as an absolute sidecar */
+.profile-quiz-area {
+  position: relative;
+}
+
+/* Sidecar: absolutely positioned to the left of the container.
+   Stretches full height so the sticky inner list has room to scroll. */
+.profile-sidecar {
+  position: absolute;
+  right: calc(100% + 16px);
+  top: 0;
+  bottom: 0;
+  width: 160px;
+}
+
+.profile-quiz-main {
+  /* nothing special — normal flow determines quiz-area height */
+}
+
+/* Question list sidebar */
+.profile-question-list {
+  position: sticky;
+  top: 12px;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 0;
+}
+.ql-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  table-layout: fixed;
+}
+.ql-table th {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 4px 6px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg-alt);
+}
+.ql-table th:last-child {
+  text-align: right;
+}
+.ql-row {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.ql-row:hover {
+  background: var(--accent-light);
+}
+.ql-row-active {
+  background: var(--accent-light);
+  font-weight: 600;
+}
+.ql-row td {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.ql-num {
+  width: 24px;
+  color: var(--text-muted);
+}
+.ql-type {
+  color: var(--text-muted);
+}
+.ql-status-pending {
+  text-align: right;
+  color: var(--text-muted);
+}
+.ql-status-optimal {
+  text-align: right;
+  color: #28a745;
+  font-weight: 600;
+}
+.ql-status-gap {
+  text-align: right;
+  color: var(--text-muted);
+}
+
 /* Scenario card */
 .profile-scenario-card {
   background: var(--bg-alt);
@@ -87,6 +175,33 @@
   display: flex;
   flex-direction: column;
 }
+/* Fixed-height layers in the left column to prevent layout shifts.
+   Dice row height is intrinsic (56px dice + margins).
+   Legend, actions, feedback, and nav each get explicit heights. */
+.profile-scenario-left .game-dice-row {
+  height: 80px; /* 56px dice + vertical centering padding */
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+.profile-scenario-left .game-dice-legend {
+  height: 28px; /* legend swatches */
+  margin: 0;
+}
+.profile-scenario-left .profile-actions {
+  height: 120px; /* fits up to 3 rows of action buttons */
+  align-content: center;
+  overflow-y: auto;
+}
+.profile-scenario-left .profile-feedback {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.profile-scenario-left .profile-nav {
+  height: 40px;
+}
 .profile-scenario-right {
   border-left: 1px solid var(--border);
   padding-left: 16px;
@@ -106,10 +221,8 @@
   padding: 2px 6px;
 }
 
-/* Dice row reuses game-dice-row + die--interactive from game.css */
-.profile-scenario-left .game-dice-row {
-  margin: 16px 0;
-}
+/* Dice row reuses game-dice-row + die--interactive from game.css.
+   Height is set by the fixed-height layer rule above. */
 
 /* Reroll indicator bar (lives in right column above scorecard) */
 .profile-reroll-indicator {
@@ -192,6 +305,7 @@
   flex-wrap: wrap;
   gap: 8px;
   justify-content: center;
+  align-items: center;
 }
 .profile-action-btn {
   font-family: var(--font-mono);
@@ -221,8 +335,6 @@
   text-align: center;
   font-family: var(--font-mono);
   font-size: 13px;
-  min-height: 24px;
-  margin-top: 8px;
   transition: opacity 0.2s;
 }
 .profile-feedback-correct {
@@ -250,8 +362,6 @@
   align-items: center;
   justify-content: center;
   gap: 16px;
-  margin-top: 12px;
-  min-height: 36px;
 }
 .profile-nav-btn {
   font-size: 13px;
@@ -474,7 +584,229 @@
   margin: 0 auto;
 }
 
-/* Responsive */
+/* Player Card */
+.player-card {
+  margin: 24px 0;
+  padding: 20px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.pc-title {
+  font-size: 1.2rem;
+  margin: 0 0 16px;
+  text-align: center;
+}
+.pc-section-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+.pc-note {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 16px 0 0;
+}
+
+/* Section A: Headline stats */
+.pc-headline {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.pc-stat-box {
+  text-align: center;
+  padding: 12px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.pc-stat-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.pc-stat-value {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 1.6rem;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+.pc-stat-gap {
+  color: var(--accent);
+}
+
+/* Section B: Box-plot */
+.pc-boxplot {
+  margin-bottom: 20px;
+}
+.pc-boxplot-track {
+  position: relative;
+  height: 24px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+.pc-boxplot-whisker {
+  position: absolute;
+  top: 50%;
+  height: 2px;
+  background: var(--accent);
+  opacity: 0.4;
+  transform: translateY(-50%);
+}
+.pc-boxplot-box {
+  position: absolute;
+  top: 3px;
+  height: calc(100% - 6px);
+  background: var(--accent);
+  opacity: 0.2;
+  border-radius: 3px;
+}
+.pc-boxplot-median {
+  position: absolute;
+  top: 2px;
+  width: 3px;
+  height: calc(100% - 4px);
+  background: var(--accent);
+  border-radius: 2px;
+  transform: translateX(-50%);
+}
+.pc-boxplot-optimal {
+  position: absolute;
+  top: 2px;
+  width: 8px;
+  height: calc(100% - 4px);
+  transform: translateX(-50%);
+}
+.pc-boxplot-optimal::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  background: #28a745;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.pc-boxplot-axis {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 0 2px;
+}
+.pc-boxplot-legend {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+.pc-legend-yours {
+  color: var(--accent);
+}
+.pc-legend-opt {
+  color: #28a745;
+}
+
+/* Section C: Counterfactual bars */
+.pc-counterfactuals {
+  margin-bottom: 20px;
+}
+.pc-cf-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 60px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.pc-cf-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.pc-cf-bar-track {
+  height: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.pc-cf-bar {
+  height: 100%;
+  background: var(--accent);
+  opacity: 0.6;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.pc-cf-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pc-cf-note {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 8px;
+}
+
+/* Section D: Fingerprint table */
+.pc-fingerprint {
+  margin-bottom: 8px;
+}
+.pc-fp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.pc-fp-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+.pc-fp-table th:first-child {
+  text-align: left;
+}
+.pc-fp-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.pc-fp-label {
+  color: var(--text-muted);
+}
+.pc-fp-you, .pc-fp-opt {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Responsive: hide sidecar when viewport can't fit it in the left margin */
+@media (max-width: 1020px) {
+  .profile-sidecar {
+    display: none;
+  }
+}
+
 @media (max-width: 720px) {
   .profile-scenario-layout {
     grid-template-columns: 1fr;
@@ -490,5 +822,11 @@
   }
   .profile-param-row {
     grid-template-columns: 100px 1fr 50px;
+  }
+  .pc-headline {
+    grid-template-columns: 1fr;
+  }
+  .pc-cf-row {
+    grid-template-columns: 120px 1fr 50px;
   }
 }

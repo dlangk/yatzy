@@ -232,17 +232,17 @@ fn main() {
     let mut theta_tables: Vec<(f32, StateValues)> = Vec::new();
 
     for &target_theta in &classification_thetas {
-        if let Some((actual_theta, path)) = all_theta_files
-            .iter()
-            .min_by(|(a, _), (b, _)| {
-                (a - target_theta)
-                    .abs()
-                    .partial_cmp(&(b - target_theta).abs())
-                    .unwrap()
-            })
-        {
+        if let Some((actual_theta, path)) = all_theta_files.iter().min_by(|(a, _), (b, _)| {
+            (a - target_theta)
+                .abs()
+                .partial_cmp(&(b - target_theta).abs())
+                .unwrap()
+        }) {
             if (actual_theta - target_theta).abs() < 0.02 {
-                if !theta_tables.iter().any(|(t, _)| (t - actual_theta).abs() < 0.001) {
+                if !theta_tables
+                    .iter()
+                    .any(|(t, _)| (t - actual_theta).abs() < 0.001)
+                {
                     match load_state_values_standalone(path) {
                         Some(sv) => {
                             println!("  Loaded θ={:.3} from {}", actual_theta, path);
@@ -351,15 +351,9 @@ fn main() {
     let grid_theta_tables: Vec<(f32, StateValues)> = {
         let mut tables: Vec<(f32, StateValues)> = Vec::new();
         for &target in &q_theta_values {
-            if let Some((actual, path)) = all_theta_files
-                .iter()
-                .min_by(|(a, _), (b, _)| {
-                    (a - target)
-                        .abs()
-                        .partial_cmp(&(b - target).abs())
-                        .unwrap()
-                })
-            {
+            if let Some((actual, path)) = all_theta_files.iter().min_by(|(a, _), (b, _)| {
+                (a - target).abs().partial_cmp(&(b - target).abs()).unwrap()
+            }) {
                 if (actual - target).abs() < 0.02
                     && !tables.iter().any(|(t, _)| (t - actual).abs() < 0.001)
                 {
@@ -451,7 +445,11 @@ fn main() {
     let mut f = std::fs::File::create(&json_path).expect("Failed to create JSON");
     f.write_all(json.as_bytes()).unwrap();
 
-    println!("\nWrote {} ({:.1} KB)", json_path, json_size as f64 / 1024.0);
+    println!(
+        "\nWrote {} ({:.1} KB)",
+        json_path,
+        json_size as f64 / 1024.0
+    );
 
     // Write master_pool.json
     let pool_json_path = format!("{}/master_pool.json", output_dir);
@@ -502,11 +500,7 @@ fn main() {
     println!("\n=== Profiling Scenarios Summary ===");
     println!("Scenarios: {}", output.scenarios.len());
     for q in &["theta", "gamma", "depth", "beta"] {
-        let count = output
-            .scenarios
-            .iter()
-            .filter(|s| s.quadrant == *q)
-            .count();
+        let count = output.scenarios.iter().filter(|s| s.quadrant == *q).count();
         let avg_gap: f32 = output
             .scenarios
             .iter()
@@ -533,8 +527,5 @@ fn main() {
     println!("Total Q-grid entries: {}", total_grid_entries);
     println!("Master pool: {} candidates", pool_output.total_candidates);
 
-    println!(
-        "\nTotal: {:.1}s",
-        total_start.elapsed().as_secs_f64(),
-    );
+    println!("\nTotal: {:.1}s", total_start.elapsed().as_secs_f64(),);
 }

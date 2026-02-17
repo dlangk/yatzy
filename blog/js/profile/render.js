@@ -9,6 +9,9 @@ import { initScenarioCard } from './components/scenario-card.js';
 import { initProgressBar } from './components/progress-bar.js';
 import { initParameterChart } from './components/parameter-chart.js';
 import { initResultPanel } from './components/result-panel.js';
+import { initPlayerCard } from './components/player-card.js';
+import { initQuestionList } from './components/question-list.js';
+import { loadPlayerCardGrid } from './player-card-data.js';
 
 // Load scenarios on init
 (async function init() {
@@ -30,11 +33,30 @@ if (root) {
   intro.id = 'profile-intro';
   root.appendChild(intro);
 
-  // Quiz components (progress bar after scenario card = at bottom)
-  initScenarioCard(root);
-  initProgressBar(root);
-  initParameterChart(root);
-  initResultPanel(root);
+  // Quiz area: relatively positioned so the question-list sidecar can anchor to it
+  const quizArea = document.createElement('div');
+  quizArea.className = 'profile-quiz-area';
+  root.appendChild(quizArea);
+
+  // Sidecar: absolutely positioned to the left, sticky inner list
+  const sidecar = document.createElement('div');
+  sidecar.className = 'profile-sidecar';
+  quizArea.appendChild(sidecar);
+  initQuestionList(sidecar);
+
+  // Main content column — everything flows here
+  const mainCol = document.createElement('div');
+  mainCol.className = 'profile-quiz-main';
+  quizArea.appendChild(mainCol);
+
+  initScenarioCard(mainCol);
+  initProgressBar(mainCol);
+  initParameterChart(mainCol);
+  initResultPanel(mainCol);
+  initPlayerCard(mainCol);
+
+  // Preload grid data in background
+  loadPlayerCardGrid();
 
   // Render intro/loading states
   function renderIntro(state) {

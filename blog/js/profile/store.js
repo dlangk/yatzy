@@ -52,7 +52,7 @@ export function dispatch(action) {
   state = reducer(state, action);
   if (state !== prev) {
     // Persist on meaningful state changes
-    if (['START_QUIZ', 'ANSWER', 'ADVANCE', 'GO_TO', 'UPDATE_PROFILE'].includes(action.type)) {
+    if (['START_QUIZ', 'ANSWER', 'CLEAR_ANSWER', 'ADVANCE', 'GO_TO', 'UPDATE_PROFILE'].includes(action.type)) {
       saveToStorage(state);
     }
     if (action.type === 'RESET') {
@@ -116,6 +116,11 @@ function reducer(state, action) {
       } else {
         answers.push(action.answer);
       }
+      return { ...state, answers };
+    }
+
+    case 'CLEAR_ANSWER': {
+      const answers = state.answers.filter(a => a.scenarioId !== action.scenarioId);
       return { ...state, answers };
     }
 

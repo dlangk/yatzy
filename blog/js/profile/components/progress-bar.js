@@ -28,7 +28,7 @@ export function initProgressBar(container) {
     fill.style.width = `${pct}%`;
     label.textContent = `${done} / ${total}`;
 
-    el.style.visibility = state.phase === 'answering' ? 'visible' : 'hidden';
+    el.style.visibility = (state.phase === 'answering' || state.phase === 'complete') ? 'visible' : 'hidden';
   }
 
   render(getState());

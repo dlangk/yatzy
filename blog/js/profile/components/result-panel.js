@@ -10,7 +10,8 @@ export function initResultPanel(container) {
   container.appendChild(el);
 
   function render(state) {
-    if (state.phase !== 'complete' || !state.profile) {
+    const allAnswered = state.scenarios.length > 0 && state.answers.length >= state.scenarios.length;
+    if (!allAnswered || !state.profile) {
       el.style.visibility = 'hidden';
       el.innerHTML = '<div class="profile-result-placeholder"></div>';
       return;

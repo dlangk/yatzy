@@ -4,5 +4,6 @@
 //! sampling across game phases, decision types, and board tensions.
 //! Pre-computes Q-value grids for client-side MLE estimation.
 
+pub mod player_card;
 pub mod qvalues;
 pub mod scenarios;

@@ -369,19 +369,47 @@ Individual errors create cascading suboptimality. Filling category X suboptimall
 
 Without a solver as reference, humans compare against other humans. With σ ≈ 38 even under optimal play, any suboptimal player will occasionally score well above their mean. These memorable highs reinforce the feeling of competence. The gap between human and optimal play is invisible without a baseline to measure against.
 
-### 7.5 Estimating Human Risk Preference
+### 7.5 Estimating Human Cognitive Profile
 
-**From observed play.** At each decision, we compute the set of θ values for which the observed action is optimal. Over many decisions, the intersection of compatible θ ranges estimates the player's risk preference.
+The goal is to estimate a player's decision-making parameters from a short quiz. Rather than requiring 50–100 observed full games, we compress estimation into 30 diagnostic scenarios — game states where the optimal action depends on the player's cognitive profile.
 
-Formally, using a softmax choice model:
+**The 4-parameter model.** Player behavior is modeled as noisy optimization of a modified value function:
 
-$$P(a \mid s, \theta, \beta) \propto \exp(\beta \cdot V_\theta(a, s))$$
+$$P(a \mid s) \propto \exp(\beta \cdot Q_{\theta,\gamma,d}(a, s))$$
 
-where β is a rationality parameter (β → ∞: perfectly optimal; β → 0: random). Given observed decisions, we fit (θ, β) by maximum likelihood. This is a standard discrete choice model (revealed preference in economics, inverse reinforcement learning in ML).
+The four parameters capture distinct cognitive dimensions:
 
-**Sample size constraint.** At θ = 0.07, only 1.9 category decisions per game differ from θ = 0. Estimating θ within ±0.02 requires ~50–100 observed games per player.
+| Parameter | Meaning | Range | Optimal |
+|---|---|---|---|
+| θ (risk) | Risk attitude — which strategy table backs decisions | [−0.05, 0.1] | 0 |
+| β (precision) | Decision precision — inverse temperature of action selection | [0.5, 10] | ∞ |
+| γ (myopia) | Discount on future value — how far ahead the player looks | [0.3, 1.0] | 1.0 |
+| d (depth) | Search depth — number of future turns considered | {8, 20, 999} | 999 |
 
-**Questionnaire approach.** We compress the estimation into ~15 pivotal scenarios — game states where different θ values prescribe different optimal categories. A Bayesian adaptive design selects each question to maximize expected information gain (entropy reduction over the θ posterior). Questions are selected greedily, equivalent to one-step-ahead Bayesian optimal experimental design. A pool of 200 Fisher-scored pivotal scenarios has been generated, filtered by a realism criterion that rejects implausible game states (too many zeros, upper score inconsistent with turn number, implausibly low total score). The questionnaire has been tested on one subject (15 questions), but the design target of CI width < 0.05 has not been validated via Monte Carlo.
+θ affects which pre-computed strategy table (state values) is used. β controls how deterministically the player follows Q-values (β → ∞ is perfectly optimal, β → 0 is random). γ discounts future state values (γ < 1 makes the player myopic — undervaluing moves that pay off later). d adds noise to the Q-value computation (lower d = shallower lookahead = noisier values).
+
+**Q-value computation.** For each scenario, Q-values are pre-computed across a 6θ × 6γ × 3d = 108 parameter grid. The Q-grid maps parameter combinations to action-value vectors, enabling rapid likelihood evaluation during estimation. Q-values always use EV-mode computation — θ only selects the strategy table, not the aggregation method. This matches the simulation model: players are modeled as noisily optimizing expected value under a θ-shifted strategy table.
+
+**Scenario generation.** 30 quiz scenarios are selected via diversity-constrained stratified sampling:
+
+1. Simulate 100K games with a noisy agent (β=3, γ=0.85, σ_d=4) to visit realistic game states
+2. At each decision point, collect the full Q-grid and identify scenarios where different parameter values prescribe different optimal actions
+3. Filter by realism (plausible upper score, consistent scoring pattern) and minimum visit count (≥100)
+4. Build a master pool (~595 candidates) by scoring for discriminative power
+5. Select 30 scenarios via semantic bucketing (3 game phases × 3 decision types × 4 tension types = 36 buckets) with action-fatigue constraints (no action label in top-2 more than 4 times) and fingerprint deduplication (blocks functionally equivalent scenarios with identical top-3 actions and EVs)
+
+**Estimation.** Given a player's 30 answers, the estimator fits (θ, β, γ, d) by maximum likelihood using multi-start Nelder-Mead optimization (8 start points × 3 d values = 24 optimizations). A weak log-normal prior on β centered at 3 prevents drift in flat regions. The estimator runs in JavaScript for client-side estimation (no server needed).
+
+**Validation (Monte Carlo).** 100 synthetic trials across 6 archetypes (cautious, impulsive, myopic, strategic, random, expert) confirm parameter recovery:
+
+| Parameter | Median RMSE | Threshold | Status |
+|---|---|---|---|
+| θ | 0.033 | < 0.2 | PASS |
+| β | 1.79 | < 2.0 | PASS |
+| γ | 0.197 | < 0.2 | PASS |
+| d | 86% accuracy | ≥ 60% | PASS |
+
+Known limitation: when β > 4 and d = 999, the player is near-deterministic and β becomes poorly identifiable (many β values produce similar likelihoods).
 
 
 ## 8. Surrogate Policy Compression: How Many Parameters for EV-Optimal Play?
@@ -613,15 +641,62 @@ Online RL fine-tuning degraded the BC policy catastrophically (mean 190 → 123 
 The constant-θ Pareto frontier is empirically tight. The state-dependent θ experiments (Section 9.1) provide the strongest evidence: four adaptive policies that explicitly condition on game state all land within 1 point of the frontier (Δμ between −0.23 and −0.98). The RL results are consistent with this but do not independently establish it — the RL algorithms may have failed for reasons unrelated to the size of the exploitable gap.
 
 
-## 10. Open Questions
+## 10. Player Card: Simulation-Backed Profile Analytics
+
+After quiz completion, the player's estimated (θ, β, γ, d) parameters are translated into tangible gameplay metrics via pre-computed Monte Carlo simulations. The Player Card shows the player's expected score distribution and pinpoints where each cognitive imperfection costs them the most points.
+
+### 10.1 Pre-Computed Simulation Grid
+
+The blog is fully static (no server), so all simulation results are pre-computed for a 4D parameter grid:
+
+| Parameter | Grid values | Count |
+|---|---|---|
+| θ | −0.05, −0.02, 0, 0.02, 0.05, 0.1 | 6 |
+| β | 0.5, 1.0, 2.0, 4.0, 7.0, 10.0 | 6 |
+| γ | 0.3, 0.6, 0.8, 0.9, 0.95, 1.0 | 6 |
+| d | 8, 20, 999 | 3 |
+
+Total: 648 combinations × 10K games each (~2.5 min on Apple Silicon). Output: `blog/data/player_card_grid.json` (~82 KB).
+
+The simulation uses `simulate_game_profiled` — a streamlined noisy agent that plays full games using softmax(β·Q) action selection with γ-discounted values and depth noise σ_d. Q-value computation always uses EV-mode (never risk-sensitive LSE) — θ only affects which strategy table (state values) backs the decisions, matching the profiling estimator's model.
+
+For each grid point, the simulation records: mean, std, p5, p10, p25, p50, p75, p90, p95, p99, and bonus rate. An optimal baseline (θ=0, perfect decisions) is also simulated for comparison.
+
+### 10.2 Counterfactual Coaching
+
+The key insight is that counterfactual analysis requires only 4 extra lookups. For a player with estimated parameters (θ̂, β̂, γ̂, d̂), each counterfactual fixes one parameter to its optimal value while keeping the others at the player's estimated values:
+
+| Counterfactual | Lookup | Measures |
+|---|---|---|
+| Fix θ → 0 | (0, β̂, γ̂, d̂) | Cost of non-neutral risk attitude |
+| Fix β → 10 | (θ̂, 10, γ̂, d̂) | Cost of imprecise decisions |
+| Fix γ → 1.0 | (θ̂, β̂, 1.0, d̂) | Cost of myopia |
+| Fix d → 999 | (θ̂, β̂, γ̂, 999) | Cost of shallow lookahead |
+
+The difference in mean score between the counterfactual and the player's actual grid entry quantifies the point cost of each imperfection. These costs overlap (fixing one parameter changes the impact of others), so their sum exceeds the total gap to optimal. The Player Card displays these as "coaching bars" sorted by impact, with a note about overlap.
+
+### 10.3 Spot-Check Validation
+
+Grid entries at parameter extremes confirm expected behavior:
+
+| Parameters | Expected | Observed mean |
+|---|---|---|
+| θ=0, β=10, γ=1.0, d=999 | ≈ optimal (248) | 248.3 |
+| θ=0, β=0.5, γ=0.3, d=8 | Near-random (~140) | 155.3 |
+| θ=0, β=2.0, γ=0.8, d=20 | Intermediate | ~195 |
+
+The near-optimal entry (β=10, γ=1.0, d=999) matches the optimal baseline within sampling noise, confirming that the noisy agent model degrades gracefully to optimal play.
+
+
+## 11. Open Questions
 
 **Head-to-head win rate.** Maximizing E[score] and maximizing P(my\_score > opponent\_score) are different objectives. Against an opponent playing θ = 0, does there exist a θ that wins > 50% of head-to-head games? The opponent's full score distribution is computable from existing simulations; win rate for any challenger θ is an O(n²) convolution. The interesting case is whether distributional shape (skewness from the bonus cliff) can be exploited beyond what mean advantage predicts. An EV-vs-EV baseline (1M games, two θ=0 players) confirms the null: 49.5% vs 49.7% wins (0.76% draws), avg winning margin 43.5 points.
-
-**θ-sensitive decisions as diagnostics.** The decision sensitivity analysis (Section 5.6) identifies 239 flip decisions where different θ values prescribe different actions. These form a natural basis for risk-preference estimation. Remaining work: validating via Monte Carlo that 15–20 Fisher-optimal scenarios achieve CI(θ) width < 0.05, and testing the adaptive questionnaire on human subjects.
 
 **Non-exponential utility.** The constant-θ frontier is tight under exponential utility. Whether strategies optimal under other utility classes (prospect-theoretic, rank-dependent) reach points inaccessible to any θ remains open.
 
 **Optimal θ\* per percentile.** The coarse θ sweep (Section 4.2) identifies approximate peak-θ values per quantile, but the grid spacing (Δθ = 0.005–0.01) limits precision. A two-phase adaptive sweep — coarse grid to locate peaks, fine grid (Δθ = 0.002) around each peak — would pin down θ\* to ±0.002 for each percentile from p1 through p99.99.
+
+**Profiling with more scenarios.** The current 30-scenario quiz achieves good recovery (θ RMSE 0.033, γ RMSE 0.197), but β recovery degrades for near-deterministic players (β > 4). Increasing to 40–50 scenarios or using adaptive scenario selection could improve β identifiability in the high-precision regime.
 
 
 ---
