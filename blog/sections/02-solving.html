@@ -1,0 +1,28 @@
+  <section id="solving">
+    <h2>Can You Play Optimal Yatzy?</h2>
+
+    <p>The game has a finite state space that can be fully enumerated. The state of a Yatzy game is determined by two things: which categories have been scored (a 15-bit bitmask, giving 32,768 possibilities) and how much progress you've made toward the upper section bonus (0 to 63 points, capped). That's 32,768 &times; 64 = 2,097,152 unique game states.</p>
+
+    <p>Using backward induction &mdash; starting from the end of the game and working backward &mdash; we can compute the exact expected value of every state. At each state, the algorithm considers all possible dice outcomes, all possible keep/reroll decisions, and all possible category assignments. The result is an 8 MB lookup table that answers the question: "given where I am in the game and what I rolled, what should I do?"</p>
+
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="stat-value">248.4</div>
+        <div class="stat-label">Mean score (optimal)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">38.5</div>
+        <div class="stat-label">Standard deviation</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">2.3s</div>
+        <div class="stat-label">Precompute time</div>
+      </div>
+    </div>
+
+    <p>An optimal player scores 248.4 points on average &mdash; about 66% of the theoretical maximum. The standard deviation is 38.5, meaning most games fall between 210 and 290 points. The entire precomputation takes 2.3 seconds on a modern laptop.</p>
+
+    <p>An instructive failure mode: if you naively maximize the <em>immediate</em> score each turn (always pick the category that scores highest right now), you average only 118.7 points &mdash; less than half of optimal. The greedy approach destroys the upper section bonus by filling categories sub-optimally, which cascades through the rest of the game.</p>
+  </section>
+
+  <hr class="divider">

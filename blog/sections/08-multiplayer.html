@@ -1,0 +1,20 @@
+  <section id="multiplayer">
+    <h2>Playing Against Someone Else</h2>
+
+    <p>Everything so far has been single-player optimization. But Yatzy is usually played against others. Does the optimal single-player strategy also win the most games head-to-head?</p>
+
+    <p>We simulated one million two-player games for each value of &theta;, always pitting the &theta;-player against an EV-optimal (&theta;=0) opponent. The results:</p>
+
+    <!-- Chart 7: Win Rate -->
+    <div class="chart-container" id="chart-win-rate">
+      <div class="chart-title">Win Rate vs an EV-Optimal Opponent</div>
+      <div id="chart-win-rate-svg"></div>
+      <p class="chart-caption">Each point represents 1 million games between a &theta;-player and an EV-optimal opponent. Color indicates risk attitude (blue = risk-averse, red = risk-seeking). Hover for exact stats.</p>
+    </div>
+
+    <p>The EV-optimal strategy (&theta;=0) is also approximately win-rate-optimal. No value of &theta; consistently beats it head-to-head. Risk-averse strategies (negative &theta;) lose around 49&ndash;50% of games &mdash; close, but still losing. Risk-seeking strategies lose badly, dropping below 40% win rate at &theta;=0.15 and below 35% at &theta;=0.2.</p>
+
+    <p>The asymmetry from the single-player analysis carries over: risk-aversion costs you very little in win rate (a percent or two), while risk-seeking drops your win rate dramatically. If you're playing competitively, the EV-optimal strategy is the right choice, but a mildly risk-averse strategy is nearly as good.</p>
+  </section>
+
+  <hr class="divider">

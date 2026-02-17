@@ -1,0 +1,36 @@
+  <section id="distribution">
+    <h2>The Distribution Is Not What You Think</h2>
+
+    <p>When I first simulated a million games, I expected a nice bell curve. What I got was something much more interesting. Drag the slider below to see how the score distribution changes as you adjust the risk parameter (more on that parameter shortly).</p>
+
+    <!-- Chart 1: Score Distribution -->
+    <div class="chart-container" id="chart-score-distribution">
+      <div class="chart-title">Score Distribution Explorer</div>
+      <div class="chart-controls">
+        <label>Risk (&theta;):</label>
+        <input type="range" class="chart-slider" step="1">
+        <span class="slider-value">0 (EV-optimal)</span>
+      </div>
+      <div id="chart-score-distribution-svg"></div>
+      <p class="chart-caption">The dashed line shows the &theta;=0 (EV-optimal) distribution for reference. Drag the slider to see how different risk attitudes reshape the distribution.</p>
+    </div>
+
+    <p>The distribution is clearly not Gaussian. There are visible bumps and a characteristic right shoulder. The explanation turns out to be beautifully simple: the score distribution is a mixture of four sub-populations, created by two binary events that dominate the variance.</p>
+
+    <p>The first event is the upper section bonus: either you reach 63 points and earn the 50-point bonus (87% of the time at &theta;=0), or you don't. The second is Yatzy: either you roll five of a kind at some point (39% of the time), or you don't. These two events are roughly independent, and each shifts your score by about 50 points, creating four clusters.</p>
+
+    <!-- Chart 2: Mixture Decomposition -->
+    <div class="chart-container" id="chart-mixture">
+      <div class="chart-title">Score Distribution as a Four-Component Mixture</div>
+      <div class="chart-controls">
+        <button class="chart-btn">Build up</button>
+      </div>
+      <div id="chart-mixture-svg"></div>
+      <div class="chart-legend"></div>
+      <p class="chart-caption">Each component is a sub-population defined by whether the player hit the upper bonus and/or scored a Yatzy. Click "Build up" to see each component added one by one. Click any legend item to toggle it.</p>
+    </div>
+
+    <p>The "Bonus + Yatzy" population (34.7% of games, mean 288) forms the right shoulder. The "No bonus, no Yatzy" population (6.1%, mean 164) creates the thin left tail. The two middle populations overlap to produce the apparent main peak. This isn't a statistical curiosity &mdash; it directly informs strategy. Any play that risks the upper bonus is effectively gambling 50 points.</p>
+  </section>
+
+  <hr class="divider">

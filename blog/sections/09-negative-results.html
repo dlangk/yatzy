@@ -1,0 +1,13 @@
+  <section id="negative-results">
+    <h2>Things That Don't Work</h2>
+
+    <p>Not everything we tried produced interesting results. Some ideas that seemed promising turned out to be dead ends.</p>
+
+    <p><strong>Adaptive &theta; within a game.</strong> What if you started risk-neutral and became risk-averse as you built a lead, or risk-seeking when behind? This violates Bellman's principle of optimality: the strategy table was computed under a fixed &theta;, so switching &theta; mid-game means your future-value estimates are wrong. The resulting policy is inconsistent with itself and performs worse than any fixed &theta;.</p>
+
+    <p><strong>Reinforcement learning.</strong> We trained RL agents (PPO, DQN) to find strategies on the Pareto frontier between mean score and score variance. After extensive tuning, every RL agent converged to a policy indistinguishable from some constant-&theta; solver. The Pareto frontier of fixed-&theta; strategies is already tight enough that RL can't find gaps to exploit. The tabular solver, which runs in 2.3 seconds, dominates RL agents that took hours to train.</p>
+
+    <p><strong>Feature-engineered inputs for surrogate models.</strong> We tried augmenting the 29 raw features (dice counts, category availability, upper score, turn) with derived features: upper bonus distance, straight partial counts, pair/triple indicators. At a fixed depth, these engineered features actually <em>hurt</em> performance. The decision tree can derive any threshold function from the raw inputs &mdash; adding derived features just dilutes the split candidates and wastes depth on redundant decisions.</p>
+  </section>
+
+  <hr class="divider">

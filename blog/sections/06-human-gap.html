@@ -1,0 +1,38 @@
+  <section id="human-gap">
+    <h2>The 82-Point Gap</h2>
+
+    <p>How badly does a reasonable heuristic play compared to optimal? We built a straightforward rule-based player that scores the highest-value available category, prefers high-count dice on rerolls, and has basic awareness of straights and full houses. The result:</p>
+
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="stat-value">82.5</div>
+        <div class="stat-label">EV points lost per game</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">166</div>
+        <div class="stat-label">Heuristic mean score</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">1.2%</div>
+        <div class="stat-label">Heuristic bonus rate</div>
+      </div>
+    </div>
+
+    <p>The heuristic player averages 166 points &mdash; 82 points below optimal &mdash; and hits the upper bonus only 1.2% of the time (vs. 87% for optimal). That last number is the key: the heuristic routinely wastes upper section categories on low scores, destroying any chance of the 50-point bonus.</p>
+
+    <p>Where exactly do those 82 points go? The chart below breaks down the top mistake patterns, colored by decision type.</p>
+
+    <!-- Chart 3: Heuristic Gap -->
+    <div class="chart-container" id="chart-heuristic-gap">
+      <div class="chart-title">Top Mistake Patterns (EV Loss per Game)</div>
+      <div id="chart-heuristic-gap-svg"></div>
+      <div class="chart-legend"></div>
+      <p class="chart-caption">Each bar shows how many EV points per game are lost to that mistake pattern. The dashed cumulative line shows how the losses add up. Hover for details including example dice.</p>
+    </div>
+
+    <p>The biggest single mistake is keeping the wrong number of dice on the first reroll &mdash; specifically, keeping 1 die when you should keep 2. This costs 8.8 points per game. The reroll mistakes collectively account for about 53% of the total loss.</p>
+
+    <p>Category selection mistakes account for 47% of the loss but are individually more expensive per occurrence. The worst category mistake &mdash; wasting Fours on a hand that should score Small Straight &mdash; costs up to 51 EV points when it happens. The heuristic sees a four and thinks "score Fours," while the solver knows the four is more valuable as progress toward the upper bonus.</p>
+  </section>
+
+  <hr class="divider">
