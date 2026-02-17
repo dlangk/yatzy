@@ -981,19 +981,30 @@ pub fn build_master_pool(
     max_per_bucket: usize,
 ) -> Vec<ScoredCandidate> {
     let sv = ctx.state_values.as_slice();
-    let min_visits = 20usize;
+
+    // Phase-dependent visit threshold: mid-game states are so diverse under
+    // noisy simulation that requiring high visit counts eliminates them all.
+    let min_visits_early_late = 5usize;
+    let min_visits_mid = 2usize;
 
     // Filter to viable candidates
     let viable: Vec<(RawDecision, usize)> = candidates
         .into_values()
         .filter(|(d, count)| {
+            let min_visits = match classify_phase(d.turn) {
+                GamePhase::Mid => min_visits_mid,
+                _ => min_visits_early_late,
+            };
             *count >= min_visits
                 && d.turn > 0
                 && d.turn < CATEGORY_COUNT - 1
         })
         .collect();
 
-    println!("  {} viable candidates (visits >= {})", viable.len(), min_visits);
+    println!(
+        "  {} viable candidates (visits >= {}/{})",
+        viable.len(), min_visits_early_late, min_visits_mid,
+    );
 
     // Prepare theta table slices
     let theta_slices: Vec<(f32, &[f32])> = theta_tables
@@ -1120,6 +1131,8 @@ pub fn assemble_quiz(
     let mut theta_count = 0usize;
     let mut gamma_count = 0usize;
     let mut depth_count = 0usize;
+    let mut beta_count = 0usize;
+    let mut turn_set: Vec<usize> = Vec::new(); // track which turns are covered
 
     let phase_idx = |p: GamePhase| -> usize {
         match p {
@@ -1142,33 +1155,63 @@ pub fn assemble_quiz(
     let min_theta = 3usize;
     let min_gamma = 3usize;
     let min_depth = 3usize;
+    let min_beta = 3usize;
+    let max_theta = 8usize;
+    let max_gamma = 8usize;
 
     // Threshold for "diagnostic" classification
     let theta_thresh = 0.5;
     let gamma_thresh = 0.5;
+    let beta_thresh = 0.15; // ev_gap > 3 pts — lowered to get more β candidates
 
-    // Helper: find best candidate satisfying a predicate
-    let find_best = |used: &[bool], pred: &dyn Fn(usize) -> bool| -> Option<usize> {
-        let mut best_idx: Option<usize> = None;
-        let mut best_score = f32::NEG_INFINITY;
-        for i in 0..pool.len() {
-            if used[i] || !pred(i) {
-                continue;
+    // Helper: find best candidate satisfying a predicate, with turn-diversity bonus
+    // and quadrant cap penalties
+    let find_best =
+        |used: &[bool], turn_set: &[usize], theta_count: usize, gamma_count: usize,
+         pred: &dyn Fn(usize) -> bool| -> Option<usize> {
+            let mut best_idx: Option<usize> = None;
+            let mut best_score = f32::NEG_INFINITY;
+            for i in 0..pool.len() {
+                if used[i] || !pred(i) {
+                    continue;
+                }
+                let is_theta_dominant = pool[i].scores.s_theta >= theta_thresh;
+                let is_gamma_dominant = pool[i].scores.s_gamma >= gamma_thresh
+                    && pool[i].scores.s_theta < theta_thresh;
+                // Hard skip when over cap
+                if is_theta_dominant && theta_count >= max_theta {
+                    continue;
+                }
+                if is_gamma_dominant && gamma_count >= max_gamma {
+                    continue;
+                }
+                let mut score = pool[i].scores.total_score();
+                // Bonus for covering a new turn number
+                if !turn_set.contains(&pool[i].decision.turn) {
+                    score += 3.0;
+                }
+                // Penalty when approaching caps
+                if is_theta_dominant && theta_count >= max_theta.saturating_sub(2) {
+                    score -= 2.0;
+                }
+                if is_gamma_dominant && gamma_count >= max_gamma.saturating_sub(2) {
+                    score -= 2.0;
+                }
+                // Small tiebreak by visit count
+                score += 0.001 * pool[i].visit_count as f32;
+                if score > best_score {
+                    best_score = score;
+                    best_idx = Some(i);
+                }
             }
-            let score = pool[i].scores.total_score()
-                + 0.01 * pool[i].visit_count as f32; // tiebreak by visit count
-            if score > best_score {
-                best_score = score;
-                best_idx = Some(i);
-            }
-        }
-        best_idx
-    };
+            best_idx
+        };
 
     let select = |idx: usize, selected: &mut Vec<usize>, used: &mut Vec<bool>,
                       phase_count: &mut [usize; 3], dtype_count: &mut [usize; 3],
                       theta_count: &mut usize, gamma_count: &mut usize,
-                      depth_count: &mut usize| {
+                      depth_count: &mut usize, beta_count: &mut usize,
+                      turn_set: &mut Vec<usize>| {
         let sc = &pool[idx];
         selected.push(idx);
         used[idx] = true;
@@ -1183,10 +1226,15 @@ pub fn assemble_quiz(
         if sc.scores.s_d > 0.0 {
             *depth_count += 1;
         }
+        if sc.scores.s_beta >= beta_thresh {
+            *beta_count += 1;
+        }
+        if !turn_set.contains(&sc.decision.turn) {
+            turn_set.push(sc.decision.turn);
+        }
     };
 
     // Phase 1: Fill must-fill quotas
-    // Priority order: phase → dtype → theta → gamma → depth
     loop {
         if selected.len() >= n_scenarios {
             break;
@@ -1194,7 +1242,7 @@ pub fn assemble_quiz(
 
         // Find the most under-served constraint
         let mut worst_deficit = 0i32;
-        let mut worst_type = 0u8; // 0=none, 1=phase, 2=dtype, 3=theta, 4=gamma, 5=depth
+        let mut worst_type = 0u8; // 0=none, 1=phase, 2=dtype, 3=theta, 4=gamma, 5=depth, 6=beta
         let mut worst_param = 0usize;
 
         for p in 0..3 {
@@ -1234,6 +1282,13 @@ pub fn assemble_quiz(
                 worst_type = 5;
             }
         }
+        {
+            let deficit = min_beta as i32 - beta_count as i32;
+            if deficit > worst_deficit {
+                worst_deficit = deficit;
+                worst_type = 6;
+            }
+        }
 
         if worst_deficit <= 0 {
             break; // All quotas met
@@ -1246,7 +1301,7 @@ pub fn assemble_quiz(
                     1 => GamePhase::Mid,
                     _ => GamePhase::Late,
                 };
-                find_best(&used, &|i| pool[i].bucket.phase == target_phase)
+                find_best(&used, &turn_set, theta_count, gamma_count, &|i| pool[i].bucket.phase == target_phase)
             }
             2 => {
                 let target_dtype = match worst_param {
@@ -1254,11 +1309,12 @@ pub fn assemble_quiz(
                     1 => DecisionType::Reroll2,
                     _ => DecisionType::Category,
                 };
-                find_best(&used, &|i| pool[i].bucket.dtype == target_dtype)
+                find_best(&used, &turn_set, theta_count, gamma_count, &|i| pool[i].bucket.dtype == target_dtype)
             }
-            3 => find_best(&used, &|i| pool[i].scores.s_theta >= theta_thresh),
-            4 => find_best(&used, &|i| pool[i].scores.s_gamma >= gamma_thresh),
-            5 => find_best(&used, &|i| pool[i].scores.s_d > 0.0),
+            3 => find_best(&used, &turn_set, theta_count, gamma_count, &|i| pool[i].scores.s_theta >= theta_thresh),
+            4 => find_best(&used, &turn_set, theta_count, gamma_count, &|i| pool[i].scores.s_gamma >= gamma_thresh),
+            5 => find_best(&used, &turn_set, theta_count, gamma_count, &|i| pool[i].scores.s_d > 0.0),
+            6 => find_best(&used, &turn_set, theta_count, gamma_count, &|i| pool[i].scores.s_beta >= beta_thresh),
             _ => None,
         };
 
@@ -1267,15 +1323,15 @@ pub fn assemble_quiz(
                 i, &mut selected, &mut used,
                 &mut phase_count, &mut dtype_count,
                 &mut theta_count, &mut gamma_count, &mut depth_count,
+                &mut beta_count, &mut turn_set,
             ),
             None => break, // Can't fill this constraint, move on
         }
     }
 
     // Phase 2: Fill remaining slots with best total diagnostic score,
-    // preferring under-represented buckets
+    // strongly preferring turn diversity and under-represented buckets
     while selected.len() < n_scenarios {
-        // Find candidate with best score, with bonus for under-represented buckets
         let mut best_idx: Option<usize> = None;
         let mut best_score = f32::NEG_INFINITY;
 
@@ -1284,20 +1340,52 @@ pub fn assemble_quiz(
                 continue;
             }
             let sc = &pool[i];
+
+            // Hard skip: over-represented quadrants
+            let is_theta_dominant = sc.scores.s_theta >= theta_thresh;
+            let is_gamma_dominant = sc.scores.s_gamma >= gamma_thresh
+                && sc.scores.s_theta < theta_thresh;
+            if is_theta_dominant && theta_count >= max_theta {
+                continue;
+            }
+            if is_gamma_dominant && gamma_count >= max_gamma {
+                continue;
+            }
+
             let mut score = sc.scores.total_score();
+
+            // Strong bonus for covering a new turn number
+            if !turn_set.contains(&sc.decision.turn) {
+                score += 5.0;
+            }
 
             // Bonus for under-represented phases/dtypes
             let pi = phase_idx(sc.bucket.phase);
             let di = dtype_idx(sc.bucket.dtype);
-            if phase_count[pi] == 0 {
-                score += 5.0;
-            } else if phase_count[pi] < 3 {
-                score += 2.0;
+            if phase_count[pi] < min_per_phase {
+                score += 3.0;
             }
-            if dtype_count[di] == 0 {
-                score += 5.0;
-            } else if dtype_count[di] < 5 {
-                score += 2.0;
+            if dtype_count[di] < min_per_dtype {
+                score += 3.0;
+            }
+
+            // Penalty when approaching caps
+            if is_theta_dominant && theta_count >= max_theta.saturating_sub(2) {
+                score -= 2.0;
+            }
+            if is_gamma_dominant && gamma_count >= max_gamma.saturating_sub(2) {
+                score -= 2.0;
+            }
+
+            // Bonus for under-represented diagnostic types
+            if sc.scores.s_gamma >= gamma_thresh && gamma_count < min_gamma {
+                score += 3.0;
+            }
+            if sc.scores.s_d > 0.0 && depth_count < min_depth {
+                score += 3.0;
+            }
+            if sc.scores.s_beta >= beta_thresh && beta_count < min_beta {
+                score += 3.0;
             }
 
             // Small tiebreak by visit count
@@ -1314,6 +1402,7 @@ pub fn assemble_quiz(
                 i, &mut selected, &mut used,
                 &mut phase_count, &mut dtype_count,
                 &mut theta_count, &mut gamma_count, &mut depth_count,
+                &mut beta_count, &mut turn_set,
             ),
             None => break,
         }
@@ -1326,17 +1415,24 @@ pub fn assemble_quiz(
 }
 
 /// Determine primary quadrant for a scored candidate.
+/// Uses a priority scheme: theta and gamma are more specific diagnostics,
+/// so they take priority when their scores are high.
 fn primary_quadrant(sc: &ScoredCandidate) -> Quadrant {
-    let scores = &sc.scores;
-    if scores.s_theta >= 0.5 {
-        Quadrant::Theta
-    } else if scores.s_gamma >= 0.5 {
-        Quadrant::Gamma
-    } else if scores.s_d > 0.0 {
-        Quadrant::Depth
-    } else {
-        Quadrant::Beta
+    let s = &sc.scores;
+    // θ-diagnostic: reroll action flips across θ values
+    if s.s_theta >= 0.5 {
+        return Quadrant::Theta;
     }
+    // γ-diagnostic: greedy ≠ optimal for category decisions
+    if s.s_gamma >= 0.5 {
+        return Quadrant::Gamma;
+    }
+    // d-diagnostic: heuristic ≠ optimal
+    if s.s_d > 0.0 {
+        return Quadrant::Depth;
+    }
+    // β-diagnostic: everything else (gap-based discrimination)
+    Quadrant::Beta
 }
 
 /// Build ProfilingScenarios from selected pool indices.
