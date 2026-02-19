@@ -214,7 +214,7 @@ USAGE:
 OPTIONS:
     --theta <FLOAT>       Single theta value
     --thetas <LIST>       Comma-separated theta values
-    --grid <NAME>         Named grid: all, dense, sparse [default: dense]
+    --grid <NAME>         Named grid: all, dense, sparse, frontier [default: dense]
     --output <DIR>        Output directory [default: outputs/density]
     -h, --help            Print this help
 

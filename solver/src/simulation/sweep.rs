@@ -140,6 +140,39 @@ pub fn resolve_grid(grid_name: &str) -> Option<Vec<f32>> {
             -3.0, -2.0, -1.5, -1.0, -0.5, -0.2, -0.1, -0.05, 0.0, 0.05, 0.1, 0.2, 0.5, 1.0, 1.5,
             2.0, 3.0,
         ]),
+        "frontier" => {
+            // 89 thetas: dense near origin, coarser in active zone, sparse shoulders
+            // Core: [-0.05, +0.05] at 0.002 step = 51 values
+            // Active: [-0.20, -0.06] and [+0.06, +0.20] at 0.01 step = 30 values
+            // Shoulder: ±0.30, ±0.50, ±0.75, ±1.00 = 8 values
+            let mut v = Vec::with_capacity(89);
+            // Shoulder (negative)
+            for &t in &[-1.0, -0.75, -0.5, -0.3] {
+                v.push(t);
+            }
+            // Active (negative): -0.20 to -0.06
+            for i in (-20..=-6).step_by(1) {
+                let t = i as f32 / 100.0;
+                v.push((t * 10000.0).round() / 10000.0);
+            }
+            // Core: -0.050 to +0.050 at 0.002
+            for i in -25..=25 {
+                let t = i as f32 * 0.002;
+                v.push((t * 10000.0).round() / 10000.0);
+            }
+            // Active (positive): 0.06 to 0.20
+            for i in (6..=20).step_by(1) {
+                let t = i as f32 / 100.0;
+                v.push((t * 10000.0).round() / 10000.0);
+            }
+            // Shoulder (positive)
+            for &t in &[0.3, 0.5, 0.75, 1.0] {
+                v.push(t);
+            }
+            v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            v.dedup();
+            Some(v)
+        }
         _ => None,
     }
 }
