@@ -701,7 +701,62 @@ The near-optimal entry (β=10, γ=1.0, d=999) matches the optimal baseline withi
 
 ---
 
-## Appendix: Full θ Sweep Data
+## Appendix A: Human Strategy Guide
+
+Based on gap analysis of 100K games comparing a pattern-matching heuristic (mean 166) against the EV-optimal solver (mean 248). See Section 7 for the full analytical treatment.
+
+### Upper Bonus Targets
+
+You need exactly 63 across all six upper categories (averaging 3-of-each-face). Surpluses in high categories offset shortfalls in low ones.
+
+| Category | Target (3x) | Surplus from 4x | Surplus from 5x |
+|----------|-------------|-----------------|-----------------|
+| Ones     | 3           | +1              | +2              |
+| Twos     | 6           | +2              | +4              |
+| Threes   | 9           | +3              | +6              |
+| Fours    | 12          | +4              | +8              |
+| Fives    | 15          | +5              | +10             |
+| Sixes    | 18          | +6              | +12             |
+| **Total**| **63**      |                 |                 |
+
+### Decision Flowchart
+
+1. **Completed pattern?** (Yatzy, straight, full house) — Score it, unless the same dice give equal or better value in an open upper category.
+2. **At-or-above par in an upper category?** — Strong candidate, but compare against available lower-section alternatives. Prefer upper when bonus is still reachable.
+3. **High pair or better?** — Keep it. Reroll the rest targeting upper bonus faces or pattern completion.
+4. **Nothing special?** — Keep your highest die(s) matching open upper categories. Reroll the rest.
+
+### Dump Priority (When Scoring Zero)
+
+1. Ones (max 5, contributes least to bonus)
+2. Twos (max 10)
+3. Yatzy (only 4.6% hit rate — if unscored by late game, dump it)
+4. Small Straight (15 pts but hard to get late)
+5. Large Straight (20 pts but very hard to get late)
+
+### When to Abandon the Bonus Chase
+
+Past turn 10, if more than 15 points below bonus pace (needing 4x or better in all remaining upper categories), shift to maximizing raw score: take highest-scoring available category, favor Chance for high-sum hands, dump low-value categories.
+
+
+## Appendix B: Human-Plausible State Filtering
+
+The solver computes optimal decisions for ~2M states, but most are irrelevant for human play. States can be rare for two independent reasons: (1) the dice sequences needed are extremely unlikely regardless of strategy, or (2) the upstream decisions needed are ones no human would make. Useful analysis requires filtering to the intersection.
+
+### Methodology
+
+Simulate games under the softmax choice model used in profiling (Section 7.5):
+
+$$P(a \mid s, \theta, \beta) \propto \exp(\beta \cdot V_\theta(a, s))$$
+
+At β ≈ 0.3: obvious decisions (EV gap > 5) are followed >95% of the time; close decisions (EV gap < 1) are followed ~55-65%; catastrophic errors (gap > 15) are extremely rare. Mean score falls in the 210-235 range, representing a decent experienced player.
+
+At each turn, sort states by visit frequency under the softmax policy. The smallest set covering 90% of games defines the human-plausible state set. This adapts to the hourglass structure: ~1 state at turn 1, a few thousand at the diffuse mid-game peak, ~20 at turn 15.
+
+Each state in the filtered set is annotated with: optimal action and EV, second-best action and EV gap (decision difficulty), and θ-sensitivity (which θ values change the optimal action). This dataset supports worked examples, difficulty maps, θ-sensitive scenario cards, and heuristic policy design.
+
+
+## Appendix C: Full θ Sweep Data
 
 **37 θ values, 1M games each:**
 
@@ -745,7 +800,7 @@ The near-optimal entry (β=10, γ=1.0, d=999) matches the optimal baseline withi
 | +2.000 | 186.0 | 44.8 | 123 | 179 | 266 | 300 | 359 |
 | +3.000 | 186.5 | 44.2 | 124 | 179 | 266 | 301 | 359 |
 
-## Appendix: Visualization Index
+## Appendix D: Visualization Index
 
 **θ sweep:**
 - `percentiles_vs_theta.png` / `percentiles_vs_theta_zoomed.png` — Score percentiles vs θ
