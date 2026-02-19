@@ -3,26 +3,26 @@
  */
 
 export const COLORS = {
-  accent: 'rgba(255, 77, 0, 0.8)',
-  accentLight: 'rgba(255, 77, 0, 0.15)',
-  riskAverse: '#2171b5',
-  riskSeeking: '#cb181d',
+  accent: 'rgba(243, 112, 33, 0.85)',
+  accentLight: 'rgba(243, 112, 33, 0.15)',
+  riskAverse: '#3b4cc0',
+  riskSeeking: '#b40426',
   neutral: '#636363',
   dt: '#2ca02c',
   mlp: '#7b3294',
   heuristic: '#d95f02',
-  optimal: '#1b9e77',
+  optimal: '#2ca02c',
   category: '#e7298a',
   reroll1: '#66a61e',
   reroll2: '#7570b3',
-  mixture: ['#4575b4', '#74add1', '#fdae61', '#f46d43'],
+  mixture: ['#3b4cc0', '#8db0fe', '#F37021', '#b40426'],
   percentiles: {
-    p5: '#2171b5',
-    p25: '#6baed6',
-    p50: '#333333',
-    p75: '#fd8d3c',
-    p95: '#cb181d',
-    p99: '#99000d',
+    p5: '#3b4cc0',
+    p25: '#8db0fe',
+    p50: '#636363',
+    p75: '#f4987a',
+    p95: '#b40426',
+    p99: '#7a0218',
   },
   humanRange: 'rgba(150, 150, 150, 0.15)',
 };
@@ -166,17 +166,24 @@ export function drawAxis(g, scale, orient, label, opts = {}) {
 }
 
 /**
- * Blue → gray → red color scale for theta.
+ * Coolwarm_mid color scale for theta: blue → orange (center) → red.
  */
 export function thetaColor(theta) {
-  if (theta < 0) {
-    const t = Math.min(1, -theta / 0.3);
-    return d3.interpolateRgb('#636363', '#2171b5')(t);
-  } else if (theta > 0) {
-    const t = Math.min(1, theta / 0.3);
-    return d3.interpolateRgb('#636363', '#cb181d')(t);
+  const stops = [
+    { t: -0.3, color: '#3b4cc0' },
+    { t: -0.15, color: '#8db0fe' },
+    { t: 0, color: '#F37021' },
+    { t: 0.15, color: '#f4987a' },
+    { t: 0.3, color: '#b40426' },
+  ];
+  const clamped = Math.max(-0.3, Math.min(0.3, theta));
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (clamped <= stops[i + 1].t) {
+      const frac = (clamped - stops[i].t) / (stops[i + 1].t - stops[i].t);
+      return d3.interpolateRgb(stops[i].color, stops[i + 1].color)(frac);
+    }
   }
-  return '#636363';
+  return stops[stops.length - 1].color;
 }
 
 /**
@@ -244,10 +251,13 @@ export function renderDice(container, values) {
 /**
  * Build density from percentile knots via piecewise-linear CDF differentiation.
  */
-export function densityFromPercentiles(row, nPoints = 300) {
+export function densityFromPercentiles(row, nPoints = 200) {
+  // Place a Gaussian kernel at each percentile midpoint, weighted by the
+  // probability mass in that interval.  This produces inherently smooth curves.
   const knots = [
-    { p: 0.01, v: row.p1 },
-    { p: 0.05, v: row.p5 },
+    { p: 0.00, v: row.p1  - (row.p5 - row.p1) },  // synthetic lower tail
+    { p: 0.01, v: row.p1  },
+    { p: 0.05, v: row.p5  },
     { p: 0.10, v: row.p10 },
     { p: 0.25, v: row.p25 },
     { p: 0.50, v: row.p50 },
@@ -255,42 +265,34 @@ export function densityFromPercentiles(row, nPoints = 300) {
     { p: 0.90, v: row.p90 },
     { p: 0.95, v: row.p95 },
     { p: 0.99, v: row.p99 },
+    { p: 1.00, v: row.p99 + (row.p99 - row.p95) },  // synthetic upper tail
   ];
 
-  const points = [];
-  const xMin = knots[0].v - 20;
-  const xMax = knots[knots.length - 1].v + 20;
-  const step = (xMax - xMin) / nPoints;
-
-  for (let i = 0; i < nPoints; i++) {
-    const x = xMin + i * step;
-    // Interpolate CDF
-    let cdf;
-    if (x <= knots[0].v) {
-      cdf = knots[0].p * Math.max(0, 1 - (knots[0].v - x) / 30);
-    } else if (x >= knots[knots.length - 1].v) {
-      cdf = knots[knots.length - 1].p + (1 - knots[knots.length - 1].p) * Math.min(1, (x - knots[knots.length - 1].v) / 30);
-    } else {
-      for (let j = 0; j < knots.length - 1; j++) {
-        if (x >= knots[j].v && x <= knots[j + 1].v) {
-          const t = (x - knots[j].v) / (knots[j + 1].v - knots[j].v);
-          cdf = knots[j].p + t * (knots[j + 1].p - knots[j].p);
-          break;
-        }
-      }
-    }
-    points.push({ x, cdf: cdf || 0 });
+  // Build mixture components: one Gaussian per interval
+  const components = [];
+  for (let j = 0; j < knots.length - 1; j++) {
+    const weight = knots[j + 1].p - knots[j].p;
+    const mu = (knots[j].v + knots[j + 1].v) / 2;
+    const span = Math.max(knots[j + 1].v - knots[j].v, 1);
+    // Bandwidth: half the interval width, clamped to a reasonable minimum
+    const sigma = Math.max(span / 2, 5);
+    components.push({ weight, mu, sigma });
   }
 
-  // Differentiate for density
+  const xMin = 0;
+  const xMax = 400;
+  const step = (xMax - xMin) / nPoints;
   const density = [];
-  for (let i = 1; i < points.length; i++) {
-    const dx = points[i].x - points[i - 1].x;
-    const dcdf = points[i].cdf - points[i - 1].cdf;
-    density.push({
-      x: (points[i].x + points[i - 1].x) / 2,
-      y: Math.max(0, dcdf / dx),
-    });
+  const sqrt2pi = Math.sqrt(2 * Math.PI);
+
+  for (let i = 0; i <= nPoints; i++) {
+    const x = xMin + i * step;
+    let y = 0;
+    for (const c of components) {
+      const z = (x - c.mu) / c.sigma;
+      y += c.weight * Math.exp(-0.5 * z * z) / (c.sigma * sqrt2pi);
+    }
+    density.push({ x, y });
   }
 
   return density;

@@ -138,7 +138,7 @@
 }
 .ql-status-optimal {
   text-align: right;
-  color: #28a745;
+  color: var(--color-success);
   font-weight: 600;
 }
 .ql-status-gap {
@@ -254,7 +254,7 @@
   font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
 }
 
 .profile-confirm-btn {
@@ -275,7 +275,7 @@
 }
 .profile-scorecard-bonus-yes {
   font-weight: 600;
-  color: #28a745;
+  color: var(--color-success);
 }
 .profile-scorecard-bonus-no {
   color: var(--text-muted);
@@ -288,10 +288,10 @@
   white-space: nowrap;
 }
 .profile-scorecard-delta.delta-pos {
-  color: #28a745;
+  color: var(--color-success);
 }
 .profile-scorecard-delta.delta-neg {
-  color: #dc3545;
+  color: var(--color-danger);
 }
 
 .profile-description {
@@ -328,8 +328,8 @@
   opacity: 0.7;
 }
 .profile-btn-optimal {
-  border-color: #28a745 !important;
-  background: rgba(40, 167, 69, 0.1) !important;
+  border-color: var(--color-success) !important;
+  background: rgba(44, 160, 44, 0.1) !important;
 }
 .profile-feedback {
   text-align: center;
@@ -338,7 +338,7 @@
   transition: opacity 0.2s;
 }
 .profile-feedback-correct {
-  color: #28a745;
+  color: var(--color-success);
   font-weight: bold;
 }
 .profile-feedback-wrong {
@@ -696,7 +696,7 @@
   left: 50%;
   width: 8px;
   height: 8px;
-  background: #28a745;
+  background: var(--color-success);
   transform: translate(-50%, -50%) rotate(45deg);
 }
 .pc-boxplot-axis {
@@ -720,7 +720,7 @@
   color: var(--accent);
 }
 .pc-legend-opt {
-  color: #28a745;
+  color: var(--color-success);
 }
 
 /* Section C: Counterfactual bars */

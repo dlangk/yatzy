@@ -1,4 +1,5 @@
 import type { CategoryState, TurnPhase } from '../types.ts';
+import { COLORS } from '../constants.ts';
 
 interface EvalPanelProps {
   currentMaskEv: number | null;
@@ -31,8 +32,8 @@ export function EvalPanel({
 
   return (
     <div style={{
-      background: '#f8f9fa',
-      border: '1px solid #dee2e6',
+      background: COLORS.bgPanel,
+      border: `1px solid ${COLORS.borderPanel}`,
       borderRadius: 6,
       padding: 10,
       margin: '12px 0',
@@ -57,7 +58,7 @@ export function EvalPanel({
         <span style={{
           textAlign: 'right',
           color: hasData && rerollsRemaining > 0 && currentMaskEv !== null && optimalMaskEv !== null
-            ? (Math.abs(currentMaskEv - optimalMaskEv) < 0.01 ? '#28a745' : '#dc3545')
+            ? (Math.abs(currentMaskEv - optimalMaskEv) < 0.01 ? COLORS.success : COLORS.danger)
             : 'inherit',
         }}>
           {hasData && rerollsRemaining > 0 && currentMaskEv !== null && optimalMaskEv !== null

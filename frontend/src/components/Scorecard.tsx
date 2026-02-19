@@ -1,6 +1,6 @@
 import type { CategoryState, TurnPhase } from '../types.ts';
 import { ScorecardRow } from './ScorecardRow.tsx';
-import { UPPER_CATEGORIES, BONUS_THRESHOLD } from '../constants.ts';
+import { UPPER_CATEGORIES, BONUS_THRESHOLD, COLORS } from '../constants.ts';
 
 interface ScorecardProps {
   categories: CategoryState[];
@@ -64,7 +64,7 @@ export function Scorecard({ categories, upperScore, bonus, totalScore, turnPhase
         <col style={{ width: '20%' }} />
       </colgroup>
       <thead>
-        <tr style={{ borderBottom: '2px solid #333' }}>
+        <tr style={{ borderBottom: `2px solid ${COLORS.text}` }}>
           <th style={{ textAlign: 'left', padding: '4px 8px' }}>Category</th>
           <th style={{ textAlign: 'center', padding: '4px 8px' }}>Score</th>
           <th style={{ textAlign: 'center', padding: '4px 8px', fontSize: 12 }}>EV</th>
@@ -73,17 +73,17 @@ export function Scorecard({ categories, upperScore, bonus, totalScore, turnPhase
       </thead>
       <tbody>
         {upperCats.map(renderRow)}
-        <tr style={{ background: '#f8f8f8', fontWeight: 'bold' }}>
-          <td style={{ padding: '4px 8px', borderBottom: '2px solid #333' }}>
+        <tr style={{ background: COLORS.bgAlt2, fontWeight: 'bold' }}>
+          <td style={{ padding: '4px 8px', borderBottom: `2px solid ${COLORS.text}` }}>
             Upper ({upperScore}/{BONUS_THRESHOLD})
           </td>
-          <td style={{ padding: '4px 8px', borderBottom: '2px solid #333', textAlign: 'center' }}>
+          <td style={{ padding: '4px 8px', borderBottom: `2px solid ${COLORS.text}`, textAlign: 'center' }}>
             {bonus > 0 ? `+${bonus}` : '\u2014'}
           </td>
-          <td colSpan={2} style={{ borderBottom: '2px solid #333' }}></td>
+          <td colSpan={2} style={{ borderBottom: `2px solid ${COLORS.text}` }}></td>
         </tr>
         {lowerCats.map(renderRow)}
-        <tr style={{ fontWeight: 'bold', borderTop: '2px solid #333' }}>
+        <tr style={{ fontWeight: 'bold', borderTop: `2px solid ${COLORS.text}` }}>
           <td style={{ padding: '6px 8px' }}>Total</td>
           <td style={{ padding: '6px 8px', textAlign: 'center' }}>{totalScore}</td>
           <td colSpan={2}></td>

@@ -3,12 +3,18 @@
   --bg-alt: #eae9e3;
   --text: #050505;
   --text-muted: #555;
-  --accent: rgba(255, 77, 0, 0.8);
-  --accent-light: rgba(255, 77, 0, 0.15);
+  --accent: rgba(243, 112, 33, 0.8);
+  --accent-light: rgba(243, 112, 33, 0.15);
   --border: #d4d3cd;
   --font-serif: 'Newsreader', Georgia, 'Times New Roman', serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
   --content-width: 675px;
+  --color-blue: #3b4cc0;
+  --color-red: #b40426;
+  --color-orange: #F37021;
+  --color-green: #2ca02c;
+  --color-success: #2ca02c;
+  --color-danger: #b40426;
 }
 
 .dark {
@@ -16,9 +22,15 @@
   --bg-alt: #252525;
   --text: #e0ddd5;
   --text-muted: #999;
-  --accent: rgba(255, 110, 50, 0.9);
-  --accent-light: rgba(255, 110, 50, 0.15);
+  --accent: rgba(243, 112, 33, 0.9);
+  --accent-light: rgba(243, 112, 33, 0.15);
   --border: #3a3a3a;
+  --color-blue: #6b8de3;
+  --color-red: #e05252;
+  --color-orange: #F37021;
+  --color-green: #4caf50;
+  --color-success: #4caf50;
+  --color-danger: #e05252;
 }
 
 *, *::before, *::after {

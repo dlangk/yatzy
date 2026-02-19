@@ -1,4 +1,5 @@
 import type { CategoryState } from '../types.ts';
+import { COLORS } from '../constants.ts';
 
 interface ScorecardRowProps {
   category: CategoryState;
@@ -13,7 +14,7 @@ interface ScorecardRowProps {
 
 const cellStyle: React.CSSProperties = {
   padding: '4px 8px',
-  borderBottom: '1px solid #ddd',
+  borderBottom: `1px solid ${COLORS.bgAlt}`,
   height: 32,
   boxSizing: 'border-box',
 };
@@ -29,22 +30,22 @@ export function ScorecardRow({ category, isOptimal, canScore, onScore, onSetScor
   const dimmed = isZero && !isOptimal;
 
   const bg = category.isScored
-    ? '#f0f0f0'
+    ? COLORS.bgAlt
     : isOptimal
-      ? '#d4edda'
+      ? 'rgba(44, 160, 44, 0.12)'
       : 'transparent';
 
-  const nameColor = dimmed ? '#aaa' : 'inherit';
+  const nameColor = dimmed ? COLORS.textMuted : 'inherit';
 
   const scoreBarColor = isOptimal
-    ? 'rgba(40, 167, 69, 0.18)'
+    ? 'rgba(44, 160, 44, 0.18)'
     : category.isScored
       ? 'rgba(0, 0, 0, 0.06)'
-      : 'rgba(59, 130, 246, 0.15)';
+      : 'rgba(59, 76, 192, 0.15)';
 
   const evBarColor = isOptimal
-    ? 'rgba(40, 167, 69, 0.18)'
-    : 'rgba(59, 130, 246, 0.15)';
+    ? 'rgba(44, 160, 44, 0.18)'
+    : 'rgba(59, 76, 192, 0.15)';
 
   const showAction = canScore && !category.isScored && category.available;
   const hasEv = !category.isScored && category.available;
@@ -75,7 +76,7 @@ export function ScorecardRow({ category, isOptimal, canScore, onScore, onSetScor
             fontSize: 14,
             padding: 0,
             height: 24,
-            color: dimmed ? '#aaa' : 'inherit',
+            color: dimmed ? COLORS.textMuted : 'inherit',
             MozAppearance: 'textfield',
           }}
         />
@@ -84,7 +85,7 @@ export function ScorecardRow({ category, isOptimal, canScore, onScore, onSetScor
         ...cellStyle,
         textAlign: 'center',
         fontSize: 12,
-        color: dimmed ? '#aaa' : 'inherit',
+        color: dimmed ? COLORS.textMuted : 'inherit',
         background: evFraction != null && evFraction > 0 ? sparkGradient(evFraction, evBarColor) : undefined,
       }}>
         {hasEv ? category.evIfScored.toFixed(1) : ''}

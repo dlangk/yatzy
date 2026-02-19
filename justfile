@@ -153,6 +153,10 @@ player-card-grid games="10000":
 profile-deploy:
     cp outputs/profiling/scenarios.json blog/data/scenarios.json
 
+# Exact density evolution: zero-variance score PMFs per θ (~6 min/theta)
+density *args:
+    YATZY_BASE_PATH=. solver/target/release/yatzy-density {{args}}
+
 # Sweep: simulate all thetas in grid, store scores (resumable)
 sweep grid="all" games="1000000":
     YATZY_BASE_PATH=. solver/target/release/yatzy-sweep --grid {{grid}} --games {{games}}

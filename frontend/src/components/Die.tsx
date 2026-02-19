@@ -1,3 +1,5 @@
+import { COLORS } from '../constants.ts';
+
 interface DieProps {
   value: number;
   held: boolean;
@@ -16,20 +18,20 @@ const arrowBtnStyle: React.CSSProperties = {
   height: 16,
   fontSize: 10,
   padding: 0,
-  border: '1px solid #ccc',
-  background: '#f0f0f0',
+  border: `1px solid ${COLORS.border}`,
+  background: COLORS.bgAlt,
   cursor: 'pointer',
   borderRadius: 3,
   lineHeight: '14px',
 };
 
 export function Die({ value, held, isOptimalReroll, isOptimalKeep, onClick, disabled, faded, onIncrement, onDecrement, showManualControls }: DieProps) {
-  const bg = held ? '#fff' : '#ddd';
+  const bg = held ? COLORS.bg : COLORS.bgAlt;
   const border = isOptimalReroll
-    ? '3px solid #e74c3c'
+    ? `3px solid ${COLORS.danger}`
     : isOptimalKeep
-      ? '3px solid #28a745'
-      : '2px solid #333';
+      ? `3px solid ${COLORS.success}`
+      : `2px solid ${COLORS.text}`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>

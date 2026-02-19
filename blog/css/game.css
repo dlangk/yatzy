@@ -145,11 +145,11 @@
 }
 
 .die--optimal-keep {
-  border: 3px solid #28a745;
+  border: 3px solid var(--color-success);
 }
 
 .die--optimal-reroll {
-  border: 3px solid #e74c3c;
+  border: 3px solid var(--color-danger);
 }
 
 .die--faded {
@@ -199,8 +199,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-.eval-positive { color: #28a745; }
-.eval-negative { color: #dc3545; }
+.eval-positive { color: var(--color-success); }
+.eval-negative { color: var(--color-danger); }
 
 /* Scorecard */
 .scorecard {
@@ -246,11 +246,11 @@
 }
 
 .scorecard-row--optimal {
-  background: rgba(40, 167, 69, 0.12);
+  background: rgba(44, 160, 44, 0.12);
 }
 
 .dark .scorecard-row--optimal {
-  background: rgba(40, 167, 69, 0.15);
+  background: rgba(44, 160, 44, 0.15);
 }
 
 .scorecard-row--scored {

@@ -1,28 +1,126 @@
-  <section id="solving">
-    <h2>Can You Play Optimal Yatzy?</h2>
+<section id="solving">
+  <h2>Building a Yatzy Solver</h2>
 
-    <p>The game has a finite <span class="concept" data-concept="state-space">state space</span> that can be fully enumerated. The state of a Yatzy game is determined by two things: which categories have been scored (a 15-bit bitmask, giving 32,768 possibilities) and how much progress you've made toward the upper section bonus (0 to 63 points, capped). That's 32,768 &times; 64 = 2,097,152 unique game states.</p>
+  <!-- ─── 1. The State Space ──────────────────────────────────────── -->
 
-    <p>Using <span class="concept" data-concept="backward-induction">backward induction</span> &mdash; starting from the end of the game and working backward &mdash; we can compute the exact expected value of every state. At each state, the algorithm considers all possible dice outcomes, all possible keep/reroll decisions, and all possible category assignments. The result is an 8 MB lookup table that answers the question: "given where I am in the game and what I rolled, what should I do?"</p>
+  <h3>The State Space</h3>
 
-    <div class="stat-row">
-      <div class="stat-card">
-        <div class="stat-value">248.4</div>
-        <div class="stat-label">Mean score (optimal)</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">38.5</div>
-        <div class="stat-label">Standard deviation</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">2.3s</div>
-        <div class="stat-label">Precompute time</div>
-      </div>
+  <p>The game has a finite <span class="concept" data-concept="state-space">state space</span> that can be fully enumerated. The state of a Yatzy game is determined by two things: which categories have been scored (a 15-bit bitmask, giving 2<sup>15</sup> = 32,768 possibilities) and how much progress you've made toward the upper section bonus (0 to 63 points, capped). That's 32,768 &times; 64 = <strong>2,097,152 unique game states</strong>.</p>
+
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-value">248.4</div>
+      <div class="stat-label">Mean score (optimal)</div>
     </div>
+    <div class="stat-card">
+      <div class="stat-value">38.5</div>
+      <div class="stat-label">Standard deviation</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">2.3s</div>
+      <div class="stat-label">Precompute time</div>
+    </div>
+  </div>
 
-    <p>An optimal player scores 248.4 points on average &mdash; about 66% of the theoretical maximum. The standard deviation is 38.5, meaning most games fall between 210 and 290 points. The entire precomputation takes 2.3 seconds on a modern laptop.</p>
+  <p>An optimal player scores 248.4 points on average &mdash; about 66% of the theoretical maximum of 374. The standard deviation of 38.5 means most games fall between 210 and 290. The entire precomputation takes 2.3 seconds on a laptop with an M-series chip.</p>
 
-    <p>An instructive failure mode: if you naively maximize the <em>immediate</em> score each turn (always pick the category that scores highest right now), you average only 118.7 points &mdash; less than half of optimal. The greedy approach destroys the upper section bonus by filling categories sub-optimally, which cascades through the rest of the game.</p>
-  </section>
+  <p>The heatmap below shows how expected value varies across this 2D landscape. Each row is the number of categories already scored (0 at the top, 15 at the bottom); each column is the upper section score. Bright cells are high-EV states; dark cells are low. Notice the "bonus ridge" at upper score 63, where the 50-point bonus kicks in.</p>
 
-  <hr class="divider">
+  <div class="chart-container" id="chart-state-heatmap">
+    <div class="chart-title">Expected Value by Game State</div>
+    <div id="chart-state-heatmap-svg"></div>
+    <div class="chart-caption">Average EV across all category masks sharing the same (categories scored, upper score) pair. States near the top-left have many turns remaining and high EV; states at the bottom have fewer turns left. The bonus ridge at upper=63 is clearly visible.</div>
+  </div>
+
+  <!-- ─── 2. One Turn at a Time: The Widget ───────────────────────── -->
+
+  <h3>One Turn at a Time: The Widget</h3>
+
+  <p>Each turn in Yatzy follows the same structure: roll five dice, optionally reroll some, optionally reroll again, then assign the result to a category. We call this self-contained unit a <em>widget</em>. The computation within a widget decomposes into six <strong>groups</strong>, alternating between chance nodes (dice rolls) and decision nodes (player choices):</p>
+
+  <ol>
+    <li><strong>Group 1 &mdash; Entry:</strong> The starting state (scored categories + upper score).</li>
+    <li><strong>Group 2 &mdash; Initial roll (chance):</strong> Probability over all 252 distinct sorted 5-dice outcomes.</li>
+    <li><strong>Group 3 &mdash; First keep (decision):</strong> Choose which dice to keep. There are 462 unique keep-multisets, collapsed from 2<sup>5</sup>=32 raw masks via deduplication.</li>
+    <li><strong>Group 4 &mdash; Second roll (chance):</strong> Probability over outcomes after rerolling unkept dice.</li>
+    <li><strong>Group 5 &mdash; Second keep (decision):</strong> Choose again which dice to keep.</li>
+    <li><strong>Group 6 &mdash; Final roll &rarr; Category (chance+decision):</strong> After the last roll, choose which category to score. This is the innermost computation and determines the value of every dice outcome.</li>
+  </ol>
+
+  <div class="chart-container" id="chart-widget-explorer">
+    <div class="chart-title">Widget Structure: One Turn's Computation</div>
+    <div id="chart-widget-explorer-svg"></div>
+    <div class="chart-controls">
+      <button class="chart-btn" id="widget-step-btn">Step Backward</button>
+      <span class="scenario-label" id="widget-step-label">Group 6 &rarr; 1</span>
+      <button class="chart-btn" id="widget-reset-btn">Reset</button>
+    </div>
+    <div class="chart-caption">The widget is solved bottom-up: first Group 6 (category assignment), then Group 5 (second keep), and so on back to Group 1. Each step computes the expected value of the best action or the probability-weighted average over outcomes. Click "Step Backward" to see the computation unfold.</div>
+  </div>
+
+  <!-- ─── 3. Backward Induction ──────────────────────────────────── -->
+
+  <h3>Backward Induction</h3>
+
+  <p>The key insight of <span class="concept" data-concept="backward-induction">backward induction</span> is that we solve the game from the end. A game with all 15 categories scored is trivial: the EV is just the upper bonus (50 if upper &ge; 63, else 0). From there, we work backward through every possible state with 14 scored categories, then 13, and so on down to the empty scorecard.</p>
+
+  <p>At each level, we solve one widget per reachable state. Within the widget, computation proceeds bottom-up through the six groups:</p>
+
+  <div class="equation">
+    <strong>Group 6 (category):</strong> &nbsp;
+    E<sub>6</sub>(r) = max<sub>c&notin;C</sub> [ s(r,c) + V(m&prime;, C&cup;{c}) ]
+  </div>
+
+  <div class="equation">
+    <strong>Group 5 (roll):</strong> &nbsp;
+    E<sub>5</sub>(k) = &sum;<sub>r</sub> P(r|k) &middot; E<sub>6</sub>(r)
+  </div>
+
+  <div class="equation">
+    <strong>Group 4 (keep):</strong> &nbsp;
+    E<sub>4</sub>(r) = max<sub>k&sube;r</sub> E<sub>5</sub>(k)
+  </div>
+
+  <div class="equation">
+    <strong>Group 3 (roll):</strong> &nbsp;
+    E<sub>3</sub>(k) = &sum;<sub>r</sub> P(r|k) &middot; E<sub>4</sub>(r)
+  </div>
+
+  <div class="equation">
+    <strong>Group 2 (keep):</strong> &nbsp;
+    E<sub>2</sub>(r) = max<sub>k&sube;r</sub> E<sub>3</sub>(k)
+  </div>
+
+  <div class="equation">
+    <strong>Group 1 (roll):</strong> &nbsp;
+    V(m,C) = &sum;<sub>r</sub> P(r) &middot; E<sub>2</sub>(r)
+  </div>
+
+  <p>Here <em>V(m,C)</em> is the expected future value from state (<em>m</em>, <em>C</em>), <em>r</em> is a dice outcome, <em>k</em> is a kept subset, <em>c</em> is a category, <em>s(r,c)</em> is the score, and <em>m&prime;</em> is the updated upper score. The max nodes are decisions; the sum nodes are chance.</p>
+
+  <p>Processing all 2.1 million states from |C|=15 down to |C|=0, with Rayon parallelism and the keep-multiset deduplication trick (462 unique keeps vs 32 raw masks), takes just <strong>2.3 seconds</strong>. The result is an 8 MB lookup table that answers any game-state question in O(1).</p>
+
+  <!-- ─── 4. Why Greedy Fails ─────────────────────────────────────── -->
+
+  <h3>Why Greedy Fails</h3>
+
+  <p>The greedy heuristic &mdash; always score the category worth the most points right now &mdash; averages only <strong>118.7 points</strong>, less than half of optimal. The gap is not small; it's catastrophic.</p>
+
+  <p>The root cause is the <strong>upper section bonus</strong>. Scoring 63 or more points across the six upper categories (Ones through Sixes) awards a 50-point bonus. The optimal player strategically routes dice to upper categories to protect this bonus, even when a lower-section category would score more immediately. The greedy player never makes this sacrifice, consistently depleting the upper section and forfeiting the bonus.</p>
+
+  <p>The comparison below walks through a single game played two ways, using the same dice rolls. Watch how the optimal player builds upper section progress while the greedy player squanders it.</p>
+
+  <div class="chart-container" id="chart-greedy-vs-optimal">
+    <div class="chart-title">Same Dice, Different Decisions</div>
+    <div id="chart-greedy-vs-optimal-inner"></div>
+    <div class="chart-controls">
+      <button class="chart-btn scenario-prev" id="gvo-prev">&larr;</button>
+      <span class="scenario-label" id="gvo-label">Turn 1 / 15</span>
+      <button class="chart-btn scenario-next" id="gvo-next">&rarr;</button>
+    </div>
+    <div class="chart-caption">Both players receive the same dice rolls. The optimal player considers future consequences; the greedy player maximizes immediate score. Turns where the two strategies diverge are highlighted.</div>
+  </div>
+
+</section>
+
+<hr class="divider">

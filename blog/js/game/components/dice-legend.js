@@ -9,8 +9,8 @@ export function initDiceLegend(container) {
   const items = [
     { bg: 'var(--bg)', border: '1px solid var(--border)', label: 'Held' },
     { bg: 'var(--bg-alt)', border: '1px solid var(--border)', label: 'Reroll' },
-    { bg: 'var(--bg)', border: '2px solid #28a745', label: 'Optimal keep' },
-    { bg: 'var(--bg-alt)', border: '2px solid #e74c3c', label: 'Optimal reroll' },
+    { bg: 'var(--bg)', border: '2px solid var(--color-success)', label: 'Optimal keep' },
+    { bg: 'var(--bg-alt)', border: '2px solid var(--color-danger)', label: 'Optimal reroll' },
   ];
 
   for (const item of items) {

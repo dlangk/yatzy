@@ -1,4 +1,5 @@
 import type { TurnPhase } from '../types.ts';
+import { COLORS } from '../constants.ts';
 
 interface ActionBarProps {
   turnPhase: TurnPhase;
@@ -23,8 +24,8 @@ const smallBtnStyle: React.CSSProperties = {
   width: 24,
   height: 24,
   padding: 0,
-  border: '1px solid #ccc',
-  background: '#f0f0f0',
+  border: `1px solid ${COLORS.border}`,
+  background: COLORS.bgAlt,
   cursor: 'pointer',
   borderRadius: 3,
   lineHeight: '22px',

@@ -28,6 +28,9 @@
   import { initDecisionExplorer } from './js/charts/decision-explorer.js';
   import { initWinRate } from './js/charts/win-rate.js';
   import { initMeanVariance } from './js/charts/mean-variance.js';
+  import { initWidgetExplorer } from './js/charts/widget-explorer.js';
+  import { initStateHeatmap } from './js/charts/state-heatmap.js';
+  import { initGreedyVsOptimal } from './js/charts/greedy-vs-optimal.js';
   import { initConceptDrawer } from './js/concept-drawer.js';
   import { initTheme } from './js/theme.js';
 
@@ -70,6 +73,9 @@
     'chart-heuristic-gap': { init: initHeuristicGap, loaded: false },
     'chart-surrogate-pareto': { init: initSurrogatePareto, loaded: false },
     'chart-win-rate': { init: initWinRate, loaded: false },
+    'chart-state-heatmap': { init: initStateHeatmap, loaded: false },
+    'chart-widget-explorer': { init: initWidgetExplorer, loaded: false },
+    'chart-greedy-vs-optimal': { init: initGreedyVsOptimal, loaded: false },
   };
 
   const observer = new IntersectionObserver((entries) => {

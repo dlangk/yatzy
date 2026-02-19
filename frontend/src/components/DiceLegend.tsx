@@ -1,4 +1,5 @@
 import type { TurnPhase } from '../types.ts';
+import { COLORS } from '../constants.ts';
 
 interface DiceLegendProps {
   turnPhase: TurnPhase;
@@ -23,26 +24,26 @@ export function DiceLegend({ turnPhase, rerollsRemaining }: DiceLegendProps) {
       gap: 16,
       justifyContent: 'center',
       fontSize: 11,
-      color: '#666',
+      color: COLORS.textMuted,
       margin: '4px 0 8px',
       opacity: active ? 1 : 0,
       transition: 'opacity 0.2s',
       minHeight: 16,
     }}>
       <span>
-        <span style={{ ...swatchBase, background: '#fff', border: '1px solid #333' }} />
+        <span style={{ ...swatchBase, background: COLORS.bg, border: `1px solid ${COLORS.text}` }} />
         Held
       </span>
       <span>
-        <span style={{ ...swatchBase, background: '#ddd', border: '1px solid #333' }} />
+        <span style={{ ...swatchBase, background: COLORS.bgAlt, border: `1px solid ${COLORS.text}` }} />
         Reroll
       </span>
       <span>
-        <span style={{ ...swatchBase, background: '#fff', border: '2px solid #28a745' }} />
+        <span style={{ ...swatchBase, background: COLORS.bg, border: `2px solid ${COLORS.success}` }} />
         Optimal keep
       </span>
       <span>
-        <span style={{ ...swatchBase, background: '#ddd', border: '2px solid #e74c3c' }} />
+        <span style={{ ...swatchBase, background: COLORS.bgAlt, border: `2px solid ${COLORS.danger}` }} />
         Optimal reroll
       </span>
     </div>
