@@ -24,9 +24,9 @@
 //! - `m` ∈ [0, 63]: upper-section score (capped)
 //! - `C`: 15-bit bitmask of scored categories (Ones=bit 0 .. Yatzy=bit 14)
 //!
-//! Flat index: `state_index(m, C) = C * 64 + m`, giving 2,097,152 total slots.
-//! This layout groups all upper-score variants of the same scored mask into
-//! contiguous 256-byte regions for L1 cache locality.
+//! Flat index: `state_index(m, C) = C * STATE_STRIDE + m` (STATE_STRIDE=128),
+//! giving 4,194,304 total slots (~16 MB). Indices 64..127 per scored mask
+//! are padded with the capped value (index 63) for branchless upper-category access.
 //!
 //! ## Key differences from the pseudocode
 //!
@@ -44,12 +44,15 @@
 #![allow(clippy::needless_range_loop)]
 
 pub mod api_computations;
+pub mod batched_solver;
 pub mod constants;
+pub mod density;
 pub mod dice_mechanics;
 pub mod game_mechanics;
 pub mod phase0_tables;
 pub mod profiling;
 pub mod server;
+pub mod simd;
 pub mod simulation;
 pub mod state_computation;
 pub mod storage;

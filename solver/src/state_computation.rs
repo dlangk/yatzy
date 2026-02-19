@@ -19,12 +19,19 @@ use std::time::Instant;
 
 use rayon::prelude::*;
 
+use crate::batched_solver::{
+    build_oracle_for_scored_mask, precompute_exp_scores, solve_widget_batched,
+    solve_widget_batched_max, solve_widget_batched_risk, solve_widget_batched_utility,
+    BatchedBuffers, ExpScores,
+};
 use crate::constants::*;
 use crate::storage::{load_all_state_values, save_all_state_values, state_file_path};
-use crate::types::{YatzyContext, YatzyState};
-use crate::widget_solver::{
-    compute_expected_state_value, compute_expected_state_value_risk, compute_max_state_value,
-};
+use crate::types::{PolicyOracle, YatzyContext};
+
+/// Maximum |θ| for utility-domain solver. Beyond this, f32 mantissa erasure
+/// causes precision loss (e^(θ×100) > 2^24 when θ > 0.166).
+/// For |θ| > 0.15, fall back to the log-domain (LSE) solver.
+const UTILITY_THETA_LIMIT: f32 = 0.15;
 
 /// Progress tracker for the Phase 2 computation loop.
 struct ComputeProgress {
@@ -90,6 +97,26 @@ impl ComputeProgress {
     }
 }
 
+/// Compute E_table[S] and optionally build the PolicyOracle.
+///
+/// When `build_oracle` is true and θ=0 (EV mode), also records every argmax
+/// decision into three flat Vec<u8> arrays (~3.17 GB). The oracle enables
+/// O(1) policy lookups in forward passes (MC simulation, density evolution).
+pub fn compute_all_state_values_with_oracle(
+    ctx: &mut YatzyContext,
+    build_oracle: bool,
+) -> Option<PolicyOracle> {
+    let should_build = build_oracle && ctx.theta == 0.0 && !ctx.max_policy;
+    let mut oracle = if should_build {
+        println!("Oracle building enabled (~3.17 GB allocation)...");
+        Some(PolicyOracle::new())
+    } else {
+        None
+    };
+    compute_all_state_values_inner(ctx, &mut oracle);
+    oracle
+}
+
 /// Compute E_table[S] for all reachable game states using backward induction.
 ///
 /// Pseudocode: `COMPUTE_OPTIMAL_STRATEGY` — iterates num_filled from 14 down to 0,
@@ -98,6 +125,10 @@ impl ComputeProgress {
 ///
 /// Results are saved to `data/all_states.bin`.
 pub fn compute_all_state_values(ctx: &mut YatzyContext) {
+    compute_all_state_values_inner(ctx, &mut None);
+}
+
+fn compute_all_state_values_inner(ctx: &mut YatzyContext, oracle: &mut Option<PolicyOracle>) {
     let mut progress = ComputeProgress::new(ctx);
 
     println!("=== Starting State Value Computation ===");
@@ -136,55 +167,145 @@ pub fn compute_all_state_values(ctx: &mut YatzyContext) {
             num_scored, progress.states_per_level[num_scored as usize]
         );
 
-        // Build state list grouped by scored_categories mask.
-        // States sharing a scored mask access the same 256-byte successor regions
-        // (due to scored*64+up index layout), so grouping them maximizes L1 cache hits.
-        let mut groups: Vec<(i32, Vec<usize>)> = Vec::new();
+        // Build list of scored_categories masks at this level.
+        // The batched solver processes all 64 upper-score variants of each mask
+        // simultaneously, converting SpMV to SpMM for cache-friendly access.
+        let mut scored_masks: Vec<i32> = Vec::new();
+        let mut state_count: usize = 0;
         for scored in 0..(1u32 << CATEGORY_COUNT) {
             if scored.count_ones() == num_scored as u32 {
                 let upper_mask = (scored & 0x3F) as usize;
-                let ups: Vec<usize> = (0..=63usize)
-                    .filter(|&up| ctx.reachable[upper_mask][up])
-                    .collect();
-                if !ups.is_empty() {
-                    groups.push((scored as i32, ups));
+                let has_reachable = (0..=63usize).any(|up| ctx.reachable[upper_mask][up]);
+                if has_reachable {
+                    scored_masks.push(scored as i32);
+                    state_count += (0..=63usize)
+                        .filter(|&up| ctx.reachable[upper_mask][up])
+                        .count();
                 }
             }
         }
 
-        // Parallel computation: each group processes sequentially on one thread.
+        // Parallel computation: each scored mask processes all 64 ups at once.
         // Safety: each (up, scored) pair maps to a unique state_index,
         // so no two threads write to the same location.
         let sv_ptr = ctx.state_values.as_mut_slice().as_mut_ptr();
 
         // AtomicPtr wrapper to satisfy Send+Sync for rayon's for_each.
-        // We only use load/store — no actual atomic contention since indices are disjoint.
         let sv_atomic = std::sync::atomic::AtomicPtr::new(sv_ptr);
 
         let ctx_ref = &*ctx;
         let use_max = ctx_ref.max_policy;
-        let use_risk = ctx_ref.theta != 0.0;
-        groups.par_iter().for_each(|(scored, ups)| {
-            let ptr = sv_atomic.load(std::sync::atomic::Ordering::Relaxed);
-            for &up in ups {
-                let state = YatzyState {
-                    upper_score: up as i32,
-                    scored_categories: *scored,
-                };
-                let ev = if use_max {
-                    compute_max_state_value(ctx_ref, &state)
-                } else if use_risk {
-                    compute_expected_state_value_risk(ctx_ref, &state)
-                } else {
-                    compute_expected_state_value(ctx_ref, &state)
-                };
-                unsafe {
-                    *ptr.add(state_index(up, *scored as usize)) = ev as f32;
-                }
-            }
-        });
+        let use_utility = ctx_ref.theta != 0.0 && ctx_ref.theta.abs() <= UTILITY_THETA_LIMIT;
+        let use_risk = ctx_ref.theta != 0.0 && !use_utility;
 
-        let state_count: usize = groups.iter().map(|(_, ups)| ups.len()).sum();
+        // Precompute e^(θ·score) table for utility-domain solver (shared across threads)
+        let exp_scores: Option<Box<ExpScores>> = if use_utility {
+            Some(precompute_exp_scores(ctx_ref, ctx_ref.theta))
+        } else {
+            None
+        };
+        let exp_scores_ref = exp_scores.as_deref();
+        let minimize = ctx_ref.theta < 0.0;
+
+        // Extract sv slice for reading (safe: writes go to different indices than reads,
+        // since we only write to states at level num_scored and read from num_scored+1).
+        let sv_slice = ctx_ref.state_values.as_slice();
+
+        // Oracle pointers (if building). Each (state_index, ds_index) is unique,
+        // so parallel writes are safe (same argument as sv writes).
+        let oracle_cat_ptr = oracle
+            .as_mut()
+            .map(|o| std::sync::atomic::AtomicPtr::new(o.oracle_cat.as_mut_ptr()));
+        let oracle_keep1_ptr = oracle
+            .as_mut()
+            .map(|o| std::sync::atomic::AtomicPtr::new(o.oracle_keep1.as_mut_ptr()));
+        let oracle_keep2_ptr = oracle
+            .as_mut()
+            .map(|o| std::sync::atomic::AtomicPtr::new(o.oracle_keep2.as_mut_ptr()));
+        let building_oracle = oracle_cat_ptr.is_some();
+
+        scored_masks
+            .par_iter()
+            .for_each_init(BatchedBuffers::new, |bufs, &scored| {
+                // Build oracle decisions if enabled (runs the solver internally)
+                let oracle_slice = if building_oracle {
+                    Some(build_oracle_for_scored_mask(
+                        ctx_ref, sv_slice, scored, bufs,
+                    ))
+                } else {
+                    None
+                };
+
+                let results = if building_oracle {
+                    // Oracle builder already computed groups 6/5/3 — recompute group 1 only.
+                    // bufs.e0 now holds the final e[r][up] after group 3. Just sum group 1.
+                    crate::batched_solver::batched_group1_pub(ctx_ref, &bufs.e0)
+                } else if use_max {
+                    solve_widget_batched_max(ctx_ref, sv_slice, scored, bufs)
+                } else if use_utility {
+                    solve_widget_batched_utility(
+                        ctx_ref,
+                        sv_slice,
+                        scored,
+                        bufs,
+                        exp_scores_ref.unwrap(),
+                        minimize,
+                    )
+                } else if use_risk {
+                    solve_widget_batched_risk(ctx_ref, sv_slice, scored, bufs)
+                } else {
+                    solve_widget_batched(ctx_ref, sv_slice, scored, bufs)
+                };
+
+                let ptr = sv_atomic.load(std::sync::atomic::Ordering::Relaxed);
+                let upper_mask = (scored & 0x3F) as usize;
+                for up in 0..=63 {
+                    if ctx_ref.reachable[upper_mask][up] {
+                        unsafe {
+                            *ptr.add(state_index(up, scored as usize)) = results[up];
+                        }
+                    }
+                }
+                // Fill topological padding: indices 64..127 get the capped value (index 63).
+                // This enables branchless upper-category access: sv[base + up + scr]
+                // reads correct values even when up + scr > 63.
+                let capped_val = results[63];
+                let base = state_index(0, scored as usize);
+                for pad in 64..STATE_STRIDE {
+                    unsafe {
+                        *ptr.add(base + pad) = capped_val;
+                    }
+                }
+
+                // Scatter oracle slice into the global oracle arrays
+                if let Some(ref os) = oracle_slice {
+                    let cat_ptr = oracle_cat_ptr
+                        .as_ref()
+                        .unwrap()
+                        .load(std::sync::atomic::Ordering::Relaxed);
+                    let k1_ptr = oracle_keep1_ptr
+                        .as_ref()
+                        .unwrap()
+                        .load(std::sync::atomic::Ordering::Relaxed);
+                    let k2_ptr = oracle_keep2_ptr
+                        .as_ref()
+                        .unwrap()
+                        .load(std::sync::atomic::Ordering::Relaxed);
+
+                    for up in 0..64 {
+                        let si = state_index(up, scored as usize);
+                        for ds in 0..NUM_DICE_SETS {
+                            let oracle_idx = si * NUM_DICE_SETS + ds;
+                            let slice_idx = ds * 64 + up;
+                            unsafe {
+                                *cat_ptr.add(oracle_idx) = os.cat[slice_idx];
+                                *k1_ptr.add(oracle_idx) = os.keep1[slice_idx];
+                                *k2_ptr.add(oracle_idx) = os.keep2[slice_idx];
+                            }
+                        }
+                    }
+                }
+            });
 
         let pre_loop_completed = progress.completed_states;
         progress.completed_states = pre_loop_completed + state_count as i32;
@@ -206,6 +327,28 @@ pub fn compute_all_state_values(ctx: &mut YatzyContext) {
     }
 
     println!("\n\n=== Computation Complete ===");
+
+    // Convert utility-domain values U(S) to log-domain L(S) = ln(U(S))
+    // so that downstream consumers (simulation, analytics, profiling) see the
+    // same format regardless of which solver was used.
+    let was_utility = ctx.theta != 0.0 && ctx.theta.abs() <= UTILITY_THETA_LIMIT && !ctx.max_policy;
+    if was_utility {
+        let t_conv = Instant::now();
+        let sv = ctx.state_values.as_mut_slice();
+        for i in 0..NUM_STATES {
+            let u = sv[i];
+            if u > 0.0 {
+                sv[i] = u.ln();
+            }
+            // u == 0.0 maps to -inf in log domain, which is correct
+            // (unreachable states stay as initialized)
+        }
+        println!(
+            "Converted utility→log domain ({} states) in {:.2} ms",
+            NUM_STATES,
+            t_conv.elapsed().as_secs_f64() * 1000.0
+        );
+    }
 
     let save_file = if ctx.max_policy {
         "data/all_states_max.bin".to_string()
