@@ -7,8 +7,11 @@
 
 pub mod adaptive;
 pub mod engine;
+pub mod fast_prng;
 pub mod heuristic;
+pub mod lockstep;
 pub mod multiplayer;
+pub mod radix_sort;
 pub mod raw_storage;
 pub mod statistics;
 pub mod strategy;

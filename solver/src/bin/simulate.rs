@@ -1,12 +1,16 @@
 use std::time::Instant;
 
 use yatzy::phase0_tables;
+use yatzy::simulation::lockstep::{simulate_batch_lockstep, simulate_batch_lockstep_oracle};
 use yatzy::simulation::{
     aggregate_statistics, make_policy, policy_thetas, save_raw_simulation, save_scores,
     save_statistics, simulate_batch, simulate_batch_adaptive_with_recording,
     simulate_batch_with_recording, ThetaTable, POLICY_CONFIGS,
 };
-use yatzy::storage::{load_all_state_values, load_state_values_standalone, state_file_path};
+use yatzy::storage::{
+    load_all_state_values, load_oracle, load_state_values_standalone, state_file_path,
+    ORACLE_FILE_PATH,
+};
 use yatzy::types::YatzyContext;
 
 fn set_working_directory() {
@@ -25,6 +29,8 @@ struct Args {
     max_policy: bool,
     policy: Option<String>,
     full_recording: bool,
+    lockstep: bool,
+    use_oracle: bool,
 }
 
 fn parse_args() -> Args {
@@ -36,6 +42,8 @@ fn parse_args() -> Args {
     let mut max_policy = false;
     let mut policy: Option<String> = None;
     let mut full_recording = false;
+    let mut lockstep = false;
+    let mut use_oracle = false;
 
     let policy_names: Vec<&str> = POLICY_CONFIGS.iter().map(|p| p.name).collect();
 
@@ -81,6 +89,12 @@ fn parse_args() -> Args {
             "--full-recording" => {
                 full_recording = true;
             }
+            "--lockstep" => {
+                lockstep = true;
+            }
+            "--oracle" => {
+                use_oracle = true;
+            }
             "--policy" => {
                 i += 1;
                 if i < args.len() {
@@ -89,7 +103,7 @@ fn parse_args() -> Args {
             }
             "--help" | "-h" => {
                 println!(
-                    "Usage: yatzy-simulate [--games N] [--seed S] [--output DIR] [--theta FLOAT] [--max-policy] [--full-recording] [--policy NAME]"
+                    "Usage: yatzy-simulate [--games N] [--seed S] [--output DIR] [--theta FLOAT] [--max-policy] [--full-recording] [--policy NAME] [--oracle]"
                 );
                 println!();
                 println!("Options:");
@@ -103,6 +117,7 @@ fn parse_args() -> Args {
                     "  --policy NAME      Adaptive policy: {}",
                     policy_names.join(", ")
                 );
+                println!("  --oracle           Use precomputed policy oracle (θ=0 lockstep only)");
                 std::process::exit(0);
             }
             other => {
@@ -137,6 +152,11 @@ fn parse_args() -> Args {
         }
     }
 
+    if use_oracle && (theta != 0.0 || max_policy) {
+        eprintln!("Error: --oracle only works with θ=0 EV mode");
+        std::process::exit(1);
+    }
+
     Args {
         num_games,
         seed,
@@ -145,6 +165,8 @@ fn parse_args() -> Args {
         max_policy,
         policy,
         full_recording,
+        lockstep,
+        use_oracle,
     }
 }
 
@@ -159,6 +181,8 @@ fn main() {
         max_policy,
         policy: policy_name,
         full_recording,
+        lockstep,
+        use_oracle,
     } = args;
 
     // Configure rayon thread pool
@@ -577,11 +601,44 @@ fn main() {
         }
     } else {
         // No output: lightweight batch, print results only
+        if lockstep {
+            println!("  Mode: lockstep (horizontal processing)");
+        }
+        if use_oracle {
+            println!("  Mode: oracle-based lockstep");
+        }
+
+        // Load oracle if requested
+        let oracle = if use_oracle {
+            let t_orc = Instant::now();
+            match load_oracle(ORACLE_FILE_PATH) {
+                Some(o) => {
+                    println!(
+                        "  Oracle:         {:.1} ms (loaded)",
+                        t_orc.elapsed().as_secs_f64() * 1000.0
+                    );
+                    Some(o)
+                }
+                None => {
+                    eprintln!("Failed to load oracle. Run yatzy-precompute --oracle first.");
+                    std::process::exit(1);
+                }
+            }
+        } else {
+            None
+        };
+
         println!(
             "Simulating {} games ({} threads)...",
             num_games, num_threads
         );
-        let result = simulate_batch(&ctx, num_games, seed);
+        let result = if use_oracle {
+            simulate_batch_lockstep_oracle(&ctx, oracle.as_ref().unwrap(), num_games, seed)
+        } else if lockstep && theta == 0.0 && !max_policy {
+            simulate_batch_lockstep(&ctx, num_games, seed)
+        } else {
+            simulate_batch(&ctx, num_games, seed)
+        };
 
         let per_game_us = result.elapsed.as_secs_f64() * 1e6 / num_games as f64;
         let throughput = num_games as f64 / result.elapsed.as_secs_f64();
