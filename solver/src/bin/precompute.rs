@@ -1,5 +1,6 @@
 use yatzy::phase0_tables;
-use yatzy::state_computation::compute_all_state_values;
+use yatzy::state_computation::{compute_all_state_values, compute_all_state_values_with_oracle};
+use yatzy::storage::{save_oracle, ORACLE_FILE_PATH};
 use yatzy::types::YatzyContext;
 
 fn set_working_directory() {
@@ -14,10 +15,11 @@ fn set_working_directory() {
     }
 }
 
-fn parse_args() -> (f32, bool) {
+fn parse_args() -> (f32, bool, bool) {
     let args: Vec<String> = std::env::args().collect();
     let mut theta = 0.0f32;
     let mut max_policy = false;
+    let mut build_oracle = false;
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
@@ -33,12 +35,16 @@ fn parse_args() -> (f32, bool) {
             "--max-policy" => {
                 max_policy = true;
             }
+            "--oracle" => {
+                build_oracle = true;
+            }
             "--help" | "-h" => {
-                println!("Usage: yatzy-precompute [--theta FLOAT] [--max-policy]");
+                println!("Usage: yatzy-precompute [--theta FLOAT] [--max-policy] [--oracle]");
                 println!();
                 println!("Options:");
                 println!("  --theta FLOAT  Risk parameter (default: 0.0, risk-neutral)");
                 println!("  --max-policy   Max-policy mode (chance nodes use max, not EV)");
+                println!("  --oracle       Build policy oracle (~3.17 GB, θ=0 only)");
                 std::process::exit(0);
             }
             other => {
@@ -52,18 +58,25 @@ fn parse_args() -> (f32, bool) {
         eprintln!("Error: --max-policy and --theta are mutually exclusive");
         std::process::exit(1);
     }
-    (theta, max_policy)
+    if build_oracle && (theta != 0.0 || max_policy) {
+        eprintln!("Error: --oracle only works with θ=0 EV mode");
+        std::process::exit(1);
+    }
+    (theta, max_policy, build_oracle)
 }
 
 fn main() {
     set_working_directory();
-    let (theta, max_policy) = parse_args();
+    let (theta, max_policy, build_oracle) = parse_args();
 
     println!("Yatzy precomputation tool (Rust)");
     if max_policy {
         println!("Mode: max-policy (chance nodes use max, not EV)");
     } else if theta != 0.0 {
         println!("Risk parameter θ = {:.4}", theta);
+    }
+    if build_oracle {
+        println!("Mode: building policy oracle (~3.17 GB)");
     }
 
     // Configure rayon thread pool
@@ -83,7 +96,15 @@ fn main() {
     ctx.theta = theta;
     ctx.max_policy = max_policy;
     phase0_tables::precompute_lookup_tables(&mut ctx);
-    compute_all_state_values(&mut ctx);
+
+    if build_oracle {
+        let oracle = compute_all_state_values_with_oracle(&mut ctx, true);
+        if let Some(ref orc) = oracle {
+            save_oracle(orc, ORACLE_FILE_PATH);
+        }
+    } else {
+        compute_all_state_values(&mut ctx);
+    }
 
     println!("Precomputation complete.");
 }

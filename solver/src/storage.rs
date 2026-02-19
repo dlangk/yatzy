@@ -1,8 +1,8 @@
 //! Binary I/O for the E_table state values.
 //!
-//! Format: 16-byte header + float32[2,097,152] in `state_index(m, C)` order
-//! (v4 layout: `C * 64 + m`).
-//! Total file size: 8,388,624 bytes (~8 MB).
+//! Format: 16-byte header + float32[4,194,304] in `state_index(m, C)` order
+//! (v6 layout: `C * STATE_STRIDE + m`, STATE_STRIDE=128 with topological padding).
+//! Total file size: 16,777,232 bytes (~16 MB).
 //!
 //! Loading uses zero-copy memory mapping via `memmap2` for <1ms startup.
 
@@ -14,7 +14,7 @@ use std::time::Instant;
 use memmap2::Mmap;
 
 use crate::constants::*;
-use crate::types::{StateValues, YatzyContext};
+use crate::types::{PolicyOracle, StateValues, YatzyContext, ORACLE_ENTRIES};
 
 /// Binary file header: magic + version + state count + theta_bits.
 ///
@@ -192,6 +192,121 @@ pub fn save_all_state_values(ctx: &YatzyContext, filename: &str) {
 
     let elapsed = start_time.elapsed().as_secs_f64() * 1000.0;
     println!("Saved {} states in {:.2} ms", NUM_STATES, elapsed);
+}
+
+/// Oracle file magic number: "ORCL" in hex.
+const ORACLE_MAGIC: u32 = 0x4C43524F;
+/// Oracle file version.
+const ORACLE_VERSION: u32 = 1;
+
+/// Binary file header for oracle.
+#[repr(C)]
+struct OracleFileHeader {
+    magic: u32,
+    version: u32,
+    entries_per_array: u64,
+}
+
+/// Default oracle file path.
+pub const ORACLE_FILE_PATH: &str = "data/strategy_tables/oracle.bin";
+
+/// Save policy oracle to disk.
+///
+/// Format: 24-byte header + 3 × ORACLE_ENTRIES bytes (~3.17 GB).
+pub fn save_oracle(oracle: &PolicyOracle, filename: &str) {
+    let start_time = Instant::now();
+    println!("Saving oracle to {}...", filename);
+
+    if let Some(parent) = Path::new(filename).parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+
+    let mut f = match File::create(filename) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("Error creating oracle file: {}", e);
+            return;
+        }
+    };
+
+    let header = OracleFileHeader {
+        magic: ORACLE_MAGIC,
+        version: ORACLE_VERSION,
+        entries_per_array: ORACLE_ENTRIES as u64,
+    };
+
+    let header_bytes = unsafe {
+        std::slice::from_raw_parts(
+            &header as *const OracleFileHeader as *const u8,
+            std::mem::size_of::<OracleFileHeader>(),
+        )
+    };
+    f.write_all(header_bytes).unwrap();
+    f.write_all(&oracle.oracle_cat).unwrap();
+    f.write_all(&oracle.oracle_keep1).unwrap();
+    f.write_all(&oracle.oracle_keep2).unwrap();
+
+    let elapsed = start_time.elapsed().as_secs_f64();
+    let size_gb = (std::mem::size_of::<OracleFileHeader>() + 3 * ORACLE_ENTRIES) as f64
+        / 1024.0
+        / 1024.0
+        / 1024.0;
+    println!("Saved oracle ({:.2} GB) in {:.2}s", size_gb, elapsed);
+}
+
+/// Load policy oracle via mmap. Returns None if file doesn't exist or is invalid.
+pub fn load_oracle(filename: &str) -> Option<PolicyOracle> {
+    let start_time = Instant::now();
+    println!("Loading oracle from {}...", filename);
+
+    let file = match File::open(filename) {
+        Ok(f) => f,
+        Err(_) => {
+            println!("Oracle file not found: {}", filename);
+            return None;
+        }
+    };
+
+    let metadata = file.metadata().ok()?;
+    let header_size = std::mem::size_of::<OracleFileHeader>();
+    let expected_size = header_size + 3 * ORACLE_ENTRIES;
+
+    if metadata.len() as usize != expected_size {
+        println!(
+            "Oracle file size mismatch: expected {}, got {}",
+            expected_size,
+            metadata.len()
+        );
+        return None;
+    }
+
+    let mmap = unsafe { Mmap::map(&file) }.ok()?;
+
+    let header = unsafe { &*(mmap.as_ptr() as *const OracleFileHeader) };
+    if header.magic != ORACLE_MAGIC || header.version != ORACLE_VERSION {
+        println!(
+            "Invalid oracle format (magic=0x{:08x} version={})",
+            header.magic, header.version
+        );
+        return None;
+    }
+
+    // Copy data from mmap into owned Vecs
+    let data_start = header_size;
+    let cat_end = data_start + ORACLE_ENTRIES;
+    let k1_end = cat_end + ORACLE_ENTRIES;
+    let k2_end = k1_end + ORACLE_ENTRIES;
+
+    let oracle = PolicyOracle {
+        oracle_cat: mmap[data_start..cat_end].to_vec(),
+        oracle_keep1: mmap[cat_end..k1_end].to_vec(),
+        oracle_keep2: mmap[k1_end..k2_end].to_vec(),
+    };
+
+    let elapsed = start_time.elapsed().as_secs_f64();
+    println!("Loaded oracle in {:.2}s", elapsed);
+
+    Some(oracle)
 }
 
 #[cfg(test)]

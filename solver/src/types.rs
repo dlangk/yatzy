@@ -23,8 +23,8 @@ use crate::constants::*;
 /// - `mask_to_keep[ds*32 + mask]` — reroll mask → keep index (API input translation)
 /// - `keep_to_mask[ds*32 + j]` — unique keep j → representative mask (API output)
 pub struct KeepTable {
-    /// Sparse probability values for each keep row.
-    pub vals: Vec<f64>,
+    /// Sparse probability values for each keep row (f32 — 7 sig digits, sufficient for transition weights).
+    pub vals: Vec<f32>,
     /// Column indices corresponding to vals entries.
     pub cols: Vec<i32>,
     /// Row boundaries: row_start[ki]..row_start[ki+1] gives range in vals/cols.
@@ -99,6 +99,49 @@ impl StateValues {
             StateValues::Owned(v) => v.as_mut_slice(),
             StateValues::Mmap { .. } => panic!("Cannot mutably access mmap'd state values"),
         }
+    }
+}
+
+/// Precomputed policy oracle: every argmax decision from backward induction.
+///
+/// Three flat arrays indexed by `state_index * 252 + ds_index`:
+/// - `oracle_cat[si*252+ds]`: best category (0-14)
+/// - `oracle_keep1[si*252+ds]`: best keep with 1 reroll left (0=keep-all, j+1=unique keep j)
+/// - `oracle_keep2[si*252+ds]`: best keep with 2 rerolls left (same encoding)
+///
+/// Total: ~3.17 GB (3 × 1,056,964,608 bytes). θ=0 EV mode only.
+pub struct PolicyOracle {
+    pub oracle_cat: Vec<u8>,
+    pub oracle_keep1: Vec<u8>,
+    pub oracle_keep2: Vec<u8>,
+}
+
+/// Number of entries per oracle array: NUM_STATES × 252.
+pub const ORACLE_ENTRIES: usize = NUM_STATES * NUM_DICE_SETS;
+
+/// Sentinel value for oracle_keep: keep all dice (mask=0).
+pub const ORACLE_KEEP_ALL: u8 = 0;
+
+impl Default for PolicyOracle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PolicyOracle {
+    /// Allocate zeroed oracle arrays (~3.17 GB total).
+    pub fn new() -> Self {
+        Self {
+            oracle_cat: vec![0u8; ORACLE_ENTRIES],
+            oracle_keep1: vec![0u8; ORACLE_ENTRIES],
+            oracle_keep2: vec![0u8; ORACLE_ENTRIES],
+        }
+    }
+
+    /// Oracle index for a given state and dice set.
+    #[inline(always)]
+    pub fn idx(state_idx: usize, ds: usize) -> usize {
+        state_idx * NUM_DICE_SETS + ds
     }
 }
 
