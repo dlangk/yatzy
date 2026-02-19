@@ -226,7 +226,7 @@ fn find_best_and_runner_up_mask(
             for k in start..end {
                 unsafe {
                     let v = *e_ds.get_unchecked(*cols.get_unchecked(k) as usize);
-                    sum += (*vals.get_unchecked(k) as f32) * (v - max_x).exp();
+                    sum += *vals.get_unchecked(k) * (v - max_x).exp();
                 }
             }
             max_x + sum.ln()
@@ -234,7 +234,7 @@ fn find_best_and_runner_up_mask(
             let mut ev: f32 = 0.0;
             for k in start..end {
                 unsafe {
-                    ev += (*vals.get_unchecked(k) as f32)
+                    ev += *vals.get_unchecked(k)
                         * e_ds.get_unchecked(*cols.get_unchecked(k) as usize);
                 }
             }

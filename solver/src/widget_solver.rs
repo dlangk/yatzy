@@ -174,7 +174,7 @@ pub fn compute_expected_value_for_reroll_mask(
     let mut ev: f32 = 0.0;
     for k in start..end {
         unsafe {
-            ev += (*vals.get_unchecked(k) as f32)
+            ev += *vals.get_unchecked(k)
                 * e_ds_for_masks.get_unchecked(*cols.get_unchecked(k) as usize);
         }
     }
@@ -211,7 +211,7 @@ pub fn choose_best_reroll_mask(
         let mut ev: f32 = 0.0;
         for k in start..end {
             unsafe {
-                ev += (*vals.get_unchecked(k) as f32)
+                ev += *vals.get_unchecked(k)
                     * e_ds_for_masks.get_unchecked(*cols.get_unchecked(k) as usize);
             }
         }
@@ -292,7 +292,7 @@ pub fn compute_expected_values_for_n_rerolls(
         let mut ev: f32 = 0.0;
         for k in start..end {
             unsafe {
-                ev += (*vals.get_unchecked(k) as f32)
+                ev += *vals.get_unchecked(k)
                     * e_ds_prev.get_unchecked(*cols.get_unchecked(k) as usize);
             }
         }
@@ -343,7 +343,7 @@ pub fn compute_max_ev_for_n_rerolls(
         let mut ev: f32 = 0.0;
         for k in start..end {
             unsafe {
-                ev += (*vals.get_unchecked(k) as f32)
+                ev += *vals.get_unchecked(k)
                     * e_ds_prev.get_unchecked(*cols.get_unchecked(k) as usize);
             }
         }
@@ -627,7 +627,7 @@ pub fn compute_opt_lse_for_n_rerolls(
         for k in start..end {
             unsafe {
                 let v = *e_ds_prev.get_unchecked(*cols.get_unchecked(k) as usize);
-                sum += (*vals.get_unchecked(k) as f32) * (v - max_val).exp();
+                sum += *vals.get_unchecked(k) * (v - max_val).exp();
             }
         }
         keep_ev[kid] = max_val + sum.ln();
@@ -685,7 +685,7 @@ pub fn compute_lse_for_reroll_mask(
     for k in start..end {
         unsafe {
             let v = *e_ds_for_masks.get_unchecked(*cols.get_unchecked(k) as usize);
-            sum += (*vals.get_unchecked(k) as f32) * (v - max_val).exp();
+            sum += *vals.get_unchecked(k) * (v - max_val).exp();
         }
     }
     (max_val + sum.ln()) as f64
@@ -731,7 +731,7 @@ pub fn choose_best_reroll_mask_risk(
         for k in start..end {
             unsafe {
                 let v = *e_ds_for_masks.get_unchecked(*cols.get_unchecked(k) as usize);
-                sum += (*vals.get_unchecked(k) as f32) * (v - max_x).exp();
+                sum += *vals.get_unchecked(k) * (v - max_x).exp();
             }
         }
         let ev = max_x + sum.ln();

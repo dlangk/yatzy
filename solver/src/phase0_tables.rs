@@ -132,7 +132,7 @@ pub fn precompute_keep_table(ctx: &mut YatzyContext) {
             if d == 5 {
                 let ti = ctx.index_lookup[(dice[0] - 1) as usize][(dice[1] - 1) as usize]
                     [(dice[2] - 1) as usize][(dice[3] - 1) as usize][(dice[4] - 1) as usize];
-                kt.vals.push(1.0);
+                kt.vals.push(1.0f32);
                 kt.cols.push(ti);
             }
             continue;
@@ -163,7 +163,8 @@ pub fn precompute_keep_table(ctx: &mut YatzyContext) {
                 continue;
             }
 
-            kt.vals.push(fact_n as f64 / denom as f64 * inv_pow6n);
+            kt.vals
+                .push((fact_n as f64 / denom as f64 * inv_pow6n) as f32);
             kt.cols.push(ti as i32);
         }
     }
@@ -229,7 +230,7 @@ pub fn precompute_keep_table(ctx: &mut YatzyContext) {
         num_keeps,
         nnz,
         total_unique as f64 / 252.0,
-        (nnz * (std::mem::size_of::<f64>() + std::mem::size_of::<i32>())) as f64 / 1024.0
+        (nnz * (std::mem::size_of::<f32>() + std::mem::size_of::<i32>())) as f64 / 1024.0
     );
 }
 
@@ -253,16 +254,31 @@ pub fn precompute_dice_set_probabilities(ctx: &mut YatzyContext) {
 /// Pseudocode: E(C, m, f) = 35 if m ≥ 63, else 0.
 /// Scandinavian Yatzy uses 50-point upper bonus instead of 35.
 ///
-/// When θ ≠ 0 (risk-sensitive mode), terminal values are in the log domain:
-/// L(S) = θ·bonus instead of E(S) = bonus.
+/// Three modes:
+/// - θ = 0 (EV): `E(S) = bonus`
+/// - θ ≠ 0, utility domain (|θ| ≤ 0.15): `U(S) = e^(θ·bonus)`
+/// - θ ≠ 0, log domain (|θ| > 0.15): `L(S) = θ·bonus`
 pub fn initialize_final_states(ctx: &mut YatzyContext) {
     let all_scored_mask = (1 << CATEGORY_COUNT) - 1;
     let theta = ctx.theta;
+    let use_utility = theta != 0.0 && theta.abs() <= 0.15;
     let state_values = ctx.state_values.as_mut_slice();
     for up in 0..=63usize {
         let bonus = if up >= 63 { 50.0f32 } else { 0.0f32 };
-        let final_val = if theta == 0.0 { bonus } else { theta * bonus };
+        let final_val = if theta == 0.0 {
+            bonus
+        } else if use_utility {
+            (theta * bonus).exp()
+        } else {
+            theta * bonus
+        };
         state_values[state_index(up, all_scored_mask)] = final_val;
+    }
+    // Fill topological padding for terminal states: indices 64..127 = value at 63
+    let capped_val = state_values[state_index(63, all_scored_mask)];
+    let base = state_index(0, all_scored_mask);
+    for pad in 64..STATE_STRIDE {
+        state_values[base + pad] = capped_val;
     }
 }
 
@@ -446,9 +462,9 @@ mod tests {
             if start == end {
                 continue;
             }
-            let sum: f64 = (start..end).map(|k| kt.vals[k]).sum();
+            let sum: f64 = (start..end).map(|k| kt.vals[k] as f64).sum();
             assert!(
-                (sum - 1.0).abs() < 1e-9,
+                (sum - 1.0).abs() < 1e-6,
                 "keep_table row {} sums to {}",
                 ki,
                 sum
@@ -492,11 +508,11 @@ mod tests {
         let start = kt.row_start[empty_kid as usize] as usize;
         let end = kt.row_start[empty_kid as usize + 1] as usize;
         for k in start..end {
-            empty_probs[kt.cols[k] as usize] = kt.vals[k];
+            empty_probs[kt.cols[k] as usize] = kt.vals[k] as f64;
         }
         for t in 0..252 {
             assert!(
-                (empty_probs[t] - ctx.dice_set_probabilities[t]).abs() < 1e-9,
+                (empty_probs[t] - ctx.dice_set_probabilities[t]).abs() < 1e-6,
                 "empty keep prob[{}]={} != dice_set_prob={}",
                 t,
                 empty_probs[t],

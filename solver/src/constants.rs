@@ -4,18 +4,28 @@
 //! - |𝒞| = [`CATEGORY_COUNT`] = 15 (Scandinavian Yatzy)
 //! - |R_{5,6}| = [`NUM_DICE_SETS`] = 252
 //! - |R_k| = [`NUM_KEEP_MULTISETS`] = 462
-//! - STATE_INDEX(m, C) = [`state_index`]`(m, C)` = C * 64 + m
+//! - STATE_INDEX(m, C) = [`state_index`]`(m, C)` = C * STATE_STRIDE + m
 //!
-//! The index layout groups all 64 upper-score variants of the same scored-categories
-//! mask into a contiguous 256-byte region, enabling L1 cache hits during Group 6
-//! successor lookups (which vary upper_score but share scored_categories).
+//! The index layout groups all upper-score variants of the same scored-categories
+//! mask into a contiguous region (STATE_STRIDE × f32 = 512 bytes). Indices 64..127
+//! are padded with the capped value (index 63), enabling branchless upper-category
+//! scoring via `sv[base + up + scr]` without `min(up + scr, 63)`.
 
 /// Number of scoring categories in Scandinavian Yatzy (Ones through Yatzy).
 /// Pseudocode uses |𝒞| = 13 (standard Yahtzee); we use 15.
 pub const CATEGORY_COUNT: usize = 15;
 
-/// Total number of game states: 64 possible upper-section scores * 2^15 scored-category bitmasks.
-pub const NUM_STATES: usize = 64 * (1 << 15);
+/// Stride per scored-categories mask in the state array.
+///
+/// Padded from 64 to 128: indices 0..63 hold actual upper-score values,
+/// indices 64..127 are filled with copies of index 63 (the capped value).
+/// This enables branchless upper-category scoring: `sv[base + up + scr]`
+/// always reads a valid, correct value without `min(up + scr, 63)`.
+pub const STATE_STRIDE: usize = 128;
+
+/// Total number of slots in the state array: STATE_STRIDE * 2^15.
+/// With padding, this is 4,194,304 slots (~16 MB).
+pub const NUM_STATES: usize = STATE_STRIDE * (1 << 15);
 
 /// Number of distinct sorted 5-dice multisets from {1..6}: C(10,5) = 252.
 pub const NUM_DICE_SETS: usize = 252;
@@ -29,11 +39,11 @@ pub const MAX_KEEP_NNZ_TOTAL: usize = 60000;
 /// Storage format magic number: "STZY" in hex.
 pub const STATE_FILE_MAGIC: u32 = 0x59545A53;
 
-/// Storage format version (v4: scored*64+up index layout for cache locality).
-pub const STATE_FILE_VERSION: u32 = 4;
+/// Storage format version (v6: scored*128+up layout with topological padding).
+pub const STATE_FILE_VERSION: u32 = 6;
 
-/// Storage format version v5: adds θ (risk parameter) in the reserved header field.
-pub const STATE_FILE_VERSION_V5: u32 = 5;
+/// Storage format version v7: scored*128+up with θ (risk parameter) in header.
+pub const STATE_FILE_VERSION_V5: u32 = 7;
 
 /// Scandinavian Yatzy upper bonus: 50 points if upper score >= 63.
 pub const UPPER_BONUS: f64 = 50.0;
@@ -79,13 +89,13 @@ pub const CATEGORY_NAMES: [&str; CATEGORY_COUNT] = [
 
 /// Map state S = (upper_score, scored_categories) to flat array index.
 ///
-/// Layout: `scored_categories * 64 + upper_score`. This groups all upper-score
-/// variants of the same scored mask into a contiguous 256-byte region (64 × f32),
-/// giving L1 cache hits when Group 6 iterates successor states that share the
-/// same scored mask but differ in upper_score.
+/// Layout: `scored_categories * STATE_STRIDE + upper_score`. With STATE_STRIDE=128,
+/// each scored mask occupies a 512-byte region (128 × f32). Indices 0..63 hold
+/// actual values; indices 64..127 are padded with copies of index 63 (capped value).
+/// This enables branchless upper-category scoring via `sv[base + up + scr]`.
 #[inline(always)]
 pub fn state_index(upper_score: usize, scored_categories: usize) -> usize {
-    scored_categories * 64 + upper_score
+    scored_categories * STATE_STRIDE + upper_score
 }
 
 /// Test whether category `cat` has been scored (bit `cat` is set).
