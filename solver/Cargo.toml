@@ -87,6 +87,18 @@ path = "src/bin/generate_profile_scenarios.rs"
 name = "yatzy-player-card-grid"
 path = "src/bin/player_card_grid.rs"
 
+[[bin]]
+name = "yatzy-export-state-heatmap"
+path = "src/bin/export_state_heatmap.rs"
+
+[[bin]]
+name = "yatzy-density"
+path = "src/bin/density_sweep.rs"
+
+[[bin]]
+name = "yatzy-export-greedy-game"
+path = "src/bin/export_greedy_game.rs"
+
 [dependencies]
 axum = "0.8"
 tokio = { version = "1", features = ["full"] }
