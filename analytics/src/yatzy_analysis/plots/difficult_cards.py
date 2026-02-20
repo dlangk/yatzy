@@ -75,8 +75,8 @@ def _build_state_text(scenario: dict, scenario_id: str = "") -> str:
 
     # Category table
     show_markers = dtype == "category"
-    best_id = best_action["action_id"] if show_markers else -1
-    ru_id = runner_up["action_id"] if show_markers else -1
+    best_id = best_action.get("id", best_action.get("action_id")) if show_markers else -1
+    ru_id = runner_up.get("id", runner_up.get("action_id")) if show_markers else -1
 
     lines.append("  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
                  "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c"
@@ -88,11 +88,16 @@ def _build_state_text(scenario: dict, scenario_id: str = "") -> str:
                  "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c"
                  "\u2500\u2500\u2500\u2500\u2500\u2500\u2524")
 
+    cat_scores = scenario.get("category_scores")
     for c in range(15):
         name = CATEGORY_NAMES[c]
         if _is_scored(scored, c):
+            if cat_scores and cat_scores[c] >= 0:
+                scr_str = f"{cat_scores[c]:>3}  "
+            else:
+                scr_str = "  \u2713  "
             lines.append(
-                f"  \u2502 {name:<16} \u2502   \u2713   \u2502      \u2502"
+                f"  \u2502 {name:<16} \u2502 {scr_str} \u2502      \u2502"
             )
         else:
             scr = compute_score(dice, c)
@@ -120,9 +125,11 @@ def _build_state_text(scenario: dict, scenario_id: str = "") -> str:
 
     # Decision summary
     lines.append("")
-    lines.append(f"  Best:       {best_action['action_name']}")
+    best_label = best_action.get("label", best_action.get("action_name"))
+    ru_label = runner_up.get("label", runner_up.get("action_name"))
+    lines.append(f"  Best:       {best_label}")
     lines.append(f"              EV = {best_action['ev']:.2f}")
-    lines.append(f"  Runner-up:  {runner_up['action_name']}")
+    lines.append(f"  Runner-up:  {ru_label}")
     lines.append(f"              EV = {runner_up['ev']:.2f}")
     lines.append(f"  Gap:        {scenario['ev_gap']:.4f}")
     lines.append("")
@@ -141,7 +148,7 @@ def _plot_action_bars(scenario: dict, ax: plt.Axes) -> None:
     show = actions[:15]
     show = list(reversed(show))  # matplotlib barh draws bottom-up
 
-    names = [a["action_name"] for a in show]
+    names = [a.get("label", a.get("action_name")) for a in show]
     evs = [a["ev"] for a in show]
     best_ev = scenario["best_action"]["ev"]
     ru_ev = scenario["runner_up_action"]["ev"]
@@ -222,7 +229,7 @@ def _plot_action_table(scenario: dict, ax: plt.Axes) -> None:
             bg = "#ffffff"
         cell_text.append([
             str(i + 1),
-            a["action_name"],
+            a.get("label", a.get("action_name")),
             f"{a['ev']:.2f}",
             f"{delta:+.4f}" if i > 0 else "best",
         ])
@@ -278,8 +285,8 @@ def plot_difficult_card(
         fontsize=14, fontweight="bold", x=0.5, y=0.96,
     )
 
-    best = scenario["best_action"]["action_name"]
-    runner_up = scenario["runner_up_action"]["action_name"]
+    best = scenario["best_action"].get("label", scenario["best_action"].get("action_name"))
+    runner_up = scenario["runner_up_action"].get("label", scenario["runner_up_action"].get("action_name"))
     gap = scenario["ev_gap"]
     fig.text(
         0.5, 0.92,
