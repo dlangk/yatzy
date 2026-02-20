@@ -40,28 +40,45 @@ def extract(base_path: str):
 @cli.command()
 @click.option("--base-path", default=".", help="Base path (repo root).")
 @click.option("--csv", "write_csv", is_flag=True, help="Also write sweep_summary.csv.")
-def compute(base_path: str, write_csv: bool):
+@click.option(
+    "--source", type=click.Choice(["mc", "density"]), default="mc",
+    help="Data source: 'mc' for MC simulation binaries, 'density' for exact density evolution JSONs.",
+)
+def compute(base_path: str, write_csv: bool, source: str):
     """Read simulation binaries directly → summary.parquet + kde.parquet."""
-    from .compute import compute_all
-    from .config import analysis_dir, discover_thetas
-    from .io import fmt_theta, read_all_scores
+    from .config import analysis_dir
     from .store import save_kde, save_summary
 
     t0 = time.time()
 
-    # Read scores directly from binary files (scores.bin or simulation_raw.bin)
-    thetas = discover_thetas(base_path)
-    if not thetas:
-        click.echo("No theta directories with simulation data found.")
-        raise SystemExit(1)
+    if source == "density":
+        from .density import compute_all_from_density, discover_density_thetas
 
-    click.echo(f"Reading scores for {len(thetas)} thetas...")
-    scores_dict = read_all_scores(thetas, base_path)
-    for t in sorted(scores_dict.keys()):
-        click.echo(f"  theta={fmt_theta(t, base_path):>6s}: {len(scores_dict[t]):>10,d} games")
+        thetas = discover_density_thetas(base_path)
+        if not thetas:
+            click.echo("No density_*.json files found in outputs/density/.")
+            raise SystemExit(1)
 
-    click.echo("Computing summary stats + KDE...")
-    summary_df, kde_df = compute_all(scores_dict)
+        click.echo(f"Reading exact density PMFs for {len(thetas)} thetas...")
+        summary_df, kde_df = compute_all_from_density(base_path)
+        click.echo(f"Computed summary + KDE from exact PMFs.")
+    else:
+        from .compute import compute_all
+        from .config import discover_thetas
+        from .io import fmt_theta, read_all_scores
+
+        thetas = discover_thetas(base_path)
+        if not thetas:
+            click.echo("No theta directories with simulation data found.")
+            raise SystemExit(1)
+
+        click.echo(f"Reading scores for {len(thetas)} thetas...")
+        scores_dict = read_all_scores(thetas, base_path)
+        for t in sorted(scores_dict.keys()):
+            click.echo(f"  theta={fmt_theta(t, base_path):>6s}: {len(scores_dict[t]):>10,d} games")
+
+        click.echo("Computing summary stats + KDE...")
+        summary_df, kde_df = compute_all(scores_dict)
 
     out_dir = analysis_dir(base_path)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -112,17 +129,20 @@ def plot(base_path: str, subset: str, fmt: str, dpi: int):
     summary_all = load_summary(summary_path)
     kde_all = load_kde(kde_path)
 
-    theta_list = PLOT_SUBSETS.get(
-        {"all": "all", "dense": "theta_dense", "sparse": "theta_sparse"}[subset],
-        PLOT_SUBSETS["all"],
-    )
-
     out_dir = plots_dir(base_path)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Filter to available thetas
-    available = set(summary_all["theta"].unique())
-    thetas = sorted([t for t in theta_list if t in available])
+    available = sorted(summary_all["theta"].unique())
+    if subset == "all":
+        # Use every theta present in the data
+        thetas = [float(t) for t in available]
+    else:
+        theta_list = PLOT_SUBSETS.get(
+            {"dense": "theta_dense", "sparse": "theta_sparse"}[subset],
+            PLOT_SUBSETS["all"],
+        )
+        thetas = sorted([t for t in theta_list if t in set(available)])
 
     stats_df = summary_all[summary_all["theta"].isin(thetas)]
     k_df = kde_all[kde_all["theta"].isin(thetas)]
@@ -1454,3 +1474,26 @@ def profile_validate(base_path: str, trials: int, seed: int):
     summaries = run_full_validation(scenarios, n_trials=trials, base_seed=seed)
     print_validation_report(summaries)
     click.echo(f"\nDone in {time.time() - t0:.1f}s")
+
+
+@cli.command("skill-ladder")
+@click.option("--base-path", default=".", help="Base path (repo root).")
+@click.option("--max-rules", default=100, type=int, help="Max rules per decision type.")
+@click.option("--min-coverage", default=100, type=int, help="Min records to cover per rule.")
+def skill_ladder(base_path: str, max_rules: int, min_coverage: int):
+    """Induce human-readable skill ladder from regret export data."""
+    from .skill_ladder import generate_skill_ladder
+
+    t0 = time.time()
+    rosetta_dir = Path(base_path) / "outputs" / "rosetta"
+    if not rosetta_dir.exists():
+        click.echo(f"{rosetta_dir} not found. Run yatzy-regret-export first.")
+        raise SystemExit(1)
+
+    output_dir = rosetta_dir
+    result = generate_skill_ladder(
+        rosetta_dir, output_dir, max_rules=max_rules, min_coverage=min_coverage,
+    )
+    total = result["meta"]["total_rules"]
+    click.echo(f"\n{total} total rules induced.")
+    click.echo(f"Done in {time.time() - t0:.1f}s.")

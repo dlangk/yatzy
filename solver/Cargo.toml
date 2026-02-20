@@ -103,6 +103,14 @@ path = "src/bin/density_sweep.rs"
 name = "yatzy-export-greedy-game"
 path = "src/bin/export_greedy_game.rs"
 
+[[bin]]
+name = "yatzy-regret-export"
+path = "src/bin/regret_export.rs"
+
+[[bin]]
+name = "yatzy-eval-policy"
+path = "src/bin/eval_policy.rs"
+
 [dependencies]
 axum = "0.8"
 tokio = { version = "1", features = ["full"] }

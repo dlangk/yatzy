@@ -195,8 +195,32 @@ efficiency:
 modality:
     analytics/.venv/bin/yatzy-analyze modality
 
+# Compute summary + KDE from exact density evolution PMFs
+density-compute:
+    analytics/.venv/bin/yatzy-analyze compute --source density --csv
+
+# Full pipeline from density data: density-compute → plot → efficiency
+density-pipeline: density-compute plot efficiency
+
 # Full analytics pipeline: compute → plot → categories → efficiency
 pipeline: compute plot categories efficiency
+
+# ── Rosetta Stone: Policy Distillation ────────────────────────────────────
+
+# Export regret data with semantic features (Phase 1+2)
+regret-export games="200000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-regret-export --games {{games}}
+
+# Induce human-readable skill ladder from regret data (Phase 3)
+skill-ladder:
+    analytics/.venv/bin/yatzy-analyze skill-ladder
+
+# Evaluate skill ladder via Monte Carlo simulation (Phase 4)
+eval-policy games="1000000":
+    YATZY_BASE_PATH=. solver/target/release/yatzy-eval-policy --games {{games}}
+
+# Full Rosetta pipeline: export → induce → evaluate
+rosetta: regret-export skill-ladder eval-policy
 
 # ── Dev ───────────────────────────────────────────────────────────────────
 
