@@ -51,6 +51,7 @@ pub mod dice_mechanics;
 pub mod game_mechanics;
 pub mod phase0_tables;
 pub mod profiling;
+pub mod scenarios;
 pub mod server;
 pub mod simd;
 pub mod simulation;

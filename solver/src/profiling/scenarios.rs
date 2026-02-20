@@ -1,5 +1,10 @@
 //! Scenario generation for cognitive profiling.
 //!
+//! **DEPRECATED**: New code should use `crate::scenarios::*` instead.
+//! This module is kept for backward compatibility with `yatzy-profile-scenarios`.
+//! The unified pipeline lives in `solver/src/scenarios/` and the binary is
+//! `yatzy-scenarios`.
+//!
 //! Generates candidate scenarios from noisy-simulated games, classifies them
 //! into a 3D semantic grid (phase × dtype × tension), scores diagnostic value,
 //! and assembles a 30-scenario quiz with diversity constraints.
@@ -9,16 +14,17 @@
 use std::collections::HashMap;
 
 use rand::rngs::SmallRng;
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 use rayon::prelude::*;
 
 use crate::constants::*;
-use crate::dice_mechanics::{count_faces, find_dice_set_index, sort_dice_set};
+use crate::dice_mechanics::{count_faces, find_dice_set_index};
 use crate::game_mechanics::update_upper_score;
 use crate::profiling::qvalues::{
     compute_eds_for_scenario, compute_group6_profiling, compute_group6_risk_profiling,
     compute_q_categories, compute_q_rerolls, sigma_for_depth, softmax_sample,
 };
+use crate::scenarios::actions as shared_actions;
 use crate::simulation::heuristic::{heuristic_pick_category, heuristic_reroll_mask};
 use crate::types::{StateValues, YatzyContext};
 use crate::widget_solver::{
@@ -222,24 +228,14 @@ fn compute_fingerprint(
     }
 }
 
-// ── Simulation helpers ──
+// ── Simulation helpers (delegated to shared module) ──
 
 fn roll_dice(rng: &mut SmallRng) -> [i32; 5] {
-    let mut dice = [0i32; 5];
-    for d in &mut dice {
-        *d = rng.random_range(1..=6);
-    }
-    sort_dice_set(&mut dice);
-    dice
+    shared_actions::roll_dice(rng)
 }
 
 fn apply_reroll(dice: &mut [i32; 5], mask: i32, rng: &mut SmallRng) {
-    for i in 0..5 {
-        if mask & (1 << i) != 0 {
-            dice[i] = rng.random_range(1..=6);
-        }
-    }
-    sort_dice_set(dice);
+    shared_actions::apply_reroll(dice, mask, rng);
 }
 
 #[inline(always)]
@@ -250,41 +246,7 @@ fn compute_group6(
     scored: i32,
     e_ds_0: &mut [f32; 252],
 ) {
-    let mut lower_succ_ev = [0.0f32; CATEGORY_COUNT];
-    for c in 6..CATEGORY_COUNT {
-        if !is_category_scored(scored, c) {
-            lower_succ_ev[c] = unsafe {
-                *sv.get_unchecked(state_index(up_score as usize, (scored | (1 << c)) as usize))
-            };
-        }
-    }
-    for ds_i in 0..252 {
-        let mut best_val = f32::NEG_INFINITY;
-        for c in 0..6 {
-            if !is_category_scored(scored, c) {
-                let scr = ctx.precomputed_scores[ds_i][c];
-                let new_up = update_upper_score(up_score, c, scr);
-                let new_scored = scored | (1 << c);
-                let val = scr as f32
-                    + unsafe {
-                        *sv.get_unchecked(state_index(new_up as usize, new_scored as usize))
-                    };
-                if val > best_val {
-                    best_val = val;
-                }
-            }
-        }
-        for c in 6..CATEGORY_COUNT {
-            if !is_category_scored(scored, c) {
-                let scr = ctx.precomputed_scores[ds_i][c];
-                let val = scr as f32 + unsafe { *lower_succ_ev.get_unchecked(c) };
-                if val > best_val {
-                    best_val = val;
-                }
-            }
-        }
-        e_ds_0[ds_i] = best_val;
-    }
+    shared_actions::compute_group6(ctx, sv, up_score, scored, e_ds_0);
 }
 
 fn find_best_category(
@@ -294,37 +256,7 @@ fn find_best_category(
     scored: i32,
     ds_index: usize,
 ) -> (usize, i32) {
-    let mut best_val = f32::NEG_INFINITY;
-    let mut best_cat = 0usize;
-    let mut best_score = 0i32;
-    for c in 0..6 {
-        if !is_category_scored(scored, c) {
-            let scr = ctx.precomputed_scores[ds_index][c];
-            let new_up = update_upper_score(up_score, c, scr);
-            let new_scored = scored | (1 << c);
-            let val = scr as f32
-                + unsafe { *sv.get_unchecked(state_index(new_up as usize, new_scored as usize)) };
-            if val > best_val {
-                best_val = val;
-                best_cat = c;
-                best_score = scr;
-            }
-        }
-    }
-    for c in 6..CATEGORY_COUNT {
-        if !is_category_scored(scored, c) {
-            let scr = ctx.precomputed_scores[ds_index][c];
-            let new_scored = scored | (1 << c);
-            let val = scr as f32
-                + unsafe { *sv.get_unchecked(state_index(up_score as usize, new_scored as usize)) };
-            if val > best_val {
-                best_val = val;
-                best_cat = c;
-                best_score = scr;
-            }
-        }
-    }
-    (best_cat, best_score)
+    shared_actions::find_best_category(ctx, sv, up_score, scored, ds_index)
 }
 
 fn find_best_category_final(
@@ -333,31 +265,7 @@ fn find_best_category_final(
     scored: i32,
     ds_index: usize,
 ) -> (usize, i32) {
-    let mut best_val = i32::MIN;
-    let mut best_cat = 0usize;
-    let mut best_score = 0i32;
-    for c in 0..CATEGORY_COUNT {
-        if !is_category_scored(scored, c) {
-            let scr = ctx.precomputed_scores[ds_index][c];
-            let bonus = if c < 6 {
-                let new_up = update_upper_score(up_score, c, scr);
-                if new_up >= 63 && up_score < 63 {
-                    50
-                } else {
-                    0
-                }
-            } else {
-                0
-            };
-            let val = scr + bonus;
-            if val > best_val {
-                best_val = val;
-                best_cat = c;
-                best_score = scr;
-            }
-        }
-    }
-    (best_cat, best_score)
+    shared_actions::find_best_category_final(ctx, up_score, scored, ds_index)
 }
 
 // ── Noisy simulation (competent human agent) ──
@@ -531,27 +439,10 @@ fn classify_bucket(d: &RawDecision) -> SemanticBucket {
     }
 }
 
-// ── Format helpers ──
+// ── Format helpers (delegated to shared module) ──
 
-/// Format a reroll mask as human-readable string.
 fn format_mask(mask: i32, dice: &[i32; 5]) -> String {
-    if mask == 0 {
-        return "Keep all".to_string();
-    }
-    if mask == 31 {
-        return "Reroll all".to_string();
-    }
-    let mut kept: Vec<i32> = Vec::new();
-    for i in 0..5 {
-        if mask & (1 << i) == 0 {
-            kept.push(dice[i]);
-        }
-    }
-    if kept.is_empty() {
-        "Reroll all".to_string()
-    } else {
-        format!("Keep {:?}", kept)
-    }
+    shared_actions::format_mask_capitalized(mask, dice)
 }
 
 /// Enumerate all reroll actions with EVs.

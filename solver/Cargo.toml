@@ -92,6 +92,10 @@ name = "yatzy-export-state-heatmap"
 path = "src/bin/export_state_heatmap.rs"
 
 [[bin]]
+name = "yatzy-scenarios"
+path = "src/bin/scenarios.rs"
+
+[[bin]]
 name = "yatzy-density"
 path = "src/bin/density_sweep.rs"
 
