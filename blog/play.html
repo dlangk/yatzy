@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/charts.css">
   <link rel="stylesheet" href="css/game.css">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
 
@@ -16,16 +17,20 @@
   <span id="theme-icon">&#9790;</span>
 </button>
 
-<div class="container">
-  <a href="index.html" class="back-link">&larr; Back to the article</a>
+<div class="game-page-container">
   <div class="game-header">
+    <a href="index.html" class="back-link">&larr; Back to the article</a>
     <h1>Delta Yatzy</h1>
-    <div style="text-align:center;margin-bottom:8px">
-      <a href="profile.html" class="game-btn-secondary" style="text-decoration:none">Profile Me</a>
+  </div>
+  <div class="game-grid">
+    <div id="game-log" class="game-grid-cell"></div>
+    <div id="game-scorecard" class="game-grid-cell"></div>
+    <div id="game-right" class="game-grid-cell">
+      <div id="game-controls"></div>
+      <div id="game-charts"></div>
     </div>
   </div>
-  <div id="game-root"></div>
-  <div id="game-charts"></div>
+  <div id="game-debug"></div>
 </div>
 
 <script type="module" src="js/game/render.js"></script>

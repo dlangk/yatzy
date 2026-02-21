@@ -11,7 +11,9 @@ export function initEvalPanel(container) {
   panel.appendChild(grid);
 
   const rows = [
-    { label: 'State EV', key: 'stateEv' },
+    { label: 'Banked', key: 'banked' },
+    { label: 'Remaining EV', key: 'stateEv' },
+    { label: 'Expected final', key: 'expectedFinal' },
     { label: 'Your mask EV', key: 'maskEv' },
     { label: 'Best mask EV', key: 'bestMaskEv' },
     { label: 'Delta', key: 'delta' },
@@ -42,7 +44,11 @@ export function initEvalPanel(container) {
     const resp = state.lastEvalResponse;
     const hasData = state.turnPhase === 'rolled' && resp && resp.state_ev != null;
 
-    valueEls.stateEv.textContent = hasData ? resp.state_ev.toFixed(2) : dash;
+    valueEls.banked.textContent = state.totalScore;
+    valueEls.stateEv.textContent = hasData ? resp.state_ev.toFixed(1) : dash;
+    valueEls.expectedFinal.textContent = hasData
+      ? (state.totalScore + resp.state_ev).toFixed(1)
+      : dash;
 
     const maskEv = hasData ? getCurrentMaskEv(state) : null;
     const showMask = hasData && state.rerollsRemaining > 0;

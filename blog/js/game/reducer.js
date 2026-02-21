@@ -14,7 +14,7 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return { ...parsed, lastEvalResponse: null, sortMap: null };
+    return { ...parsed, history: parsed.history ?? [], lastEvalResponse: null, sortMap: null };
   } catch {
     return null;
   }
@@ -22,6 +22,13 @@ function loadState() {
 
 export function clearSavedState() {
   try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+}
+
+export function clearLegacyKeys() {
+  try {
+    localStorage.removeItem('yatzy-decision-log');
+    localStorage.removeItem('yatzy-trajectory');
+  } catch { /* ignore */ }
 }
 
 function randomDie() {
@@ -53,6 +60,7 @@ function freshState() {
     sortMap: null,
     showDebug: false,
     turnPhase: 'idle',
+    history: [],
   };
 }
 
@@ -278,6 +286,16 @@ export function gameReducer(state, action) {
         sortMap: null,
         turnPhase,
       };
+    }
+
+    case 'PUSH_HISTORY':
+      return { ...state, history: [...state.history, action.entry] };
+
+    case 'PATCH_HISTORY': {
+      const history = state.history.map((e, i) =>
+        i === action.index ? { ...e, ...action.patch } : e
+      );
+      return { ...state, history };
     }
 
     case 'RESET_GAME':

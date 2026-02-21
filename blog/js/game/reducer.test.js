@@ -25,6 +25,7 @@ function freshState() {
     sortMap: null,
     showDebug: false,
     turnPhase: 'idle',
+    history: [],
   };
 }
 
@@ -223,6 +224,28 @@ describe('gameReducer', () => {
       expect(next.dice.every((d) => d.value === 0)).toBe(true);
       expect(next.categories.every((c) => !c.isScored)).toBe(true);
       expect(next.rerollsRemaining).toBe(0);
+    });
+  });
+
+  describe('PUSH_HISTORY', () => {
+    it('appends entry to history array', () => {
+      const state = freshState();
+      const entry = { type: 'start', turn: 0, label: null, delta: null, stateEv: 200, expectedFinal: 200, accumulatedScore: 0, density: null };
+      const next = gameReducer(state, { type: 'PUSH_HISTORY', entry });
+      expect(next.history).toHaveLength(1);
+      expect(next.history[0]).toEqual(entry);
+    });
+  });
+
+  describe('PATCH_HISTORY', () => {
+    it('patches existing entry at given index', () => {
+      const state = { ...freshState(), history: [
+        { type: 'reroll', turn: 1, stateEv: null, expectedFinal: null },
+      ]};
+      const next = gameReducer(state, { type: 'PATCH_HISTORY', index: 0, patch: { stateEv: 180, expectedFinal: 200 } });
+      expect(next.history[0].stateEv).toBe(180);
+      expect(next.history[0].expectedFinal).toBe(200);
+      expect(next.history[0].type).toBe('reroll');
     });
   });
 
