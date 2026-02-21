@@ -1,0 +1,16 @@
+title = "Yatzy Gitleaks Configuration"
+
+[allowlist]
+  description = "Global allowlist"
+  paths = [
+    '''node_modules''',
+    '''target''',
+    '''\.git''',
+    '''data/''',
+    '''outputs/''',
+    '''.*\.bin$''',
+    '''.*\.parquet$''',
+    '''.*\.pkl$''',
+    '''package-lock\.json$''',
+    '''uv\.lock$''',
+  ]
