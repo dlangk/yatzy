@@ -1,77 +1,116 @@
 # CLAUDE.md — Solver
 
-Instructions for Claude Code when working in this directory.
+Rust HPC engine: backward-induction DP, Monte Carlo simulation, REST API.
 
 ## Commands
 
 ```bash
-cargo build --release         # Build
-cargo test                    # Unit + integration tests
+cargo build --release         # Build (~30s with LTO)
+cargo test                    # 163 tests (136 unit + 25 integration + 2 ignored)
 cargo fmt --check             # Formatting
 cargo clippy                  # Lints
 
-# Precompute state values (required once, ~2.3s, from repo root)
-YATZY_BASE_PATH=. target/release/yatzy-precompute
-
-# Start API server (port 9000, from repo root)
-YATZY_BASE_PATH=. target/release/yatzy
-
-# Simulate games (from repo root)
-YATZY_BASE_PATH=. target/release/yatzy-simulate --games 1000000 --output data/simulations
-
-# Theta sweep: simulate all thetas, resumable (from repo root)
-YATZY_BASE_PATH=. target/release/yatzy-sweep --grid all --games 1000000
-YATZY_BASE_PATH=. target/release/yatzy-sweep --list   # show inventory
+# From repo root (YATZY_BASE_PATH=.):
+just precompute               # θ=0 strategy table (~504ms)
+just serve                    # API server on port 9000
+just simulate                 # 1M games lockstep
+just sweep                    # All 37 θ values
+just bench-check              # Performance regression test
 ```
 
-## Source Layout
+## Crate Structure
 
-| Module | Pseudocode | Role |
-|--------|------------|------|
-| `constants.rs` | — | Game constants, `state_index()`, category definitions |
-| `types.rs` | S, E_table, R_k | `YatzyContext`, `KeepTable`, `StateValues`, `YatzyState` |
-| `dice_mechanics.rs` | R_{5,6} | Face counting, sorting, index lookup, P(r) |
-| `game_mechanics.rs` | s(S,r,c), u(S,r,c) | Category scoring (15 categories), upper-score update |
-| `phase0_tables.rs` | Phase 0 + Phase 1 | All 8 precomputation steps including reachability |
-| `widget_solver.rs` | `SOLVE_WIDGET` | Groups 6-5-3-1 with ping-pong buffers |
-| `state_computation.rs` | `COMPUTE_OPTIMAL_STRATEGY` | Level-by-level backward induction with rayon |
-| `api_computations.rs` | — | API wrappers: best reroll, evaluate mask, distributions |
-| `server.rs` | — | Axum HTTP router, 9 endpoints, CORS |
-| `storage.rs` | — | Binary file I/O, zero-copy mmap via memmap2 |
-| `simulation/engine.rs` | — | Game simulation with optimal strategy, recording |
-| `simulation/statistics.rs` | — | Aggregate statistics from recorded games |
-| `simulation/raw_storage.rs` | — | Binary I/O for raw simulation data (mmap) |
-| `simulation/sweep.rs` | — | Theta sweep: inventory scan, grid resolution, ensure_strategy_table |
-| `profiling/qvalues.rs` | — | Q-value computation with (θ, γ, d) params, softmax sampling, depth noise |
-| `profiling/scenarios.rs` | — | Scenario generation: candidate pool, diversity-constrained selection, Q-grid |
-| `profiling/player_card.rs` | — | Streamlined noisy simulation for player card grid pre-computation |
+Single crate (not a workspace). Release profile: opt-level 3, fat LTO, codegen-units 1, panic=abort.
 
-Entry points: `src/bin/precompute.rs`, `src/bin/server.rs`, `src/bin/simulate.rs`, `src/bin/sweep.rs`, `src/bin/category_sweep.rs`, `src/bin/pivotal_scenarios.rs`, `src/bin/yatzy_conditional.rs`, `src/bin/generate_profile_scenarios.rs` (profiling quiz), `src/bin/player_card_grid.rs` (player card), `src/bin/export_training_data.rs` (surrogate data), `src/bin/decision_sensitivity.rs` (flip analysis), `src/bin/multiplayer.rs`, `src/bin/winrate.rs`, `src/bin/heuristic_gap.rs`, `src/bin/decision_gaps.rs`.
+28 binary targets in `src/bin/`. Key ones:
 
-## Algorithm Reference
+| Binary | Purpose |
+|--------|---------|
+| `yatzy` | axum HTTP API server |
+| `yatzy-precompute` | Backward induction DP (+ optional `--oracle`) |
+| `yatzy-simulate` | Monte Carlo simulation |
+| `yatzy-sweep` | θ sweep (resumable) |
+| `yatzy-density` | Exact forward-DP PMF |
+| `yatzy-bench` | Wall-clock performance benchmarks |
 
-The code implements `theory/pseudocode.md` (at repo root), adapted for Scandinavian Yatzy (15 categories, 50-point upper bonus, no Yahtzee bonus flag).
+## Core Data Structures
 
-### Computation Pipeline
+### YatzyContext (`types.rs`)
+Central context holding all precomputed tables and state values.
+- `state_values: StateValues` — E[score | optimal play] for all 4,194,304 state slots
+- `keep_table: KeepTable` — CSR-format probability matrix (462 unique keeps × 252 dice sets)
+- `dice_set_probabilities: [f32; 252]` — P(dice set) for each of 252 ordered combinations
+- `precomputed_scores: [[i32; 15]; 252]` — s(r, c) for all dice sets and categories
+- `reachable: [[bool; 64]; 64]` — reachability mask indexed by [upper_mask][upper_score]
+- `theta: f32` — risk parameter (0 = EV-optimal)
 
-1. **Phase 0** (`phase0_tables.rs`): Build lookup tables — dice combinations, scores, keep-multiset transition table, probabilities, reachability
-2. **Phase 2** (`state_computation.rs`): Backward induction from |C|=14 to |C|=0, calling SOLVE_WIDGET per state via rayon `par_iter`
+### State Representation (`constants.rs`)
+- S = (upper_score, scored_categories) where m ∈ [0,63], C = 15-bit bitmask
+- `STATE_STRIDE = 128` (topological padding: indices 64-127 duplicate the capped value)
+- `state_index(up, scored) = scored * 128 + up`
+- `NUM_STATES = 4,194,304` (32,768 masks × 128 stride)
+- Only ~1.43M states are reachable after pruning
 
-### State Representation
+### KeepTable (`types.rs`)
+Sparse probability matrix in CSR format. For each dice set, maps to ≤462 unique kept-dice multisets with transition probabilities. Key dedup: 462 unique keeps vs 31 raw reroll masks (~47% reduction).
 
-S = (m, C) where m = upper score [0,63], C = 15-bit scored-categories bitmask. Index: `C * 64 + m` (2,097,152 slots).
+### PolicyOracle (`types.rs`)
+Precomputed argmax decisions for θ=0. Three flat `Vec<u8>` arrays (~3.17 GB total):
+- `oracle_cat[si * 252 + ds]` — best category (0-14)
+- `oracle_keep1[si * 252 + ds]` — best keep with 1 reroll left
+- `oracle_keep2[si * 252 + ds]` — best keep with 2 rerolls left
 
-## Key Patterns
+## Hot Paths
 
-- **Hot path**: `widget_solver.rs` inner loops use `#[inline(always)]`, `get_unchecked`, cached `sv` slice
-- **Parallel writes**: `state_computation.rs` uses `AtomicPtr` + unsafe raw pointer writes (each state index unique)
-- **Keep-multiset dedup**: 462 unique keeps vs 31 raw masks per dice set (~47% fewer dot products)
-- **Storage**: 16-byte header + float32[2,097,152] (~8 MB), zero-copy mmap loading
+| Hot Path | Location | What It Computes | Why It's Fast | Do NOT |
+|----------|----------|------------------|---------------|--------|
+| SOLVE_WIDGET | `widget_solver.rs` | E(S) for one state | Ping-pong buffers, `#[inline(always)]`, `get_unchecked` | Add allocations, dynamic dispatch |
+| Batched solver | `batched_solver.rs` | 64 upper scores simultaneously | SpMV→SpMM, cache-friendly | Break the 64-wide batch pattern |
+| NEON SIMD | `simd.rs` | FMA, max, argmax over 64-element arrays | 14 NEON intrinsic kernels, fast exp | Use scalar fallbacks |
+| Backward induction | `state_computation.rs` | All 1.43M states | rayon par_iter, AtomicPtr writes | Add synchronization |
+| Lockstep sim | `simulation/lockstep.rs` | N games in parallel | Radix sort grouping, SplitMix64 PRNG | Add per-game branching |
+| Oracle sim | `simulation/lockstep.rs` | N games with O(1) lookups | No DP recomputation | Change oracle encoding |
+| Density evolution | `density/transitions.rs` | Exact PMF propagation | Sort-merge, prob-array propagation | Add Monte Carlo variance |
 
-## Important Notes
+## API Reference
 
-- Strategy tables live at `data/strategy_tables/` (repo root)
-- Simulation output goes to `data/simulations/` (repo root)
-- Analytics package lives at `analytics/` (repo root)
-- All computation uses f32 throughout (storage + internal accumulation)
-- `RAYON_NUM_THREADS=8` is optimal on Apple Silicon
+Server: axum on port 9000, stateless, `Arc<YatzyContext>` shared state.
+
+| Method | Path | Request | Latency | Purpose |
+|--------|------|---------|---------|---------|
+| GET | `/health` | — | <1ms | Health check |
+| GET | `/state_value` | `?upper_score=N&scored_categories=N` | <1ms | E_table[S] lookup |
+| POST | `/evaluate` | `{dice, upper_score, scored_categories, rerolls_remaining}` | 2-9μs | All keep-mask EVs + category EVs |
+| POST | `/density` | `{upper_score, scored_categories, accumulated_score}` | ~100ms | Exact score distribution from mid-game |
+| GET | `/score_histogram` | — | <1ms | Binned score distribution |
+| GET | `/statistics` | — | <1ms | Aggregated game statistics |
+
+## Concurrency Model
+
+- **tokio** (rt-multi-thread): async HTTP server
+- **rayon** (8 threads): parallel backward induction and batch simulation
+- No shared mutable state at runtime — context is immutable after precomputation
+- Density endpoint uses `tokio::spawn_blocking` for CPU-heavy forward DP
+
+## Risk-Sensitive Solver (θ parameter)
+
+- θ=0: expected value. θ<0: risk-averse. θ>0: risk-seeking.
+- |θ| ≤ 0.15: utility-domain solver (same speed as EV)
+- |θ| > 0.15: log-domain LSE solver (~2.7x slower)
+- θ grid: 37 values from -3.0 to +3.0 in `configs/theta_grid.toml`
+- **CRITICAL**: Delete `data/strategy_tables/all_states_theta_*.bin` after changing solver code!
+
+## Storage Format
+
+Binary files: 16-byte header (magic `0x59545A53` + version 5) + `f32[4,194,304]`.
+Zero-copy mmap loading via memmap2 (<1ms). Files are ~16 MB each.
+
+## Performance Testing
+
+```bash
+just bench-check    # Compare against baseline, PASS/FAIL
+just bench-baseline # Record new baseline
+just bench          # Print only
+```
+
+Baseline: `.overhaul/performance-baseline.json`. Threshold: `max(mean + 3σ, mean × 1.05)`.

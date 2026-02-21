@@ -1,251 +1,103 @@
-# CLAUDE.md
+# Delta Yatzy
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Optimal-play Scandinavian Yatzy: backward-induction DP solver, risk-sensitive strategies, Monte Carlo simulation, exact density evolution, cognitive profiling, and a web-based game UI.
 
-## Project Overview
+## Components
 
-Delta Yatzy is a web-based implementation of the classic dice game with optimal action suggestions and multiplayer support. The project consists of:
+| Component | Location | Purpose | Key Constraint |
+|-----------|----------|---------|----------------|
+| Solver | `solver/` | HPC Rust engine: DP, simulation, REST API | **Performance is sacred** — see hot path rules |
+| Frontend | `frontend/` | React + TypeScript game UI | No layout shifts |
+| Analytics | `analytics/` | Python analysis, visualization, pipelines | Custom colormap (`#F37021` center) |
+| Blog | `blog/` | Static site: articles, profiling quiz, game | Pre-computed data, no runtime API |
 
-- **Solver**: `solver/` — Rust, axum-based API server + DP solver with rayon parallelism and memmap2 for zero-copy I/O
-- **Analytics**: `analytics/` — Python package for simulation data analysis, plotting, and risk-sweep pipelines
-- **Frontend**: `frontend/` — Vanilla JavaScript single-page application with dynamic UI and Chart.js visualizations
-- **Blog**: `blog/` — Static site with interactive profiling quiz, game analysis articles, and data visualizations
-- **Theory**: `theory/` — Analytical insights about Yatzy strategy and score distributions
-- **Data**: `data/` — Strategy tables (~300MB) and simulation binaries (~11GB), gitignored
-- **Outputs**: `outputs/` — Regenerable aggregates, plots, scenarios, gitignored
-- **Config**: `configs/theta_grid.toml` — Canonical θ grids and simulation defaults
+See component CLAUDE.md files for detailed guidance:
+- `solver/CLAUDE.md` — architecture, hot paths, API reference, perf testing
+- `frontend/CLAUDE.md` — React patterns, API integration, layout rules
+- `analytics/CLAUDE.md` — CLI commands, colormap, data flow, plotting
+- `blog/CLAUDE.md` — quiz system, data files, component architecture
 
-A legacy C implementation exists in `legacy/` for reference only. Archived RL experiments are in `research/rl/`.
+## Critical Rules
+
+- NEVER trade solver performance for code aesthetics — run `just bench-check` after Rust changes
+- Intentionally duplicated hot-path code is marked `// PERF: intentional` — do not refactor it
+- All state values use f32 throughout (storage + computation)
+- STATE_STRIDE=128, state_index(up, scored) = scored * 128 + up
+- Delete `data/strategy_tables/all_states_theta_*.bin` after changing solver code
+- When modifying an API endpoint, update `solver/CLAUDE.md` AND `frontend/src/api.ts`
+- When a conversation produces new insights, update `theory/analysis_and_insights.md`
 
 ## Commands
 
-### Convention: Run Everything from Repo Root
-
-All commands assume repo root (`yatzy/`). Use `just --list` to see all recipes.
-
-### Solver Development
-
 ```bash
-# Build the solver
-cd solver && cargo build --release
+# Build + test
+just setup              # Build solver + install analytics
+just test               # Solver tests (163 tests)
+just bench-check        # Performance regression test (PASS/FAIL)
 
-# Run tests
-cargo test
+# Precompute + simulate
+just precompute         # θ=0 strategy table (~504ms)
+just sweep              # All 37 θ values (resumable)
+just simulate           # 1M games lockstep
 
-# Precompute state values (required once, from repo root)
-YATZY_BASE_PATH=. solver/target/release/yatzy-precompute
+# Analyze + visualize
+just pipeline           # compute → plot → categories → efficiency
+just density            # Exact forward-DP PMFs
 
-# Run the API server (port 9000, from repo root)
-YATZY_BASE_PATH=. solver/target/release/yatzy
-
-# Simulate games (from repo root)
-YATZY_BASE_PATH=. solver/target/release/yatzy-simulate --games 1000000 --output data/simulations
-
-# Simulate with full turn-by-turn recording (289 B/game vs 2 B/game)
-YATZY_BASE_PATH=. solver/target/release/yatzy-simulate --full-recording --games 1000000 --output data/simulations
-
-# Theta sweep: simulate all thetas in grid, store scores (resumable)
-YATZY_BASE_PATH=. solver/target/release/yatzy-sweep --grid all --games 1000000
-YATZY_BASE_PATH=. solver/target/release/yatzy-sweep --thetas 0.1,0.2 --games 1000000
-YATZY_BASE_PATH=. solver/target/release/yatzy-sweep --list  # show existing inventory
+# Serve
+just serve              # API server on port 9000
 ```
 
-### Analytics (Python)
-
-```bash
-# Setup (once)
-cd analytics && uv venv && uv pip install -e .
-
-# Run analytics pipeline (from repo root)
-analytics/.venv/bin/yatzy-analyze run
-
-# Compute stats with CSV output (34-column sweep_summary.csv)
-analytics/.venv/bin/yatzy-analyze compute --csv
-
-# Print summary table
-analytics/.venv/bin/yatzy-analyze summary
-
-# Run efficiency metrics
-analytics/.venv/bin/yatzy-analyze efficiency
-```
-
-### Justfile (preferred)
-
-```bash
-just setup          # Build solver + install analytics
-just precompute     # θ=0 strategy table
-just simulate       # 1M games
-just sweep          # Simulate all 37 thetas (resumable)
-just sweep-add thetas=0.1,0.2  # Add specific thetas
-just sweep-stats    # Compute stats → parquet + CSV
-just pipeline       # compute → plot → categories → efficiency
-just test           # Run solver tests
-just serve          # Start API server
-# Profiling
-just profile-generate     # Generate 30 quiz scenarios + Q-grids
-just profile-validate     # Monte Carlo validation (100 trials, ~15min)
-just profile-deploy       # Copy scenarios.json to blog/data/
-just player-card-grid     # Pre-compute 648 simulation grid (10K games/combo, ~2.5min)
-# Surrogate
-just export-training-data # Export 200K games for surrogate training
-just surrogate-train      # Train DT + MLP surrogate models
-just surrogate-eval       # Full game simulation with surrogates
-```
-
-### Docker
-
-```bash
-docker-compose up --build
-# Frontend: http://localhost:8090
-# Backend: http://localhost:9000
-```
+Full recipe list: `just --list`
 
 ## Architecture
 
-### Solver Structure (`solver/`)
-
-The solver is a multithreaded Rust application with precomputed game states:
-
-- **Entry Points**: `src/bin/server.rs` (API), `src/bin/precompute.rs` (DP), `src/bin/simulate.rs` (simulation), `src/bin/sweep.rs` (θ sweep), `src/bin/generate_profile_scenarios.rs` (profiling quiz), `src/bin/player_card_grid.rs` (player card grid), `src/bin/export_training_data.rs` (surrogate data), `src/bin/decision_sensitivity.rs` (flip analysis), plus 10+ analysis binaries
-- **Phase 0 — Precompute lookup tables**:
-  - `phase0_tables.rs` - Builds all static lookup tables (scores, keep-multiset table, probabilities)
-  - `game_mechanics.rs` - Yatzy scoring rules: s(S, r, c)
-  - `dice_mechanics.rs` - Dice operations and probability calculations
-- **Phase 2 — Backward induction**:
-  - `state_computation.rs` - DP orchestrator with Rayon parallelism
-  - `widget_solver.rs` - SOLVE_WIDGET — computes E(S) for a single state
-- **API layer**:
-  - `api_computations.rs` - Wrappers that compose widget solver primitives for HTTP handlers
-  - `server.rs` - axum router, 9 HTTP handlers, CORS via tower-http
-- **Simulation** (`simulation/`):
-  - `engine.rs` - Simulate games with optimal strategy, with/without recording
-  - `statistics.rs` - Aggregate statistics from recorded games
-  - `raw_storage.rs` - Binary I/O for raw simulation data (mmap)
-  - `sweep.rs` - Theta sweep infrastructure: inventory scan, grid resolution, ensure_strategy_table
-- **Profiling** (`profiling/`):
-  - `qvalues.rs` - Q-value computation with (θ, γ, d) parameters, softmax sampling, depth noise
-  - `scenarios.rs` - Scenario generation: candidate pool, diversity-constrained selection, Q-grid computation
-  - `player_card.rs` - Streamlined noisy simulation (`simulate_game_profiled`) for grid pre-computation
-- **Infrastructure**:
-  - `types.rs` - YatzyContext, KeepTable, StateValues (owned/mmap)
-  - `constants.rs` - Category enum, state_index, NUM_STATES
-  - `storage.rs` - Binary file I/O (16-byte header + float[2M], zero-copy mmap via memmap2)
-
-### Analytics Structure (`analytics/`)
-
-Python package (`yatzy-analysis`) with CLI entry point `yatzy-analyze`:
-
-- **Source**: `analytics/src/yatzy_analysis/`
-  - `cli.py` - CLI commands: extract, compute (--csv), plot, efficiency, run, summary, tail
-  - `compute.py` - Summary stats (34 columns), KDE, MER, SDVA, CVaR
-  - `config.py` - Path resolution, binary format constants, theta grids
-  - `io.py` - Binary file reading (simulation_raw.bin)
-  - `store.py` - Parquet save/load
-  - `plots/` - Plotting modules (cdf, density, efficiency, combined, etc.)
-
-### Data Layout
-
 ```
-data/                           # Expensive artifacts (gitignored)
-  strategy_tables/              # Precomputed EV tables (all_states*.bin)
-  simulations/                  # Raw simulation binaries
-    theta/theta_*/              # Per-θ scores.bin (32B header + i16[N], ~1.91 MB/1M games)
-    max_policy/scores.bin       # Max-policy simulation
-
-outputs/                        # Cheap to regenerate (gitignored)
-  aggregates/                   # Processed data by format
-    parquet/                    # kde, summary, scores, mer, sdva, sweep_summary.csv
-    csv/                        # category_stats, yatzy_conditional
-  plots/                        # Generated PNG visualizations (flat)
-  scenarios/                    # pivotal_scenarios.json, answers
-  profiling/                    # scenarios.json (30 quiz scenarios + Q-grids)
-  surrogate/                    # Surrogate model training results
-  policy_compression/           # Decision gap analysis
-
-blog/data/                      # Pre-computed data for static blog
-  scenarios.json                # Profiling quiz scenarios (copied from outputs/)
-  player_card_grid.json         # 648 simulation grid entries (~82 KB)
+Frontend (React, :5173) ──POST /evaluate──→ Solver (axum, :9000)
+Blog (static)           ──reads──→ blog/data/*.json (pre-computed)
+Analytics (Python)      ──reads──→ data/simulations/theta/*/scores.bin
 ```
 
-### Frontend Structure (`frontend/`)
+All game intelligence lives in the solver. Frontend and blog are thin clients. Analytics reads binary simulation files from disk.
 
-The game-playing frontend uses ES6 modules for clean separation of concerns:
+### Computation Pipeline
 
-- **Entry Point**: `js/app.js` - Initializes game state and UI
-- **Module Organization**:
-  - `modules/game/gameState.js` - Player state management and persistence
-  - `modules/utils/`:
-    - `eventHandlers.js` - All user interaction handling
-    - `uiBuilders.js` - Dynamic UI construction
-    - `refreshers.js` - Periodic UI updates and API polling
-    - `endpoints.js` - Backend API communication
-    - `chartConfig.js` - Chart.js histogram configuration
+1. **Precompute** — backward induction DP over 1.43M reachable states → `data/strategy_tables/`
+2. **Simulate** — Monte Carlo with optimal policy → `data/simulations/`
+3. **Analyze** — KDE, percentiles, CVaR, MER → `outputs/aggregates/`
+4. **Serve** — mmap-load strategy table, stateless REST lookups
+5. **Visualize** — 50+ PNG plots → `outputs/plots/`
 
-### Blog Structure (`blog/`)
+## Data Layout
 
-Static site with interactive profiling quiz and analysis articles:
+```
+data/                              # Expensive (gitignored)
+  strategy_tables/all_states*.bin  # 16 MB × 37 θ values
+  simulations/theta/theta_*/       # scores.bin (~2 MB per θ)
+  strategy_tables/oracle.bin       # 3.17 GB (θ=0 only, optional)
 
-- **Pages**: `index.html` (article), `profile.html` (quiz), `play.html` (embedded game)
-- **Profile Quiz** (`js/profile/`):
-  - `store.js` - Flux-like state management (actions: ANSWER, CLEAR_ANSWER, ADVANCE, GO_TO, etc.)
-  - `estimator.js` - Multi-start Nelder-Mead MLE for (θ, β, γ, d) estimation
-  - `render.js` - Quiz orchestrator: builds DOM, initializes all components, runs estimation
-  - `api.js` - Scenario data loading
-  - `player-card-data.js` - Grid loader, nearest-neighbor lookup, counterfactual computation
-  - `components/scenario-card.js` - Interactive quiz question (dice, scorecard, actions)
-  - `components/question-list.js` - Clickable sidebar listing all questions with status
-  - `components/result-panel.js` - Parameter estimates display (visible once all answered)
-  - `components/parameter-chart.js` - Real-time parameter convergence chart
-  - `components/progress-bar.js` - Quiz progress indicator
-  - `components/player-card.js` - Simulation-backed performance analytics
-  - `components/profile-scorecard.js` - Game state scorecard for quiz scenarios
-- **Layout**: Quiz area uses `position: relative` with the question list as an absolutely-positioned sidecar to the left of the 675px container. The sidecar is sticky while scrolling and hidden below 1020px viewport width.
-- **Styles**: `css/profile.css` - All profiling quiz styles
-- **Data**: `data/scenarios.json`, `data/player_card_grid.json`
+outputs/                           # Cheap to regenerate (gitignored)
+  aggregates/parquet/              # summary, kde, mer, sdva
+  aggregates/csv/                  # sweep_summary, category_stats
+  plots/                           # ~50 PNGs at 200 DPI
+  scenarios/                       # Pivotal/difficult scenario JSON
+  profiling/                       # Quiz scenarios + Q-grids
 
-### Key Design Patterns
+blog/data/                         # Pre-computed for static site
+  scenarios.json                   # Profiling quiz (copied from outputs/)
+  player_card_grid.json            # 648 simulation grid entries
+```
 
-1. **Precomputation**: Solver precomputes all 1.4M reachable game states offline. Runtime lookups are O(1).
+## Game Rules (Scandinavian Yatzy)
 
-2. **Keep-Multiset Dedup**: Multiple reroll masks can produce the same kept-dice multiset. The KeepTable collapses these into 462 unique keeps (avg 16.3 per dice set vs 31 masks), eliminating ~47% of redundant dot products in the DP hot path.
+- 15 categories (not 13 as in American Yahtzee)
+- 50-point upper bonus (not 35)
+- No Yahtzee bonus flag
+- State: upper_score (0-63) × scored_categories (15-bit bitmask) = 2,097,152 slots
 
-3. **Parallel Processing**: Rayon `par_iter` for state computation with unsafe direct writes (each state index is unique, so no data races).
+## Theory
 
-4. **Binary Storage**: 16-byte header + float[2,097,152] in STATE_INDEX order (~8 MB). Zero-copy mmap loading in <1ms.
-
-## Frontend UI Rules
-
-### No Layout Shifts (Hard Requirement)
-The UI must be pixel-stable: no element may change size, move, or cause reflow when state changes. This is a hard requirement on every component.
-
-**Rules:**
-1. **Never return `null`** — every component always renders its container at a fixed size. Use placeholders (`?`, `—`), `visibility: hidden`, `opacity`, or `disabled` states instead.
-2. **Fixed row/cell heights** — table rows, grid cells, and flex items must use explicit `height` or `minHeight` so content changes (text ↔ button ↔ icon) cannot alter dimensions.
-3. **Same element, different content** — when a cell switches between states (e.g. "Score" button → "✓"), keep the same DOM element (e.g. always a `<button>`) and change only its text/style. Never swap between different element types that have different intrinsic sizes.
-4. **Fixed column widths** — tables must use `table-layout: fixed` with a `<colgroup>` defining explicit percentage widths for every column. Content changes (numbers appearing/disappearing, text length changes) must never cause columns to resize.
-
-**Current examples:**
-- Dice bar: always renders 5 dice; shows `?` at `opacity: 0.3` when idle
-- Eval panel: always renders full grid; shows `—` dashes when no data
-- Action bar: `minHeight: 40` container across all turn phases
-- Scorecard rows: `height: 32` cells, button always rendered (shows "Score" or "✓"), `visibility: hidden` when not actionable
-
-## Theory & Insights
-
-The `theory/` directory contains four documents:
-
-- `theory/pseudocode.md` — Optimal Scandinavian Yatzy algorithm pseudocode
-- `theory/performance_optimizations.md` — Optimization history from ~20 min to ~2.3s
-- `theory/risk_parameter_theta.md` — Mathematical framework for the risk-sensitive solver
-- `theory/analysis_and_insights.md` — Living document of empirical findings and simulation results
-
-**When a conversation produces new statistical or theoretical insights, update `theory/analysis_and_insights.md`.** Review the entire document before editing — restructure sections if needed to maintain a coherent structure rather than just appending.
-
-## Important Considerations
-
-- Frontend assumes solver is running on port 9000 (configurable via environment or `js/config.js`)
-- Game state values are stored in `data/strategy_tables/all_states.bin` (~8 MB)
-- Scandinavian Yatzy: 15 categories, 50-point upper bonus (not 35 as in American Yahtzee)
-- State representation: `upper_score` (0-63) and `scored_categories` (15-bit bitmask), total 2,097,152 states
-- Rayon thread count configurable via `RAYON_NUM_THREADS` env var (default: 8)
-- θ grids are defined canonically in `configs/theta_grid.toml`
+- `theory/pseudocode.md` — optimal algorithm pseudocode
+- `theory/risk_parameter_theta.md` — risk-sensitive solver math
+- `theory/analysis_and_insights.md` — living document of findings
+- `theory/performance_optimizations.md` — optimization history
