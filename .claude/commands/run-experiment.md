@@ -38,4 +38,4 @@ Complete the theory document with Results and Discussion sections:
 
 ## 5. Update Documentation
 
-If the experiment reveals something about the system worth remembering, update `theory/analysis_and_insights.md`.
+If the experiment reveals something about the system worth remembering, update the appropriate file in `theory/` (see `theory/README.md` for the directory index).

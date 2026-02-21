@@ -25,7 +25,7 @@ See component CLAUDE.md files for detailed guidance:
 - STATE_STRIDE=128, state_index(up, scored) = scored * 128 + up
 - Delete `data/strategy_tables/all_states_theta_*.bin` after changing solver code
 - When modifying an API endpoint, update `solver/CLAUDE.md` AND `frontend/src/api.ts`
-- When a conversation produces new insights, update `theory/analysis_and_insights.md`
+- When a conversation produces new insights, update the appropriate file in `theory/` (see `theory/README.md`)
 
 ## Commands
 
@@ -107,7 +107,11 @@ blog/data/                         # Pre-computed for static site
 
 ## Theory
 
-- `theory/pseudocode.md` — optimal algorithm pseudocode
-- `theory/risk_parameter_theta.md` — risk-sensitive solver math
-- `theory/analysis_and_insights.md` — living document of findings
-- `theory/performance_optimizations.md` — optimization history
+See `theory/README.md` for the full directory index. Key entry points:
+
+- `theory/foundations/algorithm-and-dp.md` — DP algorithm and SOLVE_WIDGET
+- `theory/foundations/pseudocode.md` — optimal algorithm pseudocode
+- `theory/foundations/risk-parameter-theta.md` — risk-sensitive solver math
+- `theory/strategy/risk-sensitive-strategy.md` — θ sweep results and decision analysis
+- `theory/lab-reports/hardware-and-hot-path.md` — optimization history and hardware reference
+- `theory/research/human-cognition-and-compression.md` — human vs optimal, surrogate compression
