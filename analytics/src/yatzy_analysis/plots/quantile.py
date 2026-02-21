@@ -5,15 +5,16 @@ from pathlib import Path
 
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
-import pandas as pd
+import polars as pl
 
 from ..config import MAX_SCORE
-from .style import FONT_AXIS_LABEL, FONT_LEGEND, FONT_TITLE, GRID_ALPHA, fmt_theta, make_norm, setup_theme, theta_color
+from .spec import PLOT_SPECS
+from .style import FONT_AXIS_LABEL, FONT_TITLE, GRID_ALPHA, apply_theta_legend, make_norm, setup_theme, theta_color
 
 
 def plot_quantile(
     thetas: list[float],
-    cdf_df: pd.DataFrame,
+    cdf_df: pl.DataFrame,
     out_dir: Path,
     *,
     norm: mcolors.Normalize | None = None,
@@ -29,12 +30,12 @@ def plot_quantile(
         fig, ax = plt.subplots(figsize=(12, 6))
 
     for t in thetas:
-        subset = cdf_df[cdf_df["theta"] == t]
+        subset = cdf_df.filter(pl.col("theta") == t).to_pandas()
         color = theta_color(t, norm)
         lw = 2.5 if t == 0 else 1.4
         ax.plot(
             subset["cdf"], subset["score"],
-            color=color, linewidth=lw, alpha=0.85, label=f"θ={fmt_theta(t)}",
+            color=color, linewidth=lw, alpha=0.85,
         )
 
     ax.set_xlabel("Cumulative Probability", fontsize=FONT_AXIS_LABEL)
@@ -42,7 +43,7 @@ def plot_quantile(
     ax.set_title("Quantile Function (Inverse CDF) by θ", fontsize=FONT_TITLE, fontweight="bold")
     ax.set_xlim(0, 1)
     ax.set_ylim(50, MAX_SCORE)
-    ax.legend(fontsize=FONT_LEGEND, framealpha=0.9, ncol=2)
+    apply_theta_legend(ax, norm, PLOT_SPECS["quantile"])
     ax.grid(True, alpha=GRID_ALPHA)
 
     if standalone:

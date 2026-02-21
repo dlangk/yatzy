@@ -5,7 +5,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import polars as pl
 
 from .style import (
     COLOR_BLUE,
@@ -34,7 +34,7 @@ DECISION_LABELS = {
 
 
 def plot_gap_cdf(
-    gap_cdf_df: pd.DataFrame,
+    gap_cdf_df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -45,13 +45,13 @@ def plot_gap_cdf(
     fig, ax = plt.subplots(figsize=FIG_WIDE)
 
     for dt in ["category", "reroll1", "reroll2"]:
-        sub = gap_cdf_df[gap_cdf_df["decision_type"] == dt].copy()
-        if sub.empty:
+        sub = gap_cdf_df.filter(pl.col("decision_type") == dt)
+        if sub.is_empty():
             continue
-        sub = sub.sort_values("gap_threshold")
+        sub = sub.sort("gap_threshold")
         ax.plot(
-            sub["gap_threshold"],
-            sub["fraction_below"],
+            sub["gap_threshold"].to_numpy(),
+            sub["fraction_below"].to_numpy(),
             color=DECISION_COLORS[dt],
             label=DECISION_LABELS[dt],
             linewidth=2,
@@ -77,7 +77,7 @@ def plot_gap_cdf(
 
 
 def plot_gap_by_turn(
-    gap_summary_df: pd.DataFrame,
+    gap_summary_df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -94,14 +94,13 @@ def plot_gap_by_turn(
 
     for idx, dt in enumerate(["category", "reroll1", "reroll2"]):
         ax = axes[idx]
-        sub = gap_summary_df[gap_summary_df["decision_type"] == dt].copy()
-        if sub.empty:
+        sub = gap_summary_df.filter(pl.col("decision_type") == dt).sort("turn")
+        if sub.is_empty():
             continue
-        sub = sub.sort_values("turn")
 
         # Build matrix: turns × thresholds
         matrix = np.zeros((15, len(thresholds)))
-        for i, row in sub.iterrows():
+        for row in sub.iter_rows(named=True):
             t = int(row["turn"])
             for j, col in enumerate(thresholds):
                 matrix[t, j] = row[col]
@@ -132,7 +131,7 @@ def plot_gap_by_turn(
 
 
 def plot_visit_coverage(
-    visit_gaps_df: pd.DataFrame,
+    visit_gaps_df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -142,10 +141,14 @@ def plot_visit_coverage(
     setup_theme()
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=FIG_WIDE)
 
+    gap_thresh = visit_gaps_df["gap_threshold"].to_numpy()
+    decisions_above = visit_gaps_df["decisions_per_game_above"].to_numpy()
+    visit_frac = visit_gaps_df["visit_fraction_above"].to_numpy()
+
     # Left: decisions per game above threshold
     ax1.plot(
-        visit_gaps_df["gap_threshold"],
-        visit_gaps_df["decisions_per_game_above"],
+        gap_thresh,
+        decisions_above,
         "o-",
         color=COLOR_BLUE,
         linewidth=2,
@@ -161,8 +164,8 @@ def plot_visit_coverage(
 
     # Right: fraction above
     ax2.plot(
-        visit_gaps_df["gap_threshold"],
-        visit_gaps_df["visit_fraction_above"] * 100,
+        gap_thresh,
+        visit_frac * 100,
         "o-",
         color=COLOR_RED,
         linewidth=2,
@@ -179,7 +182,7 @@ def plot_visit_coverage(
 
 
 def plot_policy_distinct(
-    distinct_df: pd.DataFrame,
+    distinct_df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -189,17 +192,17 @@ def plot_policy_distinct(
     setup_theme()
     fig, ax = plt.subplots(figsize=FIG_WIDE)
 
-    turns = distinct_df["turn"].values
-    total = distinct_df["total_states"].values
+    turns = distinct_df["turn"].to_numpy()
+    total = distinct_df["total_states"].to_numpy()
     width = 0.2
 
     x = np.arange(len(turns))
     ax.bar(x - 1.5 * width, total, width, label="Total reachable states", color="lightgray", edgecolor="gray")
-    ax.bar(x - 0.5 * width, distinct_df["distinct_category"], width,
+    ax.bar(x - 0.5 * width, distinct_df["distinct_category"].to_numpy(), width,
            label="Distinct category policies", color=COLOR_BLUE, alpha=0.8)
-    ax.bar(x + 0.5 * width, distinct_df["distinct_reroll1"], width,
+    ax.bar(x + 0.5 * width, distinct_df["distinct_reroll1"].to_numpy(), width,
            label="Distinct reroll1 policies", color=COLOR_ORANGE, alpha=0.8)
-    ax.bar(x + 1.5 * width, distinct_df["distinct_reroll2"], width,
+    ax.bar(x + 1.5 * width, distinct_df["distinct_reroll2"].to_numpy(), width,
            label="Distinct reroll2 policies", color=COLOR_RED, alpha=0.8)
 
     ax.set_xlabel("Turn", fontsize=FONT_AXIS_LABEL)
@@ -229,25 +232,25 @@ def plot_all_compression(
     # Gap CDF
     cdf_path = data_dir / "gap_cdf.csv"
     if cdf_path.exists():
-        cdf_df = pd.read_csv(cdf_path)
+        cdf_df = pl.read_csv(cdf_path)
         paths.append(plot_gap_cdf(cdf_df, out_dir, dpi=dpi, fmt=fmt))
 
     # Gap by turn heatmap
     summary_path = data_dir / "gap_summary.csv"
     if summary_path.exists():
-        summary_df = pd.read_csv(summary_path)
+        summary_df = pl.read_csv(summary_path)
         paths.append(plot_gap_by_turn(summary_df, out_dir, dpi=dpi, fmt=fmt))
 
     # Visit coverage
     visit_path = data_dir / "visit_gaps.csv"
     if visit_path.exists():
-        visit_df = pd.read_csv(visit_path)
+        visit_df = pl.read_csv(visit_path)
         paths.append(plot_visit_coverage(visit_df, out_dir, dpi=dpi, fmt=fmt))
 
     # Policy distinct
     distinct_path = data_dir / "policy_distinct.csv"
     if distinct_path.exists():
-        distinct_df = pd.read_csv(distinct_path)
+        distinct_df = pl.read_csv(distinct_path)
         paths.append(plot_policy_distinct(distinct_df, out_dir, dpi=dpi, fmt=fmt))
 
     return paths

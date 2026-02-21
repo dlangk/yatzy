@@ -5,12 +5,11 @@ requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.26",
     "scipy>=1.11",
-    "pandas>=2.0",
+    "polars>=1.0",
     "pyarrow>=14.0",
     "matplotlib>=3.8",
     "seaborn>=0.13",
     "click>=8.1",
-    "plotly>=6.0",
 ]
 
 [project.optional-dependencies]

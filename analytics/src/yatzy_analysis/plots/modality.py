@@ -5,7 +5,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import polars as pl
 from numpy.typing import NDArray
 from scipy.stats import gaussian_kde, norm
 
@@ -272,7 +272,7 @@ def plot_variance_decomposition(
 
 
 def plot_mixture_waterfall(
-    mixture_df: pd.DataFrame,
+    mixture_df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -292,16 +292,18 @@ def plot_mixture_waterfall(
 
     items = []
     for col, label in factors:
-        yes_mask = mixture_df[col] == "yes"
-        no_mask = mixture_df[col] == "no"
-        yes_rows = mixture_df[yes_mask]
-        no_rows = mixture_df[no_mask]
+        yes_rows = mixture_df.filter(pl.col(col) == "yes")
+        no_rows = mixture_df.filter(pl.col(col) == "no")
 
         hit_rate = float(yes_rows["fraction"].sum())
         # Weighted mean of sub-populations that hit vs miss
-        if not yes_rows.empty and not no_rows.empty:
-            mean_yes = float((yes_rows["mean"] * yes_rows["fraction"]).sum() / yes_rows["fraction"].sum())
-            mean_no = float((no_rows["mean"] * no_rows["fraction"]).sum() / no_rows["fraction"].sum())
+        if not yes_rows.is_empty() and not no_rows.is_empty():
+            mean_yes = float(
+                (yes_rows["mean"] * yes_rows["fraction"]).sum() / yes_rows["fraction"].sum()
+            )
+            mean_no = float(
+                (no_rows["mean"] * no_rows["fraction"]).sum() / no_rows["fraction"].sum()
+            )
             delta = mean_yes - mean_no
         else:
             delta = 0.0
@@ -342,7 +344,7 @@ def plot_mixture_waterfall(
 def plot_all_modality(
     game_data: dict,
     scores: NDArray[np.int32],
-    mixture_df: pd.DataFrame,
+    mixture_df: pl.DataFrame,
     cov_matrix: np.ndarray,
     means: np.ndarray,
     labels: list[str],

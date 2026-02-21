@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from numpy.typing import NDArray
 
 from .compute import compute_kde, compute_summary
@@ -58,7 +58,7 @@ def read_adaptive_scores(
 
 def compute_adaptive_summary(
     scores_dict: dict[str, NDArray[np.int32]],
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     """Compute summary stats for adaptive policies.
 
     Returns DataFrame with columns: policy, n, mean, std, min, max, p5..p99, etc.
@@ -72,20 +72,19 @@ def compute_adaptive_summary(
         row["policy"] = name
         del row["theta"]
         summaries.append(row)
-    return pd.DataFrame(summaries)
+    return pl.DataFrame(summaries)
 
 
 def compute_adaptive_kde(
     scores_dict: dict[str, NDArray[np.int32]],
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     """Compute KDE for each adaptive policy."""
     parts = []
     for name in sorted(scores_dict.keys()):
         scores = scores_dict[name]
         kde_df = compute_kde(0.0, scores)
-        kde_df["policy"] = name
-        kde_df = kde_df.drop(columns=["theta"])
+        kde_df = kde_df.drop("theta").with_columns(pl.lit(name).alias("policy"))
         parts.append(kde_df)
     if not parts:
-        return pd.DataFrame()
-    return pd.concat(parts, ignore_index=True)
+        return pl.DataFrame()
+    return pl.concat(parts)

@@ -6,7 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
-import pandas as pd
+import polars as pl
 import seaborn as sns
 
 from .style import (
@@ -30,10 +30,10 @@ LOWER_CATS = set(range(6, 15))
 SHORT_NAMES = CATEGORY_SHORT
 
 
-def load_category_stats(csv_path: Path) -> pd.DataFrame:
+def load_category_stats(csv_path: Path) -> pl.DataFrame:
     """Load category_stats.csv and ensure proper types."""
-    df = pd.read_csv(csv_path)
-    df["theta"] = df["theta"].round(3)
+    df = pl.read_csv(csv_path)
+    df = df.with_columns(pl.col("theta").round(3))
     return df
 
 
@@ -47,7 +47,7 @@ def _section_color(cat_id: int) -> str:
 # ── Heatmap helper ───────────────────────────────────────────────────────
 
 def _heatmap_panel(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     ax: plt.Axes,
     col: str,
     title: str,
@@ -57,7 +57,9 @@ def _heatmap_panel(
     n_thetas: int,
 ) -> None:
     """Draw a single heatmap panel on the given axes."""
-    pivot = df.pivot(index="category_id", columns="theta", values=col)
+    # Convert to pandas for pivot + seaborn heatmap
+    pdf = df.to_pandas()
+    pivot = pdf.pivot(index="category_id", columns="theta", values=col)
     pivot.index = [CATEGORY_NAMES[i] for i in pivot.index]
     theta_labels = [f"{t:.2f}" if t < 1 else f"{t:.1f}" for t in pivot.columns]
     annot = n_thetas <= 21
@@ -80,7 +82,7 @@ def _heatmap_panel(
 # ── Plot 1a: Mean Score + % of Score Ceiling ────────────────────────────
 
 def plot_category_score_heatmaps(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     out_dir: Path,
     *,
     suffix: str = "",
@@ -89,7 +91,7 @@ def plot_category_score_heatmaps(
 ) -> None:
     """Heatmap: Mean Score and Score % of Ceiling."""
     setup_theme()
-    n_thetas = df["theta"].nunique()
+    n_thetas = df["theta"].n_unique()
 
     fig, axes = plt.subplots(2, 1, figsize=(max(14, n_thetas * 0.55), 9))
     fig.suptitle(
@@ -110,7 +112,7 @@ def plot_category_score_heatmaps(
 # ── Plot 1b: Zero Rate + Hit Rate ───────────────────────────────────────
 
 def plot_category_rate_heatmaps(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     out_dir: Path,
     *,
     suffix: str = "",
@@ -119,7 +121,7 @@ def plot_category_rate_heatmaps(
 ) -> None:
     """Heatmap: Zero Rate and Hit Rate."""
     setup_theme()
-    n_thetas = df["theta"].nunique()
+    n_thetas = df["theta"].n_unique()
 
     fig, axes = plt.subplots(2, 1, figsize=(max(14, n_thetas * 0.55), 9))
     fig.suptitle(
@@ -140,7 +142,7 @@ def plot_category_rate_heatmaps(
 # ── Plot 1c: Mean Fill Turn ─────────────────────────────────────────────
 
 def plot_category_fill_turn_heatmaps(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     out_dir: Path,
     *,
     suffix: str = "",
@@ -149,7 +151,7 @@ def plot_category_fill_turn_heatmaps(
 ) -> None:
     """Heatmap: Mean Fill Turn."""
     setup_theme()
-    n_thetas = df["theta"].nunique()
+    n_thetas = df["theta"].n_unique()
 
     fig, ax = plt.subplots(1, 1, figsize=(max(14, n_thetas * 0.55), 5.5))
 
@@ -169,7 +171,7 @@ def plot_category_fill_turn_heatmaps(
 # ── Plot 2: Small multiples sparklines ─────────────────────────────────────
 
 def plot_category_sparklines(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     out_dir: Path,
     *,
     stat: str = "mean_score",
@@ -183,7 +185,7 @@ def plot_category_sparklines(
     setup_theme()
 
     # Limit to theta_range
-    df = df[(df["theta"] >= theta_range[0]) & (df["theta"] <= theta_range[1])].copy()
+    df = df.filter((pl.col("theta") >= theta_range[0]) & (pl.col("theta") <= theta_range[1]))
 
     fig, axes = plt.subplots(3, 5, figsize=(22, 10), sharex=True)
     fig.suptitle(
@@ -191,24 +193,26 @@ def plot_category_sparklines(
         fontsize=FONT_SUPTITLE, fontweight="bold", y=0.98,
     )
 
-    thetas = sorted(df["theta"].unique())
+    thetas = sorted(df["theta"].unique().to_list())
 
     for cat_id in range(15):
         row, col = divmod(cat_id, 5)
         ax = axes[row, col]
 
-        cat_data = df[df["category_id"] == cat_id].sort_values("theta")
+        cat_data = df.filter(pl.col("category_id") == cat_id).sort("theta")
+        pdf_cat = cat_data.to_pandas()
         color = _section_color(cat_id)
 
-        ax.plot(cat_data["theta"], cat_data[stat], color=color, linewidth=2)
+        ax.plot(pdf_cat["theta"], pdf_cat[stat], color=color, linewidth=2)
         ax.fill_between(
-            cat_data["theta"], cat_data[stat],
+            pdf_cat["theta"], pdf_cat[stat],
             alpha=0.15, color=color,
         )
 
         # Mark θ=0 with a dot
-        t0_val = cat_data[cat_data["theta"] == 0.0][stat].values
-        if len(t0_val) > 0:
+        t0_data = cat_data.filter(pl.col("theta") == 0.0)
+        if not t0_data.is_empty():
+            t0_val = t0_data[stat].to_numpy()
             ax.plot(0.0, t0_val[0], "o", color=color, markersize=5, zorder=5)
 
         ax.set_title(CATEGORY_NAMES[cat_id], fontsize=FONT_TICK, fontweight="bold")
@@ -233,7 +237,7 @@ def plot_category_sparklines(
 # ── Plot 3: Faceted bar charts ─────────────────────────────────────────────
 
 def plot_category_bars(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     out_dir: Path,
     *,
     selected_thetas: list[float] | None = None,
@@ -247,21 +251,23 @@ def plot_category_bars(
     if selected_thetas is None:
         selected_thetas = [-1.0, -0.07, 0.0, 0.07, 1.0]
 
-    sub = df[df["theta"].isin(selected_thetas)].copy()
-    sub["category_name"] = sub["category_id"].map(lambda i: SHORT_NAMES[i])
+    sub = df.filter(pl.col("theta").is_in(selected_thetas))
+    # Convert to pandas for map + seaborn barplot
+    pdf_sub = sub.to_pandas()
+    pdf_sub["category_name"] = pdf_sub["category_id"].map(lambda i: SHORT_NAMES[i])
 
     # Use coolwarm palette sampled at the selected theta positions
     norm = plt.Normalize(vmin=min(selected_thetas), vmax=max(selected_thetas))
     colors = [CMAP(norm(t)) for t in selected_thetas]
     palette = {f"θ={t:.2f}": c for t, c in zip(selected_thetas, colors)}
-    sub["θ"] = sub["theta"].map(lambda t: f"θ={t:.2f}")
+    pdf_sub["θ"] = pdf_sub["theta"].map(lambda t: f"θ={t:.2f}")
 
     fig, axes = plt.subplots(2, 1, figsize=(18, 12))
 
     # Mean score bars
     ax = axes[0]
     sns.barplot(
-        data=sub, x="category_name", y="mean_score", hue="θ",
+        data=pdf_sub, x="category_name", y="mean_score", hue="θ",
         palette=palette, ax=ax, edgecolor="white", linewidth=0.5,
     )
     ax.set_title("Mean Score by Category", fontsize=FONT_TITLE, fontweight="bold")
@@ -275,7 +281,7 @@ def plot_category_bars(
     # Zero rate bars
     ax = axes[1]
     sns.barplot(
-        data=sub, x="category_name", y="zero_rate", hue="θ",
+        data=pdf_sub, x="category_name", y="zero_rate", hue="θ",
         palette=palette, ax=ax, edgecolor="white", linewidth=0.5,
     )
     ax.set_title("Zero Rate by Category", fontsize=FONT_TITLE, fontweight="bold")
@@ -295,7 +301,7 @@ def plot_category_bars(
 # ── Plot 4: Slope / bump chart for fill turn reordering ────────────────────
 
 def plot_category_slope(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     out_dir: Path,
     *,
     t_left: float = 0.0,
@@ -307,8 +313,19 @@ def plot_category_slope(
     """Slope chart showing how category fill order changes between two θ values."""
     setup_theme()
 
-    left = df[df["theta"] == t_left][["category_id", "mean_fill_turn"]].set_index("category_id")
-    right = df[df["theta"] == t_right][["category_id", "mean_fill_turn"]].set_index("category_id")
+    # Convert filtered subsets to pandas for .set_index / .loc access
+    pdf_left = (
+        df.filter(pl.col("theta") == t_left)
+        .select("category_id", "mean_fill_turn")
+        .to_pandas()
+        .set_index("category_id")
+    )
+    pdf_right = (
+        df.filter(pl.col("theta") == t_right)
+        .select("category_id", "mean_fill_turn")
+        .to_pandas()
+        .set_index("category_id")
+    )
 
     fig, ax = plt.subplots(figsize=(12, 10))
 
@@ -316,16 +333,16 @@ def plot_category_slope(
     max_shift = 0
     shifts = {}
     for cat_id in range(15):
-        l = left.loc[cat_id, "mean_fill_turn"]
-        r = right.loc[cat_id, "mean_fill_turn"]
+        l = pdf_left.loc[cat_id, "mean_fill_turn"]
+        r = pdf_right.loc[cat_id, "mean_fill_turn"]
         shifts[cat_id] = r - l
         max_shift = max(max_shift, abs(r - l))
 
     shift_norm = plt.Normalize(vmin=-max_shift, vmax=max_shift)
 
     for cat_id in range(15):
-        l = left.loc[cat_id, "mean_fill_turn"]
-        r = right.loc[cat_id, "mean_fill_turn"]
+        l = pdf_left.loc[cat_id, "mean_fill_turn"]
+        r = pdf_right.loc[cat_id, "mean_fill_turn"]
         shift = shifts[cat_id]
         color = CMAP(shift_norm(shift))
         lw = 2.0 + abs(shift) * 0.3  # thicker for bigger shifts
@@ -381,7 +398,7 @@ def plot_category_slope(
 # ── Plot 5: Multi-column slope chart ──────────────────────────────────────
 
 def plot_category_slope_dense(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     out_dir: Path,
     *,
     selected_thetas: list[float] | None = None,
@@ -395,10 +412,15 @@ def plot_category_slope_dense(
     if selected_thetas is None:
         selected_thetas = [-3.0, -1.0, -0.10, 0.0, 0.10, 1.00, 3.0]
 
-    # Get fill turns per theta
+    # Get fill turns per theta — convert filtered subsets to pandas for .set_index/.loc
     cols = {}
     for t in selected_thetas:
-        sub = df[df["theta"] == t][["category_id", "mean_fill_turn"]].set_index("category_id")
+        sub = (
+            df.filter(pl.col("theta") == t)
+            .select("category_id", "mean_fill_turn")
+            .to_pandas()
+            .set_index("category_id")
+        )
         if len(sub) == 0:
             continue
         cols[t] = sub["mean_fill_turn"]
@@ -489,7 +511,7 @@ def plot_category_slope_dense(
 # ── Plot 6: Fill-turn heatmap ─────────────────────────────────────────────
 
 def plot_fill_turn_heatmap(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     out_dir: Path,
     *,
     suffix: str = "",
@@ -499,7 +521,9 @@ def plot_fill_turn_heatmap(
     """Heatmap: categories (rows) × all θ values, colored by mean fill turn."""
     setup_theme()
 
-    pivot = df.pivot(index="category_id", columns="theta", values="mean_fill_turn")
+    # Convert to pandas for pivot + seaborn heatmap
+    pdf = df.to_pandas()
+    pivot = pdf.pivot(index="category_id", columns="theta", values="mean_fill_turn")
     pivot.index = [CATEGORY_NAMES[i] for i in pivot.index]
 
     # Theta labels
@@ -574,7 +598,7 @@ def plot_all_category_stats(
 
     # Zoomed versions: θ ∈ [-0.2, 0.2] — the practical range
     print("Generating zoomed category stats plots (|θ| ≤ 0.2)...")
-    zdf = df[df["theta"].abs() <= 0.2].copy()
+    zdf = df.filter(pl.col("theta").abs() <= 0.2)
     sfx = "_zoomed"
     plot_category_score_heatmaps(zdf, out_dir, suffix=sfx, dpi=dpi, fmt=fmt)
     plot_category_rate_heatmaps(zdf, out_dir, suffix=sfx, dpi=dpi, fmt=fmt)

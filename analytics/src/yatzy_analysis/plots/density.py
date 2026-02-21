@@ -6,19 +6,21 @@ from pathlib import Path
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import polars as pl
 
 from ..config import MAX_SCORE
-from .style import CMAP, FONT_AXIS_LABEL, FONT_LEGEND, FONT_TICK, FONT_TITLE, GRID_ALPHA, save_fig, fmt_theta, make_norm, setup_theme, theta_color
+from .spec import PLOT_SPECS, PlotSpec
+from .style import CMAP, FONT_AXIS_LABEL, FONT_LEGEND, FONT_TICK, FONT_TITLE, apply_theta_legend, fmt_theta, make_norm, setup_theme, theta_color
 
 
 def plot_density(
     thetas: list[float],
-    kde_df: pd.DataFrame,
+    kde_df: pl.DataFrame,
     out_dir: Path,
     *,
     norm: mcolors.Normalize | None = None,
     ax=None,
+    spec: PlotSpec | None = None,
     dpi: int = 200,
     fmt: str = "png",
 ) -> None:
@@ -30,20 +32,20 @@ def plot_density(
         fig, ax = plt.subplots(figsize=(14, 6))
 
     for t in thetas:
-        subset = kde_df[kde_df["theta"] == t].sort_values("score")
+        subset = kde_df.filter(pl.col("theta") == t).sort("score").to_pandas()
         color = theta_color(t, norm)
         lw = 2.5 if t == 0 else 1.4
         alpha = 0.9 if t == 0 else 0.7
         ax.plot(
             subset["score"], subset["density"],
-            color=color, linewidth=lw, alpha=alpha, label=f"θ={fmt_theta(t)}",
+            color=color, linewidth=lw, alpha=alpha,
         )
 
     ax.set_xlabel("Total Score", fontsize=FONT_AXIS_LABEL)
     ax.set_ylabel("Density", fontsize=FONT_AXIS_LABEL)
     ax.set_title("Score Distribution by Risk Parameter θ", fontsize=FONT_TITLE, fontweight="bold")
     ax.set_xlim(50, MAX_SCORE)
-    ax.legend(fontsize=FONT_LEGEND, framealpha=0.9, ncol=2)
+    apply_theta_legend(ax, norm, spec or PLOT_SPECS["density"])
 
     if standalone:
         fig.tight_layout()
@@ -65,8 +67,8 @@ _ADAPTIVE_DASHES = {
 
 def plot_density_with_adaptive(
     thetas: list[float],
-    kde_df: pd.DataFrame,
-    adaptive_kde_df: pd.DataFrame,
+    kde_df: pl.DataFrame,
+    adaptive_kde_df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -77,20 +79,20 @@ def plot_density_with_adaptive(
     norm = make_norm(thetas)
     fig, ax = plt.subplots(figsize=(16, 7))
 
-    # Fixed-θ densities (thin, semi-transparent)
+    # Fixed-θ densities (thin, semi-transparent, no label)
     for t in thetas:
-        subset = kde_df[kde_df["theta"] == t].sort_values("score")
+        subset = kde_df.filter(pl.col("theta") == t).sort("score").to_pandas()
         color = theta_color(t, norm)
         lw = 2.5 if t == 0 else 1.0
         alpha = 0.9 if t == 0 else 0.45
         ax.plot(
             subset["score"], subset["density"],
-            color=color, linewidth=lw, alpha=alpha, label=f"θ={fmt_theta(t)}",
+            color=color, linewidth=lw, alpha=alpha,
         )
 
     # Adaptive strategy densities (thick, dashed, prominent)
-    for policy in sorted(adaptive_kde_df["policy"].unique()):
-        subset = adaptive_kde_df[adaptive_kde_df["policy"] == policy].sort_values("score")
+    for policy in sorted(adaptive_kde_df["policy"].unique().to_list()):
+        subset = adaptive_kde_df.filter(pl.col("policy") == policy).sort("score").to_pandas()
         color = _ADAPTIVE_COLORS.get(policy, "tab:brown")
         dashes = _ADAPTIVE_DASHES.get(policy, (4, 2))
         ax.plot(
@@ -106,7 +108,10 @@ def plot_density_with_adaptive(
         fontsize=FONT_TITLE, fontweight="bold",
     )
     ax.set_xlim(50, MAX_SCORE)
-    ax.legend(fontsize=FONT_LEGEND, framealpha=0.9, ncol=3, loc="upper left")
+    # Colorbar for fixed-θ lines
+    apply_theta_legend(ax, norm, PLOT_SPECS["density_adaptive"])
+    # Small legend for adaptive policies only
+    ax.legend(fontsize=FONT_LEGEND, framealpha=0.9, loc="upper left")
     ax.grid(True, alpha=0.2)
 
     fig.tight_layout()
@@ -116,7 +121,7 @@ def plot_density_with_adaptive(
 
 def plot_density_3d(
     thetas: list[float],
-    kde_df: pd.DataFrame,
+    kde_df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -140,7 +145,7 @@ def plot_density_3d(
 
     Z = np.zeros((len(sorted_thetas), len(score_grid)))
     for i, t in enumerate(sorted_thetas):
-        subset = kde_df[kde_df["theta"] == t].sort_values("score")
+        subset = kde_df.filter(pl.col("theta") == t).sort("score").to_pandas()
         if len(subset) > 2:
             Z[i, :] = np.interp(score_grid, subset["score"].values, subset["density"].values)
 
@@ -197,7 +202,7 @@ def plot_density_3d(
 
 def plot_density_3d_gif(
     thetas: list[float],
-    kde_df: pd.DataFrame,
+    kde_df: pl.DataFrame,
     out_dir: Path,
     *,
     elev: int = 45,
@@ -220,7 +225,7 @@ def plot_density_3d_gif(
 
     Z = np.zeros((len(sorted_thetas), len(score_grid)))
     for i, t in enumerate(sorted_thetas):
-        subset = kde_df[kde_df["theta"] == t].sort_values("score")
+        subset = kde_df.filter(pl.col("theta") == t).sort("score").to_pandas()
         if len(subset) > 2:
             Z[i, :] = np.interp(score_grid, subset["score"].values, subset["density"].values)
 
@@ -266,86 +271,9 @@ def plot_density_3d_gif(
     return out_path
 
 
-def plot_density_3d_interactive(
-    thetas: list[float],
-    kde_df: pd.DataFrame,
-    out_dir: Path,
-) -> Path:
-    """Interactive 3D surface plot (HTML) using plotly.
-
-    Opens in a browser — rotate, zoom, pan freely.
-    X = score, Y = θ, Z = density.  Surface colored by θ.
-    """
-    import plotly.graph_objects as go
-
-    sorted_thetas = sorted(thetas)
-    score_min, score_max = 50, MAX_SCORE
-    score_grid = np.linspace(score_min, score_max, 400)
-
-    Z = np.zeros((len(sorted_thetas), len(score_grid)))
-    for i, t in enumerate(sorted_thetas):
-        subset = kde_df[kde_df["theta"] == t].sort_values("score")
-        if len(subset) > 2:
-            Z[i, :] = np.interp(score_grid, subset["score"].values, subset["density"].values)
-
-    # Build a color scale matching our matplotlib CMAP
-    n_colors = 256
-    cmap_samples = [CMAP(i / (n_colors - 1)) for i in range(n_colors)]
-    colorscale = [
-        [i / (n_colors - 1), f"rgb({int(c[0]*255)},{int(c[1]*255)},{int(c[2]*255)})"]
-        for i, c in enumerate(cmap_samples)
-    ]
-
-    # surfacecolor = θ values (same shape as Z)
-    Y_grid = np.array(sorted_thetas)[:, None] * np.ones((1, len(score_grid)))
-
-    fig = go.Figure(data=[go.Surface(
-        x=score_grid,
-        y=sorted_thetas,
-        z=Z,
-        surfacecolor=Y_grid,
-        colorscale=colorscale,
-        cmin=min(sorted_thetas),
-        cmax=max(sorted_thetas),
-        colorbar=dict(title="θ", tickformat=".2f"),
-        opacity=0.92,
-    )])
-
-    # Wireframe slices for key thetas
-    key_thetas = [t for t in [-1.0, -0.1, 0.0, 0.1, 1.0] if t in sorted_thetas]
-    for t in key_thetas:
-        idx = sorted_thetas.index(t)
-        rgba = CMAP(make_norm(thetas)(t))
-        color = f"rgb({int(rgba[0]*255)},{int(rgba[1]*255)},{int(rgba[2]*255)})"
-        fig.add_trace(go.Scatter3d(
-            x=score_grid, y=[t] * len(score_grid), z=Z[idx, :],
-            mode="lines",
-            line=dict(color=color, width=4 if t == 0 else 2),
-            name=f"θ={t:+.1f}",
-            showlegend=True,
-        ))
-
-    fig.update_layout(
-        title="Score Density Surface across θ",
-        scene=dict(
-            xaxis_title="Score",
-            yaxis_title="θ",
-            zaxis_title="Density",
-            camera=dict(eye=dict(x=-1.5, y=-1.5, z=1.0)),
-        ),
-        width=1000,
-        height=750,
-        margin=dict(l=0, r=0, t=40, b=0),
-    )
-
-    out_path = out_dir / "density_3d_interactive.html"
-    fig.write_html(str(out_path), include_plotlyjs=True)
-    return out_path
-
-
 def plot_density_ridge(
     thetas: list[float],
-    kde_df: pd.DataFrame,
+    kde_df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -369,7 +297,7 @@ def plot_density_ridge(
     curves: list[tuple[float, np.ndarray, np.ndarray]] = []
 
     for t in sorted_thetas:
-        subset = kde_df[kde_df["theta"] == t].sort_values("score")
+        subset = kde_df.filter(pl.col("theta") == t).sort("score").to_pandas()
         if len(subset) < 2:
             continue
         x = subset["score"].values

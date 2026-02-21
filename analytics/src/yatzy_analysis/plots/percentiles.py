@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import pandas as pd
+import polars as pl
 import seaborn as sns
 
 from .style import (
@@ -22,18 +22,19 @@ _EXTRA = PERCENTILES_EXTRA
 
 
 def _plot_percentile_curves(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     ax,
     *,
     include_extra: bool = True,
 ) -> None:
     """Draw percentile curves on the given axes."""
+    pdf = df.to_pandas()
     pct_colors = sns.color_palette("rocket", len(_CORE))
 
     for i, p in enumerate(_CORE):
-        if p in df.columns:
+        if p in pdf.columns:
             ax.plot(
-                df["theta"], df[p],
+                pdf["theta"], pdf[p],
                 marker="o", markersize=4, linewidth=1.8, color=pct_colors[i],
                 label=p, zorder=3,
             )
@@ -41,22 +42,22 @@ def _plot_percentile_curves(
     if include_extra:
         extra_styles = {"p1": ("--", "tab:blue"), "p999": ("--", "tab:orange"), "p9999": ("--", "tab:red")}
         for p, (ls, color) in extra_styles.items():
-            if p in df.columns:
+            if p in pdf.columns:
                 ax.plot(
-                    df["theta"], df[p],
+                    pdf["theta"], pdf[p],
                     linestyle=ls, marker="s", markersize=3, linewidth=1.4,
                     color=color, alpha=0.8, label=p, zorder=3,
                 )
 
-    ax.plot(df["theta"], df["min"], linestyle="--", linewidth=1.2, color="gray", alpha=0.7, label="min", zorder=2)
-    ax.plot(df["theta"], df["max"], linestyle="--", linewidth=1.2, color="black", alpha=0.7, label="max", zorder=2)
-    ax.plot(df["theta"], df["bot5_avg"], linestyle=":", linewidth=1.4, color="gray", alpha=0.7, label="bot5 avg", zorder=2)
-    ax.plot(df["theta"], df["top5_avg"], linestyle=":", linewidth=1.4, color="black", alpha=0.7, label="top5 avg", zorder=2)
+    ax.plot(pdf["theta"], pdf["min"], linestyle="--", linewidth=1.2, color="gray", alpha=0.7, label="min", zorder=2)
+    ax.plot(pdf["theta"], pdf["max"], linestyle="--", linewidth=1.2, color="black", alpha=0.7, label="max", zorder=2)
+    ax.plot(pdf["theta"], pdf["bot5_avg"], linestyle=":", linewidth=1.4, color="gray", alpha=0.7, label="bot5 avg", zorder=2)
+    ax.plot(pdf["theta"], pdf["top5_avg"], linestyle=":", linewidth=1.4, color="black", alpha=0.7, label="top5 avg", zorder=2)
 
 
 def plot_percentiles(
     thetas: list[float],
-    stats_df: pd.DataFrame,
+    stats_df: pl.DataFrame,
     out_dir: Path,
     *,
     ax=None,
@@ -82,7 +83,7 @@ def plot_percentiles(
         plt.close(fig)
 
         # Zoomed version: θ ∈ [-0.10, +0.45] — covers all percentile peaks with margin
-        zoomed_df = stats_df[(stats_df["theta"] >= -0.10) & (stats_df["theta"] <= 0.45)]
+        zoomed_df = stats_df.filter((pl.col("theta") >= -0.10) & (pl.col("theta") <= 0.45))
         if len(zoomed_df) > 0:
             fig_z, ax_z = plt.subplots(figsize=(14, 8))
             _plot_percentile_curves(zoomed_df, ax_z)

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import polars as pl
 
 from .style import FONT_AXIS_LABEL, FONT_LEGEND, FONT_SUPTITLE, FONT_TITLE, GRID_ALPHA, make_norm, setup_theme, theta_color, theta_colorbar
 
@@ -17,10 +17,10 @@ _ADAPTIVE_YLIM = (258, 348)
 
 def plot_efficiency(
     thetas: list[float],
-    summary_df: pd.DataFrame,
-    kde_df: pd.DataFrame,
-    mer_df: pd.DataFrame,
-    sdva_df: pd.DataFrame,
+    summary_df: pl.DataFrame,
+    kde_df: pl.DataFrame,
+    mer_df: pl.DataFrame,
+    sdva_df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -37,8 +37,8 @@ def plot_efficiency(
     )
 
     # Filter to available thetas and positive-theta only for MER
-    mer = mer_df[mer_df["theta"].isin(thetas) & (mer_df["theta"] > 0)].copy()
-    stats = summary_df[summary_df["theta"].isin(thetas)].copy()
+    mer = mer_df.filter(pl.col("theta").is_in(thetas) & (pl.col("theta") > 0))
+    stats = summary_df.filter(pl.col("theta").is_in(thetas))
 
     # Panel 1: MER curves for multiple quantiles
     ax = axes[0, 0]
@@ -50,9 +50,10 @@ def plot_efficiency(
         "mer_max": ("max", "tab:purple"),
     }
     for col, (label, color) in mer_cols.items():
-        valid = mer[mer[col].between(-50, 50)]  # filter out inf/dominated
-        if not valid.empty:
-            ax.plot(valid["theta"], valid[col], marker="o", markersize=4,
+        valid = mer.filter(pl.col(col).is_between(-50, 50))  # filter out inf/dominated
+        if not valid.is_empty():
+            pdf_valid = valid.to_pandas()
+            ax.plot(pdf_valid["theta"], pdf_valid[col], marker="o", markersize=4,
                     linewidth=1.8, color=color, label=label)
 
     ax.set_xlabel("θ", fontsize=FONT_AXIS_LABEL)
@@ -66,26 +67,28 @@ def plot_efficiency(
 
     # Panel 2: Efficient frontier in (mean, p95) space
     ax = axes[0, 1]
-    for _, row in stats.iterrows():
+    pdf_stats = stats.to_pandas()
+    for _, row in pdf_stats.iterrows():
         t = row["theta"]
         color = theta_color(t, norm)
         ax.scatter(row["mean"], row["p95"], color=color, s=60, zorder=5,
                    edgecolors="white", linewidths=0.5)
     # Connect with line
-    ax.plot(stats["mean"], stats["p95"], color="gray", linewidth=0.8, alpha=0.5, zorder=1)
+    ax.plot(pdf_stats["mean"], pdf_stats["p95"], color="gray", linewidth=0.8, alpha=0.5, zorder=1)
     # Mark baseline
-    base = stats[stats["theta"] == 0.0]
-    if not base.empty:
-        ax.scatter(base["mean"], base["p95"], color="black", s=120, marker="*",
+    base = stats.filter(pl.col("theta") == 0.0)
+    if not base.is_empty():
+        pdf_base = base.to_pandas()
+        ax.scatter(pdf_base["mean"], pdf_base["p95"], color="black", s=120, marker="*",
                    zorder=10, label="θ=0 (EV-optimal)")
     # Mark peak p95
-    peak_idx = stats["p95"].idxmax()
-    peak = stats.loc[peak_idx]
+    peak_idx = stats["p95"].arg_max()
+    peak = stats.row(peak_idx, named=True)
     ax.scatter(peak["mean"], peak["p95"], color="red", s=120, marker="D",
                zorder=10, label=f"peak p95 (θ={peak['theta']:.2f})")
     # Shade dominated region
-    if not base.empty:
-        b = base.iloc[0]
+    if not base.is_empty():
+        b = base.row(0, named=True)
         ax.axvspan(ax.get_xlim()[0], b["mean"], alpha=0.03, color="red")
         ax.axhspan(ax.get_ylim()[0], b["p95"], alpha=0.03, color="red")
 
@@ -99,14 +102,15 @@ def plot_efficiency(
     # Panel 3: CDF difference D(x) for representative thetas
     ax = axes[1, 0]
     representative = [t for t in [0.05, 0.08, 0.10, 0.20] if t in thetas]
-    base_kde = kde_df[kde_df["theta"] == 0.0]
-    if not base_kde.empty:
-        scores = base_kde["score"].values
+    base_kde = kde_df.filter(pl.col("theta") == 0.0)
+    if not base_kde.is_empty():
+        scores = base_kde["score"].to_numpy()
+        base_cdf = base_kde["cdf"].to_numpy()
         for t in representative:
-            t_kde = kde_df[kde_df["theta"] == t]
-            if t_kde.empty:
+            t_kde = kde_df.filter(pl.col("theta") == t)
+            if t_kde.is_empty():
                 continue
-            d = t_kde["cdf"].values - base_kde["cdf"].values
+            d = t_kde["cdf"].to_numpy() - base_cdf
             color = theta_color(t, norm)
             ax.plot(scores, d, color=color, linewidth=1.8, label=f"θ={t:.2f}")
             ax.fill_between(scores, d, 0, where=d > 0, alpha=0.15, color="red")
@@ -121,22 +125,23 @@ def plot_efficiency(
 
     # Add crossing points from SDVA
     for t in representative:
-        row = sdva_df[sdva_df["theta"] == t]
-        if not row.empty:
-            xc = row.iloc[0]["x_cross"]
+        row = sdva_df.filter(pl.col("theta") == t)
+        if not row.is_empty():
+            xc = row.row(0, named=True)["x_cross"]
             ax.axvline(xc, color=theta_color(t, norm), linewidth=0.8,
                        linestyle=":", alpha=0.7)
 
     # Panel 4: CVaR deficit overlaid with mean
     ax = axes[1, 1]
-    pos = stats[stats["theta"] >= 0].copy()
-    ax.plot(pos["theta"], pos["mean"], color="black", linewidth=2, label="Mean", marker="o",
+    pos = stats.filter(pl.col("theta") >= 0)
+    pdf_pos = pos.to_pandas()
+    ax.plot(pdf_pos["theta"], pdf_pos["mean"], color="black", linewidth=2, label="Mean", marker="o",
             markersize=4)
-    ax.plot(pos["theta"], pos["cvar_5"], color="tab:red", linewidth=2, label="CVaR 5%",
+    ax.plot(pdf_pos["theta"], pdf_pos["cvar_5"], color="tab:red", linewidth=2, label="CVaR 5%",
             marker="s", markersize=4)
-    ax.plot(pos["theta"], pos["cvar_10"], color="tab:orange", linewidth=1.5, label="CVaR 10%",
+    ax.plot(pdf_pos["theta"], pdf_pos["cvar_10"], color="tab:orange", linewidth=1.5, label="CVaR 10%",
             marker="^", markersize=4, alpha=0.8)
-    ax.plot(pos["theta"], pos["cvar_1"], color="darkred", linewidth=1.5, label="CVaR 1%",
+    ax.plot(pdf_pos["theta"], pdf_pos["cvar_1"], color="darkred", linewidth=1.5, label="CVaR 1%",
             marker="v", markersize=4, alpha=0.8)
 
     ax.set_xlabel("θ", fontsize=FONT_AXIS_LABEL)
@@ -152,8 +157,8 @@ def plot_efficiency(
 
 def _plot_adaptive_frontier(
     thetas: list[float],
-    summary_df: pd.DataFrame,
-    adaptive_df: pd.DataFrame,
+    summary_df: pl.DataFrame,
+    adaptive_df: pl.DataFrame,
     out_dir: Path,
     percentile_col: str,
     percentile_label: str,
@@ -185,20 +190,21 @@ def _plot_adaptive_frontier(
         )
 
     norm = make_norm(thetas)
-    stats = summary_df[summary_df["theta"].isin(thetas)].copy()
+    stats = summary_df.filter(pl.col("theta").is_in(thetas))
 
     # Plot fixed-θ points
-    for _, row in stats.iterrows():
+    pdf_stats = stats.to_pandas()
+    for _, row in pdf_stats.iterrows():
         t = row["theta"]
         color = theta_color(t, norm)
         ax.scatter(row["mean"], row[percentile_col], color=color, s=50, zorder=5,
                    edgecolors="white", linewidths=0.5, alpha=0.7)
 
     # Connect fixed-θ points
-    ax.plot(stats["mean"], stats[percentile_col], color="gray", linewidth=0.8, alpha=0.4, zorder=1)
+    ax.plot(pdf_stats["mean"], pdf_stats[percentile_col], color="gray", linewidth=0.8, alpha=0.4, zorder=1)
 
     # Compute and shade convex hull of fixed-θ points
-    points = stats[["mean", percentile_col]].values
+    points = stats.select("mean", percentile_col).to_numpy()
     if len(points) >= 3:
         try:
             hull = ConvexHull(points)
@@ -212,14 +218,15 @@ def _plot_adaptive_frontier(
             pass  # degenerate hull
 
     # Mark θ=0 baseline
-    base = stats[stats["theta"] == 0.0]
-    if not base.empty:
-        ax.scatter(base["mean"], base[percentile_col], color="black", s=150, marker="*",
+    base = stats.filter(pl.col("theta") == 0.0)
+    if not base.is_empty():
+        pdf_base = base.to_pandas()
+        ax.scatter(pdf_base["mean"], pdf_base[percentile_col], color="black", s=150, marker="*",
                    zorder=10, label="θ=0 (EV-optimal)")
 
     # Mark best fixed-θ for this percentile
-    peak_idx = stats[percentile_col].idxmax()
-    peak = stats.loc[peak_idx]
+    peak_idx = stats[percentile_col].arg_max()
+    peak = stats.row(peak_idx, named=True)
     ax.scatter(peak["mean"], peak[percentile_col], color="red", s=120, marker="D",
                zorder=10, label=f"Best fixed {percentile_label} (θ={peak['theta']:.2f})")
 
@@ -228,7 +235,8 @@ def _plot_adaptive_frontier(
     colors = {"bonus-adaptive": "tab:green", "phase-based": "tab:orange",
               "combined": "tab:purple", "always-ev": "gray"}
 
-    for _, row in adaptive_df.iterrows():
+    pdf_adaptive = adaptive_df.to_pandas()
+    for _, row in pdf_adaptive.iterrows():
         name = row["policy"]
         m = markers.get(name, "X")
         c = colors.get(name, "tab:brown")
@@ -256,8 +264,8 @@ def _plot_adaptive_frontier(
 
 def plot_efficiency_with_adaptive(
     thetas: list[float],
-    summary_df: pd.DataFrame,
-    adaptive_df: pd.DataFrame,
+    summary_df: pl.DataFrame,
+    adaptive_df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -275,8 +283,8 @@ def plot_efficiency_with_adaptive(
 
 def plot_efficiency_adaptive_p99(
     thetas: list[float],
-    summary_df: pd.DataFrame,
-    adaptive_df: pd.DataFrame,
+    summary_df: pl.DataFrame,
+    adaptive_df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -294,8 +302,8 @@ def plot_efficiency_adaptive_p99(
 
 def plot_efficiency_adaptive_p999(
     thetas: list[float],
-    summary_df: pd.DataFrame,
-    adaptive_df: pd.DataFrame,
+    summary_df: pl.DataFrame,
+    adaptive_df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -313,8 +321,8 @@ def plot_efficiency_adaptive_p999(
 
 def plot_efficiency_adaptive_combined(
     thetas: list[float],
-    summary_df: pd.DataFrame,
-    adaptive_df: pd.DataFrame,
+    summary_df: pl.DataFrame,
+    adaptive_df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,

@@ -6,7 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
-import pandas as pd
+import polars as pl
 import seaborn as sns
 
 from .style import CMAP, FONT_AXIS_LABEL, FONT_LEGEND, FONT_SUPTITLE, FONT_TICK, FONT_TITLE, GRID_ALPHA, PERCENTILES_CORE, PERCENTILES_EXTRA, setup_theme
@@ -17,7 +17,7 @@ _ALL = _EXTRA[:1] + _CORE + _EXTRA[1:]  # p1, p5..p99, p999, p9999
 
 
 def _plot_curves(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     ax,
     *,
     skip: set[str] | None = None,
@@ -26,10 +26,13 @@ def _plot_curves(
     skip = skip or set()
     pct_colors = sns.color_palette("rocket", len(_CORE))
 
+    # Convert to pandas for plotting convenience (column access + matplotlib)
+    pdf = df.to_pandas()
+
     for i, p in enumerate(_CORE):
-        if p in df.columns and p not in skip:
+        if p in pdf.columns and p not in skip:
             ax.plot(
-                df["theta"], df[p],
+                pdf["theta"], pdf[p],
                 marker="o", markersize=4, linewidth=1.8, color=pct_colors[i],
                 label=p, zorder=3,
             )
@@ -40,15 +43,15 @@ def _plot_curves(
         "p9999": ("--", "tab:red"),
     }
     for p, (ls, color) in extra_styles.items():
-        if p in df.columns and p not in skip:
+        if p in pdf.columns and p not in skip:
             ax.plot(
-                df["theta"], df[p],
+                pdf["theta"], pdf[p],
                 linestyle=ls, marker="s", markersize=3, linewidth=1.4,
                 color=color, alpha=0.8, label=p, zorder=3,
             )
 
 
-def _add_peak_stars(ax, df: pd.DataFrame, peaks: pd.DataFrame, theta_range=None, skip=None) -> None:
+def _add_peak_stars(ax, df: pl.DataFrame, peaks: pl.DataFrame, theta_range=None, skip=None) -> None:
     """Add star markers at each percentile's peak θ*."""
     pct_colors = sns.color_palette("rocket", len(_CORE))
     color_map = {p: pct_colors[i] for i, p in enumerate(_CORE)}
@@ -56,7 +59,7 @@ def _add_peak_stars(ax, df: pd.DataFrame, peaks: pd.DataFrame, theta_range=None,
     color_map.update(extra_colors)
     skip = skip or set()
 
-    for _, row in peaks.iterrows():
+    for row in peaks.iter_rows(named=True):
         pct = row["percentile"]
         t = row["theta_star"]
         if pct not in color_map or pct in skip:
@@ -70,27 +73,32 @@ def _add_peak_stars(ax, df: pd.DataFrame, peaks: pd.DataFrame, theta_range=None,
         )
 
 
-def _merge_with_coarse(sweep_df: pd.DataFrame, coarse_path: Path | None) -> pd.DataFrame:
+def _merge_with_coarse(sweep_df: pl.DataFrame, coarse_path: Path | None) -> pl.DataFrame:
     """Merge dense sweep with coarse summary for wider θ coverage."""
     if coarse_path is None or not coarse_path.exists():
         return sweep_df
 
-    coarse = pd.read_parquet(coarse_path)
+    coarse = pl.read_parquet(coarse_path)
 
     # Only keep coarse rows outside the sweep range
-    lo, hi = sweep_df["theta"].min(), sweep_df["theta"].max()
-    outside = coarse[(coarse["theta"] < lo - 0.001) | (coarse["theta"] > hi + 0.001)]
+    lo = sweep_df["theta"].min()
+    hi = sweep_df["theta"].max()
+    outside = coarse.filter(
+        (pl.col("theta") < lo - 0.001) | (pl.col("theta") > hi + 0.001)
+    )
 
-    if len(outside) == 0:
+    if outside.is_empty():
         return sweep_df
 
-    # Concat with all columns — missing ones become NaN, then interpolate
-    merged = pd.concat([sweep_df, outside], ignore_index=True)
-    merged = merged.sort_values("theta").reset_index(drop=True)
-    # Interpolate NaN percentile columns so lines extend smoothly
+    # Concat, sort, then interpolate NaN percentile columns via pandas
+    merged = pl.concat([sweep_df, outside], how="diagonal")
+    merged = merged.sort("theta")
+
+    # Interpolate NaN percentile columns — use pandas for index-based interpolation
     pct_cols = [c for c in merged.columns if c.startswith("p")]
-    merged[pct_cols] = merged[pct_cols].interpolate(method="index")
-    return merged
+    pdf = merged.to_pandas()
+    pdf[pct_cols] = pdf[pct_cols].interpolate(method="index")
+    return pl.from_pandas(pdf)
 
 
 def plot_percentile_sweep(
@@ -104,9 +112,9 @@ def plot_percentile_sweep(
 ) -> list[Path]:
     """Generate all percentile sweep plots. Returns list of output paths."""
     setup_theme()
-    df = pd.read_csv(sweep_path)
-    peaks = pd.read_csv(peaks_path)
-    df = df.sort_values("theta")
+    df = pl.read_csv(sweep_path)
+    peaks = pl.read_csv(peaks_path)
+    df = df.sort("theta")
 
     # Merge with coarse grid for wider-range plots
     df_wide = _merge_with_coarse(df, coarse_path)
@@ -139,8 +147,8 @@ def plot_percentile_sweep(
 
 
 def _plot_full(
-    df: pd.DataFrame,
-    peaks: pd.DataFrame,
+    df: pl.DataFrame,
+    peaks: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -166,16 +174,18 @@ def _plot_full(
 
 
 def _plot_wide(
-    df: pd.DataFrame,
-    peaks: pd.DataFrame,
+    df: pl.DataFrame,
+    peaks: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
     fmt: str = "png",
 ) -> Path:
     """Wide range: θ ∈ [-1.0, +1.0], merging dense sweep + coarse grid."""
-    wdf = df[(df["theta"] >= -1.0) & (df["theta"] <= 1.0)].copy()
-    if len(wdf) == 0:
+    wdf = df.filter(
+        (pl.col("theta") >= -1.0) & (pl.col("theta") <= 1.0)
+    )
+    if wdf.is_empty():
         wdf = df
 
     fig, ax = plt.subplots(figsize=(14, 8))
@@ -201,7 +211,7 @@ def _plot_wide(
 
 
 def _plot_mean_std(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -210,16 +220,21 @@ def _plot_mean_std(
     """Mean score vs θ with ±1 std band."""
     fig, ax = plt.subplots(figsize=(12, 6))
 
+    # Extract numpy arrays for plotting
+    theta_arr = df["theta"].to_numpy()
+    mean_arr = df["mean"].to_numpy()
+    std_arr = df["std"].to_numpy()
+
     ax.fill_between(
-        df["theta"],
-        df["mean"] - df["std"],
-        df["mean"] + df["std"],
+        theta_arr,
+        mean_arr - std_arr,
+        mean_arr + std_arr,
         alpha=0.2, color="#3182ce",
     )
-    ax.plot(df["theta"], df["mean"], linewidth=2.5, color="#2b6cb0", label="Mean ± 1σ")
+    ax.plot(theta_arr, mean_arr, linewidth=2.5, color="#2b6cb0", label="Mean ± 1σ")
 
-    ev_row = df.iloc[(df["theta"].abs()).argmin()]
-    ax.plot(ev_row["theta"], ev_row["mean"], marker="*", markersize=14, color="#e53e3e", zorder=5)
+    ev_idx = int(np.abs(theta_arr).argmin())
+    ax.plot(theta_arr[ev_idx], mean_arr[ev_idx], marker="*", markersize=14, color="#e53e3e", zorder=5)
 
     ax.axvline(0, color="black", linewidth=0.8, linestyle="-", alpha=0.4)
     ax.set_xlabel("θ  (risk parameter)", fontsize=FONT_AXIS_LABEL)
@@ -236,7 +251,7 @@ def _plot_mean_std(
 
 
 def _plot_heatmap(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -245,13 +260,13 @@ def _plot_heatmap(
     """Heatmap: rows = percentiles, columns = θ, cells = score values."""
     if len(df) > 40:
         step = max(1, len(df) // 40)
-        sdf = df.iloc[::step].copy()
+        sdf = df.gather_every(step)
     else:
-        sdf = df.copy()
+        sdf = df
 
     pcts_available = [p for p in _ALL if p in sdf.columns]
-    matrix = sdf[pcts_available].T.values.astype(float)
-    theta_labels = [f"{t:+.3f}" for t in sdf["theta"]]
+    matrix = sdf.select(pcts_available).to_numpy().T.astype(float)
+    theta_labels = [f"{t:+.3f}" for t in sdf["theta"].to_list()]
 
     fig, ax = plt.subplots(figsize=(18, 6))
     im = ax.imshow(matrix, aspect="auto", cmap="RdYlGn")
@@ -274,15 +289,17 @@ def _plot_heatmap(
 
 
 def _plot_mean_cost(
-    df: pd.DataFrame,
-    peaks: pd.DataFrame,
+    df: pl.DataFrame,
+    peaks: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
     fmt: str = "png",
 ) -> Path:
     """For each percentile peak θ*, show the percentile gain vs mean cost."""
-    ev_row = df.iloc[(df["theta"].abs()).argmin()]
+    theta_arr = df["theta"].to_numpy()
+    ev_idx = int(np.abs(theta_arr).argmin())
+    ev_row = df.row(ev_idx, named=True)
     ev_mean = ev_row["mean"]
 
     pct_colors = sns.color_palette("rocket", len(_CORE))
@@ -292,9 +309,9 @@ def _plot_mean_cost(
     fig, ax = plt.subplots(figsize=(10, 7))
 
     xs, ys, labels, colors = [], [], [], []
-    for _, row in peaks.iterrows():
+    for row in peaks.iter_rows(named=True):
         pct = row["percentile"]
-        if pct not in color_map or pct not in ev_row.index:
+        if pct not in color_map or pct not in ev_row:
             continue
         ev_pct_val = ev_row[pct]
         gain = row["value"] - ev_pct_val
@@ -327,9 +344,9 @@ def _plot_mean_cost(
 
 
 def _plot_frontier(
-    df_dense: pd.DataFrame,
-    df_wide: pd.DataFrame,
-    peaks: pd.DataFrame,
+    df_dense: pl.DataFrame,
+    df_wide: pl.DataFrame,
+    peaks: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -347,15 +364,16 @@ def _plot_frontier(
     fig, ax = plt.subplots(figsize=(14, 10))
 
     # --- Coarse-only points (outside dense range) as faded context ---
-    dense_lo, dense_hi = df_dense["theta"].min(), df_dense["theta"].max()
-    coarse_only = df_wide[
-        (df_wide["theta"] < dense_lo - 0.001) | (df_wide["theta"] > dense_hi + 0.001)
-    ].copy()
+    dense_lo = df_dense["theta"].min()
+    dense_hi = df_dense["theta"].max()
+    coarse_only = df_wide.filter(
+        (pl.col("theta") < dense_lo - 0.001) | (pl.col("theta") > dense_hi + 0.001)
+    )
     if len(coarse_only) > 0:
         norm_wide = mcolors.Normalize(
             vmin=df_wide["theta"].min(), vmax=df_wide["theta"].max(),
         )
-        for _, row in coarse_only.iterrows():
+        for row in coarse_only.iter_rows(named=True):
             ax.scatter(
                 row["std"], row["mean"],
                 color=CMAP(norm_wide(row["theta"])),
@@ -364,13 +382,13 @@ def _plot_frontier(
             )
 
     # --- Dense sweep: colored line segments by θ ---
-    ds = df_dense.sort_values("theta").reset_index(drop=True)
+    ds = df_dense.sort("theta")
     norm = mcolors.Normalize(vmin=ds["theta"].min(), vmax=ds["theta"].max())
 
     # Draw line segments colored by θ (using LineCollection for gradient)
-    stds = ds["std"].values
-    means = ds["mean"].values
-    thetas = ds["theta"].values
+    stds = ds["std"].to_numpy()
+    means = ds["mean"].to_numpy()
+    thetas = ds["theta"].to_numpy()
 
     for i in range(len(ds) - 1):
         t_mid = (thetas[i] + thetas[i + 1]) / 2
@@ -388,7 +406,7 @@ def _plot_frontier(
     )
 
     # --- θ=0 marker ---
-    ev_idx = np.abs(thetas).argmin()
+    ev_idx = int(np.abs(thetas).argmin())
     ax.scatter(
         stds[ev_idx], means[ev_idx],
         color="black", s=200, marker="*", zorder=10,
@@ -396,24 +414,24 @@ def _plot_frontier(
     )
 
     # --- Peak p95 marker ---
-    p95_peak = peaks[peaks["percentile"] == "p95"]
-    if not p95_peak.empty:
-        t_star = p95_peak.iloc[0]["theta_star"]
-        match = ds.iloc[(ds["theta"] - t_star).abs().argsort()[:1]]
-        if len(match) > 0:
-            r = match.iloc[0]
-            ax.scatter(
-                r["std"], r["mean"],
-                color="#e53e3e", s=180, marker="D", zorder=10,
-                edgecolors="black", linewidths=0.8,
-                label=f"θ*_p95 = {t_star:+.2f}",
-            )
+    p95_peak = peaks.filter(pl.col("percentile") == "p95")
+    if not p95_peak.is_empty():
+        t_star = p95_peak["theta_star"][0]
+        idx = int(np.abs(thetas - t_star).argmin())
+        r_std = stds[idx]
+        r_mean = means[idx]
+        ax.scatter(
+            r_std, r_mean,
+            color="#e53e3e", s=180, marker="D", zorder=10,
+            edgecolors="black", linewidths=0.8,
+            label=f"θ*_p95 = {t_star:+.2f}",
+        )
 
     # --- Sparse θ labels along the curve ---
     label_thetas = [-0.08, -0.04, -0.02, 0.0, 0.02, 0.05, 0.10, 0.15, 0.20, 0.30, 0.40]
     labeled = set()
     for t_target in label_thetas:
-        idx = np.abs(thetas - t_target).argmin()
+        idx = int(np.abs(thetas - t_target).argmin())
         if abs(thetas[idx] - t_target) > 0.015:
             continue
         if idx in labeled:
@@ -486,8 +504,8 @@ def _plot_frontier(
 
 
 def _plot_percentile_frontiers(
-    df: pd.DataFrame,
-    peaks: pd.DataFrame,
+    df: pl.DataFrame,
+    peaks: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -505,10 +523,10 @@ def _plot_percentile_frontiers(
     """
     fig, ax = plt.subplots(figsize=(14, 10))
 
-    ds = df.sort_values("theta").reset_index(drop=True)
-    thetas = ds["theta"].values
-    means = ds["mean"].values
-    stds = ds["std"].values
+    ds = df.sort("theta")
+    thetas = ds["theta"].to_numpy()
+    means = ds["mean"].to_numpy()
+    stds = ds["std"].to_numpy()
 
     # --- Background: full frontier curve, faded, with α ∝ |θ| ---
     abs_theta = np.abs(thetas)
@@ -532,12 +550,12 @@ def _plot_percentile_frontiers(
 
     peak_stds, peak_means, peak_labels, peak_colors = [], [], [], []
     for j, pct in enumerate(pcts):
-        row = peaks[peaks["percentile"] == pct]
-        if row.empty:
+        row = peaks.filter(pl.col("percentile") == pct)
+        if row.is_empty():
             continue
-        t_star = row.iloc[0]["theta_star"]
+        t_star = row["theta_star"][0]
         # Find nearest θ in the sweep
-        idx = np.abs(thetas - t_star).argmin()
+        idx = int(np.abs(thetas - t_star).argmin())
         color = cw(pct_norm(j))
         peak_stds.append(stds[idx])
         peak_means.append(means[idx])
@@ -571,7 +589,7 @@ def _plot_percentile_frontiers(
         )
 
     # --- θ=0 reference marker ---
-    ev_idx = np.abs(thetas).argmin()
+    ev_idx = int(np.abs(thetas).argmin())
     ax.scatter(
         stds[ev_idx], means[ev_idx],
         color="black", s=250, marker="*", zorder=10,

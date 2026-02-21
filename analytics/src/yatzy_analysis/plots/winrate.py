@@ -5,22 +5,22 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import polars as pl
 
 from .style import FONT_AXIS_LABEL, FONT_LEGEND, FONT_TITLE, GRID_ALPHA, setup_theme
 
 
 def load_winrate_data(
     winrate_dir: Path,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Load winrate_results.csv and winrate_conditional.csv."""
-    results = pd.read_csv(winrate_dir / "winrate_results.csv")
-    cond = pd.read_csv(winrate_dir / "winrate_conditional.csv")
+    results = pl.read_csv(winrate_dir / "winrate_results.csv")
+    cond = pl.read_csv(winrate_dir / "winrate_conditional.csv")
     return results, cond
 
 
 def plot_winrate_curve(
-    results: pd.DataFrame,
+    results: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -31,12 +31,11 @@ def plot_winrate_curve(
     fig, ax = plt.subplots(figsize=(12, 7))
 
     # Separate baseline and challengers
-    challengers = results[results["theta"] != 0.0].copy()
-    challengers = challengers.sort_values("theta")
+    challengers = results.filter(pl.col("theta") != 0.0).sort("theta")
 
     # Color by win/loss relative to 50%
     colors = []
-    for _, row in challengers.iterrows():
+    for row in challengers.iter_rows(named=True):
         wr = row["win_rate"]
         if wr > 0.51:
             colors.append("#27ae60")  # strong green
@@ -49,8 +48,8 @@ def plot_winrate_curve(
 
     # Plot curve
     ax.plot(
-        challengers["theta"],
-        challengers["win_rate"] * 100,
+        challengers["theta"].to_numpy(),
+        challengers["win_rate"].to_numpy() * 100,
         color="#3498db",
         linewidth=2.0,
         zorder=3,
@@ -59,8 +58,8 @@ def plot_winrate_curve(
 
     # Plot points
     ax.scatter(
-        challengers["theta"],
-        challengers["win_rate"] * 100,
+        challengers["theta"].to_numpy(),
+        challengers["win_rate"].to_numpy() * 100,
         c=colors,
         s=80,
         zorder=4,
@@ -69,8 +68,8 @@ def plot_winrate_curve(
     )
 
     # Annotate best
-    best_idx = challengers["win_rate"].idxmax()
-    best = challengers.loc[best_idx]
+    best_idx = challengers["win_rate"].arg_max()
+    best = challengers.row(best_idx, named=True)
     ax.annotate(
         f"θ={best['theta']:+.3f}\n{best['win_rate']*100:.2f}%",
         (best["theta"], best["win_rate"] * 100),
@@ -103,8 +102,8 @@ def plot_winrate_curve(
 
 
 def plot_conditional_winrate(
-    results: pd.DataFrame,
-    cond: pd.DataFrame,
+    results: pl.DataFrame,
+    cond: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -113,25 +112,26 @@ def plot_conditional_winrate(
     """Grouped bars: win rate by opponent score band for top θ values + θ=0."""
     setup_theme()
 
-    challengers = results[results["theta"] != 0.0].copy()
-    if challengers.empty:
+    challengers = results.filter(pl.col("theta") != 0.0)
+    if challengers.is_empty():
         return
 
     # Pick top 3 by win rate + the worst for contrast
-    top3 = challengers.nlargest(3, "win_rate")["theta"].tolist()
-    worst = challengers.nsmallest(1, "win_rate")["theta"].tolist()
+    top3 = challengers.sort("win_rate", descending=True).head(3)["theta"].to_list()
+    worst = challengers.sort("win_rate").head(1)["theta"].to_list()
     selected = sorted(set(top3 + worst))
 
-    cond_sel = cond[cond["theta"].isin(selected)].copy()
-    if cond_sel.empty:
+    cond_sel = cond.filter(pl.col("theta").is_in(selected))
+    if cond_sel.is_empty():
         return
 
-    # Create band labels
-    cond_sel["band"] = cond_sel.apply(
+    # Create band labels — convert to pandas for .apply-style operation
+    cond_sel_pd = cond_sel.to_pandas()
+    cond_sel_pd["band"] = cond_sel_pd.apply(
         lambda r: f"{int(r['band_lo'])}-{int(r['band_hi'])}", axis=1
     )
 
-    bands = cond_sel["band"].unique()
+    bands = cond_sel_pd["band"].unique()
     n_bands = len(bands)
     n_thetas = len(selected)
 
@@ -143,7 +143,7 @@ def plot_conditional_winrate(
     colors = ["#3498db", "#27ae60", "#e74c3c", "#9b59b6", "#e67e22"]
 
     for i, theta in enumerate(selected):
-        subset = cond_sel[cond_sel["theta"] == theta].set_index("band")
+        subset = cond_sel_pd[cond_sel_pd["theta"] == theta].set_index("band")
         vals = [subset.loc[b, "win_rate"] * 100 if b in subset.index else 0 for b in bands]
         offset = (i - n_thetas / 2 + 0.5) * bar_width
         ax.bar(
@@ -175,7 +175,7 @@ def plot_conditional_winrate(
 
 
 def plot_pmf_comparison(
-    results: pd.DataFrame,
+    results: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -189,14 +189,14 @@ def plot_pmf_comparison(
     """
     setup_theme()
 
-    baseline = results[results["theta"] == 0.0]
-    challengers = results[results["theta"] != 0.0]
-    if baseline.empty or challengers.empty:
+    baseline = results.filter(pl.col("theta") == 0.0)
+    challengers = results.filter(pl.col("theta") != 0.0)
+    if baseline.is_empty() or challengers.is_empty():
         return
 
-    best_idx = challengers["win_rate"].idxmax()
-    best = challengers.loc[best_idx]
-    bl = baseline.iloc[0]
+    best_idx = challengers["win_rate"].arg_max()
+    best = challengers.row(best_idx, named=True)
+    bl = baseline.row(0, named=True)
 
     fig, ax = plt.subplots(figsize=(12, 7))
 

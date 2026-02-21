@@ -5,31 +5,29 @@ from pathlib import Path
 
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
-import pandas as pd
+import polars as pl
 
 from ..config import MAX_SCORE
+from .spec import PLOT_SPECS, PlotSpec
 from .style import (
     FONT_AXIS_LABEL,
-    FONT_LEGEND,
     FONT_SUPTITLE,
     FONT_TITLE,
-    GRID_ALPHA,
-    fmt_theta,
+    apply_theta_legend,
     make_norm,
-    save_fig,
     setup_theme,
     theta_color,
-    theta_colorbar,
 )
 
 
 def plot_cdf(
     thetas: list[float],
-    cdf_df: pd.DataFrame,
+    cdf_df: pl.DataFrame,
     out_dir: Path,
     *,
     norm: mcolors.Normalize | None = None,
     ax=None,
+    spec: PlotSpec | None = None,
     dpi: int = 200,
     fmt: str = "png",
 ) -> None:
@@ -41,13 +39,13 @@ def plot_cdf(
         fig, ax = plt.subplots(figsize=(14, 7))
 
     for t in thetas:
-        subset = cdf_df[cdf_df["theta"] == t]
+        subset = cdf_df.filter(pl.col("theta") == t).to_pandas()
         color = theta_color(t, norm)
         lw = 2.5 if t == 0 else 1.4
         alpha = 1.0 if t == 0 else 0.85
         ax.plot(
             subset["score"], subset["cdf"],
-            color=color, linewidth=lw, alpha=alpha, label=f"θ={fmt_theta(t)}",
+            color=color, linewidth=lw, alpha=alpha,
         )
 
     ax.set_xlabel("Total Score", fontsize=FONT_AXIS_LABEL)
@@ -55,8 +53,7 @@ def plot_cdf(
     ax.set_title("Score CDF by Risk Parameter θ", fontsize=FONT_TITLE, fontweight="bold")
     ax.set_xlim(50, MAX_SCORE)
     ax.set_ylim(0, 1)
-    ax.legend(loc="upper left", fontsize=FONT_LEGEND, ncol=2, framealpha=0.9)
-    theta_colorbar(ax, norm)
+    apply_theta_legend(ax, norm, spec or PLOT_SPECS["cdf_full"])
 
     if standalone:
         fig.tight_layout()
@@ -66,11 +63,12 @@ def plot_cdf(
 
 def plot_tails(
     thetas: list[float],
-    cdf_df: pd.DataFrame,
+    cdf_df: pl.DataFrame,
     out_dir: Path,
     *,
     norm: mcolors.Normalize | None = None,
     axes=None,
+    spec: PlotSpec | None = None,
     dpi: int = 200,
     fmt: str = "png",
 ) -> None:
@@ -84,7 +82,7 @@ def plot_tails(
         ax_left, ax_right = axes
 
     for t in thetas:
-        subset = cdf_df[cdf_df["theta"] == t]
+        subset = cdf_df.filter(pl.col("theta") == t).to_pandas()
         color = theta_color(t, norm)
         lw = 2.5 if t == 0 else 1.4
         alpha = 1.0 if t == 0 else 0.85
@@ -92,28 +90,28 @@ def plot_tails(
         left = subset[subset["cdf"] <= 0.05]
         ax_left.plot(
             left["score"], left["cdf"],
-            color=color, linewidth=lw, alpha=alpha, label=f"θ={fmt_theta(t)}",
+            color=color, linewidth=lw, alpha=alpha,
         )
 
         right = subset[subset["cdf"] >= 0.97]
         ax_right.plot(
             right["score"], right["survival"],
-            color=color, linewidth=lw, alpha=alpha, label=f"θ={fmt_theta(t)}",
+            color=color, linewidth=lw, alpha=alpha,
         )
 
+    _spec = spec or PLOT_SPECS["tails_zoomed"]
     ax_left.set_xlabel("Total Score", fontsize=FONT_AXIS_LABEL)
     ax_left.set_ylabel("Cumulative Probability", fontsize=FONT_AXIS_LABEL)
     ax_left.set_title("Left Tail (bottom 5%)", fontsize=FONT_TITLE, fontweight="bold")
     ax_left.set_ylim(0, 0.05)
     ax_left.set_xlim(0, 200)
-    ax_left.legend(fontsize=FONT_LEGEND, loc="upper left", framealpha=0.9)
 
     ax_right.set_xlabel("Total Score", fontsize=FONT_AXIS_LABEL)
     ax_right.set_ylabel("P(Score > x)  [survival]", fontsize=FONT_AXIS_LABEL)
     ax_right.set_title("Right Tail (top 3%)", fontsize=FONT_TITLE, fontweight="bold")
     ax_right.set_ylim(0, 0.03)
     ax_right.set_xlim(300, MAX_SCORE)
-    ax_right.legend(fontsize=FONT_LEGEND, loc="upper right", framealpha=0.9)
+    apply_theta_legend(ax_right, norm, _spec)
 
     if standalone:
         fig.suptitle(

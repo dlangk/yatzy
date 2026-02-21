@@ -14,7 +14,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
-import pandas as pd
+import polars as pl
 
 from .style import CMAP, FONT_AXIS_LABEL, FONT_LEGEND, FONT_TITLE, GRID_ALPHA, setup_theme
 
@@ -22,15 +22,15 @@ from .style import CMAP, FONT_AXIS_LABEL, FONT_LEGEND, FONT_TITLE, GRID_ALPHA, s
 MAX_POLICY_COLOR = "#2CA02C"
 
 
-def load_conditional_csv(csv_path: Path) -> pd.DataFrame:
+def load_conditional_csv(csv_path: Path) -> pl.DataFrame:
     """Load yatzy_conditional.csv. theta column is string (may contain 'max_policy')."""
-    df = pd.read_csv(csv_path, dtype={"theta": str})
+    df = pl.read_csv(csv_path, schema_overrides={"theta": pl.Utf8})
     return df
 
 
-def _parse_strategies(df: pd.DataFrame) -> tuple[list[float], bool]:
+def _parse_strategies(df: pl.DataFrame) -> tuple[list[float], bool]:
     """Extract sorted numeric thetas and whether max_policy is present."""
-    raw = df["theta"].unique()
+    raw = df["theta"].unique().to_list()
     thetas = sorted(float(t) for t in raw if t != "max_policy")
     has_max = "max_policy" in raw
     return thetas, has_max
@@ -70,7 +70,7 @@ def _ordered_strategies(thetas: list[float], has_max: bool) -> list[str]:
 # ── Plot 1: Conditional hit rate by score band ────────────────────────────
 
 def plot_conditional_hit_rate(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -80,7 +80,7 @@ def plot_conditional_hit_rate(
     setup_theme()
 
     score_bands = ["<200", "200-220", "220-240", "240-260", "260-280", "280-300", "300+", "top5pct"]
-    band_df = df[df["band"].isin(score_bands)].copy()
+    band_df = df.filter(pl.col("band").is_in(score_bands))
 
     thetas, has_max = _parse_strategies(df)
     colors = _strategy_colors(thetas, has_max)
@@ -94,11 +94,11 @@ def plot_conditional_hit_rate(
     x = np.arange(n_bands)
 
     for j, strat in enumerate(strategies):
-        strat_data = band_df[band_df["theta"] == strat]
+        strat_data = band_df.filter(pl.col("theta") == strat)
         rates = []
         for band in score_bands:
-            row = strat_data[strat_data["band"] == band]
-            rates.append(row["yatzy_hit_rate"].values[0] * 100 if len(row) > 0 else 0)
+            row = strat_data.filter(pl.col("band") == band)
+            rates.append(row["yatzy_hit_rate"].to_numpy()[0] * 100 if len(row) > 0 else 0)
 
         offset = (j - n_strats / 2 + 0.5) * bar_width
         ax.bar(
@@ -136,7 +136,7 @@ def plot_conditional_hit_rate(
 # ── Plot 2: Unconditional vs tail hit rate ────────────────────────────────
 
 def plot_unconditional_vs_tail(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -149,35 +149,39 @@ def plot_unconditional_vs_tail(
 
     # Numeric θ data
     theta_strs = [f"{t:.3f}" for t in thetas]
-    all_df = df[(df["band"] == "all") & (df["theta"].isin(theta_strs))].copy()
-    all_df["theta_f"] = all_df["theta"].astype(float)
-    all_df = all_df.sort_values("theta_f")
+    all_df = (
+        df.filter((pl.col("band") == "all") & (pl.col("theta").is_in(theta_strs)))
+        .with_columns(pl.col("theta").cast(pl.Float64).alias("theta_f"))
+        .sort("theta_f")
+    )
 
-    top5_df = df[(df["band"] == "top5pct") & (df["theta"].isin(theta_strs))].copy()
-    top5_df["theta_f"] = top5_df["theta"].astype(float)
-    top5_df = top5_df.sort_values("theta_f")
+    top5_df = (
+        df.filter((pl.col("band") == "top5pct") & (pl.col("theta").is_in(theta_strs)))
+        .with_columns(pl.col("theta").cast(pl.Float64).alias("theta_f"))
+        .sort("theta_f")
+    )
 
     fig, ax = plt.subplots(figsize=(10, 7))
 
     ax.plot(
-        all_df["theta_f"], all_df["yatzy_hit_rate"] * 100,
+        all_df["theta_f"].to_numpy(), all_df["yatzy_hit_rate"].to_numpy() * 100,
         "o-", color="#2166AC", linewidth=2.5, markersize=8,
         label="Unconditional (all games)",
     )
     ax.plot(
-        top5_df["theta_f"], top5_df["yatzy_hit_rate"] * 100,
+        top5_df["theta_f"].to_numpy(), top5_df["yatzy_hit_rate"].to_numpy() * 100,
         "s--", color="#B2182B", linewidth=2.5, markersize=8,
         label="Top 5% tail only",
     )
 
     # Max-policy as horizontal markers
     if has_max:
-        mp_all = df[(df["band"] == "all") & (df["theta"] == "max_policy")]
-        mp_top5 = df[(df["band"] == "top5pct") & (df["theta"] == "max_policy")]
+        mp_all = df.filter((pl.col("band") == "all") & (pl.col("theta") == "max_policy"))
+        mp_top5 = df.filter((pl.col("band") == "top5pct") & (pl.col("theta") == "max_policy"))
         x_max = max(thetas) * 1.15 if thetas else 1.0
 
         if len(mp_all) > 0:
-            rate = mp_all["yatzy_hit_rate"].values[0] * 100
+            rate = mp_all["yatzy_hit_rate"].to_numpy()[0] * 100
             ax.plot(x_max, rate, "D", color=MAX_POLICY_COLOR, markersize=12, zorder=5)
             ax.annotate(
                 f"max-policy\n{rate:.1f}%", (x_max, rate),
@@ -185,7 +189,7 @@ def plot_unconditional_vs_tail(
                 color=MAX_POLICY_COLOR, fontweight="bold",
             )
         if len(mp_top5) > 0:
-            rate = mp_top5["yatzy_hit_rate"].values[0] * 100
+            rate = mp_top5["yatzy_hit_rate"].to_numpy()[0] * 100
             ax.plot(x_max, rate, "D", color=MAX_POLICY_COLOR, markersize=12, zorder=5)
             ax.annotate(
                 f"max-policy top5%\n{rate:.1f}%", (x_max, rate),
@@ -205,26 +209,30 @@ def plot_unconditional_vs_tail(
 
     # Annotate θ endpoints
     if len(all_df) >= 2:
-        t0_all = all_df.iloc[0]["yatzy_hit_rate"] * 100
-        tmax_all = all_df.iloc[-1]["yatzy_hit_rate"] * 100
+        all_first = all_df.row(0, named=True)
+        all_last = all_df.row(-1, named=True)
+        t0_all = all_first["yatzy_hit_rate"] * 100
+        tmax_all = all_last["yatzy_hit_rate"] * 100
         ax.annotate(
-            f"{t0_all:.1f}%", (all_df.iloc[0]["theta_f"], t0_all),
+            f"{t0_all:.1f}%", (all_first["theta_f"], t0_all),
             textcoords="offset points", xytext=(10, 10), fontsize=9, color="#2166AC",
         )
         ax.annotate(
-            f"{tmax_all:.1f}%", (all_df.iloc[-1]["theta_f"], tmax_all),
+            f"{tmax_all:.1f}%", (all_last["theta_f"], tmax_all),
             textcoords="offset points", xytext=(10, -15), fontsize=9, color="#2166AC",
         )
 
     if len(top5_df) >= 2:
-        t0_top5 = top5_df.iloc[0]["yatzy_hit_rate"] * 100
-        tmax_top5 = top5_df.iloc[-1]["yatzy_hit_rate"] * 100
+        top5_first = top5_df.row(0, named=True)
+        top5_last = top5_df.row(-1, named=True)
+        t0_top5 = top5_first["yatzy_hit_rate"] * 100
+        tmax_top5 = top5_last["yatzy_hit_rate"] * 100
         ax.annotate(
-            f"{t0_top5:.1f}%", (top5_df.iloc[0]["theta_f"], t0_top5),
+            f"{t0_top5:.1f}%", (top5_first["theta_f"], t0_top5),
             textcoords="offset points", xytext=(10, -15), fontsize=9, color="#B2182B",
         )
         ax.annotate(
-            f"{tmax_top5:.1f}%", (top5_df.iloc[-1]["theta_f"], tmax_top5),
+            f"{tmax_top5:.1f}%", (top5_last["theta_f"], tmax_top5),
             textcoords="offset points", xytext=(10, 10), fontsize=9, color="#B2182B",
         )
 
@@ -238,7 +246,7 @@ def plot_unconditional_vs_tail(
 # ── Plot 3: The dump gap ─────────────────────────────────────────────────
 
 def plot_dump_gap(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -251,10 +259,12 @@ def plot_dump_gap(
     strategies = _ordered_strategies(thetas, has_max)
     colors = _strategy_colors(thetas, has_max)
 
-    all_df = df[df["band"] == "all"].copy()
-    # Order by strategy list
-    all_df["_order"] = all_df["theta"].map({s: i for i, s in enumerate(strategies)})
-    all_df = all_df.sort_values("_order")
+    all_df = df.filter(pl.col("band") == "all")
+    # Order by strategy list using a mapping column
+    order_map = {s: i for i, s in enumerate(strategies)}
+    all_df = all_df.with_columns(
+        pl.col("theta").replace_strict(order_map, default=None).alias("_order")
+    ).sort("_order")
 
     labels = [_strategy_label(s) for s in strategies]
 
@@ -263,8 +273,8 @@ def plot_dump_gap(
     x = np.arange(len(strategies))
     width = 0.35
 
-    hit_scores = all_df["mean_score_hit"].values
-    miss_scores = all_df["mean_score_miss"].values
+    hit_scores = all_df["mean_score_hit"].to_numpy()
+    miss_scores = all_df["mean_score_miss"].to_numpy()
 
     ax.bar(
         x - width / 2, hit_scores, width,

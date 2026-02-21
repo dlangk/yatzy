@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 
 import click
+import polars as pl
 
 
 @click.group()
@@ -89,7 +90,7 @@ def compute(base_path: str, write_csv: bool, source: str):
 
     if write_csv:
         csv_path = out_dir / "sweep_summary.csv"
-        summary_df.to_csv(csv_path, index=False, float_format="%.6f")
+        summary_df.write_csv(csv_path, float_precision=6)
         click.echo(f"Saved {csv_path} ({len(summary_df)} rows)")
 
     click.echo(f"Done in {time.time() - t0:.1f}s.")
@@ -111,7 +112,7 @@ def plot(base_path: str, subset: str, fmt: str, dpi: int):
     from .config import PLOT_SUBSETS, analysis_dir, plots_dir
     from .plots.cdf import plot_cdf, plot_tails
     from .plots.combined import plot_combined
-    from .plots.density import plot_density, plot_density_3d, plot_density_3d_interactive
+    from .plots.density import plot_density, plot_density_3d
     from .plots.mean_std import plot_mean_vs_std
     from .plots.percentiles import plot_percentiles
     from .plots.quantile import plot_quantile
@@ -133,7 +134,7 @@ def plot(base_path: str, subset: str, fmt: str, dpi: int):
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Filter to available thetas
-    available = sorted(summary_all["theta"].unique())
+    available = sorted(summary_all["theta"].unique().to_list())
     if subset == "all":
         # Use every theta present in the data
         thetas = [float(t) for t in available]
@@ -144,8 +145,8 @@ def plot(base_path: str, subset: str, fmt: str, dpi: int):
         )
         thetas = sorted([t for t in theta_list if t in set(available)])
 
-    stats_df = summary_all[summary_all["theta"].isin(thetas)]
-    k_df = kde_all[kde_all["theta"].isin(thetas)]
+    stats_df = summary_all.filter(pl.col("theta").is_in(thetas))
+    k_df = kde_all.filter(pl.col("theta").is_in(thetas))
     cdf_df = k_df
 
     click.echo(f"[{subset}] {len(thetas)} thetas → {out_dir}/")
@@ -163,8 +164,6 @@ def plot(base_path: str, subset: str, fmt: str, dpi: int):
     click.echo(f"  density.{fmt}")
     plot_density_3d(thetas, k_df, out_dir, dpi=dpi, fmt=fmt)
     click.echo(f"  density_3d.{fmt}")
-    plot_density_3d_interactive(thetas, k_df, out_dir)
-    click.echo("  density_3d_interactive.html")
     plot_quantile(thetas, cdf_df, out_dir, dpi=dpi, fmt=fmt)
     click.echo(f"  quantile.{fmt}")
     plot_combined(thetas, cdf_df, stats_df, k_df, out_dir, dpi=dpi, fmt=fmt)
@@ -192,7 +191,7 @@ def efficiency(base_path: str):
 
     summary_df = load_summary(summary_path)
     kde_df = load_kde(kde_path)
-    thetas = sorted(summary_df["theta"].unique().tolist())
+    thetas = sorted(summary_df["theta"].unique().to_list())
 
     click.echo("Computing exchange rates...")
     mer_df = compute_exchange_rates(summary_df)
@@ -202,8 +201,8 @@ def efficiency(base_path: str):
 
     # Save to parquet
     out_dir = adir
-    mer_df.to_parquet(out_dir / "mer.parquet", engine="pyarrow", index=False)
-    sdva_df.to_parquet(out_dir / "sdva.parquet", engine="pyarrow", index=False)
+    mer_df.write_parquet(out_dir / "mer.parquet")
+    sdva_df.write_parquet(out_dir / "sdva.parquet")
     click.echo(f"Saved mer.parquet ({len(mer_df)} rows)")
     click.echo(f"Saved sdva.parquet ({len(sdva_df)} rows)")
 
@@ -215,7 +214,8 @@ def efficiency(base_path: str):
         f"{'MER_p95':>8s} | {'MER_p99':>8s} | {'MER_max':>8s}"
     )
     click.echo("-" * 72)
-    for _, row in mer_df[mer_df["theta"] > 0].iterrows():
+    mer_pos = mer_df.filter(pl.col("theta") > 0)
+    for row in mer_pos.iter_rows(named=True):
         def _fmt(v: float) -> str:
             if abs(v) > 99 or v == float("inf") or v == float("-inf"):
                 return "    dom"
@@ -235,7 +235,8 @@ def efficiency(base_path: str):
         f"{'theta':>6s} | {'A_worse':>8s} | {'A_better':>8s} | {'ratio':>7s} | {'x_cross':>7s}"
     )
     click.echo("-" * 50)
-    for _, row in sdva_df[(sdva_df["theta"] > 0) & (sdva_df["theta"] <= 0.5)].iterrows():
+    sdva_pos = sdva_df.filter((pl.col("theta") > 0) & (pl.col("theta") <= 0.5))
+    for row in sdva_pos.iter_rows(named=True):
         t = row["theta"]
         tstr = f"{t:g}" if t != int(t) or abs(t) < 1 else f"{int(t)}"
         rstr = f"{row['ratio']:7.1f}" if row["ratio"] < 999 else "    inf"
@@ -252,9 +253,10 @@ def efficiency(base_path: str):
         f"{'deficit_5':>9s}"
     )
     click.echo("-" * 58)
-    base = summary_df[summary_df["theta"] == 0.0]
-    base_cvar5 = base.iloc[0]["cvar_5"] if not base.empty else 0.0
-    for _, row in summary_df[(summary_df["theta"] >= 0) & (summary_df["theta"] <= 0.5)].iterrows():
+    base = summary_df.filter(pl.col("theta") == 0.0)
+    base_cvar5 = base.row(0, named=True)["cvar_5"] if len(base) > 0 else 0.0
+    cvar_rows = summary_df.filter((pl.col("theta") >= 0) & (pl.col("theta") <= 0.5))
+    for row in cvar_rows.iter_rows(named=True):
         t = row["theta"]
         tstr = f"{t:g}" if t != int(t) or abs(t) < 1 else f"{int(t)}"
         deficit = row["cvar_5"] - base_cvar5
@@ -488,11 +490,11 @@ def adaptive(base_path: str):
     # Save
     adir = analysis_dir(base_path)
     adir.mkdir(parents=True, exist_ok=True)
-    adaptive_summary.to_parquet(adir / "adaptive_summary.parquet", engine="pyarrow", index=False)
+    adaptive_summary.write_parquet(adir / "adaptive_summary.parquet")
     click.echo(f"Saved adaptive_summary.parquet ({len(adaptive_summary)} rows)")
 
-    if not adaptive_kde.empty:
-        adaptive_kde.to_parquet(adir / "adaptive_kde.parquet", engine="pyarrow", index=False)
+    if len(adaptive_kde) > 0:
+        adaptive_kde.write_parquet(adir / "adaptive_kde.parquet")
         click.echo(f"Saved adaptive_kde.parquet ({len(adaptive_kde)} rows)")
 
     # Print comparison table
@@ -510,9 +512,9 @@ def adaptive(base_path: str):
     theta_summary_path = adir / "summary.parquet"
     if theta_summary_path.exists():
         theta_df = load_summary(theta_summary_path)
-        base = theta_df[theta_df["theta"] == 0.0]
-        if not base.empty:
-            b = base.iloc[0]
+        base = theta_df.filter(pl.col("theta") == 0.0)
+        if len(base) > 0:
+            b = base.row(0, named=True)
             click.echo(
                 f"{'θ=0 (baseline)':>16s} | {int(b['n']):>10,d} | {b['mean']:>7.2f} | "
                 f"{b['std']:>5.1f} | {int(b['p5']):>5d} | {int(b['p50']):>5d} | "
@@ -521,8 +523,8 @@ def adaptive(base_path: str):
             )
         # Show best fixed-θ for p95
         if "p95" in theta_df.columns:
-            peak_idx = theta_df["p95"].idxmax()
-            pk = theta_df.loc[peak_idx]
+            peak_idx = theta_df["p95"].arg_max()
+            pk = theta_df.row(peak_idx, named=True)
             label = f"θ={pk['theta']:g} (best p95)"
             click.echo(
                 f"{label:>16s} | {int(pk['n']):>10,d} | {pk['mean']:>7.2f} | "
@@ -532,8 +534,7 @@ def adaptive(base_path: str):
             )
         click.echo("-" * len(header))
 
-    for _, row in adaptive_summary.iterrows():
-        # Compute bonus rate from raw scores if available
+    for row in adaptive_summary.iter_rows(named=True):
         click.echo(
             f"{row['policy']:>16s} | {int(row['n']):>10,d} | {row['mean']:>7.2f} | "
             f"{row['std']:>5.1f} | {int(row['p5']):>5d} | {int(row['p50']):>5d} | "
@@ -555,7 +556,7 @@ def adaptive(base_path: str):
         pdir = plots_dir(base_path)
         pdir.mkdir(parents=True, exist_ok=True)
         theta_df = load_summary(theta_summary_path)
-        thetas = sorted(theta_df["theta"].unique().tolist())
+        thetas = sorted(theta_df["theta"].unique().to_list())
         plot_efficiency_with_adaptive(thetas, theta_df, adaptive_summary, pdir)
         click.echo(f"\nSaved {pdir}/efficiency_adaptive.png")
         plot_efficiency_adaptive_p99(thetas, theta_df, adaptive_summary, pdir)
@@ -567,7 +568,7 @@ def adaptive(base_path: str):
         click.echo(f"Saved {pdir}/efficiency_adaptive_combined.png")
 
         # Density plot with adaptive overlays
-        if not adaptive_kde.empty:
+        if len(adaptive_kde) > 0:
             from .plots.density import plot_density_with_adaptive
             from .store import load_kde
 
@@ -890,7 +891,7 @@ def summary(base_path: str):
     click.echo(header)
     click.echo("-" * len(header))
 
-    for _, row in df.iterrows():
+    for row in df.iter_rows(named=True):
         t = row["theta"]
         tstr = f"{t:g}" if t != int(t) or abs(t) < 1 else f"{int(t)}"
         click.echo(
@@ -906,8 +907,8 @@ def summary(base_path: str):
     click.echo("=== Best theta per Metric ===")
     for metric in ["bot5_avg", "min", "p5", "p10", "p25", "p50",
                     "p75", "p90", "p95", "p99", "max", "top5_avg"]:
-        best_idx = df[metric].idxmax()
-        best_row = df.loc[best_idx]
+        best_idx = df[metric].arg_max()
+        best_row = df.row(best_idx, named=True)
         val = best_row[metric]
         tstr = f"{best_row['theta']:g}"
         vstr = f"{val:.1f}" if isinstance(val, float) and val != int(val) else str(int(val))
@@ -1021,7 +1022,7 @@ def modality(base_path: str, fmt: str, dpi: int):
         f"{'Min':>5s} | {'Max':>5s}"
     )
     click.echo("-" * 80)
-    for _, row in mixture_df.iterrows():
+    for row in mixture_df.iter_rows(named=True):
         click.echo(
             f"{row['bonus']:>5s} | {row['yatzy']:>5s} | "
             f"{row['small_straight']:>5s} | {row['large_straight']:>5s} | "
@@ -1480,8 +1481,9 @@ def profile_validate(base_path: str, trials: int, seed: int):
 @click.option("--base-path", default=".", help="Base path (repo root).")
 @click.option("--max-rules", default=100, type=int, help="Max rules per decision type.")
 @click.option("--min-coverage", default=100, type=int, help="Min records to cover per rule.")
-def skill_ladder(base_path: str, max_rules: int, min_coverage: int):
-    """Induce human-readable skill ladder from regret export data."""
+@click.option("--lam", default=0.0, type=float, help="Resource-rational complexity penalty (0=pure regret).")
+def skill_ladder(base_path: str, max_rules: int, min_coverage: int, lam: float):
+    """Induce human-readable skill ladder from regret export data (CFG actions)."""
     from .skill_ladder import generate_skill_ladder
 
     t0 = time.time()
@@ -1493,7 +1495,8 @@ def skill_ladder(base_path: str, max_rules: int, min_coverage: int):
     output_dir = rosetta_dir
     result = generate_skill_ladder(
         rosetta_dir, output_dir, max_rules=max_rules, min_coverage=min_coverage,
+        lam=lam,
     )
     total = result["meta"]["total_rules"]
-    click.echo(f"\n{total} total rules induced.")
+    click.echo(f"\n{total} total rules induced (λ={lam}).")
     click.echo(f"Done in {time.time() - t0:.1f}s.")

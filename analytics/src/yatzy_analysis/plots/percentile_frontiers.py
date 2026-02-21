@@ -6,7 +6,7 @@ from pathlib import Path
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import polars as pl
 from matplotlib.collections import LineCollection
 
 from .style import FONT_AXIS_LABEL, FONT_LEGEND, FONT_TICK, FONT_TITLE, GRID_ALPHA, setup_theme
@@ -34,7 +34,7 @@ FRONTIER_STATS = [
 
 
 def plot_percentile_frontiers(
-    stats_df: pd.DataFrame,
+    stats_df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -48,8 +48,7 @@ def plot_percentile_frontiers(
     """
     setup_theme()
 
-    df = stats_df.sort_values("theta").copy()
-    df = df[df["n"] >= 100_000].copy()
+    df = stats_df.sort("theta").filter(pl.col("n") >= 100_000)
 
     cmap = plt.cm.coolwarm
     n_stats = len(FRONTIER_STATS)
@@ -59,15 +58,17 @@ def plot_percentile_frontiers(
     # Track peak y-values for right-margin label placement
     peak_info: list[tuple[float, str, tuple]] = []  # (y_peak, label, rgb)
 
+    columns = df.columns
+
     for i, (col, label) in enumerate(FRONTIER_STATS):
-        if col not in df.columns:
+        if col not in columns:
             continue
 
         color_val = i / (n_stats - 1)
         base_rgb = cmap(color_val)[:3]
 
-        x = df["std"].values.copy()
-        y = df[col].values.astype(float).copy()
+        x = df["std"].to_numpy().copy()
+        y = df[col].to_numpy().astype(float).copy()
 
         # Peak: the point where this statistic is maximized
         peak_idx = int(np.argmax(y))
@@ -225,7 +226,7 @@ def _add_theta_colorbar(ax: plt.Axes, norm: mcolors.Normalize) -> None:
 # ---------------------------------------------------------------------------
 
 def plot_mean_vs_cvar(
-    stats_df: pd.DataFrame,
+    stats_df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -238,12 +239,11 @@ def plot_mean_vs_cvar(
     """
     setup_theme()
 
-    df = stats_df.sort_values("theta").copy()
-    df = df[df["n"] >= 100_000].copy()
+    df = stats_df.sort("theta").filter(pl.col("n") >= 100_000)
 
-    x = df["mean"].values
-    y = df["cvar_5"].values
-    thetas = df["theta"].values
+    x = df["mean"].to_numpy()
+    y = df["cvar_5"].to_numpy()
+    thetas = df["theta"].to_numpy()
     norm = mcolors.SymLogNorm(linthresh=0.05, linscale=1.0,
                               vmin=-max(abs(thetas)), vmax=max(abs(thetas)))
 
@@ -281,7 +281,7 @@ def plot_mean_vs_cvar(
 # ---------------------------------------------------------------------------
 
 def plot_p5_vs_p95(
-    stats_df: pd.DataFrame,
+    stats_df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -294,12 +294,11 @@ def plot_p5_vs_p95(
     """
     setup_theme()
 
-    df = stats_df.sort_values("theta").copy()
-    df = df[df["n"] >= 100_000].copy()
+    df = stats_df.sort("theta").filter(pl.col("n") >= 100_000)
 
-    x = df["p5"].values.astype(float)
-    y = df["p95"].values.astype(float)
-    thetas = df["theta"].values
+    x = df["p5"].to_numpy().astype(float)
+    y = df["p95"].to_numpy().astype(float)
+    thetas = df["theta"].to_numpy()
     norm = mcolors.SymLogNorm(linthresh=0.05, linscale=1.0,
                               vmin=-max(abs(thetas)), vmax=max(abs(thetas)))
 
@@ -339,7 +338,7 @@ def plot_p5_vs_p95(
 # ---------------------------------------------------------------------------
 
 def plot_skewness_vs_kurtosis(
-    stats_df: pd.DataFrame,
+    stats_df: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -352,15 +351,14 @@ def plot_skewness_vs_kurtosis(
     """
     setup_theme()
 
-    df = stats_df.sort_values("theta").copy()
-    df = df[df["n"] >= 100_000].copy()
+    df = stats_df.sort("theta").filter(pl.col("n") >= 100_000)
 
     if "skewness" not in df.columns or "kurtosis" not in df.columns:
         raise ValueError("skewness/kurtosis columns missing — run `compute --csv` first")
 
-    x = df["skewness"].values
-    y = df["kurtosis"].values
-    thetas = df["theta"].values
+    x = df["skewness"].to_numpy()
+    y = df["kurtosis"].to_numpy()
+    thetas = df["theta"].to_numpy()
     norm = mcolors.SymLogNorm(linthresh=0.05, linscale=1.0,
                               vmin=-max(abs(thetas)), vmax=max(abs(thetas)))
 

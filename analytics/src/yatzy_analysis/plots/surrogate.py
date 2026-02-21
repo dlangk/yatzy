@@ -5,7 +5,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import polars as pl
 
 from .style import (
     FONT_AXIS_LABEL,
@@ -44,11 +44,11 @@ def plot_all_surrogate(
     paths: list[Path] = []
 
     # Load results
-    all_results: dict[str, pd.DataFrame] = {}
+    all_results: dict[str, pl.DataFrame] = {}
     for dtype in ["category", "reroll1", "reroll2"]:
         p = results_dir / f"results_{dtype}.csv"
         if p.exists():
-            all_results[dtype] = pd.read_csv(p)
+            all_results[dtype] = pl.read_csv(p)
 
     if not all_results:
         return paths
@@ -75,7 +75,7 @@ def plot_all_surrogate(
 
 
 def _plot_pareto(
-    all_results: dict[str, pd.DataFrame],
+    all_results: dict[str, pl.DataFrame],
     output_dir: Path,
     *,
     dpi: int,
@@ -86,12 +86,12 @@ def _plot_pareto(
     for dtype, df in all_results.items():
         color = DECISION_COLORS[dtype]
         for mtype, marker in MODEL_MARKERS.items():
-            subset = df[df["model_type"] == mtype]
-            if subset.empty:
+            subset = df.filter(pl.col("model_type") == mtype)
+            if subset.is_empty():
                 continue
             ax.scatter(
-                subset["n_params"],
-                subset["ev_loss"],
+                subset["n_params"].to_numpy(),
+                subset["ev_loss"].to_numpy(),
                 c=color,
                 marker=marker,
                 s=60,
@@ -103,11 +103,11 @@ def _plot_pareto(
     # Pareto frontier line
     pareto_path = output_dir.parent / "surrogate" / "pareto_frontier.csv"
     if pareto_path.exists():
-        pareto = pd.read_csv(pareto_path)
-        pareto_sorted = pareto.sort_values("n_params")
+        pareto = pl.read_csv(pareto_path)
+        pareto_sorted = pareto.sort("n_params")
         ax.step(
-            pareto_sorted["n_params"],
-            pareto_sorted["ev_loss"],
+            pareto_sorted["n_params"].to_numpy(),
+            pareto_sorted["ev_loss"].to_numpy(),
             where="post",
             color="black",
             linewidth=2,
@@ -132,7 +132,7 @@ def _plot_pareto(
 
 
 def _plot_dt_vs_mlp(
-    all_results: dict[str, pd.DataFrame],
+    all_results: dict[str, pl.DataFrame],
     output_dir: Path,
     *,
     dpi: int,
@@ -143,12 +143,12 @@ def _plot_dt_vs_mlp(
     for i, (dtype, df) in enumerate(all_results.items()):
         ax = axes[i]
         for mtype, marker in [("dt", "o"), ("mlp", "s")]:
-            subset = df[(df["model_type"] == mtype)]
-            if subset.empty:
+            subset = df.filter(pl.col("model_type") == mtype)
+            if subset.is_empty():
                 continue
             ax.scatter(
-                subset["n_params"],
-                subset["ev_loss"],
+                subset["n_params"].to_numpy(),
+                subset["ev_loss"].to_numpy(),
                 marker=marker,
                 s=80,
                 alpha=0.7,
@@ -156,10 +156,10 @@ def _plot_dt_vs_mlp(
                 zorder=3,
             )
             # Connect with line
-            sorted_sub = subset.sort_values("n_params")
+            sorted_sub = subset.sort("n_params")
             ax.plot(
-                sorted_sub["n_params"],
-                sorted_sub["ev_loss"],
+                sorted_sub["n_params"].to_numpy(),
+                sorted_sub["ev_loss"].to_numpy(),
                 alpha=0.3,
                 linewidth=1,
             )
@@ -207,7 +207,7 @@ def _plot_feature_importance(
 
 
 def _plot_accuracy_heatmap(
-    all_results: dict[str, pd.DataFrame],
+    all_results: dict[str, pl.DataFrame],
     results_dir: Path,
     output_dir: Path,
     *,
@@ -229,20 +229,22 @@ def _plot_accuracy_heatmap(
         if df is None:
             continue
 
-        models = df[df["name"].isin(selected)].sort_values("n_params")
-        if models.empty:
+        models = df.filter(pl.col("name").is_in(selected)).sort("n_params")
+        if models.is_empty():
             # Fall back to showing all non-baseline models
-            models = df[df["model_type"] != "baseline"].sort_values("n_params")
+            models = df.filter(pl.col("model_type") != "baseline").sort("n_params")
 
-        y_pos = np.arange(len(models))
+        # Convert to pandas for iterrows-style plotting
+        models_pd = models.to_pandas()
+        y_pos = np.arange(len(models_pd))
         colors = [
             "#1f77b4" if row["model_type"] == "dt" else "#ff7f0e"
-            for _, row in models.iterrows()
+            for _, row in models_pd.iterrows()
         ]
 
-        ax.barh(y_pos, models["accuracy"], color=colors, alpha=0.8)
+        ax.barh(y_pos, models_pd["accuracy"], color=colors, alpha=0.8)
         ax.set_yticks(y_pos)
-        ax.set_yticklabels(models["name"])
+        ax.set_yticklabels(models_pd["name"])
         ax.set_xlabel("Accuracy", fontsize=FONT_AXIS_LABEL)
         ax.set_title(dtype, fontsize=FONT_TITLE)
         ax.set_xlim(0, 1)
@@ -266,7 +268,7 @@ def plot_game_level_results(
 ) -> list[Path]:
     """Generate game-level surrogate evaluation plots."""
     setup_theme()
-    df = pd.read_csv(csv_path)
+    df = pl.read_csv(csv_path)
     paths: list[Path] = []
 
     paths.append(_plot_params_vs_mean(df, output_dir, dpi=dpi, fmt=fmt))
@@ -276,7 +278,7 @@ def plot_game_level_results(
 
 
 def _plot_params_vs_mean(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     output_dir: Path,
     *,
     dpi: int,
@@ -286,23 +288,22 @@ def _plot_params_vs_mean(
     fig, ax = plt.subplots(figsize=FIG_WIDE)
 
     # Separate DT and MLP models
-    dt_mask = df["name"].str.startswith("dt_")
-    mlp_mask = df["name"].str.startswith("mlp_")
-    heur_mask = df["name"] == "heuristic"
+    dt_df = df.filter(pl.col("name").str.starts_with("dt_")).sort("total_params")
+    mlp_df = df.filter(pl.col("name").str.starts_with("mlp_")).sort("total_params")
+    heur_df = df.filter(pl.col("name") == "heuristic")
 
     # Plot DTs
-    dt_df = df[dt_mask].sort_values("total_params")
-    if not dt_df.empty:
+    if not dt_df.is_empty():
         ax.scatter(
-            dt_df["total_params"], dt_df["mean"],
+            dt_df["total_params"].to_numpy(), dt_df["mean"].to_numpy(),
             marker="o", s=100, c="#1f77b4", zorder=4, label="Decision Tree",
         )
         ax.plot(
-            dt_df["total_params"], dt_df["mean"],
+            dt_df["total_params"].to_numpy(), dt_df["mean"].to_numpy(),
             color="#1f77b4", alpha=0.4, linewidth=1.5, zorder=3,
         )
         # Label each point
-        for _, row in dt_df.iterrows():
+        for row in dt_df.iter_rows(named=True):
             ax.annotate(
                 row["name"], (row["total_params"], row["mean"]),
                 textcoords="offset points", xytext=(8, -4),
@@ -310,21 +311,19 @@ def _plot_params_vs_mean(
             )
 
     # Plot MLPs
-    mlp_df = df[mlp_mask].sort_values("total_params")
-    if not mlp_df.empty:
+    if not mlp_df.is_empty():
         ax.scatter(
-            mlp_df["total_params"], mlp_df["mean"],
+            mlp_df["total_params"].to_numpy(), mlp_df["mean"].to_numpy(),
             marker="s", s=100, c="#ff7f0e", zorder=4, label="MLP",
         )
         ax.plot(
-            mlp_df["total_params"], mlp_df["mean"],
+            mlp_df["total_params"].to_numpy(), mlp_df["mean"].to_numpy(),
             color="#ff7f0e", alpha=0.4, linewidth=1.5, zorder=3,
         )
 
     # Plot heuristic
-    heur_df = df[heur_mask]
-    if not heur_df.empty:
-        heur_mean = heur_df.iloc[0]["mean"]
+    if not heur_df.is_empty():
+        heur_mean = heur_df.row(0, named=True)["mean"]
         ax.axhline(
             y=heur_mean, color="#2ca02c", linestyle=":", alpha=0.7,
             label=f"Heuristic ({heur_mean:.0f})", zorder=2,
@@ -345,7 +344,7 @@ def _plot_params_vs_mean(
 
 
 def _plot_score_summary(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     output_dir: Path,
     *,
     dpi: int,
@@ -355,13 +354,13 @@ def _plot_score_summary(
     fig, ax = plt.subplots(figsize=FIG_WIDE)
 
     # Sort by total_params for display
-    df_sorted = df.sort_values("total_params")
+    df_sorted = df.sort("total_params")
 
     y_pos = np.arange(len(df_sorted))
-    names = df_sorted["name"].values
+    names = df_sorted["name"].to_numpy()
 
     # Draw whisker-style range bars
-    for i, (_, row) in enumerate(df_sorted.iterrows()):
+    for i, row in enumerate(df_sorted.iter_rows(named=True)):
         color = "#1f77b4" if row["name"].startswith("dt_") else (
             "#ff7f0e" if row["name"].startswith("mlp_") else "#2ca02c"
         )

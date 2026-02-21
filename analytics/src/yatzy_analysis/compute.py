@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from numpy.typing import NDArray
 from scipy.stats import entropy as scipy_entropy
 from scipy.stats import gaussian_kde, kurtosis, skew, trim_mean
@@ -92,7 +92,7 @@ def compute_kde(
     score_range: tuple[int, int] = KDE_RANGE,
     subsample: int = KDE_SUBSAMPLE,
     bandwidth: float = KDE_BANDWIDTH,
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     """Compute KDE density + integrated CDF + survival for one theta.
 
     Returns DataFrame with columns: theta, score, density, cdf, survival.
@@ -108,7 +108,7 @@ def compute_kde(
     cdf_vals = np.cumsum(density) * dx
     cdf_vals = cdf_vals / cdf_vals[-1]
 
-    return pd.DataFrame({
+    return pl.DataFrame({
         "theta": np.full(n_points, theta, dtype=np.float64),
         "score": x_grid.astype(np.float32),
         "density": density.astype(np.float32),
@@ -118,19 +118,19 @@ def compute_kde(
 
 
 def compute_exchange_rates(
-    summary_df: pd.DataFrame,
+    summary_df: pl.DataFrame,
     baseline: float = 0.0,
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     """Compute Marginal Exchange Rates for multiple quantile metrics.
 
     MER_q(theta) = [mean(0) - mean(theta)] / [q(theta) - q(0)]
 
     Returns DataFrame with theta and MER columns for each metric.
     """
-    base = summary_df[summary_df["theta"] == baseline].iloc[0]
+    base = summary_df.filter(pl.col("theta") == baseline).row(0, named=True)
     metrics = ["p75", "p90", "p95", "p99", "max", "top5_avg", "top5_pct_avg"]
     rows = []
-    for _, row in summary_df.iterrows():
+    for row in summary_df.iter_rows(named=True):
         t = row["theta"]
         mean_cost = base["mean"] - row["mean"]
         r: dict[str, float] = {"theta": t, "mean_cost": mean_cost}
@@ -141,11 +141,11 @@ def compute_exchange_rates(
             else:
                 r[f"mer_{m}"] = mean_cost / gain
         rows.append(r)
-    return pd.DataFrame(rows)
+    return pl.DataFrame(rows)
 
 
 def compute_sdva(
-    kde_df: pd.DataFrame,
+    kde_df: pl.DataFrame,
     theta: float,
     baseline: float = 0.0,
 ) -> dict:
@@ -158,15 +158,15 @@ def compute_sdva(
 
     Returns dict with a_worse, a_better, ratio, x_cross.
     """
-    base_cdf = kde_df[kde_df["theta"] == baseline]
-    theta_cdf = kde_df[kde_df["theta"] == theta]
+    base_cdf = kde_df.filter(pl.col("theta") == baseline)
+    theta_cdf = kde_df.filter(pl.col("theta") == theta)
 
-    if base_cdf.empty or theta_cdf.empty:
+    if base_cdf.is_empty() or theta_cdf.is_empty():
         return {"a_worse": 0.0, "a_better": 0.0, "ratio": 1.0, "x_cross": 0.0}
 
-    scores = base_cdf["score"].values
+    scores = base_cdf["score"].to_numpy()
     dx = float(scores[1] - scores[0])
-    d = theta_cdf["cdf"].values - base_cdf["cdf"].values
+    d = theta_cdf["cdf"].to_numpy() - base_cdf["cdf"].to_numpy()
 
     worse = np.maximum(d, 0)
     better = np.maximum(-d, 0)
@@ -197,10 +197,10 @@ def compute_sdva(
 
 
 def compute_all_sdva(
-    kde_df: pd.DataFrame,
+    kde_df: pl.DataFrame,
     thetas: list[float],
     baseline: float = 0.0,
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     """Compute SDVA for all thetas. Returns DataFrame."""
     rows = []
     for t in thetas:
@@ -210,10 +210,10 @@ def compute_all_sdva(
         r = compute_sdva(kde_df, t, baseline)
         r["theta"] = t
         rows.append(r)
-    return pd.DataFrame(rows)
+    return pl.DataFrame(rows)
 
 
-def compute_mixture_decomposition(game_data: dict) -> pd.DataFrame:
+def compute_mixture_decomposition(game_data: dict) -> pl.DataFrame:
     """Decompose score distribution by binary category outcomes.
 
     Groups games by (got_bonus, got_yatzy, got_small_straight, got_large_straight)
@@ -260,7 +260,7 @@ def compute_mixture_decomposition(game_data: dict) -> pd.DataFrame:
                         "min": int(subset.min()),
                         "max": int(subset.max()),
                     })
-    return pd.DataFrame(rows)
+    return pl.DataFrame(rows)
 
 
 def compute_covariance_matrix(
@@ -288,7 +288,7 @@ def compute_covariance_matrix(
 
 def compute_all(
     scores_dict: dict[float, NDArray[np.int32]],
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Compute summary + KDE for all thetas.
 
     Returns (summary_df, kde_df).
@@ -300,6 +300,6 @@ def compute_all(
         summaries.append(compute_summary(t, scores))
         kde_parts.append(compute_kde(t, scores))
 
-    summary_df = pd.DataFrame(summaries)
-    kde_df = pd.concat(kde_parts, ignore_index=True)
+    summary_df = pl.DataFrame(summaries)
+    kde_df = pl.concat(kde_parts)
     return summary_df, kde_df

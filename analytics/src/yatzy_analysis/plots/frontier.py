@@ -5,7 +5,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import polars as pl
 
 from .style import ADAPTIVE_COLORS as _STYLE_ADAPTIVE_COLORS, FONT_AXIS_LABEL, FONT_LEGEND, FONT_TITLE, GRID_ALPHA, setup_theme
 
@@ -18,23 +18,23 @@ BASELINE_COLOR = "#3498db"
 
 def load_frontier_data(
     frontier_dir: Path,
-) -> tuple[pd.DataFrame, dict[str, np.ndarray]]:
+) -> tuple[pl.DataFrame, dict[str, np.ndarray]]:
     """Load frontier_results.csv and per-policy score arrays."""
-    results = pd.read_csv(frontier_dir / "frontier_results.csv")
+    results = pl.read_csv(frontier_dir / "frontier_results.csv")
 
     scores: dict[str, np.ndarray] = {}
-    for _, row in results.iterrows():
+    for row in results.iter_rows(named=True):
         name = row["policy"]
         safe = name.replace(":", "_").replace(" ", "_")
         path = frontier_dir / f"frontier_scores_{safe}.csv"
         if path.exists():
-            scores[name] = pd.read_csv(path)["score"].values
+            scores[name] = pl.read_csv(path)["score"].to_numpy()
 
     return results, scores
 
 
 def plot_pareto_frontier(
-    results: pd.DataFrame,
+    results: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -44,20 +44,20 @@ def plot_pareto_frontier(
     setup_theme()
     fig, ax = plt.subplots(figsize=(10, 7))
 
-    baselines = results[results["kind"] == "baseline"].sort_values("std")
-    adaptive = results[results["kind"] == "adaptive"]
+    baselines = results.filter(pl.col("kind") == "baseline").sort("std")
+    adaptive = results.filter(pl.col("kind") == "adaptive")
 
     # Baseline frontier line
     ax.plot(
-        baselines["std"],
-        baselines["mean"],
+        baselines["std"].to_numpy(),
+        baselines["mean"].to_numpy(),
         color=BASELINE_COLOR,
         linewidth=2.5,
         zorder=3,
         label="Constant-θ frontier",
     )
     # Baseline points
-    for _, row in baselines.iterrows():
+    for row in baselines.iter_rows(named=True):
         ax.scatter(
             row["std"],
             row["mean"],
@@ -78,7 +78,7 @@ def plot_pareto_frontier(
         )
 
     # Adaptive policy points
-    for _, row in adaptive.iterrows():
+    for row in adaptive.iter_rows(named=True):
         name = row["policy"]
         color = ADAPTIVE_COLORS.get(name, "#95a5a6")
         ax.scatter(
@@ -93,10 +93,11 @@ def plot_pareto_frontier(
             label=name,
         )
         # Draw vertical line to frontier
-        if pd.notna(row.get("frontier_mean")):
+        frontier_mean = row.get("frontier_mean")
+        if frontier_mean is not None and frontier_mean == frontier_mean:  # not NaN
             ax.plot(
                 [row["std"], row["std"]],
-                [row["mean"], row["frontier_mean"]],
+                [row["mean"], frontier_mean],
                 color=color,
                 linewidth=1.0,
                 linestyle="--",
@@ -119,7 +120,7 @@ def plot_pareto_frontier(
 
 
 def plot_frontier_cdf(
-    results: pd.DataFrame,
+    results: pl.DataFrame,
     scores: dict[str, np.ndarray],
     out_dir: Path,
     *,
@@ -130,11 +131,11 @@ def plot_frontier_cdf(
     setup_theme()
     fig, ax = plt.subplots(figsize=(14, 7))
 
-    baselines = results[results["kind"] == "baseline"].sort_values("theta")
-    adaptive = results[results["kind"] == "adaptive"]
+    baselines = results.filter(pl.col("kind") == "baseline").sort("theta")
+    adaptive = results.filter(pl.col("kind") == "adaptive")
 
     # Baselines: thin gray lines
-    for _, row in baselines.iterrows():
+    for row in baselines.iter_rows(named=True):
         name = row["policy"]
         if name not in scores:
             continue
@@ -146,7 +147,7 @@ def plot_frontier_cdf(
         ax.plot(s, cdf, color=BASELINE_COLOR, linewidth=lw, alpha=alpha, label=theta_str)
 
     # Adaptive: colored thick lines
-    for _, row in adaptive.iterrows():
+    for row in adaptive.iter_rows(named=True):
         name = row["policy"]
         if name not in scores:
             continue
@@ -173,7 +174,7 @@ def plot_frontier_cdf(
 
 
 def plot_frontier_delta(
-    results: pd.DataFrame,
+    results: pl.DataFrame,
     out_dir: Path,
     *,
     dpi: int = 200,
@@ -182,17 +183,23 @@ def plot_frontier_delta(
     """Bar chart of Δμ (mean - frontier) for each adaptive policy."""
     setup_theme()
 
-    adaptive = results[results["kind"] == "adaptive"].copy()
-    adaptive = adaptive.dropna(subset=["delta_mu"])
-    adaptive = adaptive.sort_values("delta_mu", ascending=True)
+    adaptive = results.filter(pl.col("kind") == "adaptive")
+    adaptive = adaptive.drop_nulls(subset=["delta_mu"])
+    adaptive = adaptive.sort("delta_mu")
 
     fig, ax = plt.subplots(figsize=(8, 5))
 
-    colors = [ADAPTIVE_COLORS.get(n, "#95a5a6") for n in adaptive["policy"]]
-    bars = ax.barh(adaptive["policy"], adaptive["delta_mu"], color=colors, edgecolor="white")
+    colors = [ADAPTIVE_COLORS.get(n, "#95a5a6") for n in adaptive["policy"].to_list()]
+    bars = ax.barh(
+        adaptive["policy"].to_numpy(),
+        adaptive["delta_mu"].to_numpy(),
+        color=colors,
+        edgecolor="white",
+    )
 
     # Add value labels
-    for bar, delta in zip(bars, adaptive["delta_mu"]):
+    delta_vals = adaptive["delta_mu"].to_list()
+    for bar, delta in zip(bars, delta_vals):
         ax.text(
             bar.get_width() - 0.02,
             bar.get_y() + bar.get_height() / 2,

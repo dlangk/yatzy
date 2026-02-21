@@ -677,11 +677,11 @@ def load_model_triple(
         for dtype in ["category", "reroll1", "reroll2"]:
             csv_path = results_dir / f"results_{dtype}.csv"
             if csv_path.exists():
-                import pandas as pd
-                df = pd.read_csv(csv_path)
-                row = df[df["name"] == model_stem]
-                if not row.empty:
-                    total_params += int(row.iloc[0]["n_params"])
+                import polars as pl
+                df = pl.read_csv(csv_path)
+                row = df.filter(pl.col("name") == model_stem)
+                if not row.is_empty():
+                    total_params += int(row.row(0, named=True)["n_params"])
 
     return ModelTriple(
         category=cat, reroll1=r1, reroll2=r2,
