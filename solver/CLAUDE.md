@@ -113,7 +113,7 @@ just bench-baseline # Record new baseline
 just bench          # Print only
 ```
 
-Baseline: `.overhaul/performance-baseline.json`. Threshold: `max(mean + 3σ, mean × 1.05)`.
+Baseline: `.benchmarks/performance-baseline.json`. Threshold: `max(mean + 3σ, mean × 1.05)`.
 
 ## Test Files
 

@@ -5,7 +5,7 @@
 //!   yatzy-bench --check      # Run benchmarks, compare against baseline
 //!   yatzy-bench              # Run benchmarks, print results only
 //!
-//! Baseline is saved to .overhaul/performance-baseline.json.
+//! Baseline is saved to .benchmarks/performance-baseline.json.
 //! Failure threshold: max(mean + 3σ, mean × 1.05).
 
 use std::path::Path;
@@ -284,7 +284,7 @@ fn main() {
         Mode::Run
     };
 
-    let baseline_path = ".overhaul/performance-baseline.json";
+    let baseline_path = ".benchmarks/performance-baseline.json";
 
     let num_threads = yatzy::env_config::init_rayon_threads();
 

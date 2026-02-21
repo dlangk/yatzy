@@ -28,6 +28,9 @@ legacy/compile_commands.json
 # Python
 __pycache__/
 *.py[cod]
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
 
 # RL package
 research/rl/.venv/
@@ -36,6 +39,10 @@ research/rl/src/*.egg-info/
 
 # Node (frontend)
 node_modules/
+frontend/dist/
+
+# Overhaul artifacts (historical)
+.overhaul/
 
 # Environment
 .env
