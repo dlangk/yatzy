@@ -128,7 +128,28 @@ pub fn compute_all_state_values(ctx: &mut YatzyContext) {
     compute_all_state_values_inner(ctx, &mut None);
 }
 
+/// Like `compute_all_state_values` but always recomputes (skips cache check).
+/// Used by benchmarks to measure actual computation time.
+pub fn compute_all_state_values_nocache(ctx: &mut YatzyContext) {
+    compute_all_state_values_nocache_inner(ctx, &mut None);
+}
+
+fn compute_all_state_values_nocache_inner(
+    ctx: &mut YatzyContext,
+    oracle: &mut Option<PolicyOracle>,
+) {
+    compute_all_state_values_impl(ctx, oracle, true);
+}
+
 fn compute_all_state_values_inner(ctx: &mut YatzyContext, oracle: &mut Option<PolicyOracle>) {
+    compute_all_state_values_impl(ctx, oracle, false);
+}
+
+fn compute_all_state_values_impl(
+    ctx: &mut YatzyContext,
+    oracle: &mut Option<PolicyOracle>,
+    skip_cache: bool,
+) {
     let mut progress = ComputeProgress::new(ctx);
 
     println!("=== Starting State Value Computation ===");
@@ -144,15 +165,17 @@ fn compute_all_state_values_inner(ctx: &mut YatzyContext, oracle: &mut Option<Po
 
     let total_start = Instant::now();
 
-    // Try to load consolidated file first
-    let consolidated_file = if ctx.max_policy {
-        "data/all_states_max.bin".to_string()
-    } else {
-        state_file_path(ctx.theta)
-    };
-    if load_all_state_values(ctx, &consolidated_file) {
-        println!("Loaded pre-computed states from consolidated file");
-        return;
+    // Try to load consolidated file first (skipped for benchmarks)
+    if !skip_cache {
+        let consolidated_file = if ctx.max_policy {
+            "data/all_states_max.bin".to_string()
+        } else {
+            state_file_path(ctx.theta)
+        };
+        if load_all_state_values(ctx, &consolidated_file) {
+            println!("Loaded pre-computed states from consolidated file");
+            return;
+        }
     }
 
     // Process states level by level, from game end (14) to game start (0).
@@ -350,13 +373,15 @@ fn compute_all_state_values_inner(ctx: &mut YatzyContext, oracle: &mut Option<Po
         );
     }
 
-    let save_file = if ctx.max_policy {
-        "data/all_states_max.bin".to_string()
-    } else {
-        state_file_path(ctx.theta)
-    };
-    println!("\nSaving consolidated state file...");
-    save_all_state_values(ctx, &save_file);
+    if !skip_cache {
+        let save_file = if ctx.max_policy {
+            "data/all_states_max.bin".to_string()
+        } else {
+            state_file_path(ctx.theta)
+        };
+        println!("\nSaving consolidated state file...");
+        save_all_state_values(ctx, &save_file);
+    }
 
     let total_time = total_start.elapsed().as_secs_f64();
     println!("\nTotal computation time: {:.2} seconds", total_time);

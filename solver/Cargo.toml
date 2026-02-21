@@ -111,6 +111,10 @@ path = "src/bin/regret_export.rs"
 name = "yatzy-eval-policy"
 path = "src/bin/eval_policy.rs"
 
+[[bin]]
+name = "yatzy-bench"
+path = "src/bin/bench_wall_clock.rs"
+
 [dependencies]
 axum = "0.8"
 tokio = { version = "1", features = ["rt-multi-thread", "net", "signal", "macros"] }

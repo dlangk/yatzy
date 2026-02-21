@@ -222,6 +222,20 @@ eval-policy games="1000000":
 # Full Rosetta pipeline: export → induce → evaluate
 rosetta: regret-export skill-ladder eval-policy
 
+# ── Benchmarks ─────────────────────────────────────────────────────────────
+
+# Run wall-clock benchmarks and save baseline
+bench-baseline:
+    YATZY_BASE_PATH=. solver/target/release/yatzy-bench --record
+
+# Run wall-clock benchmarks and compare against baseline (exits non-zero on regression)
+bench-check:
+    YATZY_BASE_PATH=. solver/target/release/yatzy-bench --check
+
+# Run wall-clock benchmarks (print only, no save/check)
+bench:
+    YATZY_BASE_PATH=. solver/target/release/yatzy-bench
+
 # ── Dev ───────────────────────────────────────────────────────────────────
 
 # Run solver tests
