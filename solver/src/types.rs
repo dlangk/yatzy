@@ -141,6 +141,12 @@ impl PolicyOracle {
     /// Oracle index for a given state and dice set.
     #[inline(always)]
     pub fn idx(state_idx: usize, ds: usize) -> usize {
+        debug_assert!(
+            state_idx < NUM_STATES,
+            "state_idx {} out of range",
+            state_idx
+        );
+        debug_assert!(ds < NUM_DICE_SETS, "ds {} out of range", ds);
         state_idx * NUM_DICE_SETS + ds
     }
 }
@@ -227,6 +233,16 @@ impl YatzyContext {
     /// Returns f64 for JSON serialization compatibility.
     #[inline(always)]
     pub fn get_state_value(&self, upper_score: i32, scored: i32) -> f64 {
+        debug_assert!(
+            (0..=63).contains(&upper_score),
+            "upper_score {} out of range",
+            upper_score
+        );
+        debug_assert!(
+            scored >= 0 && scored < (1 << CATEGORY_COUNT as i32),
+            "scored {} out of range",
+            scored
+        );
         self.state_values.as_slice()[state_index(upper_score as usize, scored as usize)] as f64
     }
 }

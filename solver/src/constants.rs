@@ -95,6 +95,16 @@ pub const CATEGORY_NAMES: [&str; CATEGORY_COUNT] = [
 /// This enables branchless upper-category scoring via `sv[base + up + scr]`.
 #[inline(always)]
 pub fn state_index(upper_score: usize, scored_categories: usize) -> usize {
+    debug_assert!(
+        upper_score < STATE_STRIDE,
+        "upper_score {} out of range",
+        upper_score
+    );
+    debug_assert!(
+        scored_categories < (1 << CATEGORY_COUNT),
+        "scored_categories {} out of range",
+        scored_categories
+    );
     scored_categories * STATE_STRIDE + upper_score
 }
 

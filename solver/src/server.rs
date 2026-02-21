@@ -12,6 +12,7 @@
 //! | GET | `/score_histogram` | Binned score distribution from CSV |
 //! | GET | `/statistics` | Aggregated game statistics from simulation |
 //! | POST | `/evaluate` | All mask EVs + category EVs for one roll |
+//! | POST | `/density` | Exact score distribution from a mid-game state |
 
 use std::sync::Arc;
 
@@ -26,11 +27,30 @@ use serde::Deserialize;
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::api_computations::compute_roll_response;
-use crate::types::YatzyContext;
+use crate::types::{PolicyOracle, YatzyContext};
 
-pub type AppState = Arc<YatzyContext>;
+/// Shared server state: context + optional oracle for density endpoint.
+pub struct ServerState {
+    pub ctx: Arc<YatzyContext>,
+    pub oracle: Option<Arc<PolicyOracle>>,
+}
+
+pub type AppState = Arc<ServerState>;
 
 pub fn create_router(ctx: Arc<YatzyContext>) -> Router {
+    let state = Arc::new(ServerState { ctx, oracle: None });
+    create_router_with_state(state)
+}
+
+pub fn create_router_with_oracle(ctx: Arc<YatzyContext>, oracle: Option<PolicyOracle>) -> Router {
+    let state = Arc::new(ServerState {
+        ctx,
+        oracle: oracle.map(Arc::new),
+    });
+    create_router_with_state(state)
+}
+
+fn create_router_with_state(state: AppState) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -42,8 +62,9 @@ pub fn create_router(ctx: Arc<YatzyContext>) -> Router {
         .route("/score_histogram", get(handle_get_score_histogram))
         .route("/statistics", get(handle_get_statistics))
         .route("/evaluate", post(handle_evaluate))
+        .route("/density", post(handle_density))
         .layer(cors)
-        .with_state(ctx)
+        .with_state(state)
 }
 
 // ── Request/Response types ──────────────────────────────────────────
@@ -62,6 +83,13 @@ struct StateValueQuery {
     scored_categories: i32,
 }
 
+#[derive(Deserialize)]
+struct DensityRequest {
+    upper_score: i32,
+    scored_categories: i32,
+    accumulated_score: i32,
+}
+
 fn error_response(status: StatusCode, msg: &str) -> (StatusCode, Json<serde_json::Value>) {
     (status, Json(serde_json::json!({ "error": msg })))
 }
@@ -73,90 +101,124 @@ async fn handle_health_check() -> Json<serde_json::Value> {
 }
 
 async fn handle_get_state_value(
-    State(ctx): State<AppState>,
+    State(state): State<AppState>,
     Query(params): Query<StateValueQuery>,
-) -> impl IntoResponse {
-    let val = ctx.get_state_value(params.upper_score, params.scored_categories);
-    Json(serde_json::json!({
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    if params.upper_score < 0 || params.upper_score > 63 {
+        return Err(error_response(
+            StatusCode::BAD_REQUEST,
+            "upper_score must be 0-63",
+        ));
+    }
+    if params.scored_categories < 0 || params.scored_categories >= (1 << 15) {
+        return Err(error_response(
+            StatusCode::BAD_REQUEST,
+            "scored_categories must be a valid 15-bit bitmask",
+        ));
+    }
+    let val = state
+        .ctx
+        .get_state_value(params.upper_score, params.scored_categories);
+    Ok(Json(serde_json::json!({
         "upper_score": params.upper_score,
         "scored_categories": params.scored_categories,
         "expected_final_score": val,
-    }))
-}
-
-async fn handle_get_score_histogram(
-    State(_ctx): State<AppState>,
-) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let file_path = "data/score_histogram.csv";
-    let content = match std::fs::read_to_string(file_path) {
-        Ok(c) => c,
-        Err(_) => {
-            return Err(error_response(
-                StatusCode::NOT_FOUND,
-                "Could not open score histogram file",
-            ))
-        }
-    };
-
-    let min_ev = 100;
-    let max_ev = 380;
-    let bin_count = 56;
-    let bin_width = (max_ev - min_ev) as f64 / bin_count as f64;
-    let mut bins = vec![0i32; bin_count];
-
-    for (i, line) in content.lines().enumerate() {
-        if i == 0 {
-            continue; // skip header
-        }
-        if let Ok(score) = line.trim().parse::<i32>() {
-            if score >= min_ev && score <= max_ev {
-                let bin_index = ((score - min_ev) as f64 / bin_width) as usize;
-                if bin_index < bin_count {
-                    bins[bin_index] += 1;
-                }
-            }
-        }
-    }
-
-    Ok(Json(serde_json::json!({
-        "min_ev": min_ev,
-        "max_ev": max_ev,
-        "bin_count": bin_count,
-        "bins": bins,
     })))
 }
 
-async fn handle_get_statistics(
-    State(_ctx): State<AppState>,
+async fn handle_get_score_histogram(
+    State(_state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let file_path = "outputs/aggregates/json/game_statistics.json";
-    let content = match std::fs::read_to_string(file_path) {
-        Ok(c) => c,
-        Err(_) => {
-            return Err(error_response(
-                StatusCode::NOT_FOUND,
-                "Statistics not found. Run yatzy-simulate --output results first.",
-            ))
-        }
-    };
+    // File I/O is blocking — use spawn_blocking to avoid stalling the async runtime.
+    tokio::task::spawn_blocking(|| {
+        let file_path = "data/score_histogram.csv";
+        let content = match std::fs::read_to_string(file_path) {
+            Ok(c) => c,
+            Err(_) => {
+                return Err(error_response(
+                    StatusCode::NOT_FOUND,
+                    "Could not open score histogram file",
+                ))
+            }
+        };
 
-    let json: serde_json::Value = match serde_json::from_str(&content) {
-        Ok(v) => v,
-        Err(_) => {
-            return Err(error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to parse statistics JSON",
-            ))
-        }
-    };
+        let min_ev = 100;
+        let max_ev = 380;
+        let bin_count = 56;
+        let bin_width = (max_ev - min_ev) as f64 / bin_count as f64;
+        let mut bins = vec![0i32; bin_count];
 
-    Ok(Json(json))
+        for (i, line) in content.lines().enumerate() {
+            if i == 0 {
+                continue; // skip header
+            }
+            if let Ok(score) = line.trim().parse::<i32>() {
+                if score >= min_ev && score <= max_ev {
+                    let bin_index = ((score - min_ev) as f64 / bin_width) as usize;
+                    if bin_index < bin_count {
+                        bins[bin_index] += 1;
+                    }
+                }
+            }
+        }
+
+        Ok(Json(serde_json::json!({
+            "min_ev": min_ev,
+            "max_ev": max_ev,
+            "bin_count": bin_count,
+            "bins": bins,
+        })))
+    })
+    .await
+    .map_err(|_| {
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Histogram computation failed",
+        )
+    })?
+}
+
+async fn handle_get_statistics(
+    State(_state): State<AppState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    // File I/O is blocking — use spawn_blocking to avoid stalling the async runtime.
+    tokio::task::spawn_blocking(|| {
+        let file_path = "outputs/aggregates/json/game_statistics.json";
+        let content = match std::fs::read_to_string(file_path) {
+            Ok(c) => c,
+            Err(_) => {
+                return Err(error_response(
+                    StatusCode::NOT_FOUND,
+                    "Statistics not found. Run yatzy-simulate --output results first.",
+                ))
+            }
+        };
+
+        let json: serde_json::Value = match serde_json::from_str(&content) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to parse statistics JSON",
+                ))
+            }
+        };
+
+        Ok(Json(json))
+    })
+    .await
+    .map_err(|_| {
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Statistics computation failed",
+        )
+    })?
 }
 
 // ── POST handler ────────────────────────────────────────────────────
 
 async fn handle_evaluate(
-    State(ctx): State<AppState>,
+    State(state): State<AppState>,
     Json(req): Json<EvaluateRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     if req.rerolls_remaining < 0 || req.rerolls_remaining > 2 {
@@ -165,9 +227,29 @@ async fn handle_evaluate(
             "rerolls_remaining must be 0, 1, or 2",
         ));
     }
+    if req.upper_score < 0 || req.upper_score > 63 {
+        return Err(error_response(
+            StatusCode::BAD_REQUEST,
+            "upper_score must be 0-63",
+        ));
+    }
+    if req.scored_categories < 0 || req.scored_categories >= (1 << 15) {
+        return Err(error_response(
+            StatusCode::BAD_REQUEST,
+            "scored_categories must be a valid 15-bit bitmask",
+        ));
+    }
+    for &d in &req.dice {
+        if d < 1 || d > 6 {
+            return Err(error_response(
+                StatusCode::BAD_REQUEST,
+                "Each die must be between 1 and 6",
+            ));
+        }
+    }
 
     let resp = compute_roll_response(
-        &ctx,
+        &state.ctx,
         req.upper_score,
         req.scored_categories,
         &req.dice,
@@ -202,4 +284,68 @@ async fn handle_evaluate(
     }
 
     Ok(Json(result))
+}
+
+// ── POST /density handler ──────────────────────────────────────────
+
+async fn handle_density(
+    State(state): State<AppState>,
+    Json(req): Json<DensityRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    if req.upper_score < 0 || req.upper_score > 63 {
+        return Err(error_response(
+            StatusCode::BAD_REQUEST,
+            "upper_score must be 0-63",
+        ));
+    }
+    if req.scored_categories < 0 || req.scored_categories >= (1 << 15) {
+        return Err(error_response(
+            StatusCode::BAD_REQUEST,
+            "scored_categories must be a valid 15-bit bitmask",
+        ));
+    }
+    if req.accumulated_score < 0 {
+        return Err(error_response(
+            StatusCode::BAD_REQUEST,
+            "accumulated_score must be non-negative",
+        ));
+    }
+
+    let oracle = match &state.oracle {
+        Some(o) => Arc::clone(o),
+        None => {
+            return Err(error_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Oracle not loaded. Run yatzy-precompute --oracle first.",
+            ))
+        }
+    };
+
+    let ctx = Arc::clone(&state.ctx);
+    let upper_score = req.upper_score as usize;
+    let scored_categories = req.scored_categories as usize;
+    let accumulated_score = req.accumulated_score as usize;
+
+    let result = tokio::task::spawn_blocking(move || {
+        crate::density::forward::density_evolution_from_state(
+            &ctx,
+            &oracle,
+            upper_score,
+            scored_categories,
+            accumulated_score,
+        )
+    })
+    .await
+    .map_err(|_| {
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Density computation failed",
+        )
+    })?;
+
+    Ok(Json(serde_json::json!({
+        "mean": result.mean,
+        "std_dev": result.std_dev,
+        "percentiles": result.percentiles,
+    })))
 }
