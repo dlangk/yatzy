@@ -196,6 +196,11 @@ fn compute_group6(
 
 /// Simulate N games using lockstep processing (EV mode only, θ=0).
 ///
+/// // PERF: intentional duplication with simulation/engine.rs. Lockstep processes
+/// // all N games at each turn together (horizontal), while engine.rs processes
+/// // one game at a time (vertical). Lockstep is 4.5x faster due to radix sort
+/// // grouping and amortized per-state computation.
+///
 /// All games advance through each turn together, amortizing the expensive
 /// per-state computation across games that share the same state.
 ///

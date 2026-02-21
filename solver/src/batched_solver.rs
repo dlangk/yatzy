@@ -182,6 +182,10 @@ fn batched_group1(ctx: &YatzyContext, e: &[[f32; 64]]) -> [f32; 64] {
 
 /// Batched SOLVE_WIDGET for risk-sensitive (log-domain) mode with θ ≠ 0.
 ///
+/// // PERF: intentional duplication of solve_widget_batched. This variant uses
+/// // LSE (log-sum-exp) instead of weighted sums, and min/max instead of argmax.
+/// // Merging with the EV solver would add branches in the inner loop.
+///
 /// Transforms:
 /// - Group 6: `val = θ·scr + sv[successor]` — decision node (min if θ<0, max if θ>0)
 /// - Groups 5/3: LSE (stochastic) + opt over keeps (decision: min/max)
@@ -384,6 +388,10 @@ fn batched_group1_risk(ctx: &YatzyContext, e: &[[f32; 64]]) -> [f32; 64] {
 
 /// Batched SOLVE_WIDGET for max-policy mode.
 ///
+/// // PERF: intentional duplication of solve_widget_batched. Chance nodes use
+/// // neon_max_64 instead of neon_fma_64, eliminating probability weights entirely.
+/// // A generic interface would add branches in the tightest inner loops.
+///
 /// Chance nodes use max instead of Σ P·x:
 /// - Group 6: identical to EV mode (decision node)
 /// - Groups 5/3: max over reachable dice sets (no probability weighting)
@@ -476,6 +484,11 @@ pub fn precompute_exp_scores(ctx: &YatzyContext, theta: f32) -> Box<ExpScores> {
 /// Batched SOLVE_WIDGET for utility-domain mode (|θ| ≤ 0.15).
 ///
 /// Stores `U(S) = E[e^(θ·remaining)|S]` directly. The key win:
+/// // PERF: intentional duplication of solve_widget_batched. Utility domain uses
+/// // multiplicative exp(θ·score) instead of additive score, avoiding exp/ln/LSE
+/// // entirely. This matches θ=0 speed for |θ|≤0.15. Merging with the risk solver
+/// // would add exp/ln overhead for all θ values.
+///
 /// - **Group 6** (scoring): `val = exp_score[ds][c] * sv[successor]` (multiply, not add)
 /// - **Groups 5/3** (stochastic): plain weighted sums, IDENTICAL to EV solver
 /// - **Groups 5/3** (decision): min/max over keeps (same as risk solver)
