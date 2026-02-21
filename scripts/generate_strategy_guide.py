@@ -129,7 +129,9 @@ def enrich_rules(
                     subset_regret,
                     np.nan,
                 ).astype(np.float64)
-                with np.errstate(all="ignore"):
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)
                     cat_means = np.nanmean(mean_per_cat, axis=0)
 
                 # Best action is the one with lowest mean regret (should match action_idx)
