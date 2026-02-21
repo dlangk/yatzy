@@ -63,6 +63,15 @@ BOOL_FEATURES = {
     "small_straight", "large_straight", "full_house", "chance", "yatzy",
 ]}
 
+SEMANTIC_REROLL_ACTIONS = [
+    "Reroll_All", "Keep_Face_1", "Keep_Face_2", "Keep_Face_3",
+    "Keep_Face_4", "Keep_Face_5", "Keep_Face_6", "Keep_Pair",
+    "Keep_Two_Pairs", "Keep_Triple", "Keep_Quad",
+    "Keep_Triple_Plus_Highest", "Keep_Pair_Plus_Kicker",
+    "Keep_Straight_Draw", "Keep_All",
+]
+NUM_SEMANTIC_ACTIONS = 15
+
 
 # ── Data loading ─────────────────────────────────────────────────────────
 
@@ -107,6 +116,206 @@ def load_regret_file(path: Path, decision_type: str) -> RegretDataset:
     )
 
 
+# ── Semantic reroll projection ────────────────────────────────────────────
+
+# Face count feature indices in the feature vector (face_count_1 .. face_count_6)
+_FACE_COUNT_START = FEATURE_NAMES.index("face_count_1")  # 7
+
+
+def reconstruct_sorted_dice(face_counts: np.ndarray) -> np.ndarray:
+    """Rebuild sorted 5-dice array from 6 face counts.
+
+    E.g. counts [0,2,0,1,2,0] → dice [2,2,4,5,5].
+    """
+    dice = []
+    for face_val in range(1, 7):
+        cnt = int(face_counts[face_val - 1])
+        dice.extend([face_val] * cnt)
+    return np.array(dice, dtype=np.int32)
+
+
+def reconstruct_all_dice(features: np.ndarray) -> np.ndarray:
+    """Vectorized: reconstruct (N, 5) sorted dice from feature matrix."""
+    counts = features[:, _FACE_COUNT_START:_FACE_COUNT_START + 6].astype(np.int32)
+    n = len(counts)
+    result = np.empty((n, 5), dtype=np.int32)
+    for i in range(n):
+        pos = 0
+        for face_val in range(1, 7):
+            cnt = counts[i, face_val - 1]
+            if cnt > 0:
+                result[i, pos:pos + cnt] = face_val
+                pos += cnt
+    return result
+
+
+def semantic_to_bitmask(sorted_dice: np.ndarray, action_id: int) -> int:
+    """Map one semantic action to one bitmask for one dice set.
+
+    Convention: bit i set = REROLL position i. Dice are sorted ascending.
+    Returns -1 if action is invalid for this dice.
+    """
+    dice = sorted_dice  # length 5, sorted ascending
+
+    if action_id == 0:  # Reroll_All
+        return 31
+
+    if action_id == 14:  # Keep_All
+        return 0
+
+    if 1 <= action_id <= 6:  # Keep_Face_X
+        face = action_id  # 1-6
+        positions = [i for i in range(5) if dice[i] == face]
+        if not positions:
+            return -1
+        mask = 31
+        for p in positions:
+            mask &= ~(1 << p)
+        return mask
+
+    # Count faces for pattern-based actions
+    from collections import Counter
+    counts = Counter(int(d) for d in dice)
+
+    if action_id == 7:  # Keep_Pair — highest face with count≥2
+        pair_faces = sorted([f for f, c in counts.items() if c >= 2], reverse=True)
+        if not pair_faces:
+            return -1
+        target = pair_faces[0]
+        # Keep 2 rightmost positions with that face
+        positions = [i for i in range(5) if dice[i] == target]
+        keep = positions[-2:]  # rightmost 2
+        mask = 31
+        for p in keep:
+            mask &= ~(1 << p)
+        return mask
+
+    if action_id == 8:  # Keep_Two_Pairs — two highest pair faces
+        pair_faces = sorted([f for f, c in counts.items() if c >= 2], reverse=True)
+        if len(pair_faces) < 2:
+            return -1
+        keep_faces = pair_faces[:2]
+        mask = 31
+        for face in keep_faces:
+            positions = [i for i in range(5) if dice[i] == face]
+            for p in positions[-2:]:  # keep 2 of each
+                mask &= ~(1 << p)
+        return mask
+
+    if action_id == 9:  # Keep_Triple — highest face with count≥3
+        triple_faces = sorted([f for f, c in counts.items() if c >= 3], reverse=True)
+        if not triple_faces:
+            return -1
+        target = triple_faces[0]
+        positions = [i for i in range(5) if dice[i] == target]
+        keep = positions[-3:]  # rightmost 3
+        mask = 31
+        for p in keep:
+            mask &= ~(1 << p)
+        return mask
+
+    if action_id == 10:  # Keep_Quad — highest face with count≥4
+        quad_faces = sorted([f for f, c in counts.items() if c >= 4], reverse=True)
+        if not quad_faces:
+            return -1
+        target = quad_faces[0]
+        positions = [i for i in range(5) if dice[i] == target]
+        keep = positions[-4:]  # rightmost 4
+        mask = 31
+        for p in keep:
+            mask &= ~(1 << p)
+        return mask
+
+    if action_id == 11:  # Keep_Triple_Plus_Highest — triple + best remaining
+        triple_faces = sorted([f for f, c in counts.items() if c >= 3], reverse=True)
+        if not triple_faces:
+            return -1
+        target = triple_faces[0]
+        triple_pos = [i for i in range(5) if dice[i] == target]
+        keep_triple = triple_pos[-3:]
+        remaining = [i for i in range(5) if i not in keep_triple]
+        if not remaining:
+            return -1
+        # Pick highest remaining die (rightmost = highest since sorted)
+        best_remaining = remaining[-1]
+        mask = 31
+        for p in keep_triple + [best_remaining]:
+            mask &= ~(1 << p)
+        return mask
+
+    if action_id == 12:  # Keep_Pair_Plus_Kicker — pair + highest remaining
+        pair_faces = sorted([f for f, c in counts.items() if c >= 2], reverse=True)
+        if not pair_faces:
+            return -1
+        target = pair_faces[0]
+        pair_pos = [i for i in range(5) if dice[i] == target]
+        keep_pair = pair_pos[-2:]
+        remaining = [i for i in range(5) if i not in keep_pair]
+        if not remaining:
+            return -1
+        best_remaining = remaining[-1]
+        mask = 31
+        for p in keep_pair + [best_remaining]:
+            mask &= ~(1 << p)
+        return mask
+
+    if action_id == 13:  # Keep_Straight_Draw — longest consecutive run
+        unique_faces = sorted(set(int(d) for d in dice))
+        # Find longest consecutive subsequence
+        best_run: list[int] = []
+        current_run = [unique_faces[0]]
+        for j in range(1, len(unique_faces)):
+            if unique_faces[j] == unique_faces[j - 1] + 1:
+                current_run.append(unique_faces[j])
+            else:
+                if len(current_run) > len(best_run):
+                    best_run = current_run[:]
+                current_run = [unique_faces[j]]
+        if len(current_run) > len(best_run):
+            best_run = current_run[:]
+        if len(best_run) < 2:
+            return -1
+        # Keep 1 die per face in the run
+        mask = 31
+        run_set = set(best_run)
+        used: set[int] = set()
+        for i in range(5):
+            if int(dice[i]) in run_set and int(dice[i]) not in used:
+                mask &= ~(1 << i)
+                used.add(int(dice[i]))
+        return mask
+
+    return -1
+
+
+def build_semantic_regret_matrix(
+    features: np.ndarray, bitmask_regret: np.ndarray,
+) -> np.ndarray:
+    """Project (N, 32) bitmask regret to (N, 15) semantic regret.
+
+    For each record and semantic action, looks up the corresponding bitmask
+    and copies the regret. Invalid actions get 999.0.
+    """
+    n = len(features)
+    all_dice = reconstruct_all_dice(features)
+    semantic_regret = np.full((n, NUM_SEMANTIC_ACTIONS), 999.0, dtype=np.float32)
+
+    for i in range(n):
+        dice_i = all_dice[i]
+        for a in range(NUM_SEMANTIC_ACTIONS):
+            mask = semantic_to_bitmask(dice_i, a)
+            if mask == -1:
+                continue
+            if mask >= bitmask_regret.shape[1]:
+                continue
+            val = bitmask_regret[i, mask]
+            if val <= -1e30:
+                continue
+            semantic_regret[i, a] = val
+
+    return semantic_regret
+
+
 # ── Rule induction (vectorized) ──────────────────────────────────────────
 
 @dataclass
@@ -136,7 +345,7 @@ class Condition:
 @dataclass
 class Rule:
     conditions: list[Condition]
-    action: int
+    action: int | str
     decision_type: str
     coverage: int = 0
     mean_regret: float = 0.0
@@ -204,28 +413,49 @@ def _best_action_for_masked(
     regret: np.ndarray,
     mask: np.ndarray,
     num_actions: int,
+    semantic: bool = False,
 ) -> tuple[int, float]:
-    """Find best action for subset using majority-vote on oracle actions.
+    """Find best action for subset.
 
-    Much faster than scanning all actions' regret columns.
+    When semantic=False: majority-vote on oracle actions (fast, for category rules).
+    When semantic=True: regret-minimizing selection across all actions.
     Returns (action, mean_regret_of_that_action).
     """
-    subset_actions = best_actions[mask]
-    n = len(subset_actions)
+    n = int(mask.sum())
     if n == 0:
         return 0, float("inf")
 
-    # Mode of oracle actions = best action for this subset
-    counts = np.bincount(subset_actions, minlength=num_actions)
-    action = int(counts.argmax())
+    if semantic:
+        # Regret-minimizing: for each action, compute mean of valid regrets
+        best_action = 0
+        best_mean = float("inf")
+        subset_regret = regret[mask]  # (n_match, num_actions)
+        for a in range(num_actions):
+            col = subset_regret[:, a]
+            valid = col < 998.0  # 999.0 = invalid
+            valid_count = int(valid.sum())
+            if valid_count < n * 0.5:
+                continue  # require ≥50% valid
+            mean_reg = float(col[valid].mean())
+            if mean_reg < best_mean:
+                best_mean = mean_reg
+                best_action = a
+        if best_mean == float("inf"):
+            return 0, float("inf")
+        return best_action, best_mean
+    else:
+        subset_actions = best_actions[mask]
+        # Mode of oracle actions = best action for this subset
+        counts = np.bincount(subset_actions, minlength=num_actions)
+        action = int(counts.argmax())
 
-    # Mean regret of picking this action for all records in subset
-    regret_col = regret[mask, action]
-    valid = regret_col > -1e30
-    if valid.sum() == 0:
-        return action, 0.0
-    mean_reg = float(regret_col[valid].mean())
-    return action, mean_reg
+        # Mean regret of picking this action for all records in subset
+        regret_col = regret[mask, action]
+        valid = regret_col > -1e30
+        if valid.sum() == 0:
+            return action, 0.0
+        mean_reg = float(regret_col[valid].mean())
+        return action, mean_reg
 
 
 def induce_rules(
@@ -233,7 +463,8 @@ def induce_rules(
     max_rules: int = 100,
     min_coverage: int = 100,
     subsample: int = 300_000,
-) -> tuple[list[Rule], int]:
+    semantic: bool = False,
+) -> tuple[list[Rule], int | str]:
     """Run greedy sequential covering to induce a decision list.
 
     Subsamples to `subsample` records for tractable rule search.
@@ -291,14 +522,16 @@ def induce_rules(
 
             action, mean_reg = _best_action_for_masked(
                 best_action, regret, mask, ds.num_actions,
+                semantic=semantic,
             )
             score = mean_reg
+            act_out: int | str = SEMANTIC_REROLL_ACTIONS[action] if semantic else action
 
             if score < best_score:
                 best_score = score
                 best_rule = Rule(
                     conditions=[conditions[ci]],
-                    action=action,
+                    action=act_out,
                     decision_type=ds.decision_type,
                     coverage=n_match,
                     mean_regret=mean_reg,
@@ -329,14 +562,16 @@ def induce_rules(
 
                 action, mean_reg = _best_action_for_masked(
                     best_action, regret, mask2, ds.num_actions,
+                    semantic=semantic,
                 )
                 score = mean_reg
+                act_out2: int | str = SEMANTIC_REROLL_ACTIONS[action] if semantic else action
 
                 if score < best_score:
                     best_score = score
                     best_rule = Rule(
                         conditions=[conditions[base_ci], conditions[ci2]],
-                        action=action,
+                        action=act_out2,
                         decision_type=ds.decision_type,
                         coverage=n_match,
                         mean_regret=mean_reg,
@@ -361,9 +596,13 @@ def induce_rules(
 
         remaining = int(alive.sum())
         elapsed = time.time() - t1
+        act_str = (
+            best_rule.action if isinstance(best_rule.action, str)
+            else f"{best_rule.action:2d}"
+        )
         print(
             f"    Rule {rule_idx + 1:3d}: "
-            f"action={best_rule.action:2d}, "
+            f"action={act_str}, "
             f"coverage={covered:7,d}, "
             f"mean_regret={best_rule.mean_regret:.4f}, "
             f"remaining={remaining:7,d} "
@@ -373,11 +612,16 @@ def induce_rules(
     # Default action
     uncovered_mask = alive.astype(bool)
     if uncovered_mask.sum() > 0:
-        default_action, _ = _best_action_for_masked(
+        default_idx, _ = _best_action_for_masked(
             best_action, regret, uncovered_mask, ds.num_actions,
+            semantic=semantic,
         )
     else:
-        default_action = 0
+        default_idx = 0
+
+    default_action: int | str = (
+        SEMANTIC_REROLL_ACTIONS[default_idx] if semantic else default_idx
+    )
 
     print(f"    -> {len(rules)} rules, default={default_action}, uncovered={int(alive.sum()):,d}")
     return rules, default_action
@@ -385,7 +629,9 @@ def induce_rules(
 
 # ── Output generation ────────────────────────────────────────────────────
 
-def _action_label(action: int, decision_type: str) -> str:
+def _action_label(action: int | str, decision_type: str) -> str:
+    if isinstance(action, str):
+        return action.replace("_", " ")
     if decision_type == "category":
         if 0 <= action < len(CATEGORY_NAMES):
             return CATEGORY_NAMES[action]
@@ -429,10 +675,31 @@ def generate_skill_ladder(
         raise FileNotFoundError("No regret data files found")
 
     all_rules: dict[str, list[Rule]] = {}
-    defaults: dict[str, int] = {}
+    defaults: dict[str, int | str] = {}
 
     for dtype, ds in datasets.items():
-        rules, default = induce_rules(ds, max_rules=max_rules, min_coverage=min_coverage)
+        if dtype in ("reroll1", "reroll2"):
+            # Project bitmask regret to semantic regret
+            print(f"  Projecting {dtype} to semantic actions...")
+            t_proj = time.time()
+            semantic_regret = build_semantic_regret_matrix(ds.features, ds.regret)
+            print(f"    Done in {time.time() - t_proj:.1f}s")
+            sem_ds = RegretDataset(
+                features=ds.features,
+                q_values=ds.q_values[:, :NUM_SEMANTIC_ACTIONS] if ds.q_values.shape[1] >= NUM_SEMANTIC_ACTIONS else ds.q_values,
+                best_action=np.zeros(len(ds.features), dtype=np.int32),
+                regret=semantic_regret,
+                num_actions=NUM_SEMANTIC_ACTIONS,
+                decision_type=ds.decision_type,
+            )
+            rules, default = induce_rules(
+                sem_ds, max_rules=max_rules, min_coverage=min_coverage,
+                semantic=True,
+            )
+        else:
+            rules, default = induce_rules(
+                ds, max_rules=max_rules, min_coverage=min_coverage,
+            )
         all_rules[dtype] = rules
         defaults[dtype] = default
 
@@ -445,8 +712,8 @@ def generate_skill_ladder(
         "meta": {
             "total_rules": total_rules,
             "default_category": defaults.get("category", 0),
-            "default_reroll1": defaults.get("reroll1", 0),
-            "default_reroll2": defaults.get("reroll2", 0),
+            "default_reroll1": defaults.get("reroll1", "Reroll_All"),
+            "default_reroll2": defaults.get("reroll2", "Reroll_All"),
             "oracle_ev": 245.87,
         },
     }
