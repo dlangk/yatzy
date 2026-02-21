@@ -4,8 +4,6 @@
 //! DP-optimal policy, using the same dice rolls. Records per-turn data for
 //! visualization in `blog/data/greedy_vs_optimal.json`.
 
-use std::path::PathBuf;
-
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
@@ -17,16 +15,6 @@ use yatzy::simulation::heuristic::{heuristic_pick_category, heuristic_reroll_mas
 use yatzy::storage::load_all_state_values;
 use yatzy::types::YatzyContext;
 use yatzy::widget_solver::{choose_best_reroll_mask, compute_max_ev_for_n_rerolls};
-
-fn set_working_directory() -> PathBuf {
-    let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
-    let path = PathBuf::from(&base_path);
-    if std::env::set_current_dir(&base_path).is_err() {
-        eprintln!("Failed to change directory to {}", base_path);
-        std::process::exit(1);
-    }
-    path
-}
 
 fn roll_dice(rng: &mut SmallRng) -> [i32; 5] {
     let mut dice = [0i32; 5];
@@ -167,7 +155,7 @@ fn compute_group6(
 }
 
 fn main() {
-    let _base_path = set_working_directory();
+    let _base_path = yatzy::env_config::init_base_path();
 
     let mut ctx = YatzyContext::new_boxed();
     phase0_tables::precompute_lookup_tables(&mut ctx);

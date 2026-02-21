@@ -3,6 +3,16 @@ export interface DieState {
   held: boolean;
 }
 
+export interface TrajectoryPoint {
+  index: number;
+  turn: number;
+  event: 'start' | 'roll' | 'reroll' | 'score';
+  expectedFinal: number;
+  accumulatedScore: number;
+  stateEv: number;
+  percentiles?: Record<string, number>;
+}
+
 export interface CategoryState {
   id: number;
   name: string;
@@ -50,6 +60,8 @@ export interface GameState {
   sortMap: number[] | null;
   showDebug: boolean;
   turnPhase: TurnPhase;
+  trajectory: TrajectoryPoint[];
+  pendingTrajectoryEvent: 'roll' | 'reroll' | null;
 }
 
 export type GameAction =
@@ -63,4 +75,6 @@ export type GameAction =
   | { type: 'SET_DIE_VALUE'; index: number; value: number }
   | { type: 'SET_REROLLS'; rerollsRemaining: number }
   | { type: 'SET_CATEGORY_SCORE'; categoryId: number; score: number }
-  | { type: 'UNSET_CATEGORY'; categoryId: number };
+  | { type: 'UNSET_CATEGORY'; categoryId: number }
+  | { type: 'SET_INITIAL_EV'; ev: number }
+  | { type: 'SET_DENSITY_RESULT'; index: number; percentiles: Record<string, number> };

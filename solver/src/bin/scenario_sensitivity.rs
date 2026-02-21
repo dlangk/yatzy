@@ -567,11 +567,7 @@ fn main() {
             .unwrap_or(output_dir)
     };
 
-    let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
-    if std::env::set_current_dir(&base_path).is_err() {
-        eprintln!("Failed to change directory to {}", base_path);
-        std::process::exit(1);
-    }
+    let _base = yatzy::env_config::init_base_path();
 
     let total_start = Instant::now();
 

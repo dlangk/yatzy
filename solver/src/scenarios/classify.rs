@@ -231,11 +231,7 @@ pub fn compute_fingerprint(
 // ── Diagnostic scoring ──
 
 /// Compute S_θ: how much the optimal action changes across θ values.
-pub fn compute_s_theta(
-    ctx: &YatzyContext,
-    d: &RawDecision,
-    theta_tables: &[(f32, &[f32])],
-) -> f32 {
+pub fn compute_s_theta(ctx: &YatzyContext, d: &RawDecision, theta_tables: &[(f32, &[f32])]) -> f32 {
     if !matches!(
         d.decision_type,
         DecisionType::Reroll1 | DecisionType::Reroll2
@@ -421,4 +417,3 @@ pub fn primary_quadrant(sc: &ScoredCandidate) -> Quadrant {
     }
     Quadrant::Beta
 }
-

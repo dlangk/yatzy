@@ -221,8 +221,7 @@ pub fn evaluate_scenario_at_theta(
                 );
                 compute_max_ev_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1);
             }
-            let (bm, bv, rm, rv) =
-                find_best_and_runner_up_mask(ctx, &e_ds_1, params.dice, is_risk);
+            let (bm, bv, rm, rv) = find_best_and_runner_up_mask(ctx, &e_ds_1, params.dice, is_risk);
             (
                 format_mask(bm, params.dice),
                 bm,
@@ -252,8 +251,7 @@ pub fn evaluate_scenario_at_theta(
                     &mut e_ds_0,
                 );
             }
-            let (bm, bv, rm, rv) =
-                find_best_and_runner_up_mask(ctx, &e_ds_0, params.dice, is_risk);
+            let (bm, bv, rm, rv) = find_best_and_runner_up_mask(ctx, &e_ds_0, params.dice, is_risk);
             (
                 format_mask(bm, params.dice),
                 bm,
@@ -319,20 +317,48 @@ pub fn evaluate_scenario_sensitivity(
     let theta0_action_id = theta0_result.action_id;
     let theta0_gap = theta0_result.gap;
 
-    // Detect first flip
+    // Detect nearest flip: scan outward from θ=0 in both directions
     let mut has_flip = false;
     let mut flip_theta: f32 = 0.0;
     let mut flip_action = String::new();
     let mut flip_action_id: i32 = 0;
     let mut gap_at_flip: f32 = 0.0;
 
-    for tr in &theta_results {
-        if tr.theta != 0.0 && !has_flip && tr.action_id != theta0_action_id {
-            has_flip = true;
-            flip_theta = tr.theta;
-            flip_action = tr.action.clone();
-            flip_action_id = tr.action_id;
-            gap_at_flip = tr.gap;
+    // Find index of θ=0 result
+    let theta0_idx = theta_results
+        .iter()
+        .position(|r| r.theta == 0.0)
+        .expect("θ=0 missing");
+
+    // Scan positive direction (θ=0 outward to +max)
+    let mut best_dist = f32::INFINITY;
+    for tr in theta_results[theta0_idx + 1..].iter() {
+        if tr.action_id != theta0_action_id {
+            let dist = tr.theta.abs();
+            if dist < best_dist {
+                has_flip = true;
+                best_dist = dist;
+                flip_theta = tr.theta;
+                flip_action = tr.action.clone();
+                flip_action_id = tr.action_id;
+                gap_at_flip = tr.gap;
+            }
+            break; // sorted ascending, first mismatch is nearest
+        }
+    }
+    // Scan negative direction (θ=0 outward to -max)
+    for tr in theta_results[..theta0_idx].iter().rev() {
+        if tr.action_id != theta0_action_id {
+            let dist = tr.theta.abs();
+            if dist < best_dist {
+                has_flip = true;
+                best_dist = dist;
+                flip_theta = tr.theta;
+                flip_action = tr.action.clone();
+                flip_action_id = tr.action_id;
+                gap_at_flip = tr.gap;
+            }
+            break; // sorted ascending (reversed), first mismatch is nearest
         }
     }
 

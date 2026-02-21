@@ -5,7 +5,7 @@ Python analysis package for Yatzy simulation data.
 ## Setup
 
 ```bash
-cd analytics && uv venv && uv pip install -e .
+cd analytics && uv venv && uv pip install -e ".[test]"
 analytics/.venv/bin/yatzy-analyze --help
 ```
 
@@ -99,3 +99,18 @@ Output: outputs/aggregates/parquet/{summary,kde,mer,sdva}.parquet
 3. Define a function that takes data + `out_dir: Path` and calls `save_fig()`
 4. Register as a Click command in `cli.py`
 5. Add to the justfile if it's a standard pipeline step
+
+## Testing
+
+22 tests via pytest:
+
+```bash
+analytics/.venv/bin/pytest analytics/tests/ -q
+```
+
+| File | Tests | Purpose |
+|------|-------|---------|
+| `test_config.py` | 8 | Path resolution, theta grids, binary constants |
+| `test_io.py` | 5 | Binary file readers (scores.bin, simulation_raw) |
+| `test_compute.py` | 6 | KDE, summary stats, CVaR, MER |
+| `test_style.py` | 3 | Colormap, theta_color, save_fig |

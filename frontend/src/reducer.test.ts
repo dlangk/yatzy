@@ -27,6 +27,8 @@ function freshState(): GameState {
     sortMap: null,
     showDebug: false,
     turnPhase: 'idle',
+    trajectory: [],
+    pendingTrajectoryEvent: null,
   };
 }
 
@@ -259,6 +261,124 @@ describe('gameReducer', () => {
       expect(next.dice[2].held).toBe(false);
       // Other dice unchanged
       expect(next.dice[0].held).toBe(true);
+    });
+  });
+
+  // --- Trajectory ---
+  describe('Trajectory', () => {
+    it('ROLL sets pendingTrajectoryEvent', () => {
+      const state = freshState();
+      const next = gameReducer(state, { type: 'ROLL' });
+      expect(next.pendingTrajectoryEvent).toBe('roll');
+      expect(next.trajectory).toHaveLength(0); // not yet pushed
+    });
+
+    it('REROLL sets pendingTrajectoryEvent', () => {
+      const state = { ...rolledState(), pendingTrajectoryEvent: null as 'roll' | 'reroll' | null };
+      state.dice[1].held = false;
+      const next = gameReducer(state, { type: 'REROLL' });
+      expect(next.pendingTrajectoryEvent).toBe('reroll');
+    });
+
+    it('SET_EVAL_RESPONSE pushes trajectory point when pendingTrajectoryEvent is set', () => {
+      const state: GameState = {
+        ...rolledState(),
+        pendingTrajectoryEvent: 'roll',
+        trajectory: [],
+      };
+      const response: EvaluateResponse = {
+        categories: [],
+        optimal_category: 0,
+        optimal_category_ev: 180,
+        state_ev: 245.5,
+      };
+      const next = gameReducer(state, { type: 'SET_EVAL_RESPONSE', response, sortMap: [0, 1, 2, 3, 4] });
+      expect(next.trajectory).toHaveLength(1);
+      expect(next.trajectory[0].event).toBe('roll');
+      expect(next.trajectory[0].stateEv).toBe(245.5);
+      expect(next.trajectory[0].expectedFinal).toBe(245.5); // accumulated=0 + state_ev
+      expect(next.pendingTrajectoryEvent).toBeNull();
+    });
+
+    it('SET_EVAL_RESPONSE does not push when no pendingTrajectoryEvent', () => {
+      const state: GameState = {
+        ...rolledState(),
+        pendingTrajectoryEvent: null,
+        trajectory: [],
+      };
+      const response: EvaluateResponse = {
+        categories: [],
+        optimal_category: 0,
+        optimal_category_ev: 180,
+        state_ev: 245.5,
+      };
+      const next = gameReducer(state, { type: 'SET_EVAL_RESPONSE', response, sortMap: [0, 1, 2, 3, 4] });
+      expect(next.trajectory).toHaveLength(0);
+    });
+
+    it('SCORE_CATEGORY pushes trajectory point with correct expectedFinal', () => {
+      const state: GameState = {
+        ...rolledState(),
+        trajectory: [{ index: 0, turn: 0, event: 'start', expectedFinal: 245, accumulatedScore: 0, stateEv: 245 }],
+        pendingTrajectoryEvent: null,
+      };
+      state.categories[0].suggestedScore = 3;
+      state.categories[0].evIfScored = 240.0;
+      state.categories[0].available = true;
+      const next = gameReducer(state, { type: 'SCORE_CATEGORY', categoryId: 0 });
+      expect(next.trajectory).toHaveLength(2);
+      const point = next.trajectory[1];
+      expect(point.event).toBe('score');
+      expect(point.turn).toBe(1);
+      expect(point.accumulatedScore).toBe(3); // scored 3 points, no bonus
+      expect(point.expectedFinal).toBe(3 + 240.0); // accumulated + evIfScored
+    });
+
+    it('RESET_GAME clears trajectory', () => {
+      const state: GameState = {
+        ...rolledState(),
+        trajectory: [{ index: 0, turn: 0, event: 'start', expectedFinal: 245, accumulatedScore: 0, stateEv: 245 }],
+      };
+      const next = gameReducer(state, { type: 'RESET_GAME' });
+      expect(next.trajectory).toHaveLength(0);
+    });
+
+    it('SET_INITIAL_EV sets start point when trajectory is empty', () => {
+      const state = freshState();
+      const next = gameReducer(state, { type: 'SET_INITIAL_EV', ev: 247.3 });
+      expect(next.trajectory).toHaveLength(1);
+      expect(next.trajectory[0]).toEqual({
+        index: 0,
+        turn: 0,
+        event: 'start',
+        expectedFinal: 247.3,
+        accumulatedScore: 0,
+        stateEv: 247.3,
+      });
+    });
+
+    it('SET_INITIAL_EV is ignored when trajectory already has points', () => {
+      const state: GameState = {
+        ...freshState(),
+        trajectory: [{ index: 0, turn: 0, event: 'start', expectedFinal: 245, accumulatedScore: 0, stateEv: 245 }],
+      };
+      const next = gameReducer(state, { type: 'SET_INITIAL_EV', ev: 999 });
+      expect(next.trajectory).toHaveLength(1);
+      expect(next.trajectory[0].expectedFinal).toBe(245); // unchanged
+    });
+
+    it('SET_DENSITY_RESULT patches percentiles into trajectory point', () => {
+      const state: GameState = {
+        ...freshState(),
+        trajectory: [
+          { index: 0, turn: 0, event: 'start', expectedFinal: 245, accumulatedScore: 0, stateEv: 245 },
+          { index: 1, turn: 1, event: 'score', expectedFinal: 243, accumulatedScore: 3, stateEv: 240 },
+        ],
+      };
+      const percentiles = { p10: 200, p25: 220, p50: 245, p75: 265, p90: 285 };
+      const next = gameReducer(state, { type: 'SET_DENSITY_RESULT', index: 1, percentiles });
+      expect(next.trajectory[1].percentiles).toEqual(percentiles);
+      expect(next.trajectory[0].percentiles).toBeUndefined(); // other points unaffected
     });
   });
 });

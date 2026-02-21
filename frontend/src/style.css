@@ -1,0 +1,266 @@
+:root {
+  --color-success: #2ca02c;
+  --color-danger: #b40426;
+  --color-orange: #F37021;
+  --color-blue: #3b4cc0;
+  --color-text: #333;
+  --color-text-muted: #aaa;
+  --color-border: #ccc;
+  --color-bg: #fff;
+  --color-bg-alt: #f0f0f0;
+  --color-bg-alt2: #f8f8f8;
+  --color-bg-panel: #f8f9fa;
+  --color-border-panel: #dee2e6;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: monospace;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+/* App shell */
+.app {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.app h1 {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+/* Action bar */
+.action-bar {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  margin: 12px 0;
+  min-height: 40px;
+}
+
+.action-bar .small-btn {
+  font-size: 14px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-alt);
+  cursor: pointer;
+  border-radius: 3px;
+  line-height: 22px;
+}
+
+.action-bar .reroll-controls {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.action-bar .reset-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+  opacity: 0.6;
+}
+
+/* Dice bar */
+.dice-bar {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.die-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.die-arrow {
+  width: 56px;
+  height: 16px;
+  font-size: 10px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-alt);
+  cursor: pointer;
+  border-radius: 3px;
+  line-height: 14px;
+}
+
+.die-btn {
+  width: 56px;
+  height: 56px;
+  font-size: 28px;
+  font-weight: bold;
+  font-family: monospace;
+  border-radius: 8px;
+}
+
+/* Dice legend */
+.dice-legend {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin: 4px 0 8px;
+  transition: opacity 0.2s;
+  min-height: 16px;
+}
+
+.dice-legend .swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+/* Eval panel */
+.eval-panel {
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border-panel);
+  border-radius: 6px;
+  padding: 10px;
+  margin: 12px 0;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.eval-panel .grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.eval-panel .val {
+  text-align: right;
+}
+
+/* Trajectory chart */
+.trajectory-chart {
+  width: 568px;
+  height: 200px;
+  margin: 12px auto;
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border-panel);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.trajectory-chart svg {
+  display: block;
+}
+
+/* Scorecard */
+.scorecard {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin-top: 12px;
+  font-family: monospace;
+  font-size: 14px;
+}
+
+.scorecard colgroup .col-name { width: 45%; }
+.scorecard colgroup .col-score { width: 20%; }
+.scorecard colgroup .col-ev { width: 15%; }
+.scorecard colgroup .col-action { width: 20%; }
+
+.scorecard thead tr {
+  border-bottom: 2px solid var(--color-text);
+}
+
+.scorecard th {
+  text-align: left;
+  padding: 4px 8px;
+}
+
+.scorecard th.center { text-align: center; }
+
+.scorecard td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--color-bg-alt);
+  height: 32px;
+}
+
+.scorecard .upper-summary td {
+  padding: 4px 8px;
+  border-bottom: 2px solid var(--color-text);
+}
+
+.scorecard .upper-summary {
+  background: var(--color-bg-alt2);
+  font-weight: bold;
+}
+
+.scorecard .total-row {
+  font-weight: bold;
+}
+
+.scorecard .total-row td {
+  padding: 6px 8px;
+  border-top: 2px solid var(--color-text);
+  border-bottom: none;
+}
+
+.scorecard .score-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: center;
+  font-family: monospace;
+  font-size: 14px;
+  padding: 0;
+  height: 24px;
+}
+
+.scorecard .score-input::-webkit-inner-spin-button,
+.scorecard .score-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.scorecard .score-input { -moz-appearance: textfield; }
+
+/* Debug panel */
+.debug-panel {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 12px;
+  font-size: 11px;
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 400px;
+  overflow: auto;
+}
+
+.debug-panel .label {
+  margin-bottom: 8px;
+  color: #569cd6;
+  font-weight: bold;
+}
+
+/* Debug toggle */
+.debug-toggle {
+  text-align: center;
+  margin-top: 12px;
+}
+
+.debug-toggle button {
+  font-size: 12px;
+  opacity: 0.6;
+}

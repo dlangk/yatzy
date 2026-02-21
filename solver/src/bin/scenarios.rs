@@ -144,10 +144,10 @@ struct Args {
     num_games: usize,
     seed: u64,
     output_dir: String,
-    mode: String,       // "difficulty" or "diagnostic"
-    top_n: usize,       // for difficulty mode
-    quiz_size: usize,   // for diagnostic mode
-    pool_size: usize,   // max per bucket
+    mode: String,     // "difficulty" or "diagnostic"
+    top_n: usize,     // for difficulty mode
+    quiz_size: usize, // for diagnostic mode
+    pool_size: usize, // max per bucket
     min_visits: usize,
     noisy: bool,
     beta: f32,
@@ -310,20 +310,8 @@ fn resolve_output_dir(output_dir: &str) -> String {
 }
 
 fn setup(args: &Args) -> Box<YatzyContext> {
-    let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
-    if std::env::set_current_dir(&base_path).is_err() {
-        eprintln!("Failed to change directory to {}", base_path);
-        std::process::exit(1);
-    }
-
-    let num_threads = std::env::var("RAYON_NUM_THREADS")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(8);
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(num_threads)
-        .build_global()
-        .ok(); // May fail if already initialized
+    let _base = yatzy::env_config::init_base_path();
+    let _threads = yatzy::env_config::init_rayon_threads_lenient();
 
     println!("Precomputing lookup tables...");
     let mut ctx = YatzyContext::new_boxed();
@@ -393,9 +381,7 @@ fn cmd_select_difficulty(
     // Count total decisions by type for visit_fraction
     let mut type_totals: HashMap<&str, usize> = HashMap::new();
     for (d, count) in candidates {
-        *type_totals
-            .entry(d.decision_type.as_str())
-            .or_default() += count;
+        *type_totals.entry(d.decision_type.as_str()).or_default() += count;
     }
 
     // Build JSON output
@@ -531,7 +517,10 @@ fn cmd_select_diagnostic(
         }
     }
 
-    println!("Building master pool (max {} per bucket)...", args.pool_size);
+    println!(
+        "Building master pool (max {} per bucket)...",
+        args.pool_size
+    );
     let pool = build_master_pool(ctx, candidates, &theta_tables, args.pool_size);
 
     println!("Assembling {} quiz scenarios...", args.quiz_size);
@@ -703,8 +692,7 @@ fn cmd_enrich_sensitivity(args: &Args, output_dir: &str) {
     }
 
     // Reload ctx for evaluation
-    let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
-    let _ = std::env::set_current_dir(&base_path);
+    let _base = yatzy::env_config::init_base_path();
 
     let mut ctx = YatzyContext::new_boxed();
     phase0_tables::precompute_lookup_tables(&mut ctx);
@@ -726,8 +714,15 @@ fn cmd_enrich_sensitivity(args: &Args, output_dir: &str) {
                 turn: s.turn,
                 decision_type: &s.decision_type,
             };
-            let (theta_results, has_flip, flip_theta, flip_action, flip_action_id, gap_at_flip, gap_at_theta0) =
-                evaluate_scenario_sensitivity(&ctx, &theta_entries, &params);
+            let (
+                theta_results,
+                has_flip,
+                flip_theta,
+                flip_action,
+                flip_action_id,
+                gap_at_flip,
+                gap_at_theta0,
+            ) = evaluate_scenario_sensitivity(&ctx, &theta_entries, &params);
 
             let theta0_result = theta_results
                 .iter()
@@ -768,8 +763,7 @@ fn cmd_enrich_sensitivity(args: &Args, output_dir: &str) {
     );
 
     let json_path = format!("{}/difficult_scenarios_sensitivity.json", output_dir);
-    let json =
-        serde_json::to_string_pretty(&output_scenarios).expect("JSON serialization failed");
+    let json = serde_json::to_string_pretty(&output_scenarios).expect("JSON serialization failed");
     let mut f = std::fs::File::create(&json_path).expect("Failed to create JSON");
     f.write_all(json.as_bytes()).unwrap();
     println!("Wrote {}", json_path);
@@ -830,14 +824,14 @@ fn main() {
             }
         }
         other => {
-            eprintln!("Unknown subcommand: {}. Use collect, select, enrich, or all.", other);
+            eprintln!(
+                "Unknown subcommand: {}. Use collect, select, enrich, or all.",
+                other
+            );
             print_usage();
             std::process::exit(1);
         }
     }
 
-    println!(
-        "\nTotal: {:.1}s",
-        total_start.elapsed().as_secs_f64()
-    );
+    println!("\nTotal: {:.1}s", total_start.elapsed().as_secs_f64());
 }

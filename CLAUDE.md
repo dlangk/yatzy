@@ -7,13 +7,13 @@ Optimal-play Scandinavian Yatzy: backward-induction DP solver, risk-sensitive st
 | Component | Location | Purpose | Key Constraint |
 |-----------|----------|---------|----------------|
 | Solver | `solver/` | HPC Rust engine: DP, simulation, REST API | **Performance is sacred** — see hot path rules |
-| Frontend | `frontend/` | React + TypeScript game UI | No layout shifts |
+| Frontend | `frontend/` | Vanilla TypeScript + D3.js game UI | No layout shifts |
 | Analytics | `analytics/` | Python analysis, visualization, pipelines | Custom colormap (`#F37021` center) |
 | Blog | `blog/` | Static site: articles, profiling quiz, game | Pre-computed data, no runtime API |
 
 See component CLAUDE.md files for detailed guidance:
 - `solver/CLAUDE.md` — architecture, hot paths, API reference, perf testing
-- `frontend/CLAUDE.md` — React patterns, API integration, layout rules
+- `frontend/CLAUDE.md` — Vanilla TS patterns, store, layout rules
 - `analytics/CLAUDE.md` — CLI commands, colormap, data flow, plotting
 - `blog/CLAUDE.md` — quiz system, data files, component architecture
 
@@ -32,8 +32,16 @@ See component CLAUDE.md files for detailed guidance:
 ```bash
 # Build + test
 just setup              # Build solver + install analytics
-just test               # Solver tests (163 tests)
+just build              # Production build (solver + frontend)
+just test               # Solver tests (184 tests)
+just test-all           # All tests (solver + frontend + analytics)
+just check              # Full quality gate (lint + typecheck + test + bench)
 just bench-check        # Performance regression test (PASS/FAIL)
+
+# Code quality
+just fmt                # Format all components
+just lint-all           # Lint all components
+just typecheck          # Type-check solver + frontend
 
 # Precompute + simulate
 just precompute         # θ=0 strategy table (~504ms)
@@ -44,8 +52,10 @@ just simulate           # 1M games lockstep
 just pipeline           # compute → plot → categories → efficiency
 just density            # Exact forward-DP PMFs
 
-# Serve
+# Serve + dev
 just serve              # API server on port 9000
+just dev-backend        # Start backend server
+just dev-frontend       # Start frontend dev server
 ```
 
 Full recipe list: `just --list`
@@ -53,7 +63,7 @@ Full recipe list: `just --list`
 ## Architecture
 
 ```
-Frontend (React, :5173) ──POST /evaluate──→ Solver (axum, :9000)
+Frontend (Vanilla TS, :5173) ──POST /evaluate──→ Solver (axum, :9000)
 Blog (static)           ──reads──→ blog/data/*.json (pre-computed)
 Analytics (Python)      ──reads──→ data/simulations/theta/*/scores.bin
 ```

@@ -6,7 +6,7 @@ Rust HPC engine: backward-induction DP, Monte Carlo simulation, REST API.
 
 ```bash
 cargo build --release         # Build (~30s with LTO)
-cargo test                    # 163 tests (136 unit + 25 integration + 2 ignored)
+cargo test                    # 184 tests (136 unit + 13 API + 8 property + 25 integration + 2 ignored)
 cargo fmt --check             # Formatting
 cargo clippy                  # Lints
 
@@ -114,3 +114,12 @@ just bench          # Print only
 ```
 
 Baseline: `.overhaul/performance-baseline.json`. Threshold: `max(mean + 3σ, mean × 1.05)`.
+
+## Test Files
+
+| File | Tests | Purpose |
+|------|-------|---------|
+| `src/**/*.rs` (unit) | 136 | Inline `#[cfg(test)]` modules |
+| `tests/test_api.rs` | 13 | API endpoint integration tests |
+| `tests/test_properties.rs` | 8 | Proptest property-based tests |
+| `tests/test_precomputed.rs` | 25 | State value correctness (ignored without data) |

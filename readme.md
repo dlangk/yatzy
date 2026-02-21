@@ -10,6 +10,8 @@ just setup          # Build solver + install analytics
 just precompute     # Precompute EV table (~2.3s)
 just serve          # API server on :9000
 just test           # Run solver tests
+just test-all       # All tests (solver + frontend + analytics)
+just check          # Full quality gate (lint + typecheck + test + bench)
 just --list         # See all recipes
 ```
 
@@ -36,7 +38,7 @@ just pipeline                   # extract → compute → plot → outputs/
 yatzy/
 ├── solver/             Rust DP solver + API server + simulation engine
 ├── analytics/          Python package for analysis, KDE, plotting
-├── frontend/           Vanilla JS web UI with Chart.js
+├── frontend/           Vanilla TypeScript + D3.js game UI
 ├── theory/             Strategy docs and analytical insights
 ├── data/               Strategy tables (~300MB) + simulation data (~11GB)
 │   ├── strategy_tables/    Precomputed EV tables (all_states*.bin)
@@ -54,7 +56,7 @@ yatzy/
 ```bash
 curl "http://localhost:9000/state_value?upper_score=50&scored_categories=3"
 
-curl -X POST http://localhost:9000/suggest_optimal_action \
+curl -X POST http://localhost:9000/evaluate \
   -H "Content-Type: application/json" \
   -d '{"dice":[1,3,3,4,6],"upper_score":10,"scored_categories":5,"rerolls_remaining":2}'
 ```

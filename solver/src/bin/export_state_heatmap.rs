@@ -4,25 +4,13 @@
 //! (num_scored_categories, upper_score) pair across all reachable category masks.
 //! Outputs `blog/data/state_heatmap.json`.
 
-use std::path::PathBuf;
-
 use yatzy::constants::*;
 use yatzy::phase0_tables;
 use yatzy::storage::load_all_state_values;
 use yatzy::types::YatzyContext;
 
-fn set_working_directory() -> PathBuf {
-    let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
-    let path = PathBuf::from(&base_path);
-    if std::env::set_current_dir(&base_path).is_err() {
-        eprintln!("Failed to change directory to {}", base_path);
-        std::process::exit(1);
-    }
-    path
-}
-
 fn main() {
-    let _base_path = set_working_directory();
+    let _base_path = yatzy::env_config::init_base_path();
 
     let mut ctx = YatzyContext::new_boxed();
     phase0_tables::precompute_lookup_tables(&mut ctx);

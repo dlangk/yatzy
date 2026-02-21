@@ -1,26 +1,15 @@
 use std::sync::Arc;
 
 use yatzy::phase0_tables;
-use yatzy::server::create_router;
+use yatzy::server::create_router_with_oracle;
 use yatzy::state_computation::compute_all_state_values;
-use yatzy::storage::load_all_state_values;
+use yatzy::storage::{load_all_state_values, load_oracle, ORACLE_FILE_PATH};
 use yatzy::types::YatzyContext;
-
-fn set_working_directory() {
-    let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
-    println!("YATZY_BASE_PATH={}", base_path);
-    if std::env::set_current_dir(&base_path).is_err() {
-        eprintln!("Failed to change directory to {}", base_path);
-        std::process::exit(1);
-    }
-    if let Ok(cwd) = std::env::current_dir() {
-        println!("Working directory changed to: {}", cwd.display());
-    }
-}
 
 #[tokio::main]
 async fn main() {
-    set_working_directory();
+    let _base = yatzy::env_config::init_base_path();
+    let port = yatzy::env_config::server_port();
     println!("Starting yatzy API server...");
 
     let mut ctx = YatzyContext::new_boxed();
@@ -31,10 +20,17 @@ async fn main() {
         compute_all_state_values(&mut ctx);
     }
 
-    let ctx = Arc::new(*ctx);
-    let app = create_router(ctx);
+    // Load oracle for density endpoint (optional — skip if file missing)
+    let oracle = load_oracle(ORACLE_FILE_PATH);
+    if oracle.is_some() {
+        println!("Oracle loaded — /density endpoint available");
+    } else {
+        println!("Oracle not found — /density endpoint will return 503");
+    }
 
-    let port = 9000;
+    let ctx = Arc::new(*ctx);
+    let app = create_router_with_oracle(ctx, oracle);
+
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port))
         .await
         .unwrap();

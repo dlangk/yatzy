@@ -276,9 +276,7 @@ pub fn filter_and_validate(
             continue;
         }
 
-        if require_realistic
-            && !is_realistic(d.upper_score, d.scored, d.turn, &d.category_scores)
-        {
+        if require_realistic && !is_realistic(d.upper_score, d.scored, d.turn, &d.category_scores) {
             filtered_realistic += 1;
             continue;
         }

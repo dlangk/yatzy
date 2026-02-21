@@ -122,3 +122,24 @@ def fmt_theta(t: float) -> str:
     if t == int(t) and abs(t) >= 1:
         return f"{int(t)}"
     return f"{t:.2f}"
+
+
+def apply_theta_legend(
+    ax,
+    norm: mcolors.Normalize,
+    spec,  # PlotSpec
+    *,
+    legend_kwargs: dict | None = None,
+):
+    """Render theta legend/colorbar according to spec.theta_legend."""
+    if spec.theta_legend == "colorbar":
+        leg = ax.get_legend()
+        if leg:
+            leg.remove()
+        theta_colorbar(ax, norm)
+    elif spec.theta_legend == "legend":
+        kw: dict = {"fontsize": FONT_LEGEND, "framealpha": 0.9, "ncol": 2}
+        if legend_kwargs:
+            kw.update(legend_kwargs)
+        ax.legend(**kw)
+    # "annotation" and "none" → no action

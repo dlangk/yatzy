@@ -24,41 +24,23 @@ from .scenario_cards import (
 )
 
 
-def _build_state_text(scenario: dict, scenario_id: str = "") -> str:
-    """Build monospace text block with full scorecard."""
+def _build_state_text(scenario: dict) -> str:
+    """Build compact monospace text block: game state + scorecard only.
+
+    Info shown in the title/subtitle is NOT repeated here.
+    """
     dice = scenario["dice"]
-    turn = scenario["turn"]
     upper_score = scenario["upper_score"]
     scored = scenario["scored_categories"]
     dtype = scenario["decision_type"]
-
-    # Phase from turn
-    if turn < 5:
-        phase = "early"
-    elif turn < 10:
-        phase = "mid"
-    else:
-        phase = "late"
 
     best_action = scenario["best_action"]
     runner_up = scenario["runner_up_action"]
 
     lines: list[str] = []
 
-    if scenario_id:
-        lines.append(f"  Scenario {scenario_id}")
-        lines.append("")
-
-    # Dice
-    faces = "  ".join(DIE_FACES.get(d, str(d)) for d in dice)
-    nums = ", ".join(str(d) for d in dice)
-    lines.append(f"  {faces}")
-    lines.append(f"  [{nums}]")
-    lines.append("")
-
-    # Game context
+    # Game context (turn/decision/dice/rank/best/gap/visits are in title/subtitle)
     n_scored = bin(scored).count("1")
-    lines.append(f"  Turn {turn + 1} of 15  ({phase} game)")
     lines.append(f"  Scored: {n_scored}/15 categories")
     if upper_score >= 63:
         lines.append(f"  Upper:  {upper_score}/63 (bonus!)")
@@ -66,25 +48,24 @@ def _build_state_text(scenario: dict, scenario_id: str = "") -> str:
         lines.append(f"  Upper:  {upper_score}/63")
     lines.append("")
 
-    # Decision type header
-    dtype_label = dtype.replace("reroll", "Reroll ").title()
-    if dtype == "category":
-        dtype_label = "Category Choice"
-    lines.append(f"  Decision: {dtype_label}")
-    lines.append("")
-
     # Category table
     show_markers = dtype == "category"
     best_id = best_action.get("id", best_action.get("action_id")) if show_markers else -1
     ru_id = runner_up.get("id", runner_up.get("action_id")) if show_markers else -1
 
+    # Box-drawing table: Category(18) | Scored(7) | Avail(7) | marker(6)
     lines.append("  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
                  "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c"
                  "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c"
+                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c"
                  "\u2500\u2500\u2500\u2500\u2500\u2500\u2510")
-    lines.append("  \u2502 Category         \u2502 Score \u2502      \u2502")
+    lines.append("  \u2502 Category         "
+                 "\u2502Scored "
+                 "\u2502 Avail "
+                 "\u2502      \u2502")
     lines.append("  \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
                  "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c"
+                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c"
                  "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c"
                  "\u2500\u2500\u2500\u2500\u2500\u2500\u2524")
 
@@ -93,11 +74,12 @@ def _build_state_text(scenario: dict, scenario_id: str = "") -> str:
         name = CATEGORY_NAMES[c]
         if _is_scored(scored, c):
             if cat_scores and cat_scores[c] >= 0:
-                scr_str = f"{cat_scores[c]:>3}  "
+                scored_str = f" {cat_scores[c]:>5} "
             else:
-                scr_str = "  \u2713  "
+                scored_str = "   \u2713   "
             lines.append(
-                f"  \u2502 {name:<16} \u2502 {scr_str} \u2502      \u2502"
+                f"  \u2502 {name:<16} \u2502{scored_str}"
+                f"\u2502       \u2502      \u2502"
             )
         else:
             scr = compute_score(dice, c)
@@ -108,33 +90,27 @@ def _build_state_text(scenario: dict, scenario_id: str = "") -> str:
                 elif c == ru_id:
                     marker = "\u25c0 2nd"
             lines.append(
-                f"  \u2502 {name:<16} \u2502 {scr:>5} \u2502 {marker:<4} \u2502"
+                f"  \u2502 {name:<16} \u2502       "
+                f"\u2502 {scr:>5} "
+                f"\u2502 {marker:<5}\u2502"
             )
         if c == 5:
             lines.append(
                 "  \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
                 "\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+                "\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
                 "\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2524"
             )
 
     lines.append("  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
                  "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534"
                  "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534"
+                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534"
                  "\u2500\u2500\u2500\u2500\u2500\u2500\u2518")
 
-    # Decision summary
+    # Unique-to-panel metric
     lines.append("")
-    best_label = best_action.get("label", best_action.get("action_name"))
-    ru_label = runner_up.get("label", runner_up.get("action_name"))
-    lines.append(f"  Best:       {best_label}")
-    lines.append(f"              EV = {best_action['ev']:.2f}")
-    lines.append(f"  Runner-up:  {ru_label}")
-    lines.append(f"              EV = {runner_up['ev']:.2f}")
-    lines.append(f"  Gap:        {scenario['ev_gap']:.4f}")
-    lines.append("")
-    lines.append(f"  Visits:     {scenario['visit_count']:,} / 1M games")
-    lines.append(f"  Rank:       #{scenario['rank']}")
     lines.append(f"  Difficulty: {scenario['difficulty_score']:,.0f}")
 
     return "\n".join(lines)
@@ -245,7 +221,7 @@ def _plot_action_table(scenario: dict, ax: plt.Axes) -> None:
     )
     table.auto_set_font_size(False)
     table.set_fontsize(8.5)
-    table.scale(1.0, 1.4)
+    table.scale(1.0, 1.2)
 
     for j in range(len(col_labels)):
         cell = table[0, j]
@@ -266,15 +242,17 @@ def plot_difficult_card(
         2, 2,
         width_ratios=[0.8, 1.4],
         height_ratios=[1.3, 1],
-        hspace=0.25, wspace=0.05,
-        left=0.02, right=0.98, top=0.88, bottom=0.04,
+        hspace=0.25, wspace=0.01,
+        left=0.01, right=0.98, top=0.88, bottom=0.04,
     )
 
     # Title
     dtype = scenario["decision_type"]
-    dtype_label = dtype.replace("reroll", "Reroll ").title()
-    if dtype == "category":
-        dtype_label = "Category Choice"
+    dtype_label = {
+        "reroll2": "After first roll (2 rerolls left)",
+        "reroll1": "After second roll (1 reroll left)",
+        "category": "Final dice \u2014 choose category",
+    }.get(dtype, dtype)
     turn = scenario["turn"] + 1
     dice_str = ", ".join(str(d) for d in scenario["dice"])
 
@@ -295,14 +273,25 @@ def plot_difficult_card(
         ha="center", fontsize=11, color="#555555",
     )
 
-    # Left: monospace scorecard (spans both rows)
+    # Left: big dice + monospace scorecard (spans both rows)
     ax_text = fig.add_subplot(gs[:, 0])
     ax_text.set_xlim(0, 1)
     ax_text.set_ylim(0, 1)
     ax_text.axis("off")
-    text = _build_state_text(scenario, scenario_id=scenario_id)
+
+    # Large dice faces at top
+    dice = scenario["dice"]
+    faces = "  ".join(DIE_FACES.get(d, str(d)) for d in dice)
     ax_text.text(
-        0.03, 0.97, text,
+        0.06, 0.97, faces,
+        transform=ax_text.transAxes,
+        fontsize=28, verticalalignment="top",
+    )
+
+    # Compact state text below dice
+    text = _build_state_text(scenario)
+    ax_text.text(
+        0.03, 0.88, text,
         transform=ax_text.transAxes,
         fontfamily="monospace", fontsize=9.5,
         verticalalignment="top",

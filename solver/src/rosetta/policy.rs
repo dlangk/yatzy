@@ -9,7 +9,91 @@ use crate::game_mechanics::update_upper_score;
 use crate::rosetta::dsl::{compute_features, SemanticFeatures};
 use crate::types::YatzyContext;
 
-/// Semantic reroll actions — position-independent intents.
+// ── CFG Primitives & Actions ────────────────────────────────────────────
+
+/// Composable Filter Grammar primitives.
+#[derive(Debug, Clone, PartialEq)]
+pub enum CfgPrimitive {
+    RerollAll,
+    KeepAll,
+    Face(u8), // 1-6
+    MaxGroup,
+    Pair,
+    Triple,
+    Seq,
+    High(u8), // 1-2
+}
+
+/// Composable Filter Grammar actions.
+#[derive(Debug, Clone, PartialEq)]
+pub enum CfgAction {
+    Primitive(CfgPrimitive),
+    Union(CfgPrimitive, CfgPrimitive),
+}
+
+impl CfgPrimitive {
+    /// Parse a primitive name like "Face(3)", "MaxGroup", "High(2)".
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "RerollAll" => Some(Self::RerollAll),
+            "KeepAll" => Some(Self::KeepAll),
+            "MaxGroup" => Some(Self::MaxGroup),
+            "Pair" => Some(Self::Pair),
+            "Triple" => Some(Self::Triple),
+            "Seq" => Some(Self::Seq),
+            _ if s.starts_with("Face(") && s.ends_with(')') => {
+                let n: u8 = s[5..s.len() - 1].parse().ok()?;
+                if (1..=6).contains(&n) {
+                    Some(Self::Face(n))
+                } else {
+                    None
+                }
+            }
+            _ if s.starts_with("High(") && s.ends_with(')') => {
+                let n: u8 = s[5..s.len() - 1].parse().ok()?;
+                if (1..=2).contains(&n) {
+                    Some(Self::High(n))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+}
+
+impl CfgAction {
+    /// Parse an action string: "Face(3)", "Union(Pair,High(1))", etc.
+    pub fn parse(s: &str) -> Option<Self> {
+        if s.starts_with("Union(") && s.ends_with(')') {
+            let inner = &s[6..s.len() - 1];
+            // Find the comma at depth 0
+            let mut depth = 0i32;
+            let mut split = None;
+            for (i, ch) in inner.char_indices() {
+                match ch {
+                    '(' => depth += 1,
+                    ')' => depth -= 1,
+                    ',' if depth == 0 => {
+                        split = Some(i);
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            let split = split?;
+            let a = CfgPrimitive::parse(&inner[..split])?;
+            let b = CfgPrimitive::parse(&inner[split + 1..])?;
+            Some(CfgAction::Union(a, b))
+        } else {
+            CfgPrimitive::parse(s).map(CfgAction::Primitive)
+        }
+    }
+}
+
+// ── Legacy semantic action (backward compat) ────────────────────────────
+
+/// Legacy semantic reroll actions — kept for backward compatibility.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SemanticRerollAction {
     RerollAll,
@@ -50,39 +134,41 @@ impl SemanticRerollAction {
             _ => None,
         }
     }
+
+    /// Convert legacy action to equivalent CfgAction.
+    pub fn to_cfg(self) -> CfgAction {
+        match self {
+            Self::RerollAll => CfgAction::Primitive(CfgPrimitive::RerollAll),
+            Self::KeepAll => CfgAction::Primitive(CfgPrimitive::KeepAll),
+            Self::KeepFace1 => CfgAction::Primitive(CfgPrimitive::Face(1)),
+            Self::KeepFace2 => CfgAction::Primitive(CfgPrimitive::Face(2)),
+            Self::KeepFace3 => CfgAction::Primitive(CfgPrimitive::Face(3)),
+            Self::KeepFace4 => CfgAction::Primitive(CfgPrimitive::Face(4)),
+            Self::KeepFace5 => CfgAction::Primitive(CfgPrimitive::Face(5)),
+            Self::KeepFace6 => CfgAction::Primitive(CfgPrimitive::Face(6)),
+            Self::KeepPair => CfgAction::Primitive(CfgPrimitive::Pair),
+            Self::KeepTwoPairs => CfgAction::Union(CfgPrimitive::Pair, CfgPrimitive::Pair),
+            Self::KeepTriple => CfgAction::Primitive(CfgPrimitive::Triple),
+            Self::KeepQuad => CfgAction::Primitive(CfgPrimitive::Triple), // approx — quad not in CFG
+            Self::KeepTriplePlusHighest => {
+                CfgAction::Union(CfgPrimitive::Triple, CfgPrimitive::High(1))
+            }
+            Self::KeepPairPlusKicker => CfgAction::Union(CfgPrimitive::Pair, CfgPrimitive::High(1)),
+            Self::KeepStraightDraw => CfgAction::Primitive(CfgPrimitive::Seq),
+        }
+    }
 }
 
 /// Action types in the rule system.
 #[derive(Debug, Clone)]
 pub enum RuleAction {
     CategoryIndex(usize),
-    SemanticReroll(SemanticRerollAction),
+    CfgReroll(CfgAction),
+    SemanticReroll(SemanticRerollAction), // backward compat
     BitmaskReroll(usize),
 }
 
-/// Compile a semantic reroll action to a bitmask for specific sorted dice.
-///
-/// Convention: bit i set = REROLL position i. Dice are sorted ascending.
-/// Invalid actions fall back to 31 (Reroll All).
-pub fn compile_to_mask(dice: &[i32; 5], action: SemanticRerollAction) -> i32 {
-    match action {
-        SemanticRerollAction::RerollAll => 31,
-        SemanticRerollAction::KeepAll => 0,
-        SemanticRerollAction::KeepFace1 => keep_face(dice, 1),
-        SemanticRerollAction::KeepFace2 => keep_face(dice, 2),
-        SemanticRerollAction::KeepFace3 => keep_face(dice, 3),
-        SemanticRerollAction::KeepFace4 => keep_face(dice, 4),
-        SemanticRerollAction::KeepFace5 => keep_face(dice, 5),
-        SemanticRerollAction::KeepFace6 => keep_face(dice, 6),
-        SemanticRerollAction::KeepPair => keep_pair(dice),
-        SemanticRerollAction::KeepTwoPairs => keep_two_pairs(dice),
-        SemanticRerollAction::KeepTriple => keep_triple(dice),
-        SemanticRerollAction::KeepQuad => keep_quad(dice),
-        SemanticRerollAction::KeepTriplePlusHighest => keep_triple_plus_highest(dice),
-        SemanticRerollAction::KeepPairPlusKicker => keep_pair_plus_kicker(dice),
-        SemanticRerollAction::KeepStraightDraw => keep_straight_draw(dice),
-    }
-}
+// ── Compile CFG to mask ─────────────────────────────────────────────────
 
 fn face_counts(dice: &[i32; 5]) -> [u8; 6] {
     let mut counts = [0u8; 6];
@@ -92,26 +178,230 @@ fn face_counts(dice: &[i32; 5]) -> [u8; 6] {
     counts
 }
 
-fn keep_face(dice: &[i32; 5], face: i32) -> i32 {
-    let mut mask = 31i32;
-    let mut found = false;
-    for i in 0..5 {
-        if dice[i] == face {
-            mask &= !(1 << i);
-            found = true;
+/// Compute kept-position bitmask (bits set = KEEP) for a primitive.
+/// Returns 0 (keep nothing) for invalid primitives, 0x1f (keep all) for KeepAll.
+fn primitive_keep_mask(dice: &[i32; 5], prim: &CfgPrimitive) -> (i32, bool) {
+    match prim {
+        CfgPrimitive::RerollAll => (0, true), // keep nothing
+        CfgPrimitive::KeepAll => (0x1f, true),
+        CfgPrimitive::Face(face) => {
+            let f = *face as i32;
+            let mut mask = 0i32;
+            let mut found = false;
+            for i in 0..5 {
+                if dice[i] == f {
+                    mask |= 1 << i;
+                    found = true;
+                }
+            }
+            (mask, found)
         }
-    }
-    if found {
-        mask
-    } else {
-        31
+        CfgPrimitive::MaxGroup => {
+            let counts = face_counts(dice);
+            let mut best_face = 0usize;
+            let mut best_count = 0u8;
+            for f in 0..6 {
+                if counts[f] > best_count || (counts[f] == best_count && f > best_face) {
+                    best_count = counts[f];
+                    best_face = f;
+                }
+            }
+            let target = best_face as i32 + 1;
+            let mut mask = 0i32;
+            for i in 0..5 {
+                if dice[i] == target {
+                    mask |= 1 << i;
+                }
+            }
+            (mask, true)
+        }
+        CfgPrimitive::Pair => keep_pair_positions(dice),
+        CfgPrimitive::Triple => keep_triple_positions(dice),
+        CfgPrimitive::Seq => keep_seq_positions(dice),
+        CfgPrimitive::High(n) => {
+            let n = *n as usize;
+            let mut mask = 0i32;
+            for i in (5 - n)..5 {
+                mask |= 1 << i;
+            }
+            (mask, true)
+        }
     }
 }
 
-/// Keep 2 of highest face with count≥2.
-fn keep_pair(dice: &[i32; 5]) -> i32 {
+/// Keep 2 of highest face with count>=2. Returns (keep_mask, valid).
+fn keep_pair_positions(dice: &[i32; 5]) -> (i32, bool) {
     let counts = face_counts(dice);
-    // Find highest face with count≥2
+    let mut target = -1i32;
+    for f in (0..6).rev() {
+        if counts[f] >= 2 {
+            target = f as i32 + 1;
+            break;
+        }
+    }
+    if target < 0 {
+        return (0, false);
+    }
+    let mut mask = 0i32;
+    let mut kept = 0;
+    for i in (0..5).rev() {
+        if dice[i] == target && kept < 2 {
+            mask |= 1 << i;
+            kept += 1;
+        }
+    }
+    (mask, true)
+}
+
+/// Keep 3 of highest face with count>=3.
+fn keep_triple_positions(dice: &[i32; 5]) -> (i32, bool) {
+    let counts = face_counts(dice);
+    let mut target = -1i32;
+    for f in (0..6).rev() {
+        if counts[f] >= 3 {
+            target = f as i32 + 1;
+            break;
+        }
+    }
+    if target < 0 {
+        return (0, false);
+    }
+    let mut mask = 0i32;
+    let mut kept = 0;
+    for i in (0..5).rev() {
+        if dice[i] == target && kept < 3 {
+            mask |= 1 << i;
+            kept += 1;
+        }
+    }
+    (mask, true)
+}
+
+/// Keep longest consecutive run of unique faces (1 die per face).
+fn keep_seq_positions(dice: &[i32; 5]) -> (i32, bool) {
+    let mut unique = Vec::with_capacity(5);
+    for &d in dice {
+        if unique.last() != Some(&d) {
+            unique.push(d);
+        }
+    }
+    if unique.len() < 2 {
+        return (0, false);
+    }
+    let mut best_start = 0;
+    let mut best_len = 1;
+    let mut run_start = 0;
+    let mut run_len = 1;
+    for i in 1..unique.len() {
+        if unique[i] == unique[i - 1] + 1 {
+            run_len += 1;
+        } else {
+            if run_len > best_len {
+                best_len = run_len;
+                best_start = run_start;
+            }
+            run_start = i;
+            run_len = 1;
+        }
+    }
+    if run_len > best_len {
+        best_len = run_len;
+        best_start = run_start;
+    }
+    if best_len < 2 {
+        return (0, false);
+    }
+    let run_faces: Vec<i32> = unique[best_start..best_start + best_len].to_vec();
+    let mut mask = 0i32;
+    let mut used = [false; 7];
+    for i in 0..5 {
+        let f = dice[i] as usize;
+        if run_faces.contains(&dice[i]) && !used[f] {
+            mask |= 1 << i;
+            used[f] = true;
+        }
+    }
+    (mask, true)
+}
+
+/// Compile a CFG action to a reroll bitmask for specific sorted dice.
+///
+/// Convention: bit i set = REROLL position i. Dice are sorted ascending.
+/// Invalid actions fall back to 31 (Reroll All).
+pub fn compile_cfg_to_mask(dice: &[i32; 5], action: &CfgAction) -> i32 {
+    match action {
+        CfgAction::Primitive(p) => {
+            let (keep_mask, valid) = primitive_keep_mask(dice, p);
+            if !valid {
+                return 31;
+            }
+            // Invert: reroll = NOT kept
+            31 & !keep_mask
+        }
+        CfgAction::Union(a, b) => {
+            let (mask_a, valid_a) = primitive_keep_mask(dice, a);
+            let (mask_b, valid_b) = primitive_keep_mask(dice, b);
+            if !valid_a && !valid_b {
+                return 31;
+            }
+            let combined = if valid_a { mask_a } else { 0 } | if valid_b { mask_b } else { 0 };
+            31 & !combined
+        }
+    }
+}
+
+// ── Legacy compile_to_mask ──────────────────────────────────────────────
+
+/// Compile a legacy semantic reroll action to a bitmask.
+pub fn compile_to_mask(dice: &[i32; 5], action: SemanticRerollAction) -> i32 {
+    // Special cases that don't map cleanly to CFG
+    match action {
+        SemanticRerollAction::KeepTwoPairs => keep_two_pairs(dice),
+        SemanticRerollAction::KeepQuad => keep_quad(dice),
+        SemanticRerollAction::KeepTriplePlusHighest => keep_triple_plus_highest(dice),
+        SemanticRerollAction::KeepPairPlusKicker => keep_pair_plus_kicker(dice),
+        _ => compile_cfg_to_mask(dice, &action.to_cfg()),
+    }
+}
+
+/// Keep triple + highest remaining die (legacy).
+fn keep_triple_plus_highest(dice: &[i32; 5]) -> i32 {
+    let counts = face_counts(dice);
+    let mut target = -1i32;
+    for f in (0..6).rev() {
+        if counts[f] >= 3 {
+            target = f as i32 + 1;
+            break;
+        }
+    }
+    if target < 0 {
+        return 31;
+    }
+    let mut mask = 31i32;
+    let mut kept = 0;
+    let mut triple_positions = [false; 5];
+    for i in (0..5).rev() {
+        if dice[i] == target && kept < 3 {
+            mask &= !(1 << i);
+            triple_positions[i] = true;
+            kept += 1;
+        }
+    }
+    for i in (0..5).rev() {
+        if !triple_positions[i] {
+            mask &= !(1 << i);
+            break;
+        }
+    }
+    if kept < 3 {
+        return 31;
+    }
+    mask
+}
+
+/// Keep pair + highest remaining die (legacy).
+fn keep_pair_plus_kicker(dice: &[i32; 5]) -> i32 {
+    let counts = face_counts(dice);
     let mut target = -1i32;
     for f in (0..6).rev() {
         if counts[f] >= 2 {
@@ -122,13 +412,20 @@ fn keep_pair(dice: &[i32; 5]) -> i32 {
     if target < 0 {
         return 31;
     }
-    // Keep 2 rightmost positions with that face
     let mut mask = 31i32;
     let mut kept = 0;
+    let mut pair_positions = [false; 5];
     for i in (0..5).rev() {
         if dice[i] == target && kept < 2 {
             mask &= !(1 << i);
+            pair_positions[i] = true;
             kept += 1;
+        }
+    }
+    for i in (0..5).rev() {
+        if !pair_positions[i] {
+            mask &= !(1 << i);
+            break;
         }
     }
     mask
@@ -160,30 +457,6 @@ fn keep_two_pairs(dice: &[i32; 5]) -> i32 {
     mask
 }
 
-/// Keep 3 of highest face with count≥3.
-fn keep_triple(dice: &[i32; 5]) -> i32 {
-    let counts = face_counts(dice);
-    let mut target = -1i32;
-    for f in (0..6).rev() {
-        if counts[f] >= 3 {
-            target = f as i32 + 1;
-            break;
-        }
-    }
-    if target < 0 {
-        return 31;
-    }
-    let mut mask = 31i32;
-    let mut kept = 0;
-    for i in (0..5).rev() {
-        if dice[i] == target && kept < 3 {
-            mask &= !(1 << i);
-            kept += 1;
-        }
-    }
-    mask
-}
-
 /// Keep 4 of highest face with count≥4.
 fn keep_quad(dice: &[i32; 5]) -> i32 {
     let counts = face_counts(dice);
@@ -208,124 +481,7 @@ fn keep_quad(dice: &[i32; 5]) -> i32 {
     mask
 }
 
-/// Keep triple + highest remaining die.
-fn keep_triple_plus_highest(dice: &[i32; 5]) -> i32 {
-    let counts = face_counts(dice);
-    let mut target = -1i32;
-    for f in (0..6).rev() {
-        if counts[f] >= 3 {
-            target = f as i32 + 1;
-            break;
-        }
-    }
-    if target < 0 {
-        return 31;
-    }
-    let mut mask = 31i32;
-    let mut kept = 0;
-    let mut triple_positions = [false; 5];
-    for i in (0..5).rev() {
-        if dice[i] == target && kept < 3 {
-            mask &= !(1 << i);
-            triple_positions[i] = true;
-            kept += 1;
-        }
-    }
-    // Find highest remaining position (rightmost non-triple)
-    for i in (0..5).rev() {
-        if !triple_positions[i] {
-            mask &= !(1 << i);
-            break;
-        }
-    }
-    if kept < 3 {
-        return 31;
-    }
-    mask
-}
-
-/// Keep pair + highest remaining die.
-fn keep_pair_plus_kicker(dice: &[i32; 5]) -> i32 {
-    let counts = face_counts(dice);
-    let mut target = -1i32;
-    for f in (0..6).rev() {
-        if counts[f] >= 2 {
-            target = f as i32 + 1;
-            break;
-        }
-    }
-    if target < 0 {
-        return 31;
-    }
-    let mut mask = 31i32;
-    let mut kept = 0;
-    let mut pair_positions = [false; 5];
-    for i in (0..5).rev() {
-        if dice[i] == target && kept < 2 {
-            mask &= !(1 << i);
-            pair_positions[i] = true;
-            kept += 1;
-        }
-    }
-    // Highest remaining
-    for i in (0..5).rev() {
-        if !pair_positions[i] {
-            mask &= !(1 << i);
-            break;
-        }
-    }
-    mask
-}
-
-/// Keep longest consecutive run of unique faces (1 die per face).
-fn keep_straight_draw(dice: &[i32; 5]) -> i32 {
-    // Collect unique faces sorted
-    let mut unique = Vec::with_capacity(5);
-    for &d in dice {
-        if unique.last() != Some(&d) {
-            unique.push(d);
-        }
-    }
-    if unique.len() < 2 {
-        return 31;
-    }
-    // Find longest consecutive run
-    let mut best_start = 0;
-    let mut best_len = 1;
-    let mut run_start = 0;
-    let mut run_len = 1;
-    for i in 1..unique.len() {
-        if unique[i] == unique[i - 1] + 1 {
-            run_len += 1;
-        } else {
-            if run_len > best_len {
-                best_len = run_len;
-                best_start = run_start;
-            }
-            run_start = i;
-            run_len = 1;
-        }
-    }
-    if run_len > best_len {
-        best_len = run_len;
-        best_start = run_start;
-    }
-    if best_len < 2 {
-        return 31;
-    }
-    let run_faces: Vec<i32> = unique[best_start..best_start + best_len].to_vec();
-    // Keep 1 die per face in the run
-    let mut mask = 31i32;
-    let mut used = [false; 7]; // face 1..6
-    for i in 0..5 {
-        let f = dice[i] as usize;
-        if run_faces.contains(&dice[i]) && !used[f] {
-            mask &= !(1 << i);
-            used[f] = true;
-        }
-    }
-    mask
-}
+// ── Rule types ──────────────────────────────────────────────────────────
 
 /// A single condition in a rule: feature_name op threshold.
 #[derive(Debug, Clone)]
@@ -422,7 +578,10 @@ impl SkillLadder {
             match meta_val {
                 Some(v) if v.is_string() => {
                     let s = v.as_str().unwrap();
-                    if let Some(sem) = SemanticRerollAction::parse(s) {
+                    // Try CFG first, then legacy semantic
+                    if let Some(cfg) = CfgAction::parse(s) {
+                        RuleAction::CfgReroll(cfg)
+                    } else if let Some(sem) = SemanticRerollAction::parse(s) {
                         RuleAction::SemanticReroll(sem)
                     } else if is_reroll {
                         RuleAction::BitmaskReroll(0)
@@ -459,13 +618,18 @@ impl SkillLadder {
     }
 }
 
-/// Parse an action field from JSON — string (semantic) or integer (category/bitmask).
+/// Parse an action field from JSON — string (CFG/semantic) or integer (category/bitmask).
 fn parse_action(val: &serde_json::Value, is_reroll: bool) -> Result<RuleAction, String> {
     if let Some(s) = val.as_str() {
+        // Try CFG action first
+        if let Some(cfg) = CfgAction::parse(s) {
+            return Ok(RuleAction::CfgReroll(cfg));
+        }
+        // Backward compat: try legacy semantic
         if let Some(sem) = SemanticRerollAction::parse(s) {
             return Ok(RuleAction::SemanticReroll(sem));
         }
-        return Err(format!("Unknown semantic action: {}", s));
+        return Err(format!("Unknown action: {}", s));
     }
     if let Some(n) = val.as_u64() {
         let idx = n as usize;
@@ -478,6 +642,8 @@ fn parse_action(val: &serde_json::Value, is_reroll: bool) -> Result<RuleAction, 
         Err("Action must be string or integer".to_string())
     }
 }
+
+// ── Feature evaluation ──────────────────────────────────────────────────
 
 /// Evaluate a condition against semantic features.
 fn eval_condition(cond: &Condition, features: &SemanticFeatures) -> bool {
@@ -615,6 +781,8 @@ fn cat_name_to_index(name: &str) -> usize {
     }
 }
 
+// ── Policy application ──────────────────────────────────────────────────
+
 /// Apply a rule list to features, returning the chosen action or default.
 fn apply_rules(rules: &[Rule], features: &SemanticFeatures, default: &RuleAction) -> RuleAction {
     for rule in rules {
@@ -682,6 +850,7 @@ pub fn pick_reroll_by_rules(
     };
     let action = apply_rules(rules, &features, default);
     match action {
+        RuleAction::CfgReroll(ref cfg) => compile_cfg_to_mask(dice, cfg),
         RuleAction::SemanticReroll(sem) => compile_to_mask(dice, sem),
         RuleAction::BitmaskReroll(m) => m as i32,
         RuleAction::CategoryIndex(_) => 31, // shouldn't happen — reroll all
@@ -848,6 +1017,8 @@ pub fn simulate_game_category_rules_only(
 mod tests {
     use super::*;
 
+    // ── Legacy semantic tests (backward compat) ─────────────────────────
+
     #[test]
     fn test_reroll_all() {
         assert_eq!(
@@ -866,17 +1037,14 @@ mod tests {
 
     #[test]
     fn test_keep_face() {
-        // dice=[1,1,3,5,5], Keep_Face_5 → keep positions 3,4 → mask=0b00111=7
         assert_eq!(
             compile_to_mask(&[1, 1, 3, 5, 5], SemanticRerollAction::KeepFace5),
             0b00111
         );
-        // Keep_Face_1 → keep positions 0,1 → mask=0b11100=28
         assert_eq!(
             compile_to_mask(&[1, 1, 3, 5, 5], SemanticRerollAction::KeepFace1),
             0b11100
         );
-        // Keep_Face_4 on dice with no 4s → reroll all
         assert_eq!(
             compile_to_mask(&[1, 1, 3, 5, 5], SemanticRerollAction::KeepFace4),
             31
@@ -885,12 +1053,10 @@ mod tests {
 
     #[test]
     fn test_keep_pair() {
-        // dice=[1,1,3,5,5] → highest pair=5s at positions 3,4 → mask=0b00111=7
         assert_eq!(
             compile_to_mask(&[1, 1, 3, 5, 5], SemanticRerollAction::KeepPair),
             0b00111
         );
-        // dice=[2,3,4,5,6] → no pair → 31
         assert_eq!(
             compile_to_mask(&[2, 3, 4, 5, 6], SemanticRerollAction::KeepPair),
             31
@@ -899,12 +1065,10 @@ mod tests {
 
     #[test]
     fn test_keep_two_pairs() {
-        // dice=[1,1,3,5,5] → pairs are 5,1 → keep 5s at 3,4 and 1s at 0,1 → mask=0b00100=4
         assert_eq!(
             compile_to_mask(&[1, 1, 3, 5, 5], SemanticRerollAction::KeepTwoPairs),
             0b00100
         );
-        // dice=[1,2,3,4,5] → only 0 pairs → 31
         assert_eq!(
             compile_to_mask(&[1, 2, 3, 4, 5], SemanticRerollAction::KeepTwoPairs),
             31
@@ -913,12 +1077,10 @@ mod tests {
 
     #[test]
     fn test_keep_triple() {
-        // dice=[2,3,3,3,6] → triple of 3s at positions 1,2,3 → mask=0b10001=17
         assert_eq!(
             compile_to_mask(&[2, 3, 3, 3, 6], SemanticRerollAction::KeepTriple),
             0b10001
         );
-        // dice=[1,2,3,4,5] → no triple → 31
         assert_eq!(
             compile_to_mask(&[1, 2, 3, 4, 5], SemanticRerollAction::KeepTriple),
             31
@@ -927,12 +1089,10 @@ mod tests {
 
     #[test]
     fn test_keep_quad() {
-        // dice=[3,3,3,3,6] → quad of 3s at 0,1,2,3 → mask=0b10000=16
         assert_eq!(
             compile_to_mask(&[3, 3, 3, 3, 6], SemanticRerollAction::KeepQuad),
             0b10000
         );
-        // dice=[2,3,3,3,6] → no quad → 31
         assert_eq!(
             compile_to_mask(&[2, 3, 3, 3, 6], SemanticRerollAction::KeepQuad),
             31
@@ -941,8 +1101,6 @@ mod tests {
 
     #[test]
     fn test_keep_triple_plus_highest() {
-        // dice=[2,3,3,3,6] → triple 3s at 1,2,3 + highest remaining is 6 at pos 4
-        // → keep 1,2,3,4 → mask=0b00001=1
         assert_eq!(
             compile_to_mask(
                 &[2, 3, 3, 3, 6],
@@ -954,8 +1112,6 @@ mod tests {
 
     #[test]
     fn test_keep_pair_plus_kicker() {
-        // dice=[1,1,3,5,5] → pair 5s at 3,4 + highest remaining = 3 at pos 2
-        // → keep 2,3,4 → mask=0b00011=3
         assert_eq!(
             compile_to_mask(&[1, 1, 3, 5, 5], SemanticRerollAction::KeepPairPlusKicker),
             0b00011
@@ -964,13 +1120,10 @@ mod tests {
 
     #[test]
     fn test_keep_straight_draw() {
-        // dice=[1,2,3,5,6] → longest run is [1,2,3] (len 3)
-        // → keep 1 die per face: pos 0(1), 1(2), 2(3) → mask=0b11000=24
         assert_eq!(
             compile_to_mask(&[1, 2, 3, 5, 6], SemanticRerollAction::KeepStraightDraw),
             0b11000
         );
-        // dice=[2,3,4,5,6] → run is [2,3,4,5,6] (len 5) → keep all → mask=0
         assert_eq!(
             compile_to_mask(&[2, 3, 4, 5, 6], SemanticRerollAction::KeepStraightDraw),
             0
@@ -988,5 +1141,247 @@ mod tests {
             Some(SemanticRerollAction::RerollAll)
         );
         assert_eq!(SemanticRerollAction::parse("Unknown"), None);
+    }
+
+    // ── CFG action tests ────────────────────────────────────────────────
+
+    #[test]
+    fn test_cfg_parse_primitives() {
+        assert_eq!(
+            CfgAction::parse("RerollAll"),
+            Some(CfgAction::Primitive(CfgPrimitive::RerollAll))
+        );
+        assert_eq!(
+            CfgAction::parse("KeepAll"),
+            Some(CfgAction::Primitive(CfgPrimitive::KeepAll))
+        );
+        assert_eq!(
+            CfgAction::parse("Face(3)"),
+            Some(CfgAction::Primitive(CfgPrimitive::Face(3)))
+        );
+        assert_eq!(
+            CfgAction::parse("MaxGroup"),
+            Some(CfgAction::Primitive(CfgPrimitive::MaxGroup))
+        );
+        assert_eq!(
+            CfgAction::parse("Pair"),
+            Some(CfgAction::Primitive(CfgPrimitive::Pair))
+        );
+        assert_eq!(
+            CfgAction::parse("Triple"),
+            Some(CfgAction::Primitive(CfgPrimitive::Triple))
+        );
+        assert_eq!(
+            CfgAction::parse("Seq"),
+            Some(CfgAction::Primitive(CfgPrimitive::Seq))
+        );
+        assert_eq!(
+            CfgAction::parse("High(1)"),
+            Some(CfgAction::Primitive(CfgPrimitive::High(1)))
+        );
+        assert_eq!(
+            CfgAction::parse("High(2)"),
+            Some(CfgAction::Primitive(CfgPrimitive::High(2)))
+        );
+    }
+
+    #[test]
+    fn test_cfg_parse_unions() {
+        assert_eq!(
+            CfgAction::parse("Union(Pair,High(1))"),
+            Some(CfgAction::Union(CfgPrimitive::Pair, CfgPrimitive::High(1)))
+        );
+        assert_eq!(
+            CfgAction::parse("Union(MaxGroup,Face(6))"),
+            Some(CfgAction::Union(
+                CfgPrimitive::MaxGroup,
+                CfgPrimitive::Face(6)
+            ))
+        );
+        assert_eq!(
+            CfgAction::parse("Union(Seq,High(2))"),
+            Some(CfgAction::Union(CfgPrimitive::Seq, CfgPrimitive::High(2)))
+        );
+    }
+
+    #[test]
+    fn test_cfg_parse_invalid() {
+        assert_eq!(CfgAction::parse("Bogus"), None);
+        assert_eq!(CfgAction::parse("Face(7)"), None);
+        assert_eq!(CfgAction::parse("High(3)"), None);
+        assert_eq!(CfgAction::parse("Union(Bogus,Pair)"), None);
+    }
+
+    #[test]
+    fn test_cfg_reroll_all() {
+        let action = CfgAction::Primitive(CfgPrimitive::RerollAll);
+        assert_eq!(compile_cfg_to_mask(&[1, 2, 3, 4, 5], &action), 31);
+    }
+
+    #[test]
+    fn test_cfg_keep_all() {
+        let action = CfgAction::Primitive(CfgPrimitive::KeepAll);
+        assert_eq!(compile_cfg_to_mask(&[1, 2, 3, 4, 5], &action), 0);
+    }
+
+    #[test]
+    fn test_cfg_face() {
+        let action = CfgAction::Primitive(CfgPrimitive::Face(5));
+        // dice=[1,1,3,5,5], keep positions 3,4 → reroll mask=0b00111=7
+        assert_eq!(compile_cfg_to_mask(&[1, 1, 3, 5, 5], &action), 0b00111);
+
+        let action = CfgAction::Primitive(CfgPrimitive::Face(4));
+        // no 4s → reroll all
+        assert_eq!(compile_cfg_to_mask(&[1, 1, 3, 5, 5], &action), 31);
+    }
+
+    #[test]
+    fn test_cfg_max_group() {
+        let action = CfgAction::Primitive(CfgPrimitive::MaxGroup);
+        // dice=[2,3,3,5,5] → tie between 3s and 5s, highest wins → keep 5s at 3,4
+        assert_eq!(compile_cfg_to_mask(&[2, 3, 3, 5, 5], &action), 0b00111);
+        // dice=[1,3,3,3,5] → 3s most frequent → keep 3s at 1,2,3
+        assert_eq!(compile_cfg_to_mask(&[1, 3, 3, 3, 5], &action), 0b10001);
+    }
+
+    #[test]
+    fn test_cfg_pair() {
+        let action = CfgAction::Primitive(CfgPrimitive::Pair);
+        assert_eq!(compile_cfg_to_mask(&[1, 1, 3, 5, 5], &action), 0b00111);
+        assert_eq!(compile_cfg_to_mask(&[2, 3, 4, 5, 6], &action), 31);
+    }
+
+    #[test]
+    fn test_cfg_triple() {
+        let action = CfgAction::Primitive(CfgPrimitive::Triple);
+        assert_eq!(compile_cfg_to_mask(&[2, 3, 3, 3, 6], &action), 0b10001);
+        assert_eq!(compile_cfg_to_mask(&[1, 2, 3, 4, 5], &action), 31);
+    }
+
+    #[test]
+    fn test_cfg_seq() {
+        let action = CfgAction::Primitive(CfgPrimitive::Seq);
+        // dice=[1,2,3,5,6] → longest run [1,2,3] → keep pos 0,1,2 → reroll 3,4 → mask=0b11000
+        assert_eq!(compile_cfg_to_mask(&[1, 2, 3, 5, 6], &action), 0b11000);
+        // dice=[2,3,4,5,6] → full run → keep all → mask=0
+        assert_eq!(compile_cfg_to_mask(&[2, 3, 4, 5, 6], &action), 0);
+    }
+
+    #[test]
+    fn test_cfg_high() {
+        let action1 = CfgAction::Primitive(CfgPrimitive::High(1));
+        // keep position 4 (highest) → reroll 0-3 → mask=0b01111=15
+        assert_eq!(compile_cfg_to_mask(&[1, 2, 3, 4, 5], &action1), 0b01111);
+
+        let action2 = CfgAction::Primitive(CfgPrimitive::High(2));
+        // keep positions 3,4 → reroll 0-2 → mask=0b00111=7
+        assert_eq!(compile_cfg_to_mask(&[1, 2, 3, 4, 5], &action2), 0b00111);
+    }
+
+    #[test]
+    fn test_cfg_union_pair_high1() {
+        let action = CfgAction::Union(CfgPrimitive::Pair, CfgPrimitive::High(1));
+        // dice=[1,1,3,5,5] → Pair keeps {3,4} (5s), High(1) keeps {4}
+        // union = {3,4} → reroll mask = 0b00111 = 7
+        assert_eq!(compile_cfg_to_mask(&[1, 1, 3, 5, 5], &action), 0b00111);
+        // dice=[2,3,3,3,6] → Pair keeps {2,3} (3s), High(1) keeps {4} (6)
+        // union = {2,3,4} → reroll mask = 0b00011 = 3
+        assert_eq!(compile_cfg_to_mask(&[2, 3, 3, 3, 6], &action), 0b00011);
+    }
+
+    #[test]
+    fn test_cfg_union_maxgroup_high1() {
+        let action = CfgAction::Union(CfgPrimitive::MaxGroup, CfgPrimitive::High(1));
+        // dice=[2,3,3,3,6] → MaxGroup keeps {1,2,3} (3s), High(1) keeps {4} (6)
+        // union = {1,2,3,4} → reroll mask = 0b00001 = 1
+        assert_eq!(compile_cfg_to_mask(&[2, 3, 3, 3, 6], &action), 0b00001);
+    }
+
+    #[test]
+    fn test_cfg_union_face_face() {
+        let action = CfgAction::Union(CfgPrimitive::Face(3), CfgPrimitive::Face(5));
+        // dice=[2,3,3,5,5] → Face(3)={1,2}, Face(5)={3,4} → union={1,2,3,4} → reroll mask=1
+        assert_eq!(compile_cfg_to_mask(&[2, 3, 3, 5, 5], &action), 0b00001);
+    }
+
+    #[test]
+    fn test_cfg_union_with_one_invalid() {
+        let action = CfgAction::Union(CfgPrimitive::Triple, CfgPrimitive::High(1));
+        // dice=[1,2,3,4,5] → Triple is invalid, High(1) keeps {4} → use High(1) only
+        // reroll mask = 0b01111 = 15
+        assert_eq!(compile_cfg_to_mask(&[1, 2, 3, 4, 5], &action), 0b01111);
+    }
+
+    #[test]
+    fn test_cfg_union_both_invalid() {
+        let action = CfgAction::Union(CfgPrimitive::Triple, CfgPrimitive::Triple);
+        // dice=[1,2,3,4,5] → both invalid → reroll all
+        assert_eq!(compile_cfg_to_mask(&[1, 2, 3, 4, 5], &action), 31);
+    }
+
+    #[test]
+    fn test_cfg_max_group_tie_highest() {
+        let action = CfgAction::Primitive(CfgPrimitive::MaxGroup);
+        // dice=[1,1,3,3,5] → tie 1s and 3s, highest face wins → keep 3s at 2,3
+        assert_eq!(compile_cfg_to_mask(&[1, 1, 3, 3, 5], &action), 0b10011);
+    }
+
+    #[test]
+    fn test_cfg_high2_all_same() {
+        let action = CfgAction::Primitive(CfgPrimitive::High(2));
+        // dice=[1,1,1,1,1] → keep positions 3,4 → reroll 0,1,2 → mask=0b00111
+        assert_eq!(compile_cfg_to_mask(&[1, 1, 1, 1, 1], &action), 0b00111);
+    }
+
+    #[test]
+    fn test_cfg_seq_no_consecutive() {
+        let action = CfgAction::Primitive(CfgPrimitive::Seq);
+        // dice=[1,1,1,1,1] → only 1 unique → invalid → reroll all
+        assert_eq!(compile_cfg_to_mask(&[1, 1, 1, 1, 1], &action), 31);
+    }
+
+    #[test]
+    fn test_cfg_parse_all_80_actions() {
+        // Verify all 80 action names from enumerate_cfg_actions can be parsed
+        let prim_names = [
+            "RerollAll",
+            "KeepAll",
+            "Face(1)",
+            "Face(2)",
+            "Face(3)",
+            "Face(4)",
+            "Face(5)",
+            "Face(6)",
+            "MaxGroup",
+            "Pair",
+            "Triple",
+            "Seq",
+            "High(1)",
+            "High(2)",
+        ];
+        for name in &prim_names {
+            assert!(
+                CfgAction::parse(name).is_some(),
+                "Failed to parse primitive: {}",
+                name
+            );
+        }
+
+        // Generate union names: combinable = prim_names[2..] (12 items), C(12,2)=66
+        let combinable = &prim_names[2..];
+        let mut union_count = 0;
+        for i in 0..combinable.len() {
+            for j in (i + 1)..combinable.len() {
+                let name = format!("Union({},{})", combinable[i], combinable[j]);
+                assert!(
+                    CfgAction::parse(&name).is_some(),
+                    "Failed to parse union: {}",
+                    name
+                );
+                union_count += 1;
+            }
+        }
+        assert_eq!(union_count, 66);
+        // 14 primitives + 66 unions = 80
     }
 }

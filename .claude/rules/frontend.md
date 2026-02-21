@@ -1,11 +1,11 @@
 ---
 paths:
-  - "frontend/src/**/*.{ts,tsx}"
+  - "frontend/src/**/*.ts"
 ---
 
 # Frontend Rules
 
-- The frontend is React + TypeScript + Vite. State management via useReducer.
+- The frontend is Vanilla TypeScript + D3.js + Vite. State management via Flux store in `store.ts`.
 - Game logic lives in the Rust backend. The frontend does NOT reimplement it.
 - All backend calls go through `api.ts` — no scattered fetch() calls.
 - TypeScript strict mode. All data contracts defined in `types.ts`.

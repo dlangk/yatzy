@@ -71,22 +71,8 @@ fn main() {
             .unwrap_or(output_path)
     };
 
-    // Change to base path for loading state files
-    let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
-    if std::env::set_current_dir(&base_path).is_err() {
-        eprintln!("Failed to change directory to {}", base_path);
-        std::process::exit(1);
-    }
-
-    // Configure rayon
-    let num_threads = std::env::var("RAYON_NUM_THREADS")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(8);
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(num_threads)
-        .build_global()
-        .unwrap();
+    let _base = yatzy::env_config::init_base_path();
+    let _threads = yatzy::env_config::init_rayon_threads();
 
     // Precompute lookup tables once
     let mut ctx = YatzyContext::new_boxed();

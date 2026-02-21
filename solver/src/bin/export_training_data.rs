@@ -499,11 +499,7 @@ fn main() {
         i += 1;
     }
 
-    let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
-    if std::env::set_current_dir(&base_path).is_err() {
-        eprintln!("Failed to change directory to {}", base_path);
-        std::process::exit(1);
-    }
+    let _base = yatzy::env_config::init_base_path();
 
     // Resolve output path after chdir
     let output_dir = if std::path::Path::new(&output_dir).is_absolute() {
@@ -514,14 +510,7 @@ fn main() {
             .unwrap_or(output_dir)
     };
 
-    let num_threads = std::env::var("RAYON_NUM_THREADS")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(8);
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(num_threads)
-        .build_global()
-        .unwrap();
+    let num_threads = yatzy::env_config::init_rayon_threads();
 
     let total_start = Instant::now();
 

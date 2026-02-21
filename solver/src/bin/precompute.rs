@@ -3,18 +3,6 @@ use yatzy::state_computation::{compute_all_state_values, compute_all_state_value
 use yatzy::storage::{save_oracle, ORACLE_FILE_PATH};
 use yatzy::types::YatzyContext;
 
-fn set_working_directory() {
-    let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
-    println!("YATZY_BASE_PATH={}", base_path);
-    if std::env::set_current_dir(&base_path).is_err() {
-        eprintln!("Failed to change directory to {}", base_path);
-        std::process::exit(1);
-    }
-    if let Ok(cwd) = std::env::current_dir() {
-        println!("Working directory changed to: {}", cwd.display());
-    }
-}
-
 fn parse_args() -> (f32, bool, bool) {
     let args: Vec<String> = std::env::args().collect();
     let mut theta = 0.0f32;
@@ -66,7 +54,7 @@ fn parse_args() -> (f32, bool, bool) {
 }
 
 fn main() {
-    set_working_directory();
+    let _base = yatzy::env_config::init_base_path();
     let (theta, max_policy, build_oracle) = parse_args();
 
     println!("Yatzy precomputation tool (Rust)");
@@ -79,18 +67,7 @@ fn main() {
         println!("Mode: building policy oracle (~3.17 GB)");
     }
 
-    // Configure rayon thread pool
-    let num_threads = std::env::var("RAYON_NUM_THREADS")
-        .or_else(|_| std::env::var("OMP_NUM_THREADS"))
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(8);
-
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(num_threads)
-        .build_global()
-        .unwrap();
-    println!("Using {} threads", num_threads);
+    let _threads = yatzy::env_config::init_rayon_threads();
 
     let mut ctx = YatzyContext::new_boxed();
     ctx.theta = theta;

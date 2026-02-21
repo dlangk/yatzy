@@ -1,11 +1,11 @@
-import type { GameState, GameAction, CategoryState } from './types.ts';
+import type { GameState, GameAction, CategoryState, TrajectoryPoint } from './types.ts';
 import { CATEGORY_NAMES, CATEGORY_COUNT, TOTAL_DICE, BONUS_THRESHOLD, BONUS_SCORE, UPPER_CATEGORIES } from './constants.ts';
 
 const STORAGE_KEY = 'yatzy-game-state';
 
 export function saveState(state: GameState): void {
   try {
-    const { lastEvalResponse: _, sortMap: _s, ...persistable } = state;
+    const { lastEvalResponse: _, sortMap: _s, pendingTrajectoryEvent: _p, ...persistable } = state;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
   } catch { /* quota exceeded or private browsing — ignore */ }
 }
@@ -16,7 +16,7 @@ function loadState(): GameState | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     // Restore transient fields
-    return { ...parsed, lastEvalResponse: null, sortMap: null };
+    return { ...parsed, lastEvalResponse: null, sortMap: null, pendingTrajectoryEvent: null, trajectory: parsed.trajectory ?? [] };
   } catch {
     return null;
   }
@@ -55,6 +55,8 @@ function freshState(): GameState {
     sortMap: null,
     showDebug: false,
     turnPhase: 'idle',
+    trajectory: [],
+    pendingTrajectoryEvent: null,
   };
 }
 
@@ -100,6 +102,14 @@ function recomputeDerived(categories: CategoryState[]) {
   return { upperScore, bonus, totalScore, scoredCategories, scoredCount };
 }
 
+export function computeAccumulatedScore(state: GameState): number {
+  let sum = 0;
+  for (const cat of state.categories) {
+    if (cat.isScored) sum += cat.score;
+  }
+  return sum + state.bonus;
+}
+
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case 'ROLL': {
@@ -115,6 +125,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         lastEvalResponse: null,
         sortMap: null,
         turnPhase: 'rolled',
+        pendingTrajectoryEvent: 'roll',
       };
     }
 
@@ -136,6 +147,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         rerollsRemaining: state.rerollsRemaining - 1,
         lastEvalResponse: null,
         sortMap: null,
+        pendingTrajectoryEvent: 'reroll',
       };
     }
 
@@ -154,6 +166,18 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const derived = recomputeDerived(categories);
       const turnPhase = derived.scoredCount >= CATEGORY_COUNT ? 'game_over' as const : 'idle' as const;
 
+      const evIfScored = state.categories[catId].evIfScored;
+      const accScore = derived.totalScore;
+      const trajectory = state.trajectory;
+      const point: TrajectoryPoint = {
+        index: trajectory.length,
+        turn: derived.scoredCount,
+        event: 'score',
+        expectedFinal: turnPhase === 'game_over' ? accScore : accScore + evIfScored,
+        accumulatedScore: accScore,
+        stateEv: turnPhase === 'game_over' ? 0 : evIfScored,
+      };
+
       return {
         ...state,
         categories,
@@ -165,6 +189,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         sortMap: null,
         turnPhase,
         rerollsRemaining: 0,
+        trajectory: [...trajectory, point],
+        pendingTrajectoryEvent: null,
       };
     }
 
@@ -179,11 +205,27 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           available: apiCat.available,
         };
       });
+      let trajectory = state.trajectory;
+      if (state.pendingTrajectoryEvent) {
+        const accScore = computeAccumulatedScore(state);
+        const turn = state.categories.filter((c) => c.isScored).length;
+        const point: TrajectoryPoint = {
+          index: trajectory.length,
+          turn,
+          event: state.pendingTrajectoryEvent,
+          expectedFinal: accScore + action.response.state_ev,
+          accumulatedScore: accScore,
+          stateEv: action.response.state_ev,
+        };
+        trajectory = [...trajectory, point];
+      }
       return {
         ...state,
         categories,
         lastEvalResponse: action.response,
         sortMap: action.sortMap,
+        trajectory,
+        pendingTrajectoryEvent: null,
       };
     }
 
@@ -286,6 +328,26 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'RESET_GAME':
       clearSavedState();
       return freshState();
+
+    case 'SET_INITIAL_EV': {
+      if (state.trajectory.length > 0) return state;
+      const point: TrajectoryPoint = {
+        index: 0,
+        turn: 0,
+        event: 'start',
+        expectedFinal: action.ev,
+        accumulatedScore: 0,
+        stateEv: action.ev,
+      };
+      return { ...state, trajectory: [point] };
+    }
+
+    case 'SET_DENSITY_RESULT': {
+      const traj = state.trajectory.map((p) =>
+        p.index === action.index ? { ...p, percentiles: action.percentiles } : p
+      );
+      return { ...state, trajectory: traj };
+    }
 
     default:
       return state;

@@ -33,8 +33,7 @@ pub fn select_by_difficulty(
             let phase = classify_phase(d.turn);
             let tension = classify_tension(d.scored, d.upper_score, &d.dice);
             let fingerprint = compute_fingerprint(ctx, sv, d, &actions);
-            let top_labels: Vec<String> =
-                actions.iter().take(2).map(|a| a.label.clone()).collect();
+            let top_labels: Vec<String> = actions.iter().take(2).map(|a| a.label.clone()).collect();
 
             Some(Candidate {
                 decision: d.clone(),

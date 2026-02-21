@@ -80,6 +80,10 @@ def bin_files_dir(base_path: str = ".") -> Path:
     return simulations_dir(base_path)
 
 
+def density_dir(base_path: str = ".") -> Path:
+    return Path(base_path) / "outputs" / "density"
+
+
 def multiplayer_dir(base_path: str = ".") -> Path:
     return simulations_dir(base_path) / "multiplayer"
 

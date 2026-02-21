@@ -13,14 +13,6 @@ use yatzy::storage::{
 };
 use yatzy::types::YatzyContext;
 
-fn set_working_directory() {
-    let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
-    if std::env::set_current_dir(&base_path).is_err() {
-        eprintln!("Failed to change directory to {}", base_path);
-        std::process::exit(1);
-    }
-}
-
 struct Args {
     num_games: usize,
     seed: u64,
@@ -171,7 +163,7 @@ fn parse_args() -> Args {
 }
 
 fn main() {
-    set_working_directory();
+    let _base = yatzy::env_config::init_base_path();
     let args = parse_args();
     let Args {
         num_games,
@@ -185,17 +177,7 @@ fn main() {
         use_oracle,
     } = args;
 
-    // Configure rayon thread pool
-    let num_threads = std::env::var("RAYON_NUM_THREADS")
-        .or_else(|_| std::env::var("OMP_NUM_THREADS"))
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(8);
-
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(num_threads)
-        .build_global()
-        .unwrap();
+    let num_threads = yatzy::env_config::init_rayon_threads();
 
     println!("Yatzy Simulation ({} games)", num_games);
 

@@ -50,7 +50,7 @@ struct CategoryRecord {
 
 struct RerollRecord {
     features: [f32; NUM_SEMANTIC_FEATURES],
-    q_values: [f32; 32],  // padded to 32 (max possible masks)
+    q_values: [f32; 32], // padded to 32 (max possible masks)
     best_mask: i32,
     regret: [f32; 32],
 }
@@ -324,10 +324,7 @@ fn simulate_game_collecting(ctx: &YatzyContext, rng: &mut SmallRng) -> GameRecor
 
 // ── Binary I/O ───────────────────────────────────────────────────────────
 
-fn write_category_file(
-    path: &str,
-    records: &[CategoryRecord],
-) -> std::io::Result<()> {
+fn write_category_file(path: &str, records: &[CategoryRecord]) -> std::io::Result<()> {
     let mut f = std::io::BufWriter::new(std::fs::File::create(path)?);
 
     // Header (32 bytes)
@@ -354,10 +351,7 @@ fn write_category_file(
     Ok(())
 }
 
-fn write_reroll_file(
-    path: &str,
-    records: &[RerollRecord],
-) -> std::io::Result<()> {
+fn write_reroll_file(path: &str, records: &[RerollRecord]) -> std::io::Result<()> {
     let mut f = std::io::BufWriter::new(std::fs::File::create(path)?);
 
     // Header (32 bytes)
@@ -422,11 +416,7 @@ fn main() {
         i += 1;
     }
 
-    let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
-    if std::env::set_current_dir(&base_path).is_err() {
-        eprintln!("Failed to change directory to {}", base_path);
-        std::process::exit(1);
-    }
+    let _base = yatzy::env_config::init_base_path();
 
     let output_dir = if std::path::Path::new(&output_dir).is_absolute() {
         output_dir
@@ -436,14 +426,7 @@ fn main() {
             .unwrap_or(output_dir)
     };
 
-    let num_threads = std::env::var("RAYON_NUM_THREADS")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(8);
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(num_threads)
-        .build_global()
-        .unwrap();
+    let num_threads = yatzy::env_config::init_rayon_threads();
 
     let total_start = Instant::now();
 
@@ -525,9 +508,10 @@ fn main() {
                     .sum::<f64>()
             })
             .sum();
-        let zero_regret = cat_records.iter().filter(|r| {
-            r.regret.iter().all(|&v| v == f32::NEG_INFINITY || v < 0.01)
-        }).count();
+        let zero_regret = cat_records
+            .iter()
+            .filter(|r| r.regret.iter().all(|&v| v == f32::NEG_INFINITY || v < 0.01))
+            .count();
         println!(
             "  category: total_regret={:.1}, zero_regret_records={:.1}%",
             total_regret,

@@ -59,7 +59,7 @@ def generate_difficult_sensitivity_cards(
     json_path: Path,
     out_dir: Path,
     *,
-    max_theta_rows: int = 20,
+    max_theta_rows: int = 15,
     dpi: int = 150,
 ) -> list[Path]:
     """Generate scenario cards for all difficult scenarios with θ sensitivity.
@@ -102,7 +102,9 @@ def generate_difficult_sensitivity_cards(
         # theta_results, we just pass the full set. The table will be large
         # but matplotlib auto-scales. For better results, we subsample.
         scenario["theta_results"] = subsampled
+        scenario["chart_theta_results"] = full_results
         plot_scenario_card(scenario, out_path, scenario_id=scenario_id, dpi=dpi)
+        del scenario["chart_theta_results"]
         scenario["theta_results"] = full_results  # restore
 
         paths.append(out_path)

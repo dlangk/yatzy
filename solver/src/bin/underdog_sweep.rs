@@ -4,23 +4,12 @@
 //! against EV-optimal play and reporting win rates. Top configurations are
 //! re-tested at higher game counts for confirmation.
 
-use std::path::PathBuf;
 use std::time::Instant;
 
 use yatzy::phase0_tables;
 use yatzy::simulation::multiplayer::simulate_multiplayer;
 use yatzy::simulation::strategy::Strategy;
 use yatzy::types::YatzyContext;
-
-fn set_working_directory() -> PathBuf {
-    let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
-    let path = PathBuf::from(&base_path);
-    if std::env::set_current_dir(&base_path).is_err() {
-        eprintln!("Failed to change directory to {}", base_path);
-        std::process::exit(1);
-    }
-    path
-}
 
 struct Args {
     games: u32,
@@ -133,19 +122,9 @@ struct SweepResult {
 }
 
 fn main() {
-    let base_path = set_working_directory();
+    let base_path = yatzy::env_config::init_base_path();
     let args = parse_args();
-
-    let num_threads = std::env::var("RAYON_NUM_THREADS")
-        .or_else(|_| std::env::var("OMP_NUM_THREADS"))
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(8);
-
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(num_threads)
-        .build_global()
-        .unwrap();
+    let num_threads = yatzy::env_config::init_rayon_threads();
 
     let t0 = Instant::now();
     let mut ctx = YatzyContext::new_boxed();

@@ -63,14 +63,44 @@ BOOL_FEATURES = {
     "small_straight", "large_straight", "full_house", "chance", "yatzy",
 ]}
 
-SEMANTIC_REROLL_ACTIONS = [
-    "Reroll_All", "Keep_Face_1", "Keep_Face_2", "Keep_Face_3",
-    "Keep_Face_4", "Keep_Face_5", "Keep_Face_6", "Keep_Pair",
-    "Keep_Two_Pairs", "Keep_Triple", "Keep_Quad",
-    "Keep_Triple_Plus_Highest", "Keep_Pair_Plus_Kicker",
-    "Keep_Straight_Draw", "Keep_All",
-]
-NUM_SEMANTIC_ACTIONS = 15
+@dataclass
+class CfgAction:
+    """Composable Filter Grammar action."""
+    name: str           # e.g. "Union(MaxGroup,High(1))"
+    complexity: int     # AST node count: 1 for primitive, 3 for union
+
+
+def enumerate_cfg_actions() -> list[CfgAction]:
+    """Generate all 80 CFG actions: 14 primitives + 66 unions."""
+    primitives = [
+        CfgAction("RerollAll", 1),
+        CfgAction("KeepAll", 1),
+        CfgAction("Face(1)", 1),
+        CfgAction("Face(2)", 1),
+        CfgAction("Face(3)", 1),
+        CfgAction("Face(4)", 1),
+        CfgAction("Face(5)", 1),
+        CfgAction("Face(6)", 1),
+        CfgAction("MaxGroup", 1),
+        CfgAction("Pair", 1),
+        CfgAction("Triple", 1),
+        CfgAction("Seq", 1),
+        CfgAction("High(1)", 1),
+        CfgAction("High(2)", 1),
+    ]
+    # Combinable: all except RerollAll and KeepAll
+    combinable = primitives[2:]  # 12 items
+    unions = []
+    for i in range(len(combinable)):
+        for j in range(i + 1, len(combinable)):
+            unions.append(CfgAction(
+                f"Union({combinable[i].name},{combinable[j].name})", 3,
+            ))
+    return primitives + unions
+
+
+CFG_ACTIONS = enumerate_cfg_actions()
+NUM_CFG_ACTIONS = len(CFG_ACTIONS)  # 80
 
 
 # ── Data loading ─────────────────────────────────────────────────────────
@@ -149,119 +179,56 @@ def reconstruct_all_dice(features: np.ndarray) -> np.ndarray:
     return result
 
 
-def semantic_to_bitmask(sorted_dice: np.ndarray, action_id: int) -> int:
-    """Map one semantic action to one bitmask for one dice set.
+def _cfg_primitive_positions(dice: np.ndarray, name: str) -> set[int] | None:
+    """Compute kept positions for a single CFG primitive.
 
-    Convention: bit i set = REROLL position i. Dice are sorted ascending.
-    Returns -1 if action is invalid for this dice.
+    Returns set of kept position indices, or None if invalid.
+    Dice must be sorted ascending, length 5.
     """
-    dice = sorted_dice  # length 5, sorted ascending
+    if name == "RerollAll":
+        return set()  # keep nothing
+    if name == "KeepAll":
+        return {0, 1, 2, 3, 4}
 
-    if action_id == 0:  # Reroll_All
-        return 31
+    if name.startswith("Face(") and name.endswith(")"):
+        face = int(name[5:-1])
+        positions = {i for i in range(5) if dice[i] == face}
+        return positions if positions else None
 
-    if action_id == 14:  # Keep_All
-        return 0
-
-    if 1 <= action_id <= 6:  # Keep_Face_X
-        face = action_id  # 1-6
-        positions = [i for i in range(5) if dice[i] == face]
-        if not positions:
-            return -1
-        mask = 31
-        for p in positions:
-            mask &= ~(1 << p)
-        return mask
-
-    # Count faces for pattern-based actions
     from collections import Counter
     counts = Counter(int(d) for d in dice)
 
-    if action_id == 7:  # Keep_Pair — highest face with count≥2
+    if name == "MaxGroup":
+        # Most frequent face, ties broken by highest
+        best_face = -1
+        best_count = 0
+        for f in range(1, 7):
+            c = counts.get(f, 0)
+            if c > best_count or (c == best_count and f > best_face):
+                best_count = c
+                best_face = f
+        if best_face < 0:
+            return None
+        return {i for i in range(5) if dice[i] == best_face}
+
+    if name == "Pair":
         pair_faces = sorted([f for f, c in counts.items() if c >= 2], reverse=True)
         if not pair_faces:
-            return -1
+            return None
         target = pair_faces[0]
-        # Keep 2 rightmost positions with that face
         positions = [i for i in range(5) if dice[i] == target]
-        keep = positions[-2:]  # rightmost 2
-        mask = 31
-        for p in keep:
-            mask &= ~(1 << p)
-        return mask
+        return set(positions[-2:])
 
-    if action_id == 8:  # Keep_Two_Pairs — two highest pair faces
-        pair_faces = sorted([f for f, c in counts.items() if c >= 2], reverse=True)
-        if len(pair_faces) < 2:
-            return -1
-        keep_faces = pair_faces[:2]
-        mask = 31
-        for face in keep_faces:
-            positions = [i for i in range(5) if dice[i] == face]
-            for p in positions[-2:]:  # keep 2 of each
-                mask &= ~(1 << p)
-        return mask
-
-    if action_id == 9:  # Keep_Triple — highest face with count≥3
+    if name == "Triple":
         triple_faces = sorted([f for f, c in counts.items() if c >= 3], reverse=True)
         if not triple_faces:
-            return -1
+            return None
         target = triple_faces[0]
         positions = [i for i in range(5) if dice[i] == target]
-        keep = positions[-3:]  # rightmost 3
-        mask = 31
-        for p in keep:
-            mask &= ~(1 << p)
-        return mask
+        return set(positions[-3:])
 
-    if action_id == 10:  # Keep_Quad — highest face with count≥4
-        quad_faces = sorted([f for f, c in counts.items() if c >= 4], reverse=True)
-        if not quad_faces:
-            return -1
-        target = quad_faces[0]
-        positions = [i for i in range(5) if dice[i] == target]
-        keep = positions[-4:]  # rightmost 4
-        mask = 31
-        for p in keep:
-            mask &= ~(1 << p)
-        return mask
-
-    if action_id == 11:  # Keep_Triple_Plus_Highest — triple + best remaining
-        triple_faces = sorted([f for f, c in counts.items() if c >= 3], reverse=True)
-        if not triple_faces:
-            return -1
-        target = triple_faces[0]
-        triple_pos = [i for i in range(5) if dice[i] == target]
-        keep_triple = triple_pos[-3:]
-        remaining = [i for i in range(5) if i not in keep_triple]
-        if not remaining:
-            return -1
-        # Pick highest remaining die (rightmost = highest since sorted)
-        best_remaining = remaining[-1]
-        mask = 31
-        for p in keep_triple + [best_remaining]:
-            mask &= ~(1 << p)
-        return mask
-
-    if action_id == 12:  # Keep_Pair_Plus_Kicker — pair + highest remaining
-        pair_faces = sorted([f for f, c in counts.items() if c >= 2], reverse=True)
-        if not pair_faces:
-            return -1
-        target = pair_faces[0]
-        pair_pos = [i for i in range(5) if dice[i] == target]
-        keep_pair = pair_pos[-2:]
-        remaining = [i for i in range(5) if i not in keep_pair]
-        if not remaining:
-            return -1
-        best_remaining = remaining[-1]
-        mask = 31
-        for p in keep_pair + [best_remaining]:
-            mask &= ~(1 << p)
-        return mask
-
-    if action_id == 13:  # Keep_Straight_Draw — longest consecutive run
+    if name == "Seq":
         unique_faces = sorted(set(int(d) for d in dice))
-        # Find longest consecutive subsequence
         best_run: list[int] = []
         current_run = [unique_faces[0]]
         for j in range(1, len(unique_faces)):
@@ -274,36 +241,99 @@ def semantic_to_bitmask(sorted_dice: np.ndarray, action_id: int) -> int:
         if len(current_run) > len(best_run):
             best_run = current_run[:]
         if len(best_run) < 2:
-            return -1
-        # Keep 1 die per face in the run
-        mask = 31
+            return None
         run_set = set(best_run)
+        kept: set[int] = set()
         used: set[int] = set()
         for i in range(5):
-            if int(dice[i]) in run_set and int(dice[i]) not in used:
-                mask &= ~(1 << i)
-                used.add(int(dice[i]))
+            f = int(dice[i])
+            if f in run_set and f not in used:
+                kept.add(i)
+                used.add(f)
+        return kept
+
+    if name.startswith("High(") and name.endswith(")"):
+        n = int(name[5:-1])
+        # Keep n highest-value positions (rightmost in sorted dice)
+        return set(range(5 - n, 5))
+
+    return None
+
+
+def cfg_to_bitmask(sorted_dice: np.ndarray, action: CfgAction) -> int:
+    """Map a CFG action to a bitmask for specific sorted dice.
+
+    Convention: bit i set = REROLL position i.
+    Returns -1 if action is invalid for this dice.
+    """
+    name = action.name
+
+    if name.startswith("Union("):
+        # Parse Union(A,B)
+        inner = name[6:-1]
+        # Find split point — handle nested parens
+        depth = 0
+        split = -1
+        for i, ch in enumerate(inner):
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+            elif ch == "," and depth == 0:
+                split = i
+                break
+        if split < 0:
+            return -1
+        a_name = inner[:split]
+        b_name = inner[split + 1:]
+        pos_a = _cfg_primitive_positions(sorted_dice, a_name)
+        pos_b = _cfg_primitive_positions(sorted_dice, b_name)
+        # Union: merge valid positions
+        if pos_a is None and pos_b is None:
+            return -1
+        combined: set[int] = set()
+        if pos_a is not None:
+            combined |= pos_a
+        if pos_b is not None:
+            combined |= pos_b
+        if not combined:
+            return -1
+        mask = 31
+        for p in combined:
+            mask &= ~(1 << p)
+        return mask
+    else:
+        positions = _cfg_primitive_positions(sorted_dice, name)
+        if positions is None:
+            return -1
+        if not positions and name != "RerollAll":
+            return -1
+        mask = 31
+        for p in positions:
+            mask &= ~(1 << p)
         return mask
 
-    return -1
 
-
-def build_semantic_regret_matrix(
+def build_cfg_regret_matrix(
     features: np.ndarray, bitmask_regret: np.ndarray,
+    actions: list[CfgAction] | None = None,
 ) -> np.ndarray:
-    """Project (N, 32) bitmask regret to (N, 15) semantic regret.
+    """Project (N, 32) bitmask regret to (N, num_actions) CFG regret.
 
-    For each record and semantic action, looks up the corresponding bitmask
+    For each record and CFG action, looks up the corresponding bitmask
     and copies the regret. Invalid actions get 999.0.
     """
+    if actions is None:
+        actions = CFG_ACTIONS
+    num_actions = len(actions)
     n = len(features)
     all_dice = reconstruct_all_dice(features)
-    semantic_regret = np.full((n, NUM_SEMANTIC_ACTIONS), 999.0, dtype=np.float32)
+    cfg_regret = np.full((n, num_actions), 999.0, dtype=np.float32)
 
     for i in range(n):
         dice_i = all_dice[i]
-        for a in range(NUM_SEMANTIC_ACTIONS):
-            mask = semantic_to_bitmask(dice_i, a)
+        for a in range(num_actions):
+            mask = cfg_to_bitmask(dice_i, actions[a])
             if mask == -1:
                 continue
             if mask >= bitmask_regret.shape[1]:
@@ -311,9 +341,9 @@ def build_semantic_regret_matrix(
             val = bitmask_regret[i, mask]
             if val <= -1e30:
                 continue
-            semantic_regret[i, a] = val
+            cfg_regret[i, a] = val
 
-    return semantic_regret
+    return cfg_regret
 
 
 # ── Rule induction (vectorized) ──────────────────────────────────────────
@@ -414,11 +444,14 @@ def _best_action_for_masked(
     mask: np.ndarray,
     num_actions: int,
     semantic: bool = False,
+    lam: float = 0.0,
+    actions: list[CfgAction] | None = None,
 ) -> tuple[int, float]:
     """Find best action for subset.
 
     When semantic=False: majority-vote on oracle actions (fast, for category rules).
     When semantic=True: regret-minimizing selection across all actions.
+    lam: resource-rational penalty weight on action complexity.
     Returns (action, mean_regret_of_that_action).
     """
     n = int(mask.sum())
@@ -437,6 +470,9 @@ def _best_action_for_masked(
             if valid_count < n * 0.5:
                 continue  # require ≥50% valid
             mean_reg = float(col[valid].mean())
+            # Resource-rational: penalize complexity
+            if lam > 0 and actions is not None:
+                mean_reg += lam * actions[a].complexity
             if mean_reg < best_mean:
                 best_mean = mean_reg
                 best_action = a
@@ -464,11 +500,18 @@ def induce_rules(
     min_coverage: int = 100,
     subsample: int = 300_000,
     semantic: bool = False,
+    lam: float = 0.0,
+    actions: list[CfgAction] | None = None,
 ) -> tuple[list[Rule], int | str]:
     """Run greedy sequential covering to induce a decision list.
 
     Subsamples to `subsample` records for tractable rule search.
+    lam: resource-rational penalty weight on action complexity (semantic only).
+    actions: list of CfgAction for name lookup (semantic only).
     """
+    if actions is None:
+        actions = CFG_ACTIONS
+
     n_full = len(ds.features)
     # Subsample for speed if dataset is large
     if n_full > subsample:
@@ -487,8 +530,9 @@ def induce_rules(
     alive = np.ones(n, dtype=np.uint8)
     rules: list[Rule] = []
 
+    lam_str = f", λ={lam}" if lam > 0 else ""
     print(f"  Inducing rules for {ds.decision_type} "
-          f"({n_full:,d} records, subsampled to {n:,d}, {ds.num_actions} actions)...")
+          f"({n_full:,d} records, subsampled to {n:,d}, {ds.num_actions} actions{lam_str})...")
 
     t0 = time.time()
     cond_masks, conditions = _build_condition_masks(features)
@@ -520,12 +564,14 @@ def induce_rules(
             if n_match < min_coverage:
                 continue
 
-            action, mean_reg = _best_action_for_masked(
+            action_idx, mean_reg = _best_action_for_masked(
                 best_action, regret, mask, ds.num_actions,
-                semantic=semantic,
+                semantic=semantic, lam=lam, actions=actions,
             )
             score = mean_reg
-            act_out: int | str = SEMANTIC_REROLL_ACTIONS[action] if semantic else action
+            if semantic and lam > 0:
+                score += lam * actions[action_idx].complexity
+            act_out: int | str = actions[action_idx].name if semantic else action_idx
 
             if score < best_score:
                 best_score = score
@@ -560,12 +606,14 @@ def induce_rules(
                 if n_match < min_coverage:
                     continue
 
-                action, mean_reg = _best_action_for_masked(
+                action_idx, mean_reg = _best_action_for_masked(
                     best_action, regret, mask2, ds.num_actions,
-                    semantic=semantic,
+                    semantic=semantic, lam=lam, actions=actions,
                 )
                 score = mean_reg
-                act_out2: int | str = SEMANTIC_REROLL_ACTIONS[action] if semantic else action
+                if semantic and lam > 0:
+                    score += lam * actions[action_idx].complexity
+                act_out2: int | str = actions[action_idx].name if semantic else action_idx
 
                 if score < best_score:
                     best_score = score
@@ -614,13 +662,13 @@ def induce_rules(
     if uncovered_mask.sum() > 0:
         default_idx, _ = _best_action_for_masked(
             best_action, regret, uncovered_mask, ds.num_actions,
-            semantic=semantic,
+            semantic=semantic, lam=lam, actions=actions,
         )
     else:
         default_idx = 0
 
     default_action: int | str = (
-        SEMANTIC_REROLL_ACTIONS[default_idx] if semantic else default_idx
+        actions[default_idx].name if semantic else default_idx
     )
 
     print(f"    -> {len(rules)} rules, default={default_action}, uncovered={int(alive.sum()):,d}")
@@ -631,7 +679,11 @@ def induce_rules(
 
 def _action_label(action: int | str, decision_type: str) -> str:
     if isinstance(action, str):
-        return action.replace("_", " ")
+        # CFG action names — make human readable
+        s = action
+        # Union(Face(3),High(1)) → "Union(Face(3), High(1))"
+        s = s.replace(",", ", ")
+        return s
     if decision_type == "category":
         if 0 <= action < len(CATEGORY_NAMES):
             return CATEGORY_NAMES[action]
@@ -653,9 +705,16 @@ def generate_skill_ladder(
     output_dir: Path,
     max_rules: int = 100,
     min_coverage: int = 100,
+    lam: float = 0.0,
 ) -> dict:
-    """Load regret data, induce rules, write outputs."""
+    """Load regret data, induce rules, write outputs.
+
+    lam: resource-rational penalty weight on action complexity.
+    """
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    actions = CFG_ACTIONS
+    num_actions = NUM_CFG_ACTIONS
 
     datasets: dict[str, RegretDataset] = {}
     for dtype, filename in [
@@ -679,22 +738,22 @@ def generate_skill_ladder(
 
     for dtype, ds in datasets.items():
         if dtype in ("reroll1", "reroll2"):
-            # Project bitmask regret to semantic regret
-            print(f"  Projecting {dtype} to semantic actions...")
+            # Project bitmask regret to CFG regret
+            print(f"  Projecting {dtype} to {num_actions} CFG actions...")
             t_proj = time.time()
-            semantic_regret = build_semantic_regret_matrix(ds.features, ds.regret)
+            cfg_regret = build_cfg_regret_matrix(ds.features, ds.regret, actions)
             print(f"    Done in {time.time() - t_proj:.1f}s")
-            sem_ds = RegretDataset(
+            cfg_ds = RegretDataset(
                 features=ds.features,
-                q_values=ds.q_values[:, :NUM_SEMANTIC_ACTIONS] if ds.q_values.shape[1] >= NUM_SEMANTIC_ACTIONS else ds.q_values,
+                q_values=ds.q_values[:, :num_actions] if ds.q_values.shape[1] >= num_actions else ds.q_values,
                 best_action=np.zeros(len(ds.features), dtype=np.int32),
-                regret=semantic_regret,
-                num_actions=NUM_SEMANTIC_ACTIONS,
+                regret=cfg_regret,
+                num_actions=num_actions,
                 decision_type=ds.decision_type,
             )
             rules, default = induce_rules(
-                sem_ds, max_rules=max_rules, min_coverage=min_coverage,
-                semantic=True,
+                cfg_ds, max_rules=max_rules, min_coverage=min_coverage,
+                semantic=True, lam=lam, actions=actions,
             )
         else:
             rules, default = induce_rules(
@@ -712,8 +771,10 @@ def generate_skill_ladder(
         "meta": {
             "total_rules": total_rules,
             "default_category": defaults.get("category", 0),
-            "default_reroll1": defaults.get("reroll1", "Reroll_All"),
-            "default_reroll2": defaults.get("reroll2", "Reroll_All"),
+            "default_reroll1": defaults.get("reroll1", "RerollAll"),
+            "default_reroll2": defaults.get("reroll2", "RerollAll"),
+            "num_cfg_actions": num_actions,
+            "lambda": lam,
             "oracle_ev": 245.87,
         },
     }
@@ -728,6 +789,7 @@ def generate_skill_ladder(
         "",
         "Human-readable decision rules distilled from the exact DP oracle.",
         f"Total rules: {total_rules}",
+        f"CFG actions: {num_actions}, λ={lam}",
         "",
     ]
 

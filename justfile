@@ -246,14 +246,52 @@ test:
 lint:
     cd solver && cargo fmt --check && cargo clippy
 
+# Format all components
+fmt:
+    cd solver && cargo fmt
+    analytics/.venv/bin/ruff format analytics/src/ analytics/tests/
+
+# Lint all components
+lint-all:
+    cd solver && cargo fmt --check && cargo clippy -- -D warnings
+    cd frontend && npm run lint
+    analytics/.venv/bin/ruff check analytics/tests/
+
+# Type-check
+typecheck:
+    cd solver && cargo check
+    cd frontend && npx --yes tsc --noEmit
+
+# Run all tests
+test-all:
+    cd solver && cargo test
+    cd frontend && npm run test
+    analytics/.venv/bin/pytest analytics/tests/ -q
+
+# Production build
+build:
+    cd solver && cargo build --release
+    cd frontend && npm run build
+
+# Full quality gate
+check: lint-all typecheck test-all bench-check
+
 # Start API server on port 9000
 serve:
     YATZY_BASE_PATH=. solver/target/release/yatzy
+
+# Dev: start backend server
+dev-backend:
+    YATZY_BASE_PATH=. solver/target/release/yatzy
+
+# Dev: start frontend server
+dev-frontend:
+    cd frontend && npm run dev
 
 # Print summary table
 summary:
     analytics/.venv/bin/yatzy-analyze summary
 
-# Start frontend dev server
+# Start frontend dev server (legacy)
 frontend:
     python3 frontend/serve.py

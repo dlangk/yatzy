@@ -243,6 +243,157 @@ fn density_evolution_inner(
     }
 }
 
+/// Run exact density evolution starting from an arbitrary mid-game state (oracle required).
+///
+/// Given a specific (upper_score, scored_categories, accumulated_score), propagates
+/// the distribution forward through the remaining turns. Fewer remaining turns = faster:
+/// ~0.5s for 5 turns left, ~3s for full game.
+///
+/// Returns the same DensityResult as `density_evolution_oracle` but starting from mid-game.
+pub fn density_evolution_from_state(
+    ctx: &YatzyContext,
+    oracle: &crate::types::PolicyOracle,
+    upper_score: usize,
+    scored_categories: usize,
+    accumulated_score: usize,
+) -> DensityResult {
+    let start_si = state_index(upper_score, scored_categories) as u32;
+    let turn = (scored_categories as u32).count_ones() as usize;
+
+    // Initialize: single entry at the given state with the given accumulated score
+    let mut start_dist = vec![0.0f64; MAX_SCORE];
+    if accumulated_score < MAX_SCORE {
+        start_dist[accumulated_score] = 1.0;
+    }
+    let mut active_states: Vec<StateEntry> = vec![(start_si, start_dist)];
+
+    // Forward propagation for remaining turns
+    for t in turn..15 {
+        let num_scored = t as u32;
+
+        let transitions_and_bounds: Vec<(Vec<super::transitions::StateTransition>, usize)> =
+            active_states
+                .par_iter()
+                .map(|(si, sd)| {
+                    let scored = (*si as usize) / STATE_STRIDE;
+                    let up = (*si as usize) % STATE_STRIDE;
+
+                    debug_assert_eq!(
+                        (scored as u32).count_ones(),
+                        num_scored,
+                        "State 0x{:x} has {} scored categories, expected {}",
+                        scored,
+                        (scored as u32).count_ones(),
+                        num_scored
+                    );
+
+                    let trans = compute_transitions_oracle(ctx, oracle, up as i32, scored as i32);
+                    let max_i = sd.iter().rposition(|&p| p > 0.0).unwrap_or(0);
+                    (trans, max_i)
+                })
+                .collect();
+
+        let mut dest_map: HashMap<u32, Vec<(usize, usize)>> = HashMap::new();
+        for (src_idx, (trans, _)) in transitions_and_bounds.iter().enumerate() {
+            for (t_idx, t) in trans.iter().enumerate() {
+                dest_map
+                    .entry(t.next_state)
+                    .or_default()
+                    .push((src_idx, t_idx));
+            }
+        }
+
+        let dest_entries: Vec<(u32, Vec<(usize, usize)>)> = dest_map.into_iter().collect();
+
+        let next_states: Vec<StateEntry> = dest_entries
+            .par_iter()
+            .map(|(dest_si, contribs)| {
+                let mut dense = vec![0.0f64; MAX_SCORE];
+
+                for &(src_idx, t_idx) in contribs {
+                    let src_dist = &active_states[src_idx].1;
+                    let (ref trans, max_i) = transitions_and_bounds[src_idx];
+                    let t = &trans[t_idx];
+                    let offset = t.points as usize;
+                    let prob = t.prob;
+
+                    for i in 0..=max_i {
+                        let p = unsafe { *src_dist.get_unchecked(i) };
+                        if p > 0.0 {
+                            unsafe {
+                                *dense.get_unchecked_mut(i + offset) += prob * p;
+                            }
+                        }
+                    }
+                }
+
+                (*dest_si, dense)
+            })
+            .collect();
+
+        active_states = next_states;
+    }
+
+    // Apply upper bonus and collect final PMF
+    let mut final_pmf = vec![0.0f64; MAX_SCORE + 50];
+    let mut total_prob = 0.0;
+
+    for (si, score_dist) in &active_states {
+        let up = (*si as usize) % STATE_STRIDE;
+        let bonus: usize = if up >= 63 { 50 } else { 0 };
+
+        for (acc_score, &prob) in score_dist.iter().enumerate() {
+            if prob > 0.0 {
+                final_pmf[acc_score + bonus] += prob;
+                total_prob += prob;
+            }
+        }
+    }
+
+    // Convert to sorted PMF
+    let mut pmf: Vec<(i32, f64)> = final_pmf
+        .iter()
+        .enumerate()
+        .filter(|(_, &p)| p > 0.0)
+        .map(|(s, &p)| (s as i32, p))
+        .collect();
+    pmf.sort_by_key(|&(score, _)| score);
+
+    // Compute statistics
+    let mean: f64 = pmf.iter().map(|&(s, p)| s as f64 * p).sum();
+    let variance: f64 = pmf
+        .iter()
+        .map(|&(s, p)| (s as f64 - mean).powi(2) * p)
+        .sum();
+    let std_dev = variance.sqrt();
+
+    // Normalize if needed (should be ~1.0)
+    let norm = if total_prob > 0.0 { total_prob } else { 1.0 };
+
+    // Compute percentiles from CDF
+    let percentile_keys = [1, 5, 10, 25, 50, 75, 90, 95, 99];
+    let mut percentiles = HashMap::new();
+    let mut cum_prob = 0.0;
+    let mut pct_idx = 0;
+
+    for &(score, prob) in &pmf {
+        cum_prob += prob / norm;
+        while pct_idx < percentile_keys.len() && cum_prob >= percentile_keys[pct_idx] as f64 / 100.0
+        {
+            percentiles.insert(format!("p{}", percentile_keys[pct_idx]), score);
+            pct_idx += 1;
+        }
+    }
+
+    DensityResult {
+        pmf,
+        mean,
+        variance,
+        std_dev,
+        percentiles,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

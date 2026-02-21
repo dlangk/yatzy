@@ -9,7 +9,9 @@ use rayon::prelude::*;
 use std::time::Instant;
 
 use yatzy::phase0_tables;
-use yatzy::rosetta::policy::{simulate_game_category_rules_only, simulate_game_with_rules, SkillLadder};
+use yatzy::rosetta::policy::{
+    simulate_game_category_rules_only, simulate_game_with_rules, SkillLadder,
+};
 use yatzy::storage::{load_all_state_values, state_file_path};
 use yatzy::types::YatzyContext;
 
@@ -59,22 +61,12 @@ fn main() {
         i += 1;
     }
 
-    let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
-    if std::env::set_current_dir(&base_path).is_err() {
-        eprintln!("Failed to change directory to {}", base_path);
-        std::process::exit(1);
-    }
+    let _base = yatzy::env_config::init_base_path();
 
-    let output_path = output_path.unwrap_or_else(|| "outputs/rosetta/eval_results.json".to_string());
+    let output_path =
+        output_path.unwrap_or_else(|| "outputs/rosetta/eval_results.json".to_string());
 
-    let num_threads = std::env::var("RAYON_NUM_THREADS")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(8);
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(num_threads)
-        .build_global()
-        .unwrap();
+    let num_threads = yatzy::env_config::init_rayon_threads();
 
     let total_start = Instant::now();
 
@@ -149,7 +141,11 @@ fn main() {
     let n = scores.len();
     let sum: f64 = scores.iter().map(|&s| s as f64).sum();
     let mean = sum / n as f64;
-    let var: f64 = scores.iter().map(|&s| (s as f64 - mean).powi(2)).sum::<f64>() / n as f64;
+    let var: f64 = scores
+        .iter()
+        .map(|&s| (s as f64 - mean).powi(2))
+        .sum::<f64>()
+        / n as f64;
     let std_dev = var.sqrt();
     let min = *scores.iter().min().unwrap();
     let max = *scores.iter().max().unwrap();
@@ -182,9 +178,8 @@ fn main() {
     println!("  p95:        {:>10}", p95);
     println!("  Max:        {:>10}", max);
 
-    let total_rules = ladder.category_rules.len()
-        + ladder.reroll1_rules.len()
-        + ladder.reroll2_rules.len();
+    let total_rules =
+        ladder.category_rules.len() + ladder.reroll1_rules.len() + ladder.reroll2_rules.len();
     println!("  Total rules: {}", total_rules);
 
     // Write results JSON
@@ -209,8 +204,11 @@ fn main() {
 
     let out_dir = std::path::Path::new(&output_path).parent().unwrap();
     let _ = std::fs::create_dir_all(out_dir);
-    std::fs::write(&output_path, serde_json::to_string_pretty(&results).unwrap())
-        .expect("Failed to write results");
+    std::fs::write(
+        &output_path,
+        serde_json::to_string_pretty(&results).unwrap(),
+    )
+    .expect("Failed to write results");
     println!("\nWrote {}", output_path);
     println!("Total time: {:.1}s", total_start.elapsed().as_secs_f64());
 }

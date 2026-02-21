@@ -69,10 +69,7 @@ pub fn load_theta_entries(
     for (theta, path) in &filtered {
         match load_state_values_standalone(path) {
             Some(sv) => {
-                entries.push(ThetaEntry {
-                    theta: *theta,
-                    sv,
-                });
+                entries.push(ThetaEntry { theta: *theta, sv });
             }
             None => {
                 eprintln!("  WARNING: Failed to load {}", path);

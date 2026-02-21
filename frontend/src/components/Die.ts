@@ -1,0 +1,66 @@
+import { COLORS } from '../constants.ts';
+
+export interface DieElements {
+  container: HTMLDivElement;
+  update: (opts: {
+    value: number;
+    held: boolean;
+    isOptimalReroll: boolean;
+    isOptimalKeep: boolean;
+    disabled: boolean;
+    faded: boolean;
+  }) => void;
+}
+
+export function createDie(
+  onToggle: () => void,
+  onIncrement: () => void,
+  onDecrement: () => void,
+): DieElements {
+  const container = document.createElement('div');
+  container.className = 'die-container';
+
+  const upBtn = document.createElement('button');
+  upBtn.className = 'die-arrow';
+  upBtn.innerHTML = '&#9650;';
+  upBtn.addEventListener('click', onIncrement);
+
+  const btn = document.createElement('button');
+  btn.className = 'die-btn';
+  btn.addEventListener('click', onToggle);
+
+  const downBtn = document.createElement('button');
+  downBtn.className = 'die-arrow';
+  downBtn.innerHTML = '&#9660;';
+  downBtn.addEventListener('click', onDecrement);
+
+  container.appendChild(upBtn);
+  container.appendChild(btn);
+  container.appendChild(downBtn);
+
+  function update(opts: {
+    value: number;
+    held: boolean;
+    isOptimalReroll: boolean;
+    isOptimalKeep: boolean;
+    disabled: boolean;
+    faded: boolean;
+  }) {
+    btn.textContent = opts.value === 0 ? '?' : String(opts.value);
+    btn.disabled = opts.disabled;
+    btn.style.background = opts.held ? COLORS.bg : COLORS.bgAlt;
+    btn.style.cursor = opts.disabled ? 'default' : 'pointer';
+    btn.style.opacity = opts.faded ? '0.5' : '1';
+    btn.title = opts.held ? 'Held (click to reroll)' : 'Will reroll (click to hold)';
+
+    if (opts.isOptimalReroll) {
+      btn.style.border = `3px solid ${COLORS.danger}`;
+    } else if (opts.isOptimalKeep) {
+      btn.style.border = `3px solid ${COLORS.success}`;
+    } else {
+      btn.style.border = `2px solid ${COLORS.text}`;
+    }
+  }
+
+  return { container, update };
+}

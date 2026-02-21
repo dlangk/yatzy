@@ -48,6 +48,7 @@ pub mod batched_solver;
 pub mod constants;
 pub mod density;
 pub mod dice_mechanics;
+pub mod env_config;
 pub mod game_mechanics;
 pub mod phase0_tables;
 pub mod profiling;
