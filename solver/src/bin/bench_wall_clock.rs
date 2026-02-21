@@ -352,23 +352,11 @@ fn main() {
         let dice = [1, 2, 3, 4, 5];
 
         results.push(run_bench("api_evaluate_2rerolls", 200, || {
-            std::hint::black_box(compute_roll_response(
-                &sim_ctx,
-                12,
-                0b111,
-                &dice,
-                2,
-            ));
+            std::hint::black_box(compute_roll_response(&sim_ctx, 12, 0b111, &dice, 2));
         }));
 
         results.push(run_bench("api_evaluate_0rerolls", 200, || {
-            std::hint::black_box(compute_roll_response(
-                &sim_ctx,
-                12,
-                0b111,
-                &dice,
-                0,
-            ));
+            std::hint::black_box(compute_roll_response(&sim_ctx, 12, 0b111, &dice, 0));
         }));
 
         // Late-game: 12 categories scored (heavier computation)
