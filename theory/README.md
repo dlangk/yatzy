@@ -7,7 +7,7 @@ Theoretical foundations, experimental results, and research for the Delta Yatzy 
 | Directory | Files | Purpose |
 |-----------|------:|---------|
 | [foundations/](foundations/) | 6 | Core math: DP algorithm, game theory, risk model |
-| [lab-reports/](lab-reports/) | 11 | Performance experiments with measured results |
+| [lab-reports/](lab-reports/) | 12 | Performance experiments with measured results |
 | [research/](research/) | 10 | Exploratory ideas, surveys, ML approaches |
 | [strategy/](strategy/) | 6 | Game strategy, sweep pipelines, player tools |
 | [reviews/](reviews/) | 2 | Literature surveys and external assessments |
