@@ -1,0 +1,9 @@
+{
+  "steps": [
+    { "label": "Category bitmasks", "count": 32768, "description": "2^15 subsets of 15 categories" },
+    { "label": "Upper scores", "count": 2097152, "multiplier": 64, "description": "Each bitmask combined with upper score 0-63" },
+    { "label": "Reachability pruning", "count": 1430000, "pruned_pct": 31.8, "description": "Forward pass prunes unreachable states" },
+    { "label": "Widget nodes per state", "nodes": 1681, "description": "252 outcomes x 462 keeps x 2 rerolls + categories" },
+    { "label": "Total computation", "count": 8, "unit": "MB", "description": "The entire strategy table fits in 8 megabytes" }
+  ]
+}

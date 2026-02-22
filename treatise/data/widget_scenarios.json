@@ -1,0 +1,146 @@
+{
+  "scenarios": [
+    {
+      "id": "counterintuitive_keep",
+      "title": "Keep triple or chase straight?",
+      "description": "Three 3s with a 5 and 2 — keep triple or chase straight?",
+      "upper_score": 0,
+      "scored_categories": 0,
+      "initial_dice": [2, 3, 3, 3, 5],
+      "keep_options": [
+        {
+          "indices": [1, 2, 3],
+          "label": "Keep triple 3s",
+          "kept_dice": [3, 3, 3],
+          "ev": 252.1,
+          "optimal": true,
+          "second_rolls": [
+            { "dice": [3, 3, 3, 2, 4], "description": "No improvement" },
+            { "dice": [3, 3, 3, 3, 6], "description": "Four of a kind!" },
+            { "dice": [3, 3, 3, 1, 5], "description": "Keep triple, reroll again" }
+          ]
+        },
+        {
+          "indices": [0, 1, 2, 3],
+          "label": "Keep 2-3-3-3",
+          "kept_dice": [2, 3, 3, 3],
+          "ev": 249.8,
+          "optimal": false,
+          "second_rolls": [
+            { "dice": [2, 3, 3, 3, 4], "description": "Partial straight" },
+            { "dice": [2, 3, 3, 3, 1], "description": "No straight" }
+          ]
+        },
+        {
+          "indices": [1, 2, 3, 4],
+          "label": "Keep 3-3-3-5",
+          "kept_dice": [3, 3, 3, 5],
+          "ev": 248.5,
+          "optimal": false,
+          "second_rolls": [
+            { "dice": [3, 3, 3, 5, 6], "description": "Awkward hand" },
+            { "dice": [3, 3, 3, 5, 3], "description": "Four 3s!" }
+          ]
+        }
+      ],
+      "category_examples": [
+        { "category": "Threes", "score": 9, "ev_after": 243.2 },
+        { "category": "Three of a Kind", "score": 9, "ev_after": 240.1 },
+        { "category": "Chance", "score": 14, "ev_after": 237.8 }
+      ]
+    },
+    {
+      "id": "protect_upper_bonus",
+      "title": "Protect upper bonus",
+      "description": "Two 6s and scattered dice — take Sixes or go for Chance?",
+      "upper_score": 30,
+      "scored_categories": 992,
+      "initial_dice": [1, 3, 6, 6, 4],
+      "keep_options": [
+        {
+          "indices": [2, 3],
+          "label": "Keep pair of 6s",
+          "kept_dice": [6, 6],
+          "ev": 215.7,
+          "optimal": true,
+          "second_rolls": [
+            { "dice": [6, 6, 6, 2, 5], "description": "Triple 6s!" },
+            { "dice": [6, 6, 3, 4, 1], "description": "Keep 6s, reroll rest" }
+          ]
+        },
+        {
+          "indices": [0, 1, 2, 3, 4],
+          "label": "Keep all for Chance",
+          "kept_dice": [1, 3, 4, 6, 6],
+          "ev": 213.2,
+          "optimal": false,
+          "second_rolls": []
+        },
+        {
+          "indices": [2, 3, 4],
+          "label": "Keep 4-6-6",
+          "kept_dice": [4, 6, 6],
+          "ev": 214.1,
+          "optimal": false,
+          "second_rolls": [
+            { "dice": [4, 6, 6, 5, 3], "description": "Large straight possible" },
+            { "dice": [4, 6, 6, 2, 1], "description": "Take Sixes" }
+          ]
+        }
+      ],
+      "category_examples": [
+        { "category": "Sixes", "score": 12, "ev_after": 203.7 },
+        { "category": "Chance", "score": 20, "ev_after": 198.2 },
+        { "category": "One Pair", "score": 12, "ev_after": 199.1 }
+      ]
+    },
+    {
+      "id": "endgame_squeeze",
+      "title": "Endgame squeeze",
+      "description": "Last three categories open, upper bonus on the line.",
+      "upper_score": 54,
+      "scored_categories": 32260,
+      "initial_dice": [2, 4, 4, 5, 5],
+      "keep_options": [
+        {
+          "indices": [1, 2, 3, 4],
+          "label": "Keep 4-4-5-5",
+          "kept_dice": [4, 4, 5, 5],
+          "ev": 89.3,
+          "optimal": true,
+          "second_rolls": [
+            { "dice": [4, 4, 5, 5, 4], "description": "Full House!" },
+            { "dice": [4, 4, 5, 5, 6], "description": "Two pair, take it" }
+          ]
+        },
+        {
+          "indices": [3, 4],
+          "label": "Keep pair of 5s",
+          "kept_dice": [5, 5],
+          "ev": 86.7,
+          "optimal": false,
+          "second_rolls": [
+            { "dice": [5, 5, 5, 2, 3], "description": "Triple 5s" },
+            { "dice": [5, 5, 1, 3, 6], "description": "Just a pair" }
+          ]
+        },
+        {
+          "indices": [1, 2],
+          "label": "Keep pair of 4s",
+          "kept_dice": [4, 4],
+          "ev": 85.1,
+          "optimal": false,
+          "second_rolls": [
+            { "dice": [4, 4, 4, 6, 6], "description": "Full House!" },
+            { "dice": [4, 4, 1, 2, 3], "description": "Small straight + pair" }
+          ]
+        }
+      ],
+      "category_examples": [
+        { "category": "Two Pair", "score": 18, "ev_after": 71.3 },
+        { "category": "Full House", "score": 23, "ev_after": 66.0 },
+        { "category": "Fours", "score": 8, "ev_after": 78.2 }
+      ]
+    }
+  ]
+}

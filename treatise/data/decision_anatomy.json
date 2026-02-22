@@ -1,0 +1,41 @@
+{
+  "state": {
+    "upper_score": 15,
+    "scored_categories": 992,
+    "scored_labels": ["One Pair", "Two Pair", "Three Kind", "Four Kind", "Sm. Straight"],
+    "dice": [5, 5, 5, 6, 6],
+    "rerolls": 0
+  },
+  "human_choice": {
+    "action": "Full House",
+    "score": 25,
+    "ev_remaining": 204.8,
+    "why": "Guaranteed 25 points, no risk. Full House is hard to roll, so take it now."
+  },
+  "optimal_choice": {
+    "action": "Fives",
+    "score": 15,
+    "ev_remaining": 215.7,
+    "why": "Progresses toward the upper bonus (63 threshold). With upper = 15 + 15 = 30, the remaining upper categories can reach 63. Preserves Yatzy and Full House options for later turns."
+  },
+  "gap": 10.9,
+  "breakdown": {
+    "immediate_sacrifice": -10,
+    "upper_bonus_gain": 14.2,
+    "flexibility_value": 6.7
+  },
+  "downstream": [
+    {
+      "branch": "human",
+      "label": "Take Full House (25 pts)",
+      "expected_bonus_rate": 0.72,
+      "expected_total": 229.8
+    },
+    {
+      "branch": "optimal",
+      "label": "Take Fives (15 pts)",
+      "expected_bonus_rate": 0.91,
+      "expected_total": 230.7
+    }
+  ]
+}

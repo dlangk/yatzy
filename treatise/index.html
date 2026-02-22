@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Mathematics of Optimal Yatzy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/charts.css">
+  <link rel="stylesheet" href="css/treatise.css">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body data-depth="1">
+
+<div class="depth-bar">
+  <button class="depth-btn active" data-depth="1" title="General audience">General</button>
+  <button class="depth-btn" data-depth="2" title="Technical details">Technical</button>
+  <button class="depth-btn" data-depth="3" title="Implementation details">Code</button>
+</div>
+
+<button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+  <span id="theme-icon">&#9790;</span>
+</button>
+
+<div class="container" id="treatise-root"></div>
+
+<script type="module">
+  // Chart modules — Parts I-III
+  import { initStateSpaceCounter } from './js/charts/state-space-counter.js';
+  import { initReachabilityPruning } from './js/charts/reachability-pruning.js';
+  import { initWidgetInteractive } from './js/charts/widget-interactive.js';
+  import { initBackwardWave } from './js/charts/backward-wave.js';
+  import { initDecisionAnatomy } from './js/charts/decision-anatomy.js';
+  import { initOptimizationTimeline } from './js/charts/optimization-timeline.js';
+  import { initMaxPolicyFailure } from './js/charts/max-policy-failure.js';
+  import { initScoreDistribution } from './js/charts/score-distribution.js';
+  // Charts — Parts III-V
+  import { initMixtureDecomposition } from './js/charts/mixture-decomposition.js';
+  import { initBonusCovariance } from './js/charts/bonus-covariance.js';
+  import { initExponentialUtility } from './js/charts/exponential-utility.js';
+  import { initMeanVarianceFrontier } from './js/charts/mean-variance-frontier.js';
+  import { initRiskReward } from './js/charts/risk-reward.js';
+  import { initFreeEnergyPhase } from './js/charts/free-energy-phase.js';
+  import { initAdaptiveWinrate } from './js/charts/adaptive-winrate.js';
+  // Charts — Parts V-VIII
+  import { initThresholdPolicy } from './js/charts/threshold-policy.js';
+  import { initRlBarrierDiagram } from './js/charts/rl-barrier-diagram.js';
+  import { initSurrogatePareto } from './js/charts/surrogate-pareto.js';
+  import { initCompressionLongTail } from './js/charts/compression-long-tail.js';
+  import { initRosettaRules } from './js/charts/rosetta-rules.js';
+  import { initFilterGrammar } from './js/charts/filter-grammar.js';
+  import { initUmapManifold } from './js/charts/umap-manifold.js';
+
+  import { initConceptDrawer } from './js/concept-drawer.js';
+  import { initTheme } from './js/theme.js';
+  import { initDepthToggle } from './js/depth-toggle.js';
+
+  // Section files in display order
+  const sectionFiles = [
+    'sections/header.html',
+    'sections/00-prologue.html',
+    'sections/01-geometry.html',
+    'sections/02-engineering.html',
+    'sections/03-luck.html',
+    'sections/04-thermodynamics.html',
+    'sections/05-multiplayer.html',
+    'sections/06-compression.html',
+    'sections/07-rosetta.html',
+    'sections/08-interpretability.html',
+    'sections/09-conclusion.html',
+  ];
+
+  // Load all sections in parallel, insert in order
+  const responses = await Promise.all(sectionFiles.map(f => fetch(f)));
+  const htmls = await Promise.all(responses.map(r => r.text()));
+  document.getElementById('treatise-root').innerHTML = htmls.join('\n');
+
+  // Initialize systems
+  initConceptDrawer();
+  initTheme();
+  initDepthToggle();
+
+  // Re-render charts on theme change
+  document.getElementById('theme-toggle').addEventListener('click', () => initAll());
+
+  // Lazy initialization with IntersectionObserver
+  const chartInits = {
+    'chart-state-space-counter': { init: initStateSpaceCounter, loaded: false },
+    'chart-reachability-pruning': { init: initReachabilityPruning, loaded: false },
+    'chart-widget-interactive': { init: initWidgetInteractive, loaded: false },
+    'chart-backward-wave': { init: initBackwardWave, loaded: false },
+    'chart-decision-anatomy': { init: initDecisionAnatomy, loaded: false },
+    'chart-optimization-timeline': { init: initOptimizationTimeline, loaded: false },
+    'chart-max-policy-failure': { init: initMaxPolicyFailure, loaded: false },
+    'chart-score-distribution': { init: initScoreDistribution, loaded: false },
+    'chart-mixture': { init: initMixtureDecomposition, loaded: false },
+    'chart-bonus-covariance': { init: initBonusCovariance, loaded: false },
+    'chart-exponential-utility': { init: initExponentialUtility, loaded: false },
+    'chart-mean-variance-frontier': { init: initMeanVarianceFrontier, loaded: false },
+    'chart-risk-reward': { init: initRiskReward, loaded: false },
+    'chart-free-energy-phase': { init: initFreeEnergyPhase, loaded: false },
+    'chart-adaptive-winrate': { init: initAdaptiveWinrate, loaded: false },
+    'chart-threshold-policy': { init: initThresholdPolicy, loaded: false },
+    'chart-rl-barrier-diagram': { init: initRlBarrierDiagram, loaded: false },
+    'chart-surrogate-pareto': { init: initSurrogatePareto, loaded: false },
+    'chart-compression-long-tail': { init: initCompressionLongTail, loaded: false },
+    'chart-rosetta-rules': { init: initRosettaRules, loaded: false },
+    'chart-filter-grammar': { init: initFilterGrammar, loaded: false },
+    'chart-umap-manifold': { init: initUmapManifold, loaded: false },
+  };
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        const chart = chartInits[id];
+        if (chart && !chart.loaded) {
+          chart.loaded = true;
+          chart.init().catch(err => console.error(`Failed to init ${id}:`, err));
+        }
+      }
+    });
+  }, { rootMargin: '200px' });
+
+  Object.keys(chartInits).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) observer.observe(el);
+  });
+
+  function initAll() {
+    Object.values(chartInits).forEach(c => {
+      c.loaded = true;
+      c.init().catch(err => console.error(err));
+    });
+  }
+</script>
+
+</body>
+</html>
