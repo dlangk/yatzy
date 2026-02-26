@@ -37,9 +37,10 @@ research/rl/.venv/
 research/rl/checkpoints/
 research/rl/src/*.egg-info/
 
-# Node (frontend)
+# Node (frontend + treatise)
 node_modules/
 frontend/dist/
+treatise/sections/*.html
 
 # Overhaul artifacts (historical)
 .overhaul/

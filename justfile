@@ -268,9 +268,14 @@ test-all:
     cd frontend && npm run test
     analytics/.venv/bin/pytest analytics/tests/ -q
 
+# Build treatise sections (Markdown → HTML)
+build-treatise:
+    cd treatise && npm run build
+
 # Production build
 build:
     cd solver && cargo build --release
+    cd treatise && npm run build
     cd frontend && npm run build
 
 # Full quality gate
@@ -292,6 +297,16 @@ dev-frontend:
 summary:
     analytics/.venv/bin/yatzy-analyze summary
 
+# Serve treatise on port 8080
+serve-treatise:
+    cd treatise && python3 -m http.server 8080
+
 # Start frontend dev server (legacy)
 frontend:
     python3 frontend/serve.py
+
+# ── Deploy ───────────────────────────────────────────────────────────────────
+
+# Deploy to production (cross-compile + docker + transfer)
+deploy:
+    bash deploy/deploy.sh
