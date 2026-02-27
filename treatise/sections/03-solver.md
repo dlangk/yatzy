@@ -1,10 +1,6 @@
-:::section{#part-ii}
+:::section{#solver}
 
-:::part-title
-Part II
-:::
-
-## Engineering the Solver
+## The Solver
 
 Knowing the mathematics is not enough. The state space has 1.43 million positions,
 each requiring evaluation of hundreds of dice-keep-category combinations. A naive
@@ -34,7 +30,7 @@ induction, and its performance dominates total solve time.
     <button class="chart-btn" id="widget-reset-btn">Reset</button>
   </div>
   <div id="widget-flow"></div>
-  <div id="widget-fan-panel" class="depth-2"></div>
+  <div id="widget-fan-panel" class="math"></div>
 </div>
 :::
 
@@ -94,7 +90,7 @@ than 0.001 points. The 2× bandwidth savings and native NEON f32 throughput
 made the switch overwhelmingly worthwhile.
 :::
 
-:::depth-2
+:::math
 
 The widget solver evaluates the Bellman equation in three phases. Phase 1
 computes the immediate score for each (dice-outcome, category) pair. Phase 2
@@ -117,7 +113,7 @@ formulation is used, at roughly 2.5× the cost.
 
 :::
 
-:::depth-3
+:::code
 
 The NEON kernel for keep evaluation processes 4 state values simultaneously.
 The critical function `neon_fma_max_f32x4` performs a fused

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forward Pass Charts — Test</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/charts.css">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body { max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-family: 'Newsreader', Georgia, serif; font-size: 1.8rem; margin-bottom: 0.5rem; }
+    h2 { font-family: 'Newsreader', Georgia, serif; font-size: 1.3rem; margin-top: 2.5rem; color: var(--text-muted, #555); }
+    .chart-container { margin: 1rem 0 2rem; position: relative; }
+  </style>
+</head>
+<body>
+
+<button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+  <span id="theme-icon">&#9790;</span>
+</button>
+
+<h1>Forward Pass Visualizations</h1>
+<p style="color: var(--text-muted, #555); font-family: 'Newsreader', Georgia, serif;">
+  Three charts showing exact Markov visitation probabilities under optimal play.
+</p>
+
+<h2>1. Race to 63</h2>
+<div class="chart-container" id="chart-race-to-63"></div>
+
+<h2>2. Category Streamgraph</h2>
+<div class="chart-container" id="chart-category-stream"></div>
+
+<h2>3. EV Ridgeline</h2>
+<div class="chart-container" id="chart-ev-ridgeline"></div>
+
+<script type="module">
+  import { initRaceTo63 } from './js/charts/race-to-63.js';
+  import { initCategoryStream } from './js/charts/category-stream.js';
+  import { initEvRidgeline } from './js/charts/ev-ridgeline.js';
+  import { initTheme } from './js/theme.js';
+
+  initTheme();
+
+  await initRaceTo63();
+  await initCategoryStream();
+  await initEvRidgeline();
+
+  // Re-render on theme toggle
+  document.getElementById('theme-toggle').addEventListener('click', async () => {
+    await initRaceTo63();
+    await initCategoryStream();
+    await initEvRidgeline();
+  });
+</script>
+
+</body>
+</html>

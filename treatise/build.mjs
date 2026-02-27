@@ -6,8 +6,11 @@ const SECTIONS_DIR = join(import.meta.dirname, "sections");
 const md = new MarkdownIt({ html: true });
 
 // Block shortcodes: :::type{#id} ... :::
-// Supports: section, depth-2, depth-3, equation, insight, part-title, html
+// Supports: section, math, code, equation, insight, part-title, html
 const BLOCK_RE = /^:::(\w[\w-]*)(\{#([\w-]+)\})?\s*$/;
+
+// Map shortcode names to CSS classes (identity if not listed)
+const CLASS_MAP = { code: "code-detail" };
 
 function processShortcodes(src) {
   const lines = src.split("\n");
@@ -31,7 +34,7 @@ function processShortcodes(src) {
       } else if (top.type === "part-title") {
         out.push("</div>");
       } else {
-        // depth-2, depth-3, equation, insight
+        // math, code, equation, insight
         out.push(`</div>`);
       }
       continue;
@@ -53,9 +56,10 @@ function processShortcodes(src) {
         stack.push({ type: "part-title" });
         out.push(`<div class="part-title">`);
       } else {
-        // depth-2, depth-3, equation, insight
+        // math, code, equation, insight
+        const cls = CLASS_MAP[type] || type;
         stack.push({ type });
-        out.push(`<div class="${type}">`);
+        out.push(`<div class="${cls}">`);
       }
       continue;
     }
@@ -78,19 +82,58 @@ function processShortcodes(src) {
 }
 
 // Process all .md files in sections/
-const files = readdirSync(SECTIONS_DIR).filter((f) => f.endsWith(".md"));
+const files = readdirSync(SECTIONS_DIR)
+  .filter((f) => f.endsWith(".md"))
+  .sort();
 
 if (files.length === 0) {
   console.error("No .md files found in", SECTIONS_DIR);
   process.exit(1);
 }
 
+// Build TOC from numbered section files (01-*.md through 99-*.md)
+const SECTION_ID_RE = /^:::section\{#([\w-]+)\}/m;
+const FIRST_H2_RE = /^## (.+)$/m;
+const PART_LABEL_RE = /^:::part-title\s*\n([^\n]+)\n:::/m;
+
+const tocEntries = [];
+const fileSectionMap = new Map(); // file -> { number, id }
+let sectionNum = 0;
+for (const file of files) {
+  if (!/^\d/.test(file) || file === "header.md" || file.startsWith("00-")) continue;
+  const src = readFileSync(join(SECTIONS_DIR, file), "utf-8");
+  const idMatch = src.match(SECTION_ID_RE);
+  const h2Match = src.match(FIRST_H2_RE);
+  if (!idMatch || !h2Match) continue;
+  sectionNum++;
+  const id = idMatch[1];
+  const title = h2Match[1].replace(/^\d+\.\s*/, ""); // strip leading "1. "
+  tocEntries.push({ id, display: title, number: sectionNum });
+  fileSectionMap.set(file, { number: sectionNum, id });
+}
+
+const tocHtml =
+  `<nav class="toc">\n    <h3>Contents</h3>\n    <ol>\n` +
+  tocEntries.map((e) => `      <li><a href="#${e.id}">${e.display}</a></li>`).join("\n") +
+  `\n    </ol>\n  </nav>`;
+
+// Build all sections
 for (const file of files) {
   const src = readFileSync(join(SECTIONS_DIR, file), "utf-8");
   const shortcoded = processShortcodes(src);
   let html = md.render(shortcoded);
   // Kill all em dashes (Unicode and HTML entity)
   html = html.replace(/\u2014/g, "--").replace(/&mdash;/g, "--");
+  // Inject section number + permalink into first h2
+  const sec = fileSectionMap.get(file);
+  if (sec) {
+    html = html.replace(
+      /<h2>(.+?)<\/h2>/,
+      `<h2><a href="#${sec.id}" class="section-link">${sec.number}. $1</a></h2>`
+    );
+  }
+  // Inject TOC where placeholder exists
+  html = html.replace("<!-- TOC -->", tocHtml);
   const outName = file.replace(/\.md$/, ".html");
   writeFileSync(join(SECTIONS_DIR, outName), html);
   console.log(`  ${file} → ${outName}`);

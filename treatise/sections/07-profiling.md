@@ -1,10 +1,6 @@
-:::section{#part-viii}
+:::section{#profiling}
 
-:::part-title
-Part VIII
-:::
-
-## Interpretability and the Human Player
+## Profiling a Player
 
 The 82-point gap between human and optimal play is not random noise. It has
 structure. Understanding where it concentrates turns a dice game into a lens
@@ -53,7 +49,7 @@ value; humans feel the bonus as binary. These are signatures of a mind evolved
 for fast, adequate decisions with limited working memory. The gap is a window
 into how we think.
 
-:::depth-2
+:::math
 
 The cognitive model defines action probabilities via a softmax over modified
 Q-values:
@@ -81,13 +77,13 @@ identical top-3 actions and EVs.
 The player card grid covers 648 parameter combinations. Each combination
 runs 10,000 Monte Carlo games, producing distributions of mean score, standard
 deviation, upper bonus rate, and percentile markers. The grid is stored as a
-single JSON file (`blog/data/player_card_grid.json`) that the
+single JSON file (`profiler/data/player_card_grid.json`) that the
 client-side profiler loads to render player cards without any server
 computation.
 
 :::
 
-:::depth-3
+:::code
 
 The two-tower Q-network architecture embeds 56-dimensional state features and
 6-dimensional action features (keep-multiset face counts) into a shared 16D

@@ -14,7 +14,7 @@ async function load(name) {
 }
 
 export const DataLoader = {
-  // Copied from blog
+  // Shared data loaders
   sweepSummary: () => load('sweep_summary.json'),
   kdeCurves: () => load('kde_curves.json'),
   winrate: () => load('winrate.json'),
@@ -26,7 +26,6 @@ export const DataLoader = {
   categoryStats: () => load('category_stats_theta0.json'),
 
   // New treatise data
-  stateCounterSteps: () => load('state_counter_steps.json'),
   backwardWave: () => load('backward_wave.json'),
   widgetScenarios: () => load('widget_scenarios.json'),
   decisionAnatomy: () => load('decision_anatomy.json'),
@@ -39,4 +38,14 @@ export const DataLoader = {
   rosettaRules: () => load('rosetta_rules.json'),
   filterGrammar: () => load('filter_grammar.json'),
   umapEmbeddings: () => load('umap_embeddings.json'),
+
+  // Score spray (prologue)
+  scoreSpray: () => load('score_spray.json'),
+  scoreSprayMeta: () => load('score_spray_meta.json'),
+  densityExact: () => load('density_exact.json'),
+
+  // Forward pass visualizations
+  raceTo63: () => load('graph_race_to_63.json'),
+  categorySankey: () => load('graph_category_sankey.json'),
+  evFunnel: () => load('graph_ev_funnel.json'),
 };

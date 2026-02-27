@@ -1,49 +1,83 @@
-/* Treatise-specific styles: depth toggle, part headers, equations */
+/* Treatise-specific styles: layer toggle, part headers, equations */
 
-/* Depth toggle bar */
-.depth-bar {
-  position: fixed;
-  top: 1rem;
-  right: 3.5rem;
+/* Section dividers */
+section + section {
+  border-top: 1px solid var(--border);
+}
+
+/* Permalink headings */
+h2 .section-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+h2 .section-link:hover {
+  color: var(--accent);
+}
+
+
+/* Progressive disclosure — inline collapsible blocks.
+   Blocks start collapsed (CSS default); JS adds .layer-open to expand. */
+.math,
+.code-detail {
+  height: 0;
+  overflow: hidden;
+  margin: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-left-color: transparent;
+  opacity: 0;
+  transition: height 0.3s ease, opacity 0.2s ease, margin 0.3s ease,
+              padding 0.3s ease, border-left-color 0.3s ease;
+}
+
+.math.layer-open,
+.code-detail.layer-open {
+  opacity: 1;
+  overflow: visible;
+  transition: height 0.3s ease, opacity 0.2s ease 0.05s;
+}
+
+/* Full-width toggle bar */
+.layer-toggle {
   display: flex;
-  gap: 2px;
-  z-index: 100;
-  background: var(--bg-alt);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 2px;
-}
-
-.depth-btn {
+  align-items: center;
+  gap: 0.4em;
+  width: 100%;
   font-family: var(--font-serif);
-  font-size: 0.7rem;
-  padding: 0.25rem 0.5rem;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
+  font-size: 0.75rem;
   color: var(--text-muted);
-  white-space: nowrap;
-  transition: background 0.15s, color 0.15s;
+  background: none;
+  border: none;
+  border-left: 2px solid var(--border);
+  padding: 0.3rem 0 0.3rem 1rem;
+  cursor: pointer;
+  margin: 0.25rem 0;
+  transition: color 0.15s, border-left-color 0.15s;
 }
 
-.depth-btn:hover {
-  background: var(--accent-light);
+.layer-toggle[data-layer="3"] {
+  border-left-color: var(--text-muted);
 }
 
-.depth-btn.active {
-  background: var(--accent);
-  color: #fff;
+.layer-toggle:hover {
+  color: var(--accent);
+  border-left-color: var(--accent);
 }
 
-/* Progressive disclosure */
-body[data-depth="1"] .depth-2,
-body[data-depth="1"] .depth-3 {
-  display: none;
+.layer-toggle .toggle-arrow {
+  display: inline-block;
+  transition: transform 0.3s ease;
+  font-size: 0.55rem;
 }
 
-body[data-depth="2"] .depth-3 {
-  display: none;
+.layer-toggle.expanded .toggle-arrow {
+  transform: rotate(90deg);
+}
+
+.layer-toggle.expanded {
+  border-left-color: var(--accent);
+  margin-bottom: 0;
 }
 
 /* Part headers */
@@ -79,27 +113,19 @@ body[data-depth="2"] .depth-3 {
   font-style: italic;
 }
 
-/* Depth-gated content markers */
-.depth-2, .depth-3 {
+/* Layer content markers */
+.math, .code-detail {
   border-left: 2px solid var(--border);
   padding-left: 1rem;
   margin: 0.75rem 0;
 }
 
-.depth-3 {
+.code-detail {
   border-left-color: var(--text-muted);
 }
 
-/* Inline depth indicator */
-.depth-marker {
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  vertical-align: super;
-  margin-left: 0.2em;
-}
-
-/* Pre blocks for code in depth-3 */
-.depth-3 pre {
+/* Pre blocks for code layer */
+.code-detail pre {
   background: var(--bg-alt);
   padding: 0.75rem 1rem;
   border-radius: 6px;
@@ -108,7 +134,7 @@ body[data-depth="2"] .depth-3 {
   line-height: 1.5;
 }
 
-.depth-3 pre code {
+.code-detail pre code {
   background: none;
   padding: 0;
 }
@@ -124,73 +150,6 @@ body[data-depth="2"] .depth-3 {
 
 .insight strong:first-child {
   color: var(--accent);
-}
-
-/* Scrollytelling — State Space Counter */
-.scroll-sticky {
-  position: sticky;
-  top: 80px;
-  min-height: 300px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1;
-}
-
-.scroll-steps .step {
-  min-height: 50vh;
-  padding: 1rem 0;
-  opacity: 0.3;
-  transition: opacity 0.4s;
-}
-
-.scroll-steps .step.active {
-  opacity: 1;
-}
-
-.counter-big {
-  font-size: 3rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--accent);
-  text-align: center;
-  line-height: 1.2;
-}
-
-.counter-label {
-  font-size: 0.95rem;
-  color: var(--text-muted);
-  text-align: center;
-  margin-top: 0.25rem;
-}
-
-.counter-bar-wrap {
-  margin-top: 1rem;
-  max-width: 400px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.counter-bar-track {
-  height: 10px;
-  background: var(--bg-alt);
-  border-radius: 5px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-}
-
-.counter-bar-fill {
-  height: 100%;
-  border-radius: 5px;
-  transition: width 0.6s ease;
-}
-
-.counter-bar-labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-top: 0.25rem;
 }
 
 /* Widget flow — interactive turn */
@@ -494,13 +453,58 @@ body[data-depth="2"] .depth-3 {
   stroke-width: 2;
 }
 
+/* Score Spray */
+#chart-score-spray-wrap { position: relative; min-height: 400px; }
+#chart-score-spray-wrap canvas { position: absolute; top: 0; left: 0; }
+#chart-score-spray-wrap svg { position: absolute; top: 0; left: 0; pointer-events: none; }
+
+.spray-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+.spray-legend-item { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; cursor: pointer; user-select: none; }
+.spray-legend-swatch { width: 12px; height: 12px; border-radius: 50%; }
+.spray-legend-item.muted { opacity: 0.3; }
+
+.spray-popup {
+  position: absolute; z-index: 50;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  font-size: 0.75rem; min-width: 200px; max-width: 280px;
+}
+.spray-popup.hidden { display: none; }
+.spray-popup-title { font-weight: 600; margin-bottom: 6px; font-size: 0.85rem; }
+.spray-popup-row { display: flex; justify-content: space-between; padding: 1px 0; }
+.spray-popup-row.zero { color: var(--text-muted); }
+.spray-popup-divider { border-top: 1px solid var(--border); margin: 4px 0; }
+.spray-popup-bonus { color: var(--accent); font-weight: 600; }
+.spray-popup-total { font-weight: 700; font-size: 0.9rem; margin-top: 4px; }
+.spray-popup-close { position: absolute; top: 4px; right: 8px; cursor: pointer; color: var(--text-muted); background: none; border: none; font-size: 1rem; }
+.spray-popup-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 0.7rem; margin-top: 6px; }
+
+/* Reduction Funnel */
+.funnel-bar {
+  transition: opacity 0.2s;
+}
+
+/* Reachability Grid */
+#chart-reachability-grid rect {
+  transition: opacity 0.15s;
+}
+
+/* Topological Cascade */
+#chart-topological-cascade .chart-controls {
+  margin-bottom: 0.5rem;
+}
+
+#chart-topological-cascade-svg {
+  min-height: 300px;
+}
+
+/* Memory Lifecycle */
+#chart-memory-lifecycle path {
+  transition: opacity 0.2s;
+}
+
 /* Responsive */
 @media (max-width: 720px) {
-  .depth-bar {
-    top: auto;
-    bottom: 1rem;
-    right: 1rem;
-  }
   .part-title {
     margin-top: 2.5rem;
     padding-top: 1.5rem;
@@ -516,8 +520,5 @@ body[data-depth="2"] .depth-3 {
     transform: rotate(90deg);
     min-height: auto;
     justify-content: center;
-  }
-  .counter-big {
-    font-size: 2rem;
   }
 }

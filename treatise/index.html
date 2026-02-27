@@ -12,13 +12,8 @@
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
-<body data-depth="1">
+<body data-layer="1">
 
-<div class="depth-bar">
-  <button class="depth-btn active" data-depth="1" title="General audience">General</button>
-  <button class="depth-btn" data-depth="2" title="Technical details">Technical</button>
-  <button class="depth-btn" data-depth="3" title="Implementation details">Code</button>
-</div>
 
 <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
   <span id="theme-icon">&#9790;</span>
@@ -27,30 +22,42 @@
 <div class="container" id="treatise-root"></div>
 
 <script type="module">
-  // Chart modules — Parts I-III
-  import { initStateSpaceCounter } from './js/charts/state-space-counter.js';
-  import { initReachabilityPruning } from './js/charts/reachability-pruning.js';
+  // Chart modules — Introduction
+  import { initScoreSpray } from './js/charts/score-spray.js';
+  // Chart modules — State Space (Reduction Chain)
+  import { initReductionFunnel } from './js/charts/reduction-funnel.js';
+  import { initReachabilityGrid } from './js/charts/reachability-grid.js';
+  import { initWidgetStructure } from './js/charts/widget-structure.js';
+  import { initTopologicalCascade } from './js/charts/topological-cascade.js';
+  import { initMemoryLifecycle } from './js/charts/memory-lifecycle.js';
+  // Chart modules — Solver
   import { initWidgetInteractive } from './js/charts/widget-interactive.js';
   import { initBackwardWave } from './js/charts/backward-wave.js';
-  import { initDecisionAnatomy } from './js/charts/decision-anatomy.js';
   import { initOptimizationTimeline } from './js/charts/optimization-timeline.js';
-  import { initMaxPolicyFailure } from './js/charts/max-policy-failure.js';
+  // Chart modules — Optimal Strategy
+  import { initDecisionAnatomy } from './js/charts/decision-anatomy.js';
   import { initScoreDistribution } from './js/charts/score-distribution.js';
-  // Charts — Parts III-V
   import { initMixtureDecomposition } from './js/charts/mixture-decomposition.js';
   import { initBonusCovariance } from './js/charts/bonus-covariance.js';
+  import { initMaxPolicyFailure } from './js/charts/max-policy-failure.js';
+  // Chart modules — Forward Pass
+  import { initRaceTo63 } from './js/charts/race-to-63.js';
+  import { initCategoryStream } from './js/charts/category-stream.js';
+  import { initEvRidgeline } from './js/charts/ev-ridgeline.js';
+  // Chart modules — Risk Parameter
   import { initExponentialUtility } from './js/charts/exponential-utility.js';
   import { initMeanVarianceFrontier } from './js/charts/mean-variance-frontier.js';
   import { initRiskReward } from './js/charts/risk-reward.js';
   import { initFreeEnergyPhase } from './js/charts/free-energy-phase.js';
   import { initAdaptiveWinrate } from './js/charts/adaptive-winrate.js';
-  // Charts — Parts V-VIII
   import { initThresholdPolicy } from './js/charts/threshold-policy.js';
+  // Chart modules — Compression
   import { initRlBarrierDiagram } from './js/charts/rl-barrier-diagram.js';
   import { initSurrogatePareto } from './js/charts/surrogate-pareto.js';
   import { initCompressionLongTail } from './js/charts/compression-long-tail.js';
   import { initRosettaRules } from './js/charts/rosetta-rules.js';
   import { initFilterGrammar } from './js/charts/filter-grammar.js';
+  // Chart modules — Profiling
   import { initUmapManifold } from './js/charts/umap-manifold.js';
 
   import { initConceptDrawer } from './js/concept-drawer.js';
@@ -60,16 +67,14 @@
   // Section files in display order
   const sectionFiles = [
     'sections/header.html',
-    'sections/00-prologue.html',
-    'sections/01-geometry.html',
-    'sections/02-engineering.html',
-    'sections/03-luck.html',
-    'sections/04-thermodynamics.html',
-    'sections/05-multiplayer.html',
+    'sections/01-introduction.html',
+    'sections/02-state-space.html',
+    'sections/03-solver.html',
+    'sections/04-optimal-strategy.html',
+    'sections/05-risk-parameter.html',
     'sections/06-compression.html',
-    'sections/07-rosetta.html',
-    'sections/08-interpretability.html',
-    'sections/09-conclusion.html',
+    'sections/07-profiling.html',
+    'sections/08-conclusion.html',
   ];
 
   // Load all sections in parallel, insert in order
@@ -87,16 +92,23 @@
 
   // Lazy initialization with IntersectionObserver
   const chartInits = {
-    'chart-state-space-counter': { init: initStateSpaceCounter, loaded: false },
-    'chart-reachability-pruning': { init: initReachabilityPruning, loaded: false },
+    'chart-score-spray': { init: initScoreSpray, loaded: false },
+    'chart-reduction-funnel': { init: initReductionFunnel, loaded: false },
+    'chart-reachability-grid': { init: initReachabilityGrid, loaded: false },
+    'chart-widget-structure': { init: initWidgetStructure, loaded: false },
+    'chart-topological-cascade': { init: initTopologicalCascade, loaded: false },
+    'chart-memory-lifecycle': { init: initMemoryLifecycle, loaded: false },
     'chart-widget-interactive': { init: initWidgetInteractive, loaded: false },
     'chart-backward-wave': { init: initBackwardWave, loaded: false },
-    'chart-decision-anatomy': { init: initDecisionAnatomy, loaded: false },
     'chart-optimization-timeline': { init: initOptimizationTimeline, loaded: false },
-    'chart-max-policy-failure': { init: initMaxPolicyFailure, loaded: false },
+    'chart-decision-anatomy': { init: initDecisionAnatomy, loaded: false },
     'chart-score-distribution': { init: initScoreDistribution, loaded: false },
     'chart-mixture': { init: initMixtureDecomposition, loaded: false },
     'chart-bonus-covariance': { init: initBonusCovariance, loaded: false },
+    'chart-max-policy-failure': { init: initMaxPolicyFailure, loaded: false },
+    'chart-race-to-63': { init: initRaceTo63, loaded: false },
+    'chart-category-stream': { init: initCategoryStream, loaded: false },
+    'chart-ev-ridgeline': { init: initEvRidgeline, loaded: false },
     'chart-exponential-utility': { init: initExponentialUtility, loaded: false },
     'chart-mean-variance-frontier': { init: initMeanVarianceFrontier, loaded: false },
     'chart-risk-reward': { init: initRiskReward, loaded: false },

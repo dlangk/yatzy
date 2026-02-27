@@ -1,10 +1,6 @@
 :::section{#conclusion}
 
-:::part-title
-Conclusion
-:::
-
-## What a Dice Game Teaches
+## Conclusions
 
 A children's dice game contains a 1.43-million-state MDP that admits exact
 solution in 1.1 seconds. The optimal policy scores 248.4 with standard
@@ -41,7 +37,7 @@ full complexity of sequential decision-making under uncertainty --a
 microcosm where optimality, engineering, compression, and human judgment
 converge on five dice and a scorecard.
 
-:::depth-2
+:::math
 
 The key quantitative results span four levels of analysis:
 
@@ -63,7 +59,7 @@ exhausted the expressible structure.
 
 :::
 
-:::depth-3
+:::code
 
 Reproducing the full pipeline from source:
 
