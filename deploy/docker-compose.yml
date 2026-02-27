@@ -1,0 +1,34 @@
+services:
+  yatzy-frontend:
+    image: yatzy-frontend:latest
+    container_name: yatzy-frontend
+    restart: always
+    networks: [shared_network]
+    expose: [8090]
+    environment:
+      - API_BASE_URL=https://langkilde.se/yatzy/api
+    volumes:
+      - /home/daniel.langkilde/yatzy-treatise:/usr/share/nginx/html:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  yatzy-backend:
+    image: yatzy-backend:latest
+    container_name: yatzy-backend
+    restart: always
+    networks: [shared_network]
+    expose: [9000]
+    environment:
+      - RAYON_NUM_THREADS=2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  shared_network:
+    external: true
