@@ -76,17 +76,21 @@ pub struct YatzyState {
 ///
 /// - `Owned(Vec<f32>)`: allocated during precomputation, written via unsafe raw pointers
 ///   from parallel rayon workers.
-/// - `Mmap`: zero-copy memory-mapped file, loaded in <1ms. The mmap includes a 16-byte
-///   header (16 bytes), so `as_slice()` skips the first 16 bytes.
+/// - `Mmap` (native only): zero-copy memory-mapped file, loaded in <1ms. The mmap includes a
+///   16-byte header, so `as_slice()` skips the first 16 bytes.
 pub enum StateValues {
     Owned(Vec<f32>),
-    Mmap { mmap: memmap2::Mmap },
+    #[cfg(feature = "full")]
+    Mmap {
+        mmap: memmap2::Mmap,
+    },
 }
 
 impl StateValues {
     pub fn as_slice(&self) -> &[f32] {
         match self {
             StateValues::Owned(v) => v.as_slice(),
+            #[cfg(feature = "full")]
             StateValues::Mmap { mmap } => {
                 let data_ptr = unsafe { mmap.as_ptr().add(16) as *const f32 };
                 unsafe { std::slice::from_raw_parts(data_ptr, NUM_STATES) }
@@ -97,6 +101,7 @@ impl StateValues {
     pub fn as_mut_slice(&mut self) -> &mut [f32] {
         match self {
             StateValues::Owned(v) => v.as_mut_slice(),
+            #[cfg(feature = "full")]
             StateValues::Mmap { .. } => panic!("Cannot mutably access mmap'd state values"),
         }
     }

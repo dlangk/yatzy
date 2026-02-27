@@ -231,8 +231,16 @@ pub fn compute_transitions(
     // Group 3: best keep from initial roll (uses Group 5 EVs)
     let (_e_ds_2, best_keep_2) = compute_reroll_with_decisions(ctx, &e_ds_1, theta, minimize);
 
-    // Enumerate all paths and accumulate transitions
-    // Key: (next_state_index, points) → accumulated probability
+    // Enumerate all paths through one turn and accumulate transition probabilities.
+    // A turn has 3 decision points: keep2 (from initial roll), keep1 (after 1st reroll),
+    // and category selection (after final dice). This creates 4 path shapes:
+    //
+    //   A. keep2=all, keep1=all → score ds0 directly
+    //   B. keep2=all, keep1=reroll → score rerolled ds_final
+    //   C. keep2=reroll, keep1=all → score ds_mid from 1st reroll
+    //   D. keep2=reroll, keep1=reroll → score ds_final from 2nd reroll
+    //
+    // Each path accumulates P(ds0) * P(reroll outcomes) into (next_state, points).
     let mut accum: HashMap<(u32, u16), f64> = HashMap::new();
 
     for ds0 in 0..252usize {

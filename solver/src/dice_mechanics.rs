@@ -18,11 +18,11 @@ pub fn count_faces(dice: &[i32; 5]) -> [i32; 7] {
 
 /// Normalize dice to canonical sorted form (ascending order).
 /// Required because R_{5,6} contains only sorted multisets.
-pub fn sort_dice_set(arr: &mut [i32; 5]) {
+pub fn sort_dice_set(dice: &mut [i32; 5]) {
     for i in 0..4 {
         for j in (i + 1)..5 {
-            if arr[j] < arr[i] {
-                arr.swap(i, j);
+            if dice[j] < dice[i] {
+                dice.swap(i, j);
             }
         }
     }

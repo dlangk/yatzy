@@ -210,10 +210,7 @@ async fn evaluate_deterministic() {
         "scored_categories": 0,
         "rerolls_remaining": 1,
     });
-    let resp1 = app()
-        .oneshot(evaluate_request(body.clone()))
-        .await
-        .unwrap();
+    let resp1 = app().oneshot(evaluate_request(body.clone())).await.unwrap();
     let json1 = body_json(resp1.into_body()).await;
 
     let resp2 = app().oneshot(evaluate_request(body)).await.unwrap();

@@ -13,6 +13,7 @@
 //! 7. **Terminal states** — Phase 2 base case: E(S) = 50 if m≥63, else 0
 //! 8. **Reachability pruning** — Phase 1: which (upper_mask, m) pairs are achievable
 
+#[cfg(feature = "full")]
 use std::time::Instant;
 
 use crate::constants::*;
@@ -359,36 +360,51 @@ pub fn precompute_reachability(ctx: &mut YatzyContext) {
 
 /// Phase 0 orchestrator: build all static lookup tables in dependency order.
 pub fn precompute_lookup_tables(ctx: &mut YatzyContext) {
-    println!("=== Phase 0: Precompute Lookup Tables ===");
-    let phase0_start = Instant::now();
+    #[cfg(feature = "full")]
+    {
+        println!("=== Phase 0: Precompute Lookup Tables ===");
+        let phase0_start = Instant::now();
 
-    macro_rules! timed {
-        ($label:expr, $body:expr) => {{
-            let t0 = Instant::now();
-            $body;
-            let dt = t0.elapsed().as_secs_f64() * 1000.0;
-            println!("  {:<42} {:>8.3} ms", $label, dt);
-        }};
+        macro_rules! timed {
+            ($label:expr, $body:expr) => {{
+                let t0 = Instant::now();
+                $body;
+                let dt = t0.elapsed().as_secs_f64() * 1000.0;
+                println!("  {:<42} {:>8.3} ms", $label, dt);
+            }};
+        }
+
+        timed!("Factorials", precompute_factorials(ctx));
+        timed!("Dice combinations (252)", build_all_dice_combinations(ctx));
+        timed!("Category scores", precompute_category_scores(ctx));
+        timed!("Keep-multiset table", precompute_keep_table(ctx));
+        timed!(
+            "Dice set probabilities",
+            precompute_dice_set_probabilities(ctx)
+        );
+        timed!(
+            "Scored category counts",
+            precompute_scored_category_counts(ctx)
+        );
+        timed!("Terminal states", initialize_final_states(ctx));
+        timed!("Reachability pruning", precompute_reachability(ctx));
+
+        let total = phase0_start.elapsed().as_secs_f64() * 1000.0;
+        println!("  {:<42} {:>8.3} ms", "TOTAL Phase 0", total);
+        println!();
     }
 
-    timed!("Factorials", precompute_factorials(ctx));
-    timed!("Dice combinations (252)", build_all_dice_combinations(ctx));
-    timed!("Category scores", precompute_category_scores(ctx));
-    timed!("Keep-multiset table", precompute_keep_table(ctx));
-    timed!(
-        "Dice set probabilities",
-        precompute_dice_set_probabilities(ctx)
-    );
-    timed!(
-        "Scored category counts",
-        precompute_scored_category_counts(ctx)
-    );
-    timed!("Terminal states", initialize_final_states(ctx));
-    timed!("Reachability pruning", precompute_reachability(ctx));
-
-    let total = phase0_start.elapsed().as_secs_f64() * 1000.0;
-    println!("  {:<42} {:>8.3} ms", "TOTAL Phase 0", total);
-    println!();
+    #[cfg(not(feature = "full"))]
+    {
+        precompute_factorials(ctx);
+        build_all_dice_combinations(ctx);
+        precompute_category_scores(ctx);
+        precompute_keep_table(ctx);
+        precompute_dice_set_probabilities(ctx);
+        precompute_scored_category_counts(ctx);
+        initialize_final_states(ctx);
+        precompute_reachability(ctx);
+    }
 }
 
 #[cfg(test)]

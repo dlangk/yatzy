@@ -385,11 +385,9 @@ pub fn simulate_batch_lockstep_oracle(
             let ds0 = find_dice_set_index(ctx, &dice);
             let keep2 = oracle.oracle_keep2[base + ds0];
             if keep2 != 0 {
-                // Decode keep_id → mask
+                // Decode oracle keep_id to a reroll bitmask (bit=1 → reroll that die)
                 let j = (keep2 - 1) as usize;
                 let mask = kt.keep_to_mask[ds0 * 32 + j];
-                // Convert keep mask to reroll mask: reroll = 0b11111 XOR keep bits
-                // keep_to_mask gives a keep mask where bit=1 means reroll that die
                 apply_reroll(&mut dice, mask, &mut g.rng);
 
                 // Second reroll decision (1 reroll left)

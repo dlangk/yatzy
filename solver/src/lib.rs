@@ -43,21 +43,40 @@
 
 #![allow(clippy::needless_range_loop)]
 
-pub mod api_computations;
-pub mod batched_solver;
+// Core modules — always available (no rayon/memmap/axum/SIMD)
 pub mod constants;
-pub mod density;
 pub mod dice_mechanics;
-pub mod env_config;
 pub mod game_mechanics;
 pub mod phase0_tables;
-pub mod profiling;
-pub mod rosetta;
-pub mod scenarios;
-pub mod server;
-pub mod simd;
-pub mod simulation;
-pub mod state_computation;
-pub mod storage;
 pub mod types;
 pub mod widget_solver;
+
+// Modules requiring native-only deps (rayon, memmap2, axum, SIMD)
+#[cfg(feature = "full")]
+pub mod api_computations;
+#[cfg(feature = "full")]
+pub mod batched_solver;
+#[cfg(feature = "full")]
+pub mod density;
+#[cfg(feature = "full")]
+pub mod env_config;
+#[cfg(feature = "full")]
+pub mod forward_pass;
+#[cfg(feature = "full")]
+pub mod profiling;
+#[cfg(feature = "full")]
+pub mod rosetta;
+#[cfg(feature = "full")]
+pub mod scenarios;
+#[cfg(feature = "full")]
+pub mod server;
+#[cfg(feature = "full")]
+pub mod simd;
+#[cfg(feature = "full")]
+pub mod state_computation;
+#[cfg(feature = "full")]
+pub mod storage;
+
+// Simulation module — partially gated internally
+pub mod simulation;
+

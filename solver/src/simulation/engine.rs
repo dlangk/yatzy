@@ -10,8 +10,12 @@
 //! category, score) into a compact `GameRecord` for offline aggregation.
 
 use rand::rngs::SmallRng;
-use rand::{Rng, SeedableRng};
+use rand::Rng;
+#[cfg(any(feature = "full", feature = "wasm", test))]
+use rand::SeedableRng;
+#[cfg(feature = "full")]
 use rayon::prelude::*;
+#[cfg(feature = "full")]
 use std::time::Instant;
 
 use crate::constants::*;
@@ -24,6 +28,7 @@ use crate::widget_solver::{
 };
 
 /// Results of a batch simulation.
+#[cfg(feature = "full")]
 pub struct SimulationResult {
     pub scores: Vec<i32>,
     pub mean: f64,
@@ -832,6 +837,7 @@ fn simulate_game_summary_max(ctx: &YatzyContext, rng: &mut SmallRng) -> GameSumm
 }
 
 /// Simulate N games in parallel, returning lightweight summaries.
+#[cfg(feature = "full")]
 pub fn simulate_batch_summaries(
     ctx: &YatzyContext,
     num_games: usize,
@@ -847,6 +853,7 @@ pub fn simulate_batch_summaries(
 }
 
 /// Simulate N games in parallel, returning aggregate statistics.
+#[cfg(feature = "full")]
 pub fn simulate_batch(ctx: &YatzyContext, num_games: usize, seed: u64) -> SimulationResult {
     let start = Instant::now();
 
@@ -886,6 +893,7 @@ pub fn simulate_batch(ctx: &YatzyContext, num_games: usize, seed: u64) -> Simula
 }
 
 /// Simulate N games in parallel with full recording, returning all GameRecords.
+#[cfg(feature = "full")]
 pub fn simulate_batch_with_recording(
     ctx: &YatzyContext,
     num_games: usize,
@@ -898,6 +906,179 @@ pub fn simulate_batch_with_recording(
             simulate_game_with_recording(ctx, &mut rng)
         })
         .collect()
+}
+
+/// Simulate one game from an arbitrary mid-game state (EV-optimal, θ=0 only).
+///
+/// Returns a Vec of per-turn `(turn_number, expected_final_score)` pairs where
+/// expected_final = accumulated_score_so_far + state_ev. The first entry is
+/// the starting state; subsequent entries are recorded after each category is scored.
+pub fn simulate_game_from_state(
+    ctx: &YatzyContext,
+    rng: &mut SmallRng,
+    mut up_score: i32,
+    mut scored: i32,
+    mut accumulated: i32,
+) -> Vec<f32> {
+    let sv = ctx.state_values.as_slice();
+    let scored_count_start = scored.count_ones() as usize;
+    let remaining_turns = CATEGORY_COUNT - scored_count_start;
+
+    // Record expected final at start
+    let mut trajectory = Vec::with_capacity(remaining_turns + 1);
+    let start_ev = sv[state_index(up_score as usize, scored as usize)];
+    trajectory.push(accumulated as f32 + start_ev);
+
+    let mut e_ds_0 = [0.0f32; 252];
+    let mut e_ds_1 = [0.0f32; 252];
+
+    for t in 0..remaining_turns {
+        let is_last_turn = scored_count_start + t == CATEGORY_COUNT - 1;
+        let mut dice = roll_dice(rng);
+
+        if is_last_turn {
+            compute_group6(ctx, sv, up_score, scored, &mut e_ds_0);
+            compute_max_ev_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1);
+
+            let mut best_ev = 0.0;
+            let mask1 = choose_best_reroll_mask(ctx, &e_ds_1, &dice, &mut best_ev);
+            if mask1 != 0 {
+                apply_reroll(&mut dice, mask1, rng);
+            }
+            let mask2 = choose_best_reroll_mask(ctx, &e_ds_0, &dice, &mut best_ev);
+            if mask2 != 0 {
+                apply_reroll(&mut dice, mask2, rng);
+            }
+
+            let ds_index = find_dice_set_index(ctx, &dice);
+            let (cat, scr) = find_best_category_final(ctx, up_score, scored, ds_index);
+            up_score = update_upper_score(up_score, cat, scr);
+            scored |= 1 << cat;
+            accumulated += scr;
+        } else {
+            compute_group6(ctx, sv, up_score, scored, &mut e_ds_0);
+            compute_max_ev_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1);
+
+            let mut best_ev = 0.0;
+            let mask1 = choose_best_reroll_mask(ctx, &e_ds_1, &dice, &mut best_ev);
+            if mask1 != 0 {
+                apply_reroll(&mut dice, mask1, rng);
+            }
+            let mask2 = choose_best_reroll_mask(ctx, &e_ds_0, &dice, &mut best_ev);
+            if mask2 != 0 {
+                apply_reroll(&mut dice, mask2, rng);
+            }
+
+            let ds_index = find_dice_set_index(ctx, &dice);
+            let (cat, scr) = find_best_category(ctx, sv, up_score, scored, ds_index);
+            up_score = update_upper_score(up_score, cat, scr);
+            scored |= 1 << cat;
+            accumulated += scr;
+        }
+
+        // Record expected final after this turn
+        if scored_count_start + t + 1 < CATEGORY_COUNT {
+            let ev = sv[state_index(up_score as usize, scored as usize)];
+            trajectory.push(accumulated as f32 + ev);
+        } else {
+            // Game over: add bonus if qualified
+            let final_score = accumulated + if up_score >= 63 { 50 } else { 0 };
+            trajectory.push(final_score as f32);
+        }
+    }
+
+    trajectory
+}
+
+/// Per-turn percentile result from a forecast.
+#[derive(Clone, serde::Serialize)]
+pub struct ForecastTurn {
+    pub turn: usize,
+    pub p10: f32,
+    pub p25: f32,
+    pub p50: f32,
+    pub p75: f32,
+    pub p90: f32,
+}
+
+/// Result of a Monte Carlo forecast from a mid-game state.
+#[derive(Clone, serde::Serialize)]
+pub struct ForecastResult {
+    pub turns: Vec<ForecastTurn>,
+}
+
+/// Run N Monte Carlo rollouts from a mid-game state and compute per-turn percentiles.
+pub fn simulate_forecast(
+    ctx: &YatzyContext,
+    upper_score: i32,
+    scored_categories: i32,
+    accumulated_score: i32,
+    num_rollouts: u32,
+    seed: u64,
+) -> ForecastResult {
+    let n = num_rollouts as usize;
+    // Collect all trajectories
+    let mut all_trajectories: Vec<Vec<f32>> = Vec::with_capacity(n);
+    for i in 0..n {
+        let mut rng = SmallRng::seed_from_u64(seed.wrapping_add(i as u64));
+        let traj = simulate_game_from_state(
+            ctx,
+            &mut rng,
+            upper_score,
+            scored_categories,
+            accumulated_score,
+        );
+        all_trajectories.push(traj);
+    }
+
+    // All trajectories should have the same length
+    let traj_len = all_trajectories.first().map_or(0, |t| t.len());
+    let scored_count = scored_categories.count_ones() as usize;
+
+    let mut turns = Vec::with_capacity(traj_len);
+    let mut col = Vec::with_capacity(n);
+
+    for step in 0..traj_len {
+        col.clear();
+        for traj in &all_trajectories {
+            if step < traj.len() {
+                col.push(traj[step]);
+            }
+        }
+        col.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        let len = col.len();
+        if len == 0 {
+            continue;
+        }
+
+        turns.push(ForecastTurn {
+            turn: scored_count + step,
+            p10: percentile(&col, 0.10),
+            p25: percentile(&col, 0.25),
+            p50: percentile(&col, 0.50),
+            p75: percentile(&col, 0.75),
+            p90: percentile(&col, 0.90),
+        });
+    }
+
+    ForecastResult { turns }
+}
+
+/// Linear-interpolation percentile from a sorted slice.
+fn percentile(sorted: &[f32], p: f32) -> f32 {
+    let n = sorted.len();
+    if n == 0 {
+        return 0.0;
+    }
+    if n == 1 {
+        return sorted[0];
+    }
+    let idx = p * (n - 1) as f32;
+    let lo = idx.floor() as usize;
+    let hi = (lo + 1).min(n - 1);
+    let frac = idx - lo as f32;
+    sorted[lo] * (1.0 - frac) + sorted[hi] * frac
 }
 
 #[cfg(test)]

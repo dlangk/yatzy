@@ -6,7 +6,7 @@ Rust HPC engine: backward-induction DP, Monte Carlo simulation, REST API.
 
 ```bash
 cargo build --release         # Build (~30s with LTO)
-cargo test                    # 184 tests (136 unit + 13 API + 8 property + 25 integration + 2 ignored)
+cargo test                    # 182 tests (136 unit + 13 API + 8 property + 25 integration + 2 ignored)
 cargo fmt --check             # Formatting
 cargo clippy                  # Lints
 

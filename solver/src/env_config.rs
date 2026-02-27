@@ -1,7 +1,7 @@
 //! Shared environment configuration for all Yatzy binaries.
 //!
 //! Consolidates `YATZY_BASE_PATH`, `RAYON_NUM_THREADS`, and `YATZY_PORT`
-//! reads that were previously copy-pasted across 28 binaries.
+//! reads shared by all 28 binaries.
 
 use std::path::PathBuf;
 

@@ -6,131 +6,177 @@ edition = "2021"
 [[bin]]
 name = "yatzy"
 path = "src/bin/server.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-precompute"
 path = "src/bin/precompute.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-simulate"
 path = "src/bin/simulate.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-category-sweep"
 path = "src/bin/category_sweep.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-conditional"
 path = "src/bin/yatzy_conditional.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "pivotal-scenarios"
 path = "src/bin/pivotal_scenarios.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-decision-sensitivity"
 path = "src/bin/decision_sensitivity.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-multiplayer"
 path = "src/bin/multiplayer.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-underdog-sweep"
 path = "src/bin/underdog_sweep.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-frontier-test"
 path = "src/bin/frontier_test.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-winrate"
 path = "src/bin/winrate.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-percentile-sweep"
 path = "src/bin/percentile_sweep.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-human-baseline"
 path = "src/bin/human_baseline.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-difficult-scenarios"
 path = "src/bin/difficult_scenarios.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-scenario-sensitivity"
 path = "src/bin/scenario_sensitivity.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-sweep"
 path = "src/bin/sweep.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-decision-gaps"
 path = "src/bin/decision_gaps.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-export-training-data"
 path = "src/bin/export_training_data.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-heuristic-gap"
 path = "src/bin/heuristic_gap.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-profile-scenarios"
 path = "src/bin/generate_profile_scenarios.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-player-card-grid"
 path = "src/bin/player_card_grid.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-export-state-heatmap"
 path = "src/bin/export_state_heatmap.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-scenarios"
 path = "src/bin/scenarios.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-density"
 path = "src/bin/density_sweep.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-export-greedy-game"
 path = "src/bin/export_greedy_game.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-regret-export"
 path = "src/bin/regret_export.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-eval-policy"
 path = "src/bin/eval_policy.rs"
+required-features = ["full"]
+
+[[bin]]
+name = "yatzy-forward-pass"
+path = "src/bin/forward_pass.rs"
+required-features = ["full"]
 
 [[bin]]
 name = "yatzy-bench"
 path = "src/bin/bench_wall_clock.rs"
+required-features = ["full"]
 
 [dependencies]
-axum = "0.8"
-tokio = { version = "1", features = ["rt-multi-thread", "net", "signal", "macros"] }
+# Why: HTTP server framework (routing, extractors, middleware)
+axum = { version = "0.8", optional = true }
+# Why: async runtime for axum; tightened to only needed features
+tokio = { version = "1", features = ["rt-multi-thread", "net", "signal", "macros"], optional = true }
+# Why: derive Serialize/Deserialize for API request/response types
 serde = { version = "1", features = ["derive"] }
+# Why: JSON serialization for REST API payloads
 serde_json = "1"
-rayon = "1.10"
+# Why: parallel iteration for backward induction and batch simulation
+rayon = { version = "1.10", optional = true }
+# Why: PRNG for Monte Carlo simulation (SmallRng for speed)
 rand = { version = "0.9", features = ["small_rng"] }
-memmap2 = "0.9"
-tower-http = { version = "0.6", features = ["cors"] }
+# Why: zero-copy memory-mapped loading of strategy tables (<1ms)
+memmap2 = { version = "0.9", optional = true }
+# Why: CORS middleware for frontend cross-origin requests
+tower-http = { version = "0.6", features = ["cors"], optional = true }
 
 [dev-dependencies]
+# Why: tower::ServiceExt for one_request API integration tests
 tower = { version = "0.5", features = ["util"] }
+# Why: HTTP body utilities for API integration tests
 http-body-util = "0.1"
+# Why: property-based testing (state invariants, score bounds)
 proptest = "1"
 
 [features]
+default = ["full"]
+full = ["dep:axum", "dep:tokio", "dep:rayon", "dep:memmap2", "dep:tower-http"]
 timing = []
 
 [profile.release]
