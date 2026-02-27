@@ -7,15 +7,15 @@ Optimal-play Scandinavian Yatzy: backward-induction DP solver, risk-sensitive st
 | Component | Location | Purpose | Key Constraint |
 |-----------|----------|---------|----------------|
 | Solver | `solver/` | HPC Rust engine: DP, simulation, REST API | **Performance is sacred** — see hot path rules |
-| Frontend | `frontend/` | Vanilla TypeScript + D3.js game UI | No layout shifts |
+| Frontend | `frontend/` | Vanilla TypeScript + D3.js game UI + Vite dev server | No layout shifts |
+| Treatise | `treatise/` | Markdown-driven static site: theory, D3 charts | Build with `just build-treatise` |
+| Profiler | `profiler/` | Cognitive profiling quiz (30 scenarios) | Pre-computed data, no runtime API |
 | Analytics | `analytics/` | Python analysis, visualization, pipelines | Custom colormap (`#F37021` center) |
-| Blog | `blog/` | Static site: articles, profiling quiz, game | Pre-computed data, no runtime API |
 
 See component CLAUDE.md files for detailed guidance:
 - `solver/CLAUDE.md` — architecture, hot paths, API reference, perf testing
 - `frontend/CLAUDE.md` — Vanilla TS patterns, store, layout rules
 - `analytics/CLAUDE.md` — CLI commands, colormap, data flow, plotting
-- `blog/CLAUDE.md` — quiz system, data files, component architecture
 
 ## Critical Rules
 
@@ -33,7 +33,7 @@ See component CLAUDE.md files for detailed guidance:
 # Build + test
 just setup              # Build solver + install analytics
 just build              # Production build (solver + frontend)
-just test               # Solver tests (184 tests)
+just test               # Solver tests (182 tests)
 just test-all           # All tests (solver + frontend + analytics)
 just check              # Full quality gate (lint + typecheck + test + bench)
 just bench-check        # Performance regression test (PASS/FAIL)
@@ -52,23 +52,43 @@ just simulate           # 1M games lockstep
 just pipeline           # compute → plot → categories → efficiency
 just density            # Exact forward-DP PMFs
 
-# Serve + dev
-just serve              # API server on port 9000
-just dev-backend        # Start backend server
-just dev-frontend       # Start frontend dev server
+# Serve + dev (two servers needed)
+just dev-backend        # Backend API on port 9000
+just dev-frontend       # Vite on port 5173 (serves all UIs + proxies API)
 ```
+
+## Local Development
+
+Two servers, one URL. The Vite dev server serves all three UIs and proxies the API:
+
+```bash
+just dev-backend        # Terminal 1: Rust API on port 9000
+just dev-frontend       # Terminal 2: Vite on port 5173
+```
+
+| URL | UI |
+|-----|-----|
+| `http://localhost:5173/yatzy/` | Treatise |
+| `http://localhost:5173/yatzy/play/` | Game UI |
+| `http://localhost:5173/yatzy/profile/` | Profiler |
+| `http://localhost:5173/yatzy/api/health` | API (proxied to backend) |
+
+This mirrors the production URL structure at `langkilde.se/yatzy/*`.
 
 Full recipe list: `just --list`
 
 ## Architecture
 
 ```
-Frontend (Vanilla TS, :5173) ──POST /evaluate──→ Solver (axum, :9000)
-Blog (static)           ──reads──→ blog/data/*.json (pre-computed)
-Analytics (Python)      ──reads──→ data/simulations/theta/*/scores.bin
+Vite (:5173) ─── /yatzy/play/     → Game UI (frontend/)
+             ├── /yatzy/           → Treatise (treatise/)
+             ├── /yatzy/profile/   → Profiler (profiler/)
+             └── /yatzy/api/       → proxy → Solver (axum, :9000)
+
+Analytics (Python) ──reads──→ data/simulations/theta/*/scores.bin
 ```
 
-All game intelligence lives in the solver. Frontend and blog are thin clients. Analytics reads binary simulation files from disk.
+All game intelligence lives in the solver. The three UIs are thin clients. Analytics reads binary simulation files from disk.
 
 ### Computation Pipeline
 
@@ -93,7 +113,7 @@ outputs/                           # Cheap to regenerate (gitignored)
   scenarios/                       # Pivotal/difficult scenario JSON
   profiling/                       # Quiz scenarios + Q-grids
 
-blog/data/                         # Pre-computed for static site
+profiler/data/                     # Pre-computed for static site
   scenarios.json                   # Profiling quiz (copied from outputs/)
   player_card_grid.json            # 648 simulation grid entries
 ```

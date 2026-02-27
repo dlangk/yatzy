@@ -6,6 +6,7 @@ import { initTrajectoryChart } from './components/TrajectoryChart.ts';
 import { initScorecard } from './components/Scorecard.ts';
 import { initDebugPanel } from './components/DebugPanel.ts';
 
+/** Build the app DOM skeleton and initialize all component modules. */
 export function initApp(container: HTMLElement): void {
   container.innerHTML = '';
   const app = document.createElement('div');
@@ -15,30 +16,46 @@ export function initApp(container: HTMLElement): void {
   h1.textContent = 'Delta Yatzy';
   app.appendChild(h1);
 
+  // Two-column layout
+  const columns = document.createElement('div');
+  columns.className = 'app-columns';
+  app.appendChild(columns);
+
+  // Left column: scorecard
+  const leftCol = document.createElement('div');
+  leftCol.className = 'app-col-left';
+  columns.appendChild(leftCol);
+
+  const scorecardEl = document.createElement('div');
+  leftCol.appendChild(scorecardEl);
+  initScorecard(scorecardEl);
+
+  // Right column: dice + action bar + graphs
+  const rightCol = document.createElement('div');
+  rightCol.className = 'app-col-right';
+  columns.appendChild(rightCol);
+
   const actionBarEl = document.createElement('div');
-  app.appendChild(actionBarEl);
+  rightCol.appendChild(actionBarEl);
   initActionBar(actionBarEl);
 
   const diceBarEl = document.createElement('div');
-  app.appendChild(diceBarEl);
+  rightCol.appendChild(diceBarEl);
   initDiceBar(diceBarEl);
 
   const diceLegendEl = document.createElement('div');
-  app.appendChild(diceLegendEl);
+  rightCol.appendChild(diceLegendEl);
   initDiceLegend(diceLegendEl);
 
   const evalPanelEl = document.createElement('div');
-  app.appendChild(evalPanelEl);
+  rightCol.appendChild(evalPanelEl);
   initEvalPanel(evalPanelEl);
 
   const chartEl = document.createElement('div');
-  app.appendChild(chartEl);
+  rightCol.appendChild(chartEl);
   initTrajectoryChart(chartEl);
 
-  const scorecardEl = document.createElement('div');
-  app.appendChild(scorecardEl);
-  initScorecard(scorecardEl);
-
+  // Debug below both columns
   const debugToggleEl = document.createElement('div');
   debugToggleEl.className = 'debug-toggle';
   app.appendChild(debugToggleEl);

@@ -1,5 +1,3 @@
-import { COLORS } from '../constants.ts';
-
 export interface DieElements {
   container: HTMLDivElement;
   update: (opts: {
@@ -48,17 +46,17 @@ export function createDie(
   }) {
     btn.textContent = opts.value === 0 ? '?' : String(opts.value);
     btn.disabled = opts.disabled;
-    btn.style.background = opts.held ? COLORS.bg : COLORS.bgAlt;
+    btn.style.background = opts.held ? 'var(--bg)' : 'var(--bg-alt)';
     btn.style.cursor = opts.disabled ? 'default' : 'pointer';
     btn.style.opacity = opts.faded ? '0.5' : '1';
     btn.title = opts.held ? 'Held (click to reroll)' : 'Will reroll (click to hold)';
 
     if (opts.isOptimalReroll) {
-      btn.style.border = `3px solid ${COLORS.danger}`;
+      btn.style.border = '3px solid var(--color-danger)';
     } else if (opts.isOptimalKeep) {
-      btn.style.border = `3px solid ${COLORS.success}`;
+      btn.style.border = '3px solid var(--color-success)';
     } else {
-      btn.style.border = `2px solid ${COLORS.text}`;
+      btn.style.border = '2px solid var(--text)';
     }
   }
 

@@ -99,6 +99,8 @@ export function initScorecard(container: HTMLElement): void {
   function render() {
     const s = getState();
     const canScore = s.turnPhase === 'rolled';
+    const mustScore = canScore && s.rerollsRemaining <= 0;
+    console.log('Scorecard render:', { turnPhase: s.turnPhase, rerollsRemaining: s.rerollsRemaining, canScore, mustScore });
     const optimalCategoryId = s.lastEvalResponse?.optimal_category ?? null;
 
     // Compute normalization ranges
@@ -120,6 +122,7 @@ export function initScorecard(container: HTMLElement): void {
         category: cat,
         isOptimal: cat.id === optimalCategoryId && canScore,
         canScore,
+        mustScore,
         scoreFraction,
         evFraction,
       });

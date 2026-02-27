@@ -110,6 +110,8 @@ export function computeAccumulatedScore(state: GameState): number {
   return sum + state.bonus;
 }
 
+/** Pure reducer for all game state transitions. Handles dice rolling, rerolling,
+ *  category scoring, eval response integration, and debug/manual overrides. */
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case 'ROLL': {

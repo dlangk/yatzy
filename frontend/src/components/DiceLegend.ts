@@ -1,14 +1,13 @@
 import { getState, subscribe } from '../store.ts';
-import { COLORS } from '../constants.ts';
 
 export function initDiceLegend(container: HTMLElement): void {
   container.className = 'dice-legend';
 
   const items: [string, string, string][] = [
-    [COLORS.bg, `1px solid ${COLORS.text}`, 'Held'],
-    [COLORS.bgAlt, `1px solid ${COLORS.text}`, 'Reroll'],
-    [COLORS.bg, `2px solid ${COLORS.success}`, 'Optimal keep'],
-    [COLORS.bgAlt, `2px solid ${COLORS.danger}`, 'Optimal reroll'],
+    ['var(--bg)', '1px solid var(--text)', 'Held'],
+    ['var(--bg-alt)', '1px solid var(--text)', 'Reroll'],
+    ['var(--bg)', '2px solid var(--color-success)', 'Optimal keep'],
+    ['var(--bg-alt)', '2px solid var(--color-danger)', 'Optimal reroll'],
   ];
 
   for (const [bg, border, label] of items) {

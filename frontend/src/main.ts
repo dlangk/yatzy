@@ -3,7 +3,6 @@ import { initApp } from './App.ts';
 import { evaluate, getStateValue, fetchDensity } from './api.ts';
 import { sortDiceWithMapping } from './mask.ts';
 import { computeAccumulatedScore } from './reducer.ts';
-
 initStore();
 
 const root = document.getElementById('root')!;
@@ -47,3 +46,4 @@ subscribe((state, prev) => {
       .catch(() => { /* server not available */ });
   }
 }
+

@@ -13,4 +13,5 @@ Exploratory ideas, literature surveys, and ML/RL approaches.
 | `percentile-optimization.md` | 77 | Direct percentile maximization as alternative to exponential utility |
 | `rl-and-ml-approaches.md` | 53 | Why RL hits a wall: bonus credit assignment, network capacity, no curriculum |
 | `transformer-credit-assignment.md` | 82 | Transformer attention as credit assignment for delayed bonus rewards |
+| `treatise-outline.md` | 1 | Full treatise outline: 8-section structure from oracle to interpretability |
 | `yahtzee-research-landscape.md` | 94 | Overview of published Yahtzee/Yatzy research |

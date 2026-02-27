@@ -147,11 +147,15 @@ profile-validate trials="100":
 # Pre-compute player card simulation grid (648 combos × N games)
 player-card-grid games="10000":
     YATZY_BASE_PATH=. solver/target/release/yatzy-player-card-grid \
-      --games {{games}} --output blog/data/player_card_grid.json
+      --games {{games}} --output profiler/data/player_card_grid.json
 
-# Copy profiling scenarios to blog for frontend consumption
+# Copy profiling scenarios to profiler for frontend consumption
 profile-deploy:
-    cp outputs/profiling/scenarios.json blog/data/scenarios.json
+    cp outputs/profiling/scenarios.json profiler/data/scenarios.json
+
+# Exact forward pass: state visitation probabilities → D3 JSON
+forward-pass *args:
+    YATZY_BASE_PATH=. solver/target/release/yatzy-forward-pass {{args}}
 
 # Exact density evolution: zero-variance score PMFs per θ (~6 min/theta)
 density *args:
@@ -281,15 +285,11 @@ build:
 # Full quality gate
 check: lint-all typecheck test-all bench-check
 
-# Start API server on port 9000
-serve:
-    YATZY_BASE_PATH=. solver/target/release/yatzy
-
-# Dev: start backend server
+# Dev: start backend API server (port 9000)
 dev-backend:
     YATZY_BASE_PATH=. solver/target/release/yatzy
 
-# Dev: start frontend server
+# Dev: start Vite dev server (port 5173, serves all UIs + proxies API)
 dev-frontend:
     cd frontend && npm run dev
 
@@ -297,16 +297,12 @@ dev-frontend:
 summary:
     analytics/.venv/bin/yatzy-analyze summary
 
-# Serve treatise on port 8080
-serve-treatise:
-    cd treatise && python3 -m http.server 8080
-
-# Start frontend dev server (legacy)
-frontend:
-    python3 frontend/serve.py
-
 # ── Deploy ───────────────────────────────────────────────────────────────────
 
 # Deploy to production (cross-compile + docker + transfer)
 deploy:
     bash deploy/deploy.sh
+
+# Deploy only the treatise (fast, no Docker rebuild)
+deploy-treatise:
+    bash deploy/deploy-treatise.sh

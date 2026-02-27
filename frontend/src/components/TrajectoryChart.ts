@@ -21,8 +21,8 @@ export function initTrajectoryChart(container: HTMLElement): void {
 
   const svg = d3.select(wrapper)
     .append('svg')
-    .attr('width', WIDTH)
-    .attr('height', HEIGHT);
+    .attr('viewBox', `0 0 ${WIDTH} ${HEIGHT}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet');
 
   // Background
   svg.append('rect')

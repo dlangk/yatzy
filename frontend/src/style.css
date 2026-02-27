@@ -1,16 +1,19 @@
 :root {
+  --bg: #f6f5ef;
+  --bg-alt: #eae9e3;
+  --text: #050505;
+  --text-muted: #555;
+  --accent: rgba(243, 112, 33, 0.8);
+  --accent-light: rgba(243, 112, 33, 0.15);
+  --border: #d4d3cd;
+  --font-serif: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --color-blue: #3b4cc0;
+  --color-red: #b40426;
+  --color-orange: #F37021;
+  --color-green: #2ca02c;
   --color-success: #2ca02c;
   --color-danger: #b40426;
-  --color-orange: #F37021;
-  --color-blue: #3b4cc0;
-  --color-text: #333;
-  --color-text-muted: #aaa;
-  --color-border: #ccc;
-  --color-bg: #fff;
-  --color-bg-alt: #f0f0f0;
-  --color-bg-alt2: #f8f8f8;
-  --color-bg-panel: #f8f9fa;
-  --color-border-panel: #dee2e6;
 }
 
 *, *::before, *::after {
@@ -19,14 +22,15 @@
 
 body {
   margin: 0;
-  font-family: monospace;
-  color: var(--color-text);
-  background: var(--color-bg);
+  font-family: var(--font-serif);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
 }
 
 /* App shell */
 .app {
-  max-width: 600px;
+  max-width: 1100px;
   margin: 0 auto;
   padding: 16px;
 }
@@ -34,6 +38,23 @@ body {
 .app h1 {
   text-align: center;
   margin-bottom: 8px;
+}
+
+/* Two-column layout */
+.app-columns {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.app-col-left {
+  flex: 0 0 340px;
+  min-width: 0;
+}
+
+.app-col-right {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 /* Action bar */
@@ -51,11 +72,17 @@ body {
   width: 24px;
   height: 24px;
   padding: 0;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-alt);
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
   cursor: pointer;
   border-radius: 3px;
   line-height: 22px;
+  color: var(--text);
+}
+
+.action-bar .small-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 .action-bar .reroll-controls {
@@ -68,6 +95,61 @@ body {
   font-size: 12px;
   padding: 4px 10px;
   opacity: 0.6;
+}
+
+/* Primary & secondary button classes */
+.game-btn-primary {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  padding: 6px 20px;
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.game-btn-primary:hover {
+  opacity: 0.85;
+}
+
+.game-btn-primary:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.game-btn-secondary {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 4px 10px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text);
+  opacity: 0.6;
+}
+
+.game-btn-secondary:hover {
+  opacity: 1;
+  background: var(--accent-light);
+}
+
+/* Scorecard action button */
+.scorecard-action-btn {
+  font-size: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  border-radius: 3px;
+  color: var(--text);
+}
+
+.scorecard-action-btn:disabled {
+  cursor: default;
+  opacity: 0.3;
 }
 
 /* Dice bar */
@@ -90,11 +172,12 @@ body {
   height: 16px;
   font-size: 10px;
   padding: 0;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-alt);
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
   cursor: pointer;
   border-radius: 3px;
   line-height: 14px;
+  color: var(--text);
 }
 
 .die-btn {
@@ -102,8 +185,9 @@ body {
   height: 56px;
   font-size: 28px;
   font-weight: bold;
-  font-family: monospace;
+  font-family: var(--font-mono);
   border-radius: 8px;
+  color: var(--text);
 }
 
 /* Dice legend */
@@ -112,7 +196,7 @@ body {
   gap: 16px;
   justify-content: center;
   font-size: 11px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   margin: 4px 0 8px;
   transition: opacity 0.2s;
   min-height: 16px;
@@ -129,12 +213,12 @@ body {
 
 /* Eval panel */
 .eval-panel {
-  background: var(--color-bg-panel);
-  border: 1px solid var(--color-border-panel);
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 10px;
   margin: 12px 0;
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
 }
 
@@ -150,17 +234,18 @@ body {
 
 /* Trajectory chart */
 .trajectory-chart {
-  width: 568px;
+  width: 100%;
   height: 200px;
-  margin: 12px auto;
-  background: var(--color-bg-panel);
-  border: 1px solid var(--color-border-panel);
+  margin: 12px 0;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
 }
 
 .trajectory-chart svg {
   display: block;
+  width: 100%;
 }
 
 /* Scorecard */
@@ -169,7 +254,7 @@ body {
   table-layout: fixed;
   border-collapse: collapse;
   margin-top: 12px;
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
 }
 
@@ -179,7 +264,7 @@ body {
 .scorecard colgroup .col-action { width: 20%; }
 
 .scorecard thead tr {
-  border-bottom: 2px solid var(--color-text);
+  border-bottom: 2px solid var(--text);
 }
 
 .scorecard th {
@@ -191,17 +276,17 @@ body {
 
 .scorecard td {
   padding: 4px 8px;
-  border-bottom: 1px solid var(--color-bg-alt);
+  border-bottom: 1px solid var(--border);
   height: 32px;
 }
 
 .scorecard .upper-summary td {
   padding: 4px 8px;
-  border-bottom: 2px solid var(--color-text);
+  border-bottom: 2px solid var(--text);
 }
 
 .scorecard .upper-summary {
-  background: var(--color-bg-alt2);
+  background: var(--bg-alt);
   font-weight: bold;
 }
 
@@ -211,7 +296,7 @@ body {
 
 .scorecard .total-row td {
   padding: 6px 8px;
-  border-top: 2px solid var(--color-text);
+  border-top: 2px solid var(--text);
   border-bottom: none;
 }
 
@@ -220,10 +305,12 @@ body {
   border: none;
   background: transparent;
   text-align: center;
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
   padding: 0;
   height: 24px;
+  color: inherit;
+  -moz-appearance: textfield;
 }
 
 .scorecard .score-input::-webkit-inner-spin-button,
@@ -231,7 +318,6 @@ body {
   -webkit-appearance: none;
   margin: 0;
 }
-.scorecard .score-input { -moz-appearance: textfield; }
 
 /* Debug panel */
 .debug-panel {
@@ -241,7 +327,7 @@ body {
   padding: 12px;
   margin-top: 12px;
   font-size: 11px;
-  font-family: monospace;
+  font-family: var(--font-mono);
   white-space: pre-wrap;
   word-break: break-all;
   max-height: 400px;

@@ -1,17 +1,17 @@
-// Unified color palette (matches analytics coolwarm_mid)
+// Unified color palette (synced with blog/treatise design tokens)
+// Only used by D3/SVG which can't use CSS var()
 export const COLORS = {
   success: '#2ca02c',
   danger: '#b40426',
   orange: '#F37021',
   blue: '#3b4cc0',
-  text: '#333',
-  textMuted: '#aaa',
-  border: '#ccc',
-  bg: '#fff',
-  bgAlt: '#f0f0f0',
-  bgAlt2: '#f8f8f8',
-  bgPanel: '#f8f9fa',
-  borderPanel: '#dee2e6',
+  text: '#050505',
+  textMuted: '#555',
+  border: '#d4d3cd',
+  bg: '#f6f5ef',
+  bgAlt: '#eae9e3',
+  bgPanel: '#eae9e3',
+  borderPanel: '#d4d3cd',
 } as const;
 
 export const CATEGORY_NAMES = [

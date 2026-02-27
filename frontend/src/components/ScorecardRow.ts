@@ -1,5 +1,4 @@
 import type { CategoryState } from '../types.ts';
-import { COLORS } from '../constants.ts';
 
 function sparkGradient(fraction: number, color: string): string {
   const pct = `${(fraction * 100).toFixed(1)}%`;
@@ -12,6 +11,7 @@ export interface RowElements {
     category: CategoryState;
     isOptimal: boolean;
     canScore: boolean;
+    mustScore: boolean;
     scoreFraction: number;
     evFraction: number | null;
   }) => void;
@@ -49,8 +49,6 @@ export function createScorecardRow(
   const actionTd = document.createElement('td');
   actionTd.style.textAlign = 'center';
   const actionBtn = document.createElement('button');
-  actionBtn.style.fontSize = '12px';
-  actionBtn.style.padding = '2px 8px';
   actionBtn.addEventListener('click', () => {
     // re-check current state at click time
     if (actionBtn.dataset.action === 'unset') {
@@ -66,17 +64,18 @@ export function createScorecardRow(
     category: CategoryState;
     isOptimal: boolean;
     canScore: boolean;
+    mustScore: boolean;
     scoreFraction: number;
     evFraction: number | null;
   }) {
-    const { category, isOptimal, canScore, scoreFraction, evFraction } = opts;
+    const { category, isOptimal, canScore, mustScore, scoreFraction, evFraction } = opts;
     const displayedScore = category.isScored ? category.score : category.suggestedScore;
     const isZero = !category.isScored && displayedScore === 0;
     const dimmed = isZero && !isOptimal;
 
     // Row background
     if (category.isScored) {
-      tr.style.background = COLORS.bgAlt;
+      tr.style.background = 'var(--bg-alt)';
     } else if (isOptimal) {
       tr.style.background = 'rgba(44, 160, 44, 0.12)';
     } else {
@@ -84,11 +83,11 @@ export function createScorecardRow(
     }
 
     // Name color
-    nameTd.style.color = dimmed ? COLORS.textMuted : 'inherit';
+    nameTd.style.color = dimmed ? 'var(--text-muted)' : 'inherit';
 
     // Score cell
     scoreInput.value = String(displayedScore);
-    scoreInput.style.color = dimmed ? COLORS.textMuted : 'inherit';
+    scoreInput.style.color = dimmed ? 'var(--text-muted)' : 'inherit';
 
     const scoreBarColor = isOptimal
       ? 'rgba(44, 160, 44, 0.18)'
@@ -100,7 +99,7 @@ export function createScorecardRow(
     // EV cell
     const hasEv = !category.isScored && category.available;
     evTd.textContent = hasEv ? category.evIfScored.toFixed(1) : '';
-    evTd.style.color = dimmed ? COLORS.textMuted : 'inherit';
+    evTd.style.color = dimmed ? 'var(--text-muted)' : 'inherit';
     const evBarColor = isOptimal ? 'rgba(44, 160, 44, 0.18)' : 'rgba(59, 76, 192, 0.15)';
     evTd.style.background = evFraction != null && evFraction > 0 ? sparkGradient(evFraction, evBarColor) : '';
 
@@ -110,6 +109,7 @@ export function createScorecardRow(
       actionBtn.textContent = '\u2713';
       actionBtn.dataset.action = 'unset';
       actionBtn.disabled = false;
+      actionBtn.className = 'scorecard-action-btn';
       actionBtn.style.border = 'none';
       actionBtn.style.background = 'transparent';
       actionBtn.style.cursor = 'pointer';
@@ -119,6 +119,11 @@ export function createScorecardRow(
       actionBtn.textContent = 'Score';
       actionBtn.dataset.action = 'score';
       actionBtn.disabled = false;
+      if (mustScore) {
+        actionBtn.className = 'scorecard-action-btn game-btn-primary';
+      } else {
+        actionBtn.className = 'scorecard-action-btn';
+      }
       actionBtn.style.border = '';
       actionBtn.style.background = '';
       actionBtn.style.cursor = 'pointer';
@@ -128,6 +133,9 @@ export function createScorecardRow(
       actionBtn.textContent = 'Score';
       actionBtn.dataset.action = '';
       actionBtn.disabled = true;
+      actionBtn.className = 'scorecard-action-btn';
+      actionBtn.style.border = '';
+      actionBtn.style.background = '';
       actionBtn.style.cursor = 'default';
       actionBtn.style.visibility = 'hidden';
       actionBtn.title = '';

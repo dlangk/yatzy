@@ -60,25 +60,22 @@ cp "$STRATEGY_TABLE" "$BACKEND_CTX/data/strategy_tables/all_states.bin"
 cp "$DEPLOY_DIR/Dockerfile.backend" "$BACKEND_CTX/Dockerfile"
 echo "✓ Backend context assembled"
 
-# Frontend context
+# Frontend context (apps only — treatise served via volume mount)
 FRONTEND_CTX="$BUILD_DIR/frontend"
-mkdir -p "$FRONTEND_CTX/html"
-
-# Treatise at root
-cp -r "$PROJECT_ROOT/treatise/"* "$FRONTEND_CTX/html/"
+mkdir -p "$FRONTEND_CTX/apps"
 
 # Game UI at /play/
-mkdir -p "$FRONTEND_CTX/html/play"
-cp -r "$PROJECT_ROOT/frontend/dist/"* "$FRONTEND_CTX/html/play/"
+mkdir -p "$FRONTEND_CTX/apps/play"
+cp -r "$PROJECT_ROOT/frontend/dist/"* "$FRONTEND_CTX/apps/play/"
 
 # Profiler at /profile/
-mkdir -p "$FRONTEND_CTX/html/profile/css" "$FRONTEND_CTX/html/profile/js" "$FRONTEND_CTX/html/profile/data"
-cp "$PROJECT_ROOT/blog/profile.html" "$FRONTEND_CTX/html/profile/index.html"
+mkdir -p "$FRONTEND_CTX/apps/profile/css" "$FRONTEND_CTX/apps/profile/js" "$FRONTEND_CTX/apps/profile/data"
+cp "$PROJECT_ROOT/profiler/profile/index.html" "$FRONTEND_CTX/apps/profile/index.html"
 # Fix "Back to article" link to point to treatise root
-sed -i '' 's|href="index.html"|href="/yatzy/"|g' "$FRONTEND_CTX/html/profile/index.html"
-cp -r "$PROJECT_ROOT/blog/css/"* "$FRONTEND_CTX/html/profile/css/"
-cp -r "$PROJECT_ROOT/blog/js/"* "$FRONTEND_CTX/html/profile/js/"
-cp -r "$PROJECT_ROOT/blog/data/"* "$FRONTEND_CTX/html/profile/data/"
+sed -i '' 's|href="index.html"|href="/yatzy/"|g' "$FRONTEND_CTX/apps/profile/index.html"
+cp -r "$PROJECT_ROOT/profiler/css/"* "$FRONTEND_CTX/apps/profile/css/"
+cp -r "$PROJECT_ROOT/profiler/js/"* "$FRONTEND_CTX/apps/profile/js/"
+cp -r "$PROJECT_ROOT/profiler/data/"* "$FRONTEND_CTX/apps/profile/data/"
 
 # Nginx config and entrypoint
 cp "$DEPLOY_DIR/nginx.conf" "$FRONTEND_CTX/nginx.conf"
@@ -129,6 +126,20 @@ sleep 5
 REMOTE
 echo "✓ Containers deployed"
 
+# ── Step 8b: Sync treatise to host volume ─────────────────────────────────
+echo ""
+echo "── Step 8b: Sync treatise to server"
+$SSH "mkdir -p ~/yatzy-treatise"
+rsync -az --delete \
+  -e "ssh -i $SSH_KEY" \
+  --exclude='node_modules/' \
+  --exclude='package*.json' \
+  --exclude='build.mjs' \
+  --exclude='sections/*.md' \
+  "$PROJECT_ROOT/treatise/" \
+  "$SERVER_USER@$SERVER_HOST:/home/$SERVER_USER/yatzy-treatise/"
+echo "✓ Treatise synced"
+
 # ── Step 9: Health checks ───────────────────────────────────────────────────
 echo ""
 echo "── Step 9: Health checks"
@@ -145,6 +156,28 @@ docker exec yatzy-frontend wget -q --spider http://localhost:8090/profile/ && ec
 echo -n "External:       "
 curl -sk -H "Host: langkilde.se" -o /dev/null -w "%{http_code}" https://localhost/yatzy/ && echo " OK" || echo " FAIL"
 HEALTHCHECK
+
+# ── Step 10: Purge Cloudflare cache ──────────────────────────────────────────
+echo ""
+echo "── Step 10: Purge Cloudflare cache"
+$SSH bash -s <<'PURGE'
+if [ ! -f ~/.cloudflare ]; then
+  echo "✗ ~/.cloudflare not found — skipping cache purge"
+  exit 0
+fi
+CF_ZONE_ID=$(sed -n '1p' ~/.cloudflare)
+CF_TOKEN=$(sed -n '2p' ~/.cloudflare)
+CF_RESPONSE=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+  -H "Authorization: Bearer ${CF_TOKEN}" \
+  -H "Content-Type: application/json" \
+  --data '{"purge_everything":true}')
+if echo "$CF_RESPONSE" | grep -q '"success":true\|"success": true'; then
+  echo "✓ Cache purged"
+else
+  echo "✗ Cache purge may have failed"
+  echo "$CF_RESPONSE"
+fi
+PURGE
 
 echo ""
 echo "=== Deploy complete ==="

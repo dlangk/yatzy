@@ -1,11 +1,10 @@
-# CLAUDE.md — Blog
+# CLAUDE.md — Profiler
 
-Static site with articles, interactive profiling quiz, and embedded game.
+Static site with articles and interactive profiling quiz.
 
 ## Commands
 
 ```bash
-cd blog && npm test    # 25 tests (vitest)
 python3 -m http.server # Serve locally for development
 ```
 
@@ -14,8 +13,7 @@ python3 -m http.server # Serve locally for development
 | Page | File | Purpose |
 |------|------|---------|
 | Article | `index.html` | Data-driven Yatzy analysis with D3 charts |
-| Profile Quiz | `profile.html` | 30-scenario cognitive profiling |
-| Game | `play.html` | Embedded game (calls solver API at runtime) |
+| Profile Quiz | `profile/index.html` | 30-scenario cognitive profiling |
 
 ## Profile Quiz Architecture
 
@@ -48,4 +46,4 @@ Flux-like state management with component-based rendering (no framework):
 - Q-grid keys use Rust float formatting: `"0"` not `"0.0"`. This breaks if reformatted.
 - Quiz layout: 675px container with sticky sidecar, hidden below 1020px viewport.
 - 4-parameter model: θ (risk), β (precision), γ (myopia), d (depth).
-- Tests: `js/game/mask.test.js` (11) + `js/game/reducer.test.js` (14).
+- Game UI lives in `frontend/` (canonical Vite+TS app), not here.

@@ -7,13 +7,10 @@ export function initActionBar(container: HTMLElement): void {
   gameOverLabel.textContent = 'Game Over!';
 
   const mainBtn = document.createElement('button');
-  mainBtn.style.fontSize = '16px';
-  mainBtn.style.padding = '6px 20px';
 
   const newGameBtn = document.createElement('button');
+  newGameBtn.className = 'game-btn-primary';
   newGameBtn.textContent = 'New Game';
-  newGameBtn.style.fontSize = '16px';
-  newGameBtn.style.padding = '6px 16px';
   newGameBtn.addEventListener('click', () => dispatch({ type: 'RESET_GAME' }));
 
   const rerollControls = document.createElement('span');
@@ -39,7 +36,7 @@ export function initActionBar(container: HTMLElement): void {
   rerollControls.appendChild(plusBtn);
 
   const resetBtn = document.createElement('button');
-  resetBtn.className = 'reset-btn';
+  resetBtn.className = 'game-btn-secondary';
   resetBtn.textContent = 'Reset';
   resetBtn.addEventListener('click', () => {
     if (window.confirm('Reset game? All progress will be lost.')) {
@@ -49,8 +46,7 @@ export function initActionBar(container: HTMLElement): void {
 
   // Placeholder for game-over hidden reset (keeps layout stable)
   const hiddenPlaceholder = document.createElement('button');
-  hiddenPlaceholder.style.fontSize = '12px';
-  hiddenPlaceholder.style.padding = '4px 10px';
+  hiddenPlaceholder.className = 'game-btn-secondary';
   hiddenPlaceholder.style.visibility = 'hidden';
   hiddenPlaceholder.textContent = 'Reset';
 
@@ -77,9 +73,15 @@ export function initActionBar(container: HTMLElement): void {
     if (s.turnPhase === 'idle') {
       mainBtn.textContent = 'Roll';
       mainBtn.disabled = false;
-    } else {
+      mainBtn.className = 'game-btn-primary';
+    } else if (s.rerollsRemaining > 0) {
       mainBtn.textContent = `Reroll (${s.rerollsRemaining})`;
-      mainBtn.disabled = s.rerollsRemaining <= 0;
+      mainBtn.disabled = false;
+      mainBtn.className = 'game-btn-primary';
+    } else {
+      mainBtn.textContent = `Reroll (0)`;
+      mainBtn.disabled = true;
+      mainBtn.className = 'game-btn-primary';
     }
     container.appendChild(mainBtn);
 

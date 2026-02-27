@@ -1,6 +1,5 @@
 import { getState, subscribe } from '../store.ts';
 import { computeRerollMask, mapMaskToSorted } from '../mask.ts';
-import { COLORS } from '../constants.ts';
 
 export function initEvalPanel(container: HTMLElement): void {
   container.className = 'eval-panel';
@@ -60,7 +59,7 @@ export function initEvalPanel(container: HTMLElement): void {
     if (hasData && rerolls > 0 && currentMaskEv !== null && optMaskEv !== null) {
       const delta = currentMaskEv - optMaskEv;
       rows[3][1].textContent = delta.toFixed(2);
-      rows[3][1].style.color = Math.abs(delta) < 0.01 ? COLORS.success : COLORS.danger;
+      rows[3][1].style.color = Math.abs(delta) < 0.01 ? 'var(--color-success)' : 'var(--color-danger)';
     } else {
       rows[3][1].textContent = dash;
       rows[3][1].style.color = 'inherit';

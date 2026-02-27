@@ -1,6 +1,7 @@
 import { API_BASE_URL } from './config.ts';
 import type { EvaluateRequest, EvaluateResponse } from './types.ts';
 
+/** Evaluate all keep-mask and category EVs for the current dice + game state. */
 export async function evaluate(req: EvaluateRequest): Promise<EvaluateResponse> {
   const res = await fetch(`${API_BASE_URL}/evaluate`, {
     method: 'POST',
@@ -13,6 +14,7 @@ export async function evaluate(req: EvaluateRequest): Promise<EvaluateResponse> 
   return res.json() as Promise<EvaluateResponse>;
 }
 
+/** Check if the solver backend is reachable. Returns false on any error. */
 export async function healthCheck(): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE_URL}/health`);
@@ -22,6 +24,7 @@ export async function healthCheck(): Promise<boolean> {
   }
 }
 
+/** Look up the expected final score for a given scorecard state (mmap table lookup). */
 export async function getStateValue(
   upperScore: number,
   scoredCategories: number,
@@ -43,6 +46,7 @@ export interface DensityResponse {
   percentiles: Record<string, number>;
 }
 
+/** Compute exact score distribution from a mid-game state via forward density evolution. */
 export async function fetchDensity(
   upperScore: number,
   scoredCategories: number,
