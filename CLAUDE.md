@@ -104,15 +104,27 @@ All game intelligence lives in the solver. The three UIs are thin clients. Analy
 ```
 data/                              # Expensive (gitignored)
   strategy_tables/all_states*.bin  # 16 MB × 37 θ values
-  simulations/theta/theta_*/       # scores.bin (~2 MB per θ)
   strategy_tables/oracle.bin       # 3.17 GB (θ=0 only, optional)
+  simulations/theta/theta_*/       # scores.bin (~2 MB per θ)
+  simulations/adaptive/            # Adaptive-θ simulation results
+  simulations/max_policy/          # Max-policy simulation results
+  simulations/multiplayer/         # Multiplayer game recordings
+  simulations/rl/                  # RL experiment data
+  surrogate/                       # Surrogate model training data
 
 outputs/                           # Cheap to regenerate (gitignored)
   aggregates/parquet/              # summary, kde, mer, sdva
   aggregates/csv/                  # sweep_summary, category_stats
+  density/                         # Exact forward-DP PMFs (JSON)
   plots/                           # ~50 PNGs at 200 DPI
   scenarios/                       # Pivotal/difficult scenario JSON
   profiling/                       # Quiz scenarios + Q-grids
+  surrogate/                       # Surrogate model outputs
+  rosetta/                         # Rosetta distillation outputs
+  frontier/                        # Pareto frontier data
+  policy_compression/              # Compression gap analysis
+  heuristic_gap/                   # Heuristic vs optimal gap data
+  winrate/                         # Multiplayer win-rate analysis
 
 profiler/data/                     # Pre-computed for static site
   scenarios.json                   # Profiling quiz (copied from outputs/)

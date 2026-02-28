@@ -10,7 +10,7 @@ Theoretical foundations, experimental results, and research for the Delta Yatzy 
 | [lab-reports/](lab-reports/) | 12 | Performance experiments with measured results |
 | [research/](research/) | 11 | Exploratory ideas, surveys, ML approaches |
 | [strategy/](strategy/) | 6 | Game strategy, sweep pipelines, player tools |
-| [reviews/](reviews/) | 2 | Literature surveys and external assessments |
+| [reviews/](reviews/) | 4 | Literature surveys, external assessments, cross-reference audits |
 
 ## Key Entry Points
 

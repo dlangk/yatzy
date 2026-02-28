@@ -37,7 +37,16 @@ npm run lint      # ESLint
 | `constants.ts` | Colors, category names, game constants |
 | `config.ts` | API base URL configuration |
 | `style.css` | All styles via CSS custom properties |
-| `components/*.ts` | Vanilla TS component modules (init + subscribe pattern) |
+| `components/ActionBar.ts` | Roll/reroll buttons and reroll counter |
+| `components/DebugPanel.ts` | Collapsible raw state inspector |
+| `components/DecisionLog.ts` | Per-turn reroll/score decision table with delta bars |
+| `components/DiceBar.ts` | Five-die display with hold toggles |
+| `components/DiceLegend.ts` | Optimal keep/reroll color legend |
+| `components/Die.ts` | Single die SVG with pip layout |
+| `components/EvalPanel.ts` | State value and optimal action summary |
+| `components/Scorecard.ts` | 15-category scoring table with EV column |
+| `components/ScorecardRow.ts` | Single scorecard row factory (score input + action button) |
+| `components/TrajectoryChart.ts` | D3 SVG line chart with percentile bands |
 
 ## Component Pattern
 
