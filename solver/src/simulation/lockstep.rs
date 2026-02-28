@@ -387,7 +387,11 @@ pub fn simulate_batch_lockstep_oracle(
 
             // First reroll decision (2 rerolls left)
             let ds0 = find_dice_set_index(ctx, &dice);
-            let keep2 = oracle.oracle_keep2[base + ds0];
+            let oracle_keep2 = oracle.keep2();
+            let oracle_keep1 = oracle.keep1();
+            let oracle_cat = oracle.cat();
+
+            let keep2 = oracle_keep2[base + ds0];
             if keep2 != 0 {
                 // Decode oracle keep_id to a reroll bitmask (bit=1 → reroll that die)
                 let j = (keep2 - 1) as usize;
@@ -396,7 +400,7 @@ pub fn simulate_batch_lockstep_oracle(
 
                 // Second reroll decision (1 reroll left)
                 let ds1 = find_dice_set_index(ctx, &dice);
-                let keep1 = oracle.oracle_keep1[base + ds1];
+                let keep1 = oracle_keep1[base + ds1];
                 if keep1 != 0 {
                     let j1 = (keep1 - 1) as usize;
                     let mask1 = kt.keep_to_mask[ds1 * 32 + j1];
@@ -404,7 +408,7 @@ pub fn simulate_batch_lockstep_oracle(
                 }
             } else {
                 // Kept all dice from initial roll, check second reroll
-                let keep1 = oracle.oracle_keep1[base + ds0];
+                let keep1 = oracle_keep1[base + ds0];
                 if keep1 != 0 {
                     let j1 = (keep1 - 1) as usize;
                     let mask1 = kt.keep_to_mask[ds0 * 32 + j1];
@@ -416,9 +420,9 @@ pub fn simulate_batch_lockstep_oracle(
             let ds_final = find_dice_set_index(ctx, &dice);
             // Both paths are identical: the oracle already accounts for terminal values
             let cat = if is_last_turn {
-                oracle.oracle_cat[base + ds_final] as usize
+                oracle_cat[base + ds_final] as usize
             } else {
-                oracle.oracle_cat[base + ds_final] as usize
+                oracle_cat[base + ds_final] as usize
             };
 
             let scr = ctx.precomputed_scores[ds_final][cat];

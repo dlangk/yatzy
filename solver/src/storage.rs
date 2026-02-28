@@ -242,9 +242,9 @@ pub fn save_oracle(oracle: &PolicyOracle, filename: &str) {
         )
     };
     f.write_all(header_bytes).unwrap();
-    f.write_all(&oracle.oracle_cat).unwrap();
-    f.write_all(&oracle.oracle_keep1).unwrap();
-    f.write_all(&oracle.oracle_keep2).unwrap();
+    f.write_all(oracle.cat()).unwrap();
+    f.write_all(oracle.keep1()).unwrap();
+    f.write_all(oracle.keep2()).unwrap();
 
     let elapsed = start_time.elapsed().as_secs_f64();
     let size_gb = (std::mem::size_of::<OracleFileHeader>() + 3 * ORACLE_ENTRIES) as f64
@@ -291,20 +291,13 @@ pub fn load_oracle(filename: &str) -> Option<PolicyOracle> {
         return None;
     }
 
-    // Copy data from mmap into owned Vecs
+    // Zero-copy mmap: slices are computed on access via cat()/keep1()/keep2()
     let data_start = header_size;
-    let cat_end = data_start + ORACLE_ENTRIES;
-    let k1_end = cat_end + ORACLE_ENTRIES;
-    let k2_end = k1_end + ORACLE_ENTRIES;
 
-    let oracle = PolicyOracle {
-        oracle_cat: mmap[data_start..cat_end].to_vec(),
-        oracle_keep1: mmap[cat_end..k1_end].to_vec(),
-        oracle_keep2: mmap[k1_end..k2_end].to_vec(),
-    };
+    let oracle = PolicyOracle::Mmap { mmap, data_start };
 
     let elapsed = start_time.elapsed().as_secs_f64();
-    println!("Loaded oracle in {:.2}s", elapsed);
+    println!("Loaded oracle (zero-copy mmap) in {:.2}s", elapsed);
 
     Some(oracle)
 }

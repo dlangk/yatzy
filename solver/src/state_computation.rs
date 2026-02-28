@@ -238,13 +238,13 @@ fn compute_all_state_values_impl(
         // so parallel writes are safe (same argument as sv writes).
         let oracle_cat_ptr = oracle
             .as_mut()
-            .map(|o| std::sync::atomic::AtomicPtr::new(o.oracle_cat.as_mut_ptr()));
+            .map(|o| std::sync::atomic::AtomicPtr::new(o.cat_mut().as_mut_ptr()));
         let oracle_keep1_ptr = oracle
             .as_mut()
-            .map(|o| std::sync::atomic::AtomicPtr::new(o.oracle_keep1.as_mut_ptr()));
+            .map(|o| std::sync::atomic::AtomicPtr::new(o.keep1_mut().as_mut_ptr()));
         let oracle_keep2_ptr = oracle
             .as_mut()
-            .map(|o| std::sync::atomic::AtomicPtr::new(o.oracle_keep2.as_mut_ptr()));
+            .map(|o| std::sync::atomic::AtomicPtr::new(o.keep2_mut().as_mut_ptr()));
         let building_oracle = oracle_cat_ptr.is_some();
 
         scored_masks

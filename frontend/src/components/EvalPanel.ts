@@ -131,11 +131,12 @@ export function initEvalPanel(container: HTMLElement): void {
 
     // --- Game column ---
 
-    // Expected final score
+    // Expected final score = accumulated + remaining EV
     const stateEv = s.lastEvalResponse?.state_ev ?? null;
+    const rawScoredSum = s.categories.reduce((sum, c) => c.isScored ? sum + c.score : sum, 0);
     const latestScored = [...s.trajectory].reverse().find(p => p.event === 'score');
     const expectedFinal = hasData && stateEv !== null
-      ? stateEv
+      ? rawScoredSum + stateEv
       : latestScored?.expectedFinal ?? null;
     gameVals[0].textContent = expectedFinal !== null ? expectedFinal.toFixed(1) : DASH;
 
@@ -146,16 +147,19 @@ export function initEvalPanel(container: HTMLElement): void {
     const scoredCount = s.categories.filter(c => c.isScored).length;
     gameVals[2].textContent = `${scoredCount} / 15`;
 
-    // Percentile (from latest trajectory point with percentiles)
-    const latestWithPct = [...s.trajectory].reverse().find(p => p.percentiles);
+    // Percentile: compare against earliest density (first scored turn's distribution)
+    const refPoint = s.trajectory.find(p => p.percentiles && p.turn < 15);
     const ef = expectedFinal ?? latestScored?.expectedFinal ?? null;
-    if (latestWithPct?.percentiles && ef !== null) {
-      gameVals[3].textContent = percentileBracket(ef, latestWithPct.percentiles);
+    if (refPoint?.percentiles && ef !== null) {
+      gameVals[3].textContent = percentileBracket(ef, refPoint.percentiles);
     } else {
       gameVals[3].textContent = DASH;
     }
 
-    // Finish range (p10–p90)
+    // Finish range (p10–p90 from latest non-degenerate density)
+    const latestWithPct = [...s.trajectory].reverse().find(
+      p => p.percentiles && p.event !== 'score' || (p.event === 'score' && p.turn < 15),
+    );
     if (latestWithPct?.percentiles) {
       const p10 = latestWithPct.percentiles.p10;
       const p90 = latestWithPct.percentiles.p90;

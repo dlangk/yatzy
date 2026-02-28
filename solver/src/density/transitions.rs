@@ -393,7 +393,7 @@ pub fn compute_transitions_oracle(
         if p == 0.0 {
             continue;
         }
-        let keep2 = oracle.oracle_keep2[base + ds];
+        let keep2 = oracle.keep2()[base + ds];
         if keep2 == 0 {
             // Keep all dice
             nxt_probs[ds] += p;
@@ -417,7 +417,7 @@ pub fn compute_transitions_oracle(
         if p == 0.0 {
             continue;
         }
-        let keep1 = oracle.oracle_keep1[base + ds];
+        let keep1 = oracle.keep1()[base + ds];
         if keep1 == 0 {
             // Keep all dice
             nxt_probs[ds] += p;
@@ -438,7 +438,7 @@ pub fn compute_transitions_oracle(
         if p == 0.0 {
             continue;
         }
-        let cat = oracle.oracle_cat[base + ds] as usize;
+        let cat = oracle.cat()[base + ds] as usize;
         let pts = ctx.precomputed_scores[ds][cat];
         let new_up = if cat < 6 {
             update_upper_score(up_score, cat, pts)

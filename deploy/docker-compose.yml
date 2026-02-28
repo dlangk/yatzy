@@ -23,6 +23,8 @@ services:
     expose: [9000]
     environment:
       - RAYON_NUM_THREADS=2
+    volumes:
+      - /home/daniel.langkilde/yatzy-data/oracle.bin:/app/data/strategy_tables/oracle.bin:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
       interval: 30s

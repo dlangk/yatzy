@@ -115,10 +115,21 @@ impl StateValues {
 /// - `oracle_keep2[si*252+ds]`: best keep with 2 rerolls left (same encoding)
 ///
 /// Total: ~3.17 GB (3 × 1,056,964,608 bytes). θ=0 EV mode only.
-pub struct PolicyOracle {
-    pub oracle_cat: Vec<u8>,
-    pub oracle_keep1: Vec<u8>,
-    pub oracle_keep2: Vec<u8>,
+///
+/// Two backing modes (like StateValues):
+/// - `Owned`: Vec-backed, used during precomputation (mutable writes via raw pointers)
+/// - `Mmap`: zero-copy memory-mapped, used at serve time (~0 RSS, OS pages on demand)
+pub enum PolicyOracle {
+    Owned {
+        oracle_cat: Vec<u8>,
+        oracle_keep1: Vec<u8>,
+        oracle_keep2: Vec<u8>,
+    },
+    #[cfg(feature = "full")]
+    Mmap {
+        mmap: memmap2::Mmap,
+        data_start: usize,
+    },
 }
 
 /// Number of entries per oracle array: NUM_STATES × 252.
@@ -136,7 +147,7 @@ impl Default for PolicyOracle {
 impl PolicyOracle {
     /// Allocate zeroed oracle arrays (~3.17 GB total).
     pub fn new() -> Self {
-        Self {
+        Self::Owned {
             oracle_cat: vec![0u8; ORACLE_ENTRIES],
             oracle_keep1: vec![0u8; ORACLE_ENTRIES],
             oracle_keep2: vec![0u8; ORACLE_ENTRIES],
@@ -153,6 +164,71 @@ impl PolicyOracle {
         );
         debug_assert!(ds < NUM_DICE_SETS, "ds {} out of range", ds);
         state_idx * NUM_DICE_SETS + ds
+    }
+
+    /// Slice of best-category decisions.
+    #[inline(always)]
+    pub fn cat(&self) -> &[u8] {
+        match self {
+            PolicyOracle::Owned { oracle_cat, .. } => oracle_cat,
+            #[cfg(feature = "full")]
+            PolicyOracle::Mmap { mmap, data_start } => {
+                &mmap[*data_start..*data_start + ORACLE_ENTRIES]
+            }
+        }
+    }
+
+    /// Slice of best-keep-with-1-reroll decisions.
+    #[inline(always)]
+    pub fn keep1(&self) -> &[u8] {
+        match self {
+            PolicyOracle::Owned { oracle_keep1, .. } => oracle_keep1,
+            #[cfg(feature = "full")]
+            PolicyOracle::Mmap { mmap, data_start } => {
+                let start = *data_start + ORACLE_ENTRIES;
+                &mmap[start..start + ORACLE_ENTRIES]
+            }
+        }
+    }
+
+    /// Slice of best-keep-with-2-rerolls decisions.
+    #[inline(always)]
+    pub fn keep2(&self) -> &[u8] {
+        match self {
+            PolicyOracle::Owned { oracle_keep2, .. } => oracle_keep2,
+            #[cfg(feature = "full")]
+            PolicyOracle::Mmap { mmap, data_start } => {
+                let start = *data_start + 2 * ORACLE_ENTRIES;
+                &mmap[start..start + ORACLE_ENTRIES]
+            }
+        }
+    }
+
+    /// Mutable slice of best-category decisions (only for Owned variant, used during build).
+    pub fn cat_mut(&mut self) -> &mut [u8] {
+        match self {
+            PolicyOracle::Owned { oracle_cat, .. } => oracle_cat,
+            #[cfg(feature = "full")]
+            PolicyOracle::Mmap { .. } => panic!("Cannot mutably access mmap'd oracle"),
+        }
+    }
+
+    /// Mutable slice of best-keep-with-1-reroll decisions.
+    pub fn keep1_mut(&mut self) -> &mut [u8] {
+        match self {
+            PolicyOracle::Owned { oracle_keep1, .. } => oracle_keep1,
+            #[cfg(feature = "full")]
+            PolicyOracle::Mmap { .. } => panic!("Cannot mutably access mmap'd oracle"),
+        }
+    }
+
+    /// Mutable slice of best-keep-with-2-rerolls decisions.
+    pub fn keep2_mut(&mut self) -> &mut [u8] {
+        match self {
+            PolicyOracle::Owned { oracle_keep2, .. } => oracle_keep2,
+            #[cfg(feature = "full")]
+            PolicyOracle::Mmap { .. } => panic!("Cannot mutably access mmap'd oracle"),
+        }
     }
 }
 

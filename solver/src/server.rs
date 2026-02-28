@@ -217,6 +217,17 @@ async fn handle_density(
         ));
     }
 
+    // Guard: reject density with too many remaining turns — forward DP grows
+    // exponentially with remaining categories and can OOM/timeout low-resource servers.
+    // Require at least 5 scored categories (≤10 remaining, ~2-10s on 2-CPU server).
+    let turns_scored = (req.scored_categories as u32).count_ones();
+    if turns_scored < 5 {
+        return Err(error_response(
+            StatusCode::BAD_REQUEST,
+            "Density requires at least 5 scored categories (≤10 remaining turns).",
+        ));
+    }
+
     let oracle = match &state.oracle {
         Some(o) => Arc::clone(o),
         None => {
@@ -232,7 +243,7 @@ async fn handle_density(
     let scored_categories = req.scored_categories as usize;
     let accumulated_score = req.accumulated_score as usize;
 
-    let result = tokio::task::spawn_blocking(move || {
+    let computation = tokio::task::spawn_blocking(move || {
         crate::density::forward::density_evolution_from_state(
             &ctx,
             &oracle,
@@ -240,14 +251,24 @@ async fn handle_density(
             scored_categories,
             accumulated_score,
         )
-    })
-    .await
-    .map_err(|_| {
-        error_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Density computation failed",
-        )
-    })?;
+    });
+
+    let result = match tokio::time::timeout(std::time::Duration::from_secs(30), computation).await
+    {
+        Ok(Ok(r)) => r,
+        Ok(Err(_)) => {
+            return Err(error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Density computation failed",
+            ))
+        }
+        Err(_) => {
+            return Err(error_response(
+                StatusCode::REQUEST_TIMEOUT,
+                "Density computation timed out (>30s)",
+            ))
+        }
+    };
 
     Ok(Json(serde_json::json!({
         "mean": result.mean,

@@ -183,10 +183,11 @@ async fn evaluate_invalid_rerolls() {
 
 #[tokio::test]
 async fn density_without_oracle_returns_503() {
+    // Use scored_categories with ≥5 bits set to bypass the min-turns guard
     let body = serde_json::json!({
-        "upper_score": 0,
-        "scored_categories": 0,
-        "accumulated_score": 0,
+        "upper_score": 15,
+        "scored_categories": 31,
+        "accumulated_score": 50,
     });
     let resp = app()
         .oneshot(
@@ -198,6 +199,26 @@ async fn density_without_oracle_returns_503() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+}
+
+#[tokio::test]
+async fn density_too_few_scored_rejected() {
+    // 3 categories scored (< 5 minimum) — too expensive
+    let body = serde_json::json!({
+        "upper_score": 5,
+        "scored_categories": 7,
+        "accumulated_score": 30,
+    });
+    let resp = app()
+        .oneshot(
+            Request::post("/density")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 }
 
 // ── Determinism ──────────────────────────────────────────────────────
