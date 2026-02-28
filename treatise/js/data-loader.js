@@ -39,6 +39,9 @@ export const DataLoader = {
   filterGrammar: () => load('filter_grammar.json'),
   umapEmbeddings: () => load('umap_embeddings.json'),
 
+  // Dice symmetry (state space intro)
+  diceSymmetry: () => load('dice_symmetry.json'),
+
   // Score spray (prologue)
   scoreSpray: () => load('score_spray.json'),
   scoreSprayMeta: () => load('score_spray_meta.json'),

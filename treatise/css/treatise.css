@@ -522,3 +522,255 @@ h2 .section-link:hover {
     justify-content: center;
   }
 }
+
+/* ===== Dice Symmetry Explorer ===== */
+
+.dice-symmetry-explorer {
+  position: relative;
+}
+
+.dice-tray {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-alt);
+  border-radius: 8px;
+}
+
+.dice-tray-top {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.dice-tray-row {
+  display: flex;
+  gap: 6px;
+}
+
+.dice-roll-btn {
+  font-weight: 600;
+}
+
+/* Keeps Panel — floats outside content column on the right */
+.dice-symmetry-explorer {
+  position: relative;
+}
+
+.keeps-panel {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin-left: 1rem;
+  width: 160px;
+  background: var(--bg-alt);
+  border-radius: 8px;
+  padding: 0.2rem 0;
+}
+
+.keeps-panel:empty {
+  display: none;
+}
+
+.keep-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.4rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.12s;
+}
+
+.keep-row:last-child {
+  border-bottom: none;
+}
+
+.keep-row:hover {
+  background: rgba(128, 128, 128, 0.08);
+}
+
+.keep-row.active {
+  background: var(--accent-light, rgba(243, 112, 33, 0.12));
+}
+
+.keep-row-dice {
+  display: flex;
+  gap: 2px;
+}
+
+.keep-die {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  line-height: 0;
+}
+
+.keep-die svg {
+  width: 100%;
+  height: 100%;
+}
+
+.keep-masks {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* Pattern Table */
+.pattern-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  margin: 1rem 0;
+  table-layout: fixed;
+}
+
+.pattern-table colgroup .col-swatch  { width: 32px; }
+.pattern-table colgroup .col-pattern { width: 24%; }
+.pattern-table colgroup .col-num     { width: 24%; }
+
+.pattern-table th.num {
+  text-align: right;
+}
+
+.pattern-table th {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 2px solid var(--border);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted, #666);
+}
+
+.pattern-table td {
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.pattern-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.pattern-row {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.pattern-row:hover {
+  background: var(--bg-alt);
+}
+
+.pattern-row.active {
+  background: var(--accent-light, rgba(243, 112, 33, 0.12));
+}
+
+.pattern-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.pattern-glyph {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.pattern-total td {
+  border-top: 2px solid var(--border);
+  border-bottom: none;
+}
+
+
+/* 252 Grid */
+.grid-252 {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.grid-family-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.grid-family-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding-left: 6px;
+  margin-bottom: 2px;
+}
+
+.grid-family-count {
+  font-weight: 400;
+  color: var(--text-muted, #666);
+}
+
+.grid-family-dice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.grid-quintuplet {
+  display: flex;
+  gap: 1px;
+  cursor: pointer;
+  padding: 1px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  transition: border-color 0.15s;
+}
+
+.grid-quintuplet:hover {
+  border-color: var(--text);
+}
+
+.grid-quintuplet.active {
+  border-color: var(--accent);
+  border-width: 2px;
+  padding: 0;
+  background: rgba(243, 112, 33, 0.15);
+  animation: pulse-border 1.2s ease-in-out infinite;
+  z-index: 1;
+  position: relative;
+}
+
+.grid-die {
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+}
+
+@keyframes pulse-border {
+  0%, 100% { box-shadow: 0 0 4px 2px rgba(243, 112, 33, 0.4); }
+  50% { box-shadow: 0 0 8px 4px rgba(243, 112, 33, 0.7); }
+}
+
+/* Responsive */
+@media (max-width: 720px) {
+  .dice-tray {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .grid-die {
+    width: 6px;
+    height: 6px;
+  }
+  .pattern-table {
+    font-size: 0.8rem;
+  }
+  .keeps-panel {
+    display: none;
+  }
+}

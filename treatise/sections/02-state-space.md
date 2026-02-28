@@ -2,9 +2,13 @@
 
 ## The State Space
 
-A Yatzy game is a sequence of rolls, keeps, and category assignments spread across fifteen rounds. Played naively, the number of distinct game histories is roughly 1.7 &times; 10<sup>170</sup>. That vastly exceeds the number of atoms in the observable universe, which is "only" about 10^80! 🤯
+A Yatzy game is a sequence of rolls, keeps, and category assignments spread across fifteen rounds. Played naively, the number of distinct game histories is roughly 1.7 &times; 10<sup>170</sup>, a number that vastly exceeds the number of atoms in the observable universe, estimated at "only" about 10^80! 🤯
 
-Fortunately, clever mathematicians like [CITE1, CITE2] figured out how to reduce the state space into something much, much smaller.
+Fortunately, clever mathematicians like [CITE1, CITE2] figured out how to reduce the state space into something much, much smaller. Before we begin the reduction, let's build some intuition. Roll five dice below and see how 7,776 ordered outcomes collapse into just 252 distinct multisets grouped by pattern.
+
+:::html
+<div class="chart-container" id="chart-dice-symmetry"></div>
+:::
 
 ### Step 1: Don't Worry About The Details
 

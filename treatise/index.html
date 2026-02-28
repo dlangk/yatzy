@@ -25,6 +25,7 @@
   // Chart modules — Introduction
   import { initScoreSpray } from './js/charts/score-spray.js';
   // Chart modules — State Space (Reduction Chain)
+  import { initDiceSymmetry } from './js/charts/dice-symmetry.js';
   import { initReductionFunnel } from './js/charts/reduction-funnel.js';
   import { initReachabilityGrid } from './js/charts/reachability-grid.js';
   import { initWidgetStructure } from './js/charts/widget-structure.js';
@@ -93,6 +94,7 @@
   // Lazy initialization with IntersectionObserver
   const chartInits = {
     'chart-score-spray': { init: initScoreSpray, loaded: false },
+    'chart-dice-symmetry': { init: initDiceSymmetry, loaded: false },
     'chart-reduction-funnel': { init: initReductionFunnel, loaded: false },
     'chart-reachability-grid': { init: initReachabilityGrid, loaded: false },
     'chart-widget-structure': { init: initWidgetStructure, loaded: false },
