@@ -32,12 +32,6 @@ fifteen rounds --enough, one might think, for the
 to take hold --the distribution is visibly skewed and heavy-tailed to
 the left. The reason lies in the structural dependencies between rounds.
 
-:::html
-<div class="chart-container" id="chart-score-distribution">
-  <div id="chart-score-distribution-svg"></div>
-</div>
-:::
-
 ### Four Populations, One Game
 
 The non-Gaussian shape is not random noise; it has a precise structural

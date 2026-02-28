@@ -475,12 +475,12 @@ fn main() {
         pool_json_size as f64 / 1024.0
     );
 
-    // Copy to blog/data/
-    let blog_data_dir = "blog/data";
-    if std::path::Path::new(blog_data_dir).exists() {
-        let blog_dest = format!("{}/scenarios.json", blog_data_dir);
-        if std::fs::copy(&json_path, &blog_dest).is_ok() {
-            println!("Copied to {}", blog_dest);
+    // Copy to profiler/data/
+    let profiler_data_dir = "profiler/data";
+    if std::path::Path::new(profiler_data_dir).exists() {
+        let profiler_dest = format!("{}/scenarios.json", profiler_data_dir);
+        if std::fs::copy(&json_path, &profiler_dest).is_ok() {
+            println!("Copied to {}", profiler_dest);
         }
     }
 

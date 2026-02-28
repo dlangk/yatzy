@@ -11,7 +11,7 @@ cargo fmt --check             # Formatting
 cargo clippy                  # Lints
 
 # From repo root (YATZY_BASE_PATH=.):
-just precompute               # θ=0 strategy table (~504ms)
+just precompute               # θ=0 strategy table (~1.1s)
 just serve                    # API server on port 9000
 just simulate                 # 1M games lockstep
 just sweep                    # All 37 θ values
@@ -22,7 +22,7 @@ just bench-check              # Performance regression test
 
 Single crate (not a workspace). Release profile: opt-level 3, fat LTO, codegen-units 1, panic=abort.
 
-28 binary targets in `src/bin/`. Key ones:
+29 binary targets in `src/bin/`. Key ones:
 
 | Binary | Purpose |
 |--------|---------|
@@ -94,15 +94,17 @@ Server: axum on port 9000, stateless, `Arc<YatzyContext>` shared state.
 
 ## Risk-Sensitive Solver (θ parameter)
 
-- θ=0: expected value. θ<0: risk-averse. θ>0: risk-seeking.
+- θ=0: expected value (EV-optimal). θ<0: risk-averse. θ>0: risk-seeking.
 - |θ| ≤ 0.15: utility-domain solver (same speed as EV)
 - |θ| > 0.15: log-domain LSE solver (~2.7x slower)
 - θ grid: 37 values from -3.0 to +3.0 in `configs/theta_grid.toml`
+- Math: `theory/foundations/risk-parameter-theta.md`
+- Strategy analysis: `theory/strategy/risk-sensitive-strategy.md`
 - **CRITICAL**: Delete `data/strategy_tables/all_states_theta_*.bin` after changing solver code!
 
 ## Storage Format
 
-Binary files: 16-byte header (magic `0x59545A53` + version 5) + `f32[4,194,304]`.
+Binary files: 16-byte header (magic `0x59545A53` + version 6) + `f32[4,194,304]`.
 Zero-copy mmap loading via memmap2 (<1ms). Files are ~16 MB each.
 
 ## Performance Testing
@@ -114,6 +116,19 @@ just bench          # Print only
 ```
 
 Baseline: `.benchmarks/performance-baseline.json`. Threshold: `max(mean + 3σ, mean × 1.05)`.
+
+### Reference Numbers (M1 Max, 8 threads)
+
+| Benchmark | Time |
+|-----------|------|
+| Precompute θ=0 (EV) | ~1.1s |
+| Precompute \|θ\|≤0.15 (utility) | ~0.49s |
+| Precompute \|θ\|>0.15 (LSE) | ~2.7s |
+| Lockstep simulation | ~232K games/s |
+| Oracle simulation | ~5.6M games/s |
+| API `/evaluate` | 2-9μs |
+| Density evolution (oracle) | ~3.0s |
+| Density evolution (non-oracle) | ~381s |
 
 ## Test Files
 

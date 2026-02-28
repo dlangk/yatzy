@@ -1,3 +1,4 @@
+/** DOM handles and update function returned by {@link createDie}. */
 export interface DieElements {
   container: HTMLDivElement;
   update: (opts: {
@@ -10,6 +11,13 @@ export interface DieElements {
   }) => void;
 }
 
+/**
+ * Creates a single die button with up/down increment arrows and hold toggle.
+ *
+ * Callbacks: onToggle (hold/reroll), onIncrement (+1), onDecrement (-1).
+ * Returned `update()` sets value, held state, optimal-keep/reroll borders,
+ * and disabled/faded appearance.
+ */
 export function createDie(
   onToggle: () => void,
   onIncrement: () => void,

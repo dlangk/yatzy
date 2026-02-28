@@ -13,18 +13,19 @@ Optimal-play Scandinavian Yatzy: backward-induction DP solver, risk-sensitive st
 | Analytics | `analytics/` | Python analysis, visualization, pipelines | Custom colormap (`#F37021` center) |
 
 See component CLAUDE.md files for detailed guidance:
-- `solver/CLAUDE.md` — architecture, hot paths, API reference, perf testing
+- `solver/CLAUDE.md` — architecture, hot paths, API reference, perf baselines, θ parameter
 - `frontend/CLAUDE.md` — Vanilla TS patterns, store, layout rules
+- `treatise/CLAUDE.md` — build system, section structure, D3 chart pattern
 - `analytics/CLAUDE.md` — CLI commands, colormap, data flow, plotting
+- `profiler/CLAUDE.md` — quiz architecture, data files, critical notes
 
 ## Critical Rules
 
 - NEVER trade solver performance for code aesthetics — run `just bench-check` after Rust changes
 - Intentionally duplicated hot-path code is marked `// PERF: intentional` — do not refactor it
-- All state values use f32 throughout (storage + computation)
-- STATE_STRIDE=128, state_index(up, scored) = scored * 128 + up
+- All state values use f32 throughout — see `solver/CLAUDE.md` for state layout and θ parameter details
 - Delete `data/strategy_tables/all_states_theta_*.bin` after changing solver code
-- When modifying an API endpoint, update `solver/CLAUDE.md` AND `frontend/src/api.ts`
+- When modifying an API endpoint, update `solver/CLAUDE.md` AND `frontend/src/api.ts` AND `frontend/CLAUDE.md`
 - When a conversation produces new insights, update the appropriate file in `theory/` (see `theory/README.md`)
 
 ## Commands
@@ -44,7 +45,7 @@ just lint-all           # Lint all components
 just typecheck          # Type-check solver + frontend
 
 # Precompute + simulate
-just precompute         # θ=0 strategy table (~504ms)
+just precompute         # θ=0 strategy table (~1.1s)
 just sweep              # All 37 θ values (resumable)
 just simulate           # 1M games lockstep
 

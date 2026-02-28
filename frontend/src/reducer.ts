@@ -3,20 +3,36 @@ import { CATEGORY_NAMES, CATEGORY_COUNT, TOTAL_DICE, BONUS_THRESHOLD, BONUS_SCOR
 
 const STORAGE_KEY = 'yatzy-game-state';
 
+/**
+ * Persist game state to localStorage on every dispatch.
+ *
+ * Persisted fields: dice, scores, categories, trajectory, bonus,
+ * turnPhase, rerollsRemaining, showDebug, showHints, lastEvalResponse, sortMap.
+ *
+ * Excluded (transient): pendingTrajectoryEvent, pendingRerollLabel,
+ * pendingRerollDelta — these are mid-dispatch intermediates that are
+ * consumed before the next render and must not survive a page reload.
+ */
 export function saveState(state: GameState): void {
   try {
-    const { lastEvalResponse: _, sortMap: _s, pendingTrajectoryEvent: _p, ...persistable } = state;
+    const { pendingTrajectoryEvent: _p, pendingRerollLabel: _l, pendingRerollDelta: _d, ...persistable } = state;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
   } catch { /* quota exceeded or private browsing — ignore */ }
 }
 
+/**
+ * Restore game state from localStorage on startup.
+ *
+ * Transient fields are nulled (pendingTrajectoryEvent, pendingRerollLabel,
+ * pendingRerollDelta). Fields added after initial release are defaulted:
+ * trajectory→[], showHints→true, lastEvalResponse→null, sortMap→null.
+ */
 function loadState(): GameState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    // Restore transient fields
-    return { ...parsed, lastEvalResponse: null, sortMap: null, pendingTrajectoryEvent: null, trajectory: parsed.trajectory ?? [] };
+    return { ...parsed, lastEvalResponse: parsed.lastEvalResponse ?? null, sortMap: parsed.sortMap ?? null, pendingTrajectoryEvent: null, pendingRerollLabel: null, pendingRerollDelta: null, trajectory: parsed.trajectory ?? [], showHints: parsed.showHints ?? true };
   } catch {
     return null;
   }
@@ -57,6 +73,9 @@ function freshState(): GameState {
     turnPhase: 'idle',
     trajectory: [],
     pendingTrajectoryEvent: null,
+    pendingRerollLabel: null,
+    pendingRerollDelta: null,
+    showHints: true,
   };
 }
 
@@ -140,6 +159,35 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'REROLL': {
       if (state.rerollsRemaining <= 0) return state;
+      // Compute decision label and delta before rerolling
+      const keptValues = state.dice.filter(d => d.held).map(d => d.value).sort((a, b) => a - b);
+      const rerollLabel = keptValues.length === TOTAL_DICE
+        ? 'Kept all'
+        : keptValues.length === 0
+          ? 'Rerolled all'
+          : `Kept ${keptValues.join(',')}`;
+
+      let rerollDelta: number | null = null;
+      if (state.lastEvalResponse?.mask_evs && state.sortMap) {
+        // Compute player's reroll mask in sorted order
+        let playerMask = 0;
+        for (let i = 0; i < state.dice.length; i++) {
+          if (!state.dice[i].held) playerMask |= 1 << i;
+        }
+        // Map to sorted order
+        let sortedMask = 0;
+        for (let si = 0; si < state.sortMap.length; si++) {
+          if (playerMask & (1 << state.sortMap[si])) {
+            sortedMask |= 1 << si;
+          }
+        }
+        const playerMaskEv = state.lastEvalResponse.mask_evs[sortedMask] ?? null;
+        const optimalMaskEv = state.lastEvalResponse.optimal_mask_ev ?? null;
+        if (playerMaskEv !== null && optimalMaskEv !== null) {
+          rerollDelta = playerMaskEv - optimalMaskEv;
+        }
+      }
+
       const dice = state.dice.map((d) =>
         d.held ? d : { value: randomDie(), held: true }
       );
@@ -150,6 +198,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         lastEvalResponse: null,
         sortMap: null,
         pendingTrajectoryEvent: 'reroll',
+        pendingRerollLabel: rerollLabel,
+        pendingRerollDelta: rerollDelta,
       };
     }
 
@@ -162,7 +212,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const categories = state.categories.map((c) =>
         c.id === catId
           ? { ...c, isScored: true, score: c.suggestedScore }
-          : c
+          : c.isScored ? c : { ...c, suggestedScore: 0, evIfScored: 0, available: true }
       );
 
       const derived = recomputeDerived(categories);
@@ -171,13 +221,27 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const evIfScored = state.categories[catId].evIfScored;
       const accScore = derived.totalScore;
       const trajectory = state.trajectory;
+      const scoreLabel = `${cat.name} (${cat.suggestedScore})`;
+      const optimalCatEv = state.lastEvalResponse?.optimal_category_ev ?? null;
+      let scoreDelta: number | undefined;
+      if (optimalCatEv !== null) {
+        scoreDelta = evIfScored - optimalCatEv;
+      }
+      // The solver's ev_if_scored = category_score + V(successor_state).
+      // V(successor) already accounts for the terminal bonus (50 pts if upper >= 63).
+      // Use raw scored sum (no bonus) + V(successor) to avoid double-counting
+      // both the category score (Bug 1) and the upper bonus (Bug 2).
+      const successorEv = evIfScored - cat.suggestedScore;
+      const rawScoredSum = categories.reduce((s, c) => c.isScored ? s + c.score : s, 0);
       const point: TrajectoryPoint = {
         index: trajectory.length,
         turn: derived.scoredCount,
         event: 'score',
-        expectedFinal: turnPhase === 'game_over' ? accScore : accScore + evIfScored,
+        expectedFinal: turnPhase === 'game_over' ? accScore : rawScoredSum + successorEv,
         accumulatedScore: accScore,
-        stateEv: turnPhase === 'game_over' ? 0 : evIfScored,
+        stateEv: turnPhase === 'game_over' ? 0 : successorEv,
+        label: scoreLabel,
+        delta: scoreDelta,
       };
 
       return {
@@ -210,14 +274,19 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       let trajectory = state.trajectory;
       if (state.pendingTrajectoryEvent) {
         const accScore = computeAccumulatedScore(state);
+        // Raw sum without bonus — the solver's state_ev already includes
+        // the terminal bonus (50 pts) when upper >= 63.
+        const rawScoredSum = state.categories.reduce((s, c) => c.isScored ? s + c.score : s, 0);
         const turn = state.categories.filter((c) => c.isScored).length;
         const point: TrajectoryPoint = {
           index: trajectory.length,
           turn,
           event: state.pendingTrajectoryEvent,
-          expectedFinal: accScore + action.response.state_ev,
+          expectedFinal: rawScoredSum + action.response.state_ev,
           accumulatedScore: accScore,
           stateEv: action.response.state_ev,
+          label: state.pendingRerollLabel ?? undefined,
+          delta: state.pendingRerollDelta ?? undefined,
         };
         trajectory = [...trajectory, point];
       }
@@ -228,11 +297,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         sortMap: action.sortMap,
         trajectory,
         pendingTrajectoryEvent: null,
+        pendingRerollLabel: null,
+        pendingRerollDelta: null,
       };
     }
 
     case 'TOGGLE_DEBUG':
       return { ...state, showDebug: !state.showDebug };
+
+    case 'TOGGLE_HINTS':
+      return { ...state, showHints: !state.showHints };
 
     case 'SET_DIE_VALUE': {
       const { index, value } = action;

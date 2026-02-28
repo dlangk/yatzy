@@ -30,7 +30,12 @@ def fmt_theta(t: float, base_path: str = "results") -> str:
 def read_scores_compact(path: Path) -> NDArray[np.int32] | None:
     """Read scores from the compact scores.bin format (32-byte header + i16[]).
 
-    Returns sorted int32 array, or None if file doesn't exist or is invalid.
+    Args:
+        path: Path to a scores.bin file (magic 0x59545353).
+
+    Returns:
+        Sorted ascending int32 array of game scores, or None if the file
+        doesn't exist or has an invalid magic number.
     """
     if not path.exists():
         return None
@@ -96,7 +101,13 @@ def read_multiplayer_recording(path: Path) -> dict | None:
     Format: 32-byte header + MultiplayerGameRecord[N] (64 bytes each).
     Each record: scores i16[2] + turn_totals i16[2][15].
 
-    Returns dict with keys: num_games, num_players, seed, scores (N,2), turn_totals (N,2,15).
+    Args:
+        path: Path to a multiplayer recording file (magic 0x594C504D).
+
+    Returns:
+        Dict with keys num_games (int), num_players (int), seed (int),
+        scores (N,2 int16 array), and turn_totals (N,2,15 int16 array).
+        Returns None if the file doesn't exist or has an invalid format.
     """
     if not path.exists():
         return None

@@ -63,6 +63,7 @@ fn apply_reroll(dice: &mut [i32; 5], mask: i32, rng: &mut SplitMix64) {
 }
 
 /// Find the best category (non-final turn).
+/// // PERF: intentional duplication of widget_solver Group 6 scoring logic
 #[inline(always)]
 fn find_best_category(
     ctx: &YatzyContext,
@@ -145,6 +146,7 @@ fn find_best_category_final(
 }
 
 /// Compute Group 6: best category EV for each dice set.
+/// // PERF: intentional duplication of widget_solver Group 6 for lockstep self-containment
 #[inline(always)]
 fn compute_group6(
     ctx: &YatzyContext,
@@ -260,6 +262,8 @@ pub fn simulate_batch_lockstep(
 
         // Step 4: Build game→cache mapping from sorted groups, then apply
         // decisions for all games in parallel.
+        // Invert group-to-game mapping: radix sort produces (state, start, count) groups
+        // in sorted.indices; this loop builds a per-game cache index for O(1) lookup.
         let mut game_to_cache = vec![0u32; num_games];
         for (group_idx, &(_si, group_start, group_count)) in sorted.groups.iter().enumerate() {
             for j in group_start..(group_start + group_count) {
@@ -410,10 +414,8 @@ pub fn simulate_batch_lockstep_oracle(
 
             // Category assignment
             let ds_final = find_dice_set_index(ctx, &dice);
+            // Both paths are identical: the oracle already accounts for terminal values
             let cat = if is_last_turn {
-                // Last turn: use oracle_cat but verify bonus considerations
-                // The oracle was built from the DP which already accounts for successor
-                // values, so for the last turn we should use the same oracle.
                 oracle.oracle_cat[base + ds_final] as usize
             } else {
                 oracle.oracle_cat[base + ds_final] as usize

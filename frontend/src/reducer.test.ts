@@ -29,6 +29,9 @@ function freshState(): GameState {
     turnPhase: 'idle',
     trajectory: [],
     pendingTrajectoryEvent: null,
+    pendingRerollLabel: null,
+    pendingRerollDelta: null,
+    showHints: true,
   };
 }
 
@@ -331,7 +334,10 @@ describe('gameReducer', () => {
       expect(point.event).toBe('score');
       expect(point.turn).toBe(1);
       expect(point.accumulatedScore).toBe(3); // scored 3 points, no bonus
-      expect(point.expectedFinal).toBe(3 + 240.0); // accumulated + evIfScored
+      // expectedFinal = rawScoredSum + V(successor)
+      // V(successor) = evIfScored - suggestedScore = 240 - 3 = 237
+      // rawScoredSum = 3 (no bonus), so expectedFinal = 3 + 237 = 240
+      expect(point.expectedFinal).toBe(3 + (240.0 - 3)); // rawSum + successorEv
     });
 
     it('RESET_GAME clears trajectory', () => {

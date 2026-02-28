@@ -26,6 +26,8 @@ const KEEP_ALL: u16 = 0xFFFF;
 
 /// Compute the optimal category for each dice set (Group 6 with decision tracking).
 ///
+/// Handles both EV (theta=0) and risk-sensitive (theta!=0) modes.
+///
 /// Returns (e_ds_0[252], best_cat[252]) where:
 /// - e_ds_0[ds] = best EV achievable by scoring dice set ds
 /// - best_cat[ds] = category index that achieves it
@@ -356,6 +358,9 @@ pub fn compute_transitions(
 }
 
 /// Compute all transitions using the precomputed oracle (θ=0 only).
+///
+/// Prob-array propagation: 2 matrix-vector multiplications on [f64; 252] arrays
+/// (~4 KB working set) vs path-by-path enumeration with unbounded HashMap aggregation.
 ///
 /// Uses probability-array propagation instead of path-by-path enumeration.
 /// Two passes propagate a [f64; 252] probability distribution through the oracle's

@@ -1,5 +1,6 @@
 import { getState, dispatch, subscribe } from '../store.ts';
 
+/** Render the debug panel: toggle button and raw JSON state dump. */
 export function initDebugPanel(toggleContainer: HTMLElement, panelContainer: HTMLElement): void {
   const toggleBtn = document.createElement('button');
   toggleBtn.textContent = 'Show Debug';

@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>More Than You Ever Wanted to Know About Yatzy</title>
+  <title>Yatzy Player Profile</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/charts.css">
-  <script src="https://d3js.org/d3.v7.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="css/game.css">
+  <link rel="stylesheet" href="css/profile.css">
 </head>
 <body>
 
@@ -17,92 +16,18 @@
   <span id="theme-icon">&#9790;</span>
 </button>
 
-<div class="container" id="sections-root"></div>
+<div class="container">
+  <a href="/yatzy/" class="back-link">&larr; Back to the treatise</a>
+  <div class="game-header">
+    <h1>Yatzy Player Profile</h1>
+  </div>
+  <div id="profile-root"></div>
+</div>
 
+<script type="module" src="js/profile/render.js"></script>
 <script type="module">
-  import { initScoreDistribution } from './js/charts/score-distribution.js';
-  import { initMixtureDecomposition } from './js/charts/mixture-decomposition.js';
-  import { initHeuristicGap } from './js/charts/heuristic-gap.js';
-  import { initRiskReward } from './js/charts/risk-reward.js';
-  import { initSurrogatePareto } from './js/charts/surrogate-pareto.js';
-  import { initDecisionExplorer } from './js/charts/decision-explorer.js';
-  import { initWinRate } from './js/charts/win-rate.js';
-  import { initMeanVariance } from './js/charts/mean-variance.js';
-  import { initWidgetExplorer } from './js/charts/widget-explorer.js';
-  import { initStateHeatmap } from './js/charts/state-heatmap.js';
-  import { initGreedyVsOptimal } from './js/charts/greedy-vs-optimal.js';
-  import { initConceptDrawer } from './js/concept-drawer.js';
   import { initTheme } from './js/theme.js';
-
-  // Section files in display order
-  const sectionFiles = [
-    'sections/header.html',
-    'sections/01-rules.html',
-    'sections/02-solving.html',
-    'sections/03-distribution.html',
-    'sections/04-risk.html',
-    'sections/05-decisions.html',
-    'sections/06-human-gap.html',
-    'sections/07-compression.html',
-    'sections/08-multiplayer.html',
-    'sections/09-negative-results.html',
-    'sections/10-conclusion.html',
-  ];
-
-  // Load all sections in parallel, insert in order
-  const responses = await Promise.all(sectionFiles.map(f => fetch(f)));
-  const htmls = await Promise.all(responses.map(r => r.text()));
-  document.getElementById('sections-root').innerHTML = htmls.join('\n');
-
-  // Concept drawer
-  initConceptDrawer();
-
-  // Dark mode toggle (shared module)
-  const themeCtrl = initTheme();
-
-  // Re-render charts on theme change
-  document.getElementById('theme-toggle').addEventListener('click', () => initAll());
-
-  // Lazy initialization with IntersectionObserver
-  const chartInits = {
-    'chart-score-distribution': { init: initScoreDistribution, loaded: false },
-    'chart-mixture': { init: initMixtureDecomposition, loaded: false },
-    'chart-mean-variance': { init: initMeanVariance, loaded: false },
-    'chart-risk-reward': { init: initRiskReward, loaded: false },
-    'chart-decision-explorer': { init: initDecisionExplorer, loaded: false },
-    'chart-heuristic-gap': { init: initHeuristicGap, loaded: false },
-    'chart-surrogate-pareto': { init: initSurrogatePareto, loaded: false },
-    'chart-win-rate': { init: initWinRate, loaded: false },
-    'chart-state-heatmap': { init: initStateHeatmap, loaded: false },
-    'chart-widget-explorer': { init: initWidgetExplorer, loaded: false },
-    'chart-greedy-vs-optimal': { init: initGreedyVsOptimal, loaded: false },
-  };
-
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const id = entry.target.id;
-        const chart = chartInits[id];
-        if (chart && !chart.loaded) {
-          chart.loaded = true;
-          chart.init().catch(err => console.error(`Failed to init ${id}:`, err));
-        }
-      }
-    });
-  }, { rootMargin: '200px' });
-
-  Object.keys(chartInits).forEach(id => {
-    const el = document.getElementById(id);
-    if (el) observer.observe(el);
-  });
-
-  // Re-init all charts (e.g. on theme change)
-  function initAll() {
-    Object.values(chartInits).forEach(c => {
-      c.loaded = true;
-      c.init().catch(err => console.error(err));
-    });
-  }
+  initTheme();
 </script>
 
 </body>

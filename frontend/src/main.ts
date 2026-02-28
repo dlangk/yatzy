@@ -2,7 +2,7 @@ import { initStore, getState, dispatch, subscribe } from './store.ts';
 import { initApp } from './App.ts';
 import { evaluate, getStateValue, fetchDensity } from './api.ts';
 import { sortDiceWithMapping } from './mask.ts';
-import { computeAccumulatedScore } from './reducer.ts';
+
 initStore();
 
 const root = document.getElementById('root')!;
@@ -30,7 +30,8 @@ subscribe((state, prev) => {
   if (traj.length > prev.trajectory.length) {
     const latest = traj[traj.length - 1];
     if (latest.event === 'score' && !latest.percentiles && latest.turn < 15) {
-      fetchDensity(state.upperScore, state.scoredCategories, computeAccumulatedScore(state))
+      const rawScoredSum = state.categories.reduce((sum, c) => c.isScored ? sum + c.score : sum, 0);
+      fetchDensity(state.upperScore, state.scoredCategories, rawScoredSum)
         .then(res => dispatch({ type: 'SET_DENSITY_RESULT', index: latest.index, percentiles: res.percentiles }))
         .catch(() => { /* density endpoint not available */ });
     }

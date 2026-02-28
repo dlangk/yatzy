@@ -105,7 +105,15 @@ def fmt_theta_dir(t: float) -> str:
 
 
 def discover_thetas(base_path: str = ".") -> list[float]:
-    """Scan data/simulations/theta/ for theta_* subdirs containing scores.bin or simulation_raw.bin."""
+    """Scan data/simulations/theta/ for theta_* subdirs with simulation data.
+
+    Args:
+        base_path: Repository root directory (default ".").
+
+    Returns:
+        Sorted list of theta values whose directories contain scores.bin
+        or simulation_raw.bin.
+    """
     base = theta_base_dir(base_path)
     thetas = []
     if not base.is_dir():

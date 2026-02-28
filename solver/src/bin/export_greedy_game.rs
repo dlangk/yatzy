@@ -2,7 +2,7 @@
 //!
 //! Simulates one game with a fixed seed under both the greedy heuristic and the
 //! DP-optimal policy, using the same dice rolls. Records per-turn data for
-//! visualization in `blog/data/greedy_vs_optimal.json`.
+//! visualization in `profiler/data/greedy_vs_optimal.json`.
 
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -222,8 +222,8 @@ fn main() {
     });
 
     let json = serde_json::to_string_pretty(&output).unwrap();
-    let out_path = "blog/data/greedy_vs_optimal.json";
-    std::fs::create_dir_all("blog/data").unwrap();
+    let out_path = "profiler/data/greedy_vs_optimal.json";
+    std::fs::create_dir_all("profiler/data").unwrap();
     std::fs::write(out_path, &json).unwrap();
     println!("Wrote {} to {}", json.len(), out_path);
     println!(

@@ -32,8 +32,25 @@ turn it right for ambition.
 The solver sweeps 37 values of &theta; from &minus;3.0 to +3.0, with dense
 spacing near zero (19 values with &Delta;&theta; as small as 0.005) and sparser
 coverage at the extremes. Each produces a complete strategy table via backward
-induction, and each is evaluated over one million simulated games. The results
-trace a ::concept[mean-variance frontier]{free-energy}
+induction, and each is evaluated over one million simulated games.
+
+Use the slider below to see how the score distribution changes across the
+full &theta; range. At &theta; = 0 the familiar left-skewed EV-optimal
+distribution appears. As &theta; moves negative the distribution compresses
+--lower mean, tighter spread. As &theta; moves positive the distribution
+stretches toward both tails before collapsing at extreme values.
+
+:::html
+<div class="chart-container" id="chart-score-distribution">
+  <div class="chart-controls">
+    <label>&theta; = <span class="slider-value">0</span></label>
+    <input type="range" class="chart-slider" min="0" max="36" value="18">
+  </div>
+  <div id="chart-score-distribution-svg"></div>
+</div>
+:::
+
+The results trace a ::concept[mean-variance frontier]{free-energy}
 that reveals the price of risk in exact quantitative terms.
 
 :::html

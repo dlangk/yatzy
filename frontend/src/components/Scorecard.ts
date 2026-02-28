@@ -1,5 +1,5 @@
 import { getState, dispatch, subscribe } from '../store.ts';
-import { UPPER_CATEGORIES, BONUS_THRESHOLD } from '../constants.ts';
+import { UPPER_CATEGORIES } from '../constants.ts';
 import { createScorecardRow, type RowElements } from './ScorecardRow.ts';
 
 function normalize(value: number, min: number, max: number): number {
@@ -7,6 +7,7 @@ function normalize(value: number, min: number, max: number): number {
   return (value - min) / (max - min);
 }
 
+/** Render the 15-category scorecard with score inputs, E[final] column, and action buttons. */
 export function initScorecard(container: HTMLElement): void {
   const table = document.createElement('table');
   table.className = 'scorecard';
@@ -23,7 +24,7 @@ export function initScorecard(container: HTMLElement): void {
   // Header
   const thead = document.createElement('thead');
   const headerRow = document.createElement('tr');
-  for (const [text, center] of [['Category', false], ['Score', true], ['EV', true], ['', true]] as [string, boolean][]) {
+  for (const [text, center] of [['Category', false], ['Score', true], ['E[final]', true], ['', true]] as [string, boolean][]) {
     const th = document.createElement('th');
     th.textContent = text;
     if (center) th.className = 'center';
@@ -54,18 +55,33 @@ export function initScorecard(container: HTMLElement): void {
     tbody.appendChild(row.tr);
   }
 
-  // Upper summary row
-  const upperRow = document.createElement('tr');
-  upperRow.className = 'upper-summary';
-  const upperNameTd = document.createElement('td');
-  const upperScoreTd = document.createElement('td');
-  upperScoreTd.style.textAlign = 'center';
-  const upperRestTd = document.createElement('td');
-  upperRestTd.colSpan = 2;
-  upperRow.appendChild(upperNameTd);
-  upperRow.appendChild(upperScoreTd);
-  upperRow.appendChild(upperRestTd);
-  tbody.appendChild(upperRow);
+  // Upper Total row
+  const upperTotalRow = document.createElement('tr');
+  upperTotalRow.className = 'upper-summary';
+  const upperTotalNameTd = document.createElement('td');
+  upperTotalNameTd.textContent = 'Upper Total';
+  const upperTotalScoreTd = document.createElement('td');
+  upperTotalScoreTd.style.textAlign = 'center';
+  const upperTotalRestTd = document.createElement('td');
+  upperTotalRestTd.colSpan = 2;
+  upperTotalRow.appendChild(upperTotalNameTd);
+  upperTotalRow.appendChild(upperTotalScoreTd);
+  upperTotalRow.appendChild(upperTotalRestTd);
+  tbody.appendChild(upperTotalRow);
+
+  // Bonus row
+  const bonusRow = document.createElement('tr');
+  bonusRow.className = 'upper-summary';
+  const bonusNameTd = document.createElement('td');
+  bonusNameTd.textContent = 'Bonus';
+  const bonusScoreTd = document.createElement('td');
+  bonusScoreTd.style.textAlign = 'center';
+  const bonusRestTd = document.createElement('td');
+  bonusRestTd.colSpan = 2;
+  bonusRow.appendChild(bonusNameTd);
+  bonusRow.appendChild(bonusScoreTd);
+  bonusRow.appendChild(bonusRestTd);
+  tbody.appendChild(bonusRow);
 
   // Lower categories
   for (let i = UPPER_CATEGORIES; i < s.categories.length; i++) {
@@ -101,22 +117,26 @@ export function initScorecard(container: HTMLElement): void {
     const canScore = s.turnPhase === 'rolled';
     const mustScore = canScore && s.rerollsRemaining <= 0;
     console.log('Scorecard render:', { turnPhase: s.turnPhase, rerollsRemaining: s.rerollsRemaining, canScore, mustScore });
-    const optimalCategoryId = s.lastEvalResponse?.optimal_category ?? null;
+    const optimalCategoryId = s.showHints ? (s.lastEvalResponse?.optimal_category ?? null) : null;
 
     // Compute normalization ranges
     const scoreValues = s.categories.map(c => c.isScored ? c.score : c.suggestedScore);
     const scoreMin = Math.min(...scoreValues);
     const scoreMax = Math.max(...scoreValues);
+    // Raw scored sum without bonus — the solver's evIfScored already includes
+    // the terminal bonus, so using totalScore (which includes bonus) would double-count.
+    const rawScoredSum = s.categories.reduce((sum, c) => c.isScored ? sum + c.score : sum, 0);
     const unscoredAvailable = s.categories.filter(c => !c.isScored && c.available);
-    const evValues = unscoredAvailable.map(c => c.evIfScored);
-    const evMin = evValues.length > 0 ? Math.min(...evValues) : 0;
-    const evMax = evValues.length > 0 ? Math.max(...evValues) : 0;
+    const evCumulativeValues = unscoredAvailable.map(c => rawScoredSum + c.evIfScored);
+    const evMin = evCumulativeValues.length > 0 ? Math.min(...evCumulativeValues) : 0;
+    const evMax = evCumulativeValues.length > 0 ? Math.max(...evCumulativeValues) : 0;
 
     for (let i = 0; i < s.categories.length; i++) {
       const cat = s.categories[i];
       const scoreVal = cat.isScored ? cat.score : cat.suggestedScore;
       const scoreFraction = normalize(scoreVal, scoreMin, scoreMax);
-      const evFraction = (!cat.isScored && cat.available) ? normalize(cat.evIfScored, evMin, evMax) : null;
+      const cumulativeEv = rawScoredSum + cat.evIfScored;
+      const evFraction = (!cat.isScored && cat.available) ? normalize(cumulativeEv, evMin, evMax) : null;
 
       rows[i].update({
         category: cat,
@@ -125,12 +145,26 @@ export function initScorecard(container: HTMLElement): void {
         mustScore,
         scoreFraction,
         evFraction,
+        totalScore: rawScoredSum,
+        showHints: s.showHints,
+        bonusAchieved: s.bonus > 0,
       });
     }
 
-    // Upper summary
-    upperNameTd.textContent = `Upper (${s.upperScore}/${BONUS_THRESHOLD})`;
-    upperScoreTd.textContent = s.bonus > 0 ? `+${s.bonus}` : '\u2014';
+    // Upper Total
+    upperTotalScoreTd.textContent = String(s.upperScore);
+
+    // Bonus — show cumulative +/- par until bonus achieved
+    if (s.bonus > 0) {
+      bonusScoreTd.textContent = `+${s.bonus}`;
+      bonusScoreTd.style.color = 'var(--color-success)';
+    } else {
+      const parDelta = s.categories.slice(0, UPPER_CATEGORIES).reduce(
+        (sum, c) => c.isScored ? sum + (c.score - 3 * (c.id + 1)) : sum, 0,
+      );
+      bonusScoreTd.textContent = parDelta > 0 ? `+${parDelta}` : parDelta < 0 ? `${parDelta}` : '±0';
+      bonusScoreTd.style.color = parDelta > 0 ? 'var(--color-success)' : parDelta < 0 ? 'var(--color-danger)' : 'var(--text-muted)';
+    }
 
     // Total
     totalScoreTd.textContent = String(s.totalScore);

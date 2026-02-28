@@ -113,6 +113,7 @@ fn batched_group6(ctx: &YatzyContext, sv: &[f32], scored: i32, e_out: &mut [[f32
                 let scr_f = scr as f32;
                 let new_scored = (scored | (1 << c)) as usize;
                 let succ_base = new_scored * STATE_STRIDE;
+                // SAFETY: up + scr <= 63 + 36 = 99 < STATE_STRIDE (128), safe due to topological padding.
                 unsafe { neon_add_max_offset_64(row, sv.as_ptr(), succ_base + scr, scr_f) };
             }
         }
@@ -730,6 +731,7 @@ fn batched_group6_with_argmax(
         // Initialize to NEG_INFINITY with category 0
         *row = [f32::NEG_INFINITY; 64];
         idx_slice.fill(0);
+        // PERF: first category sets values directly (all beat -INF), avoiding redundant comparison
         let mut first_cat = true;
 
         // Lower categories (6-14): track which category wins
@@ -829,6 +831,7 @@ fn batched_group53_with_argmax(
             let kid = unsafe { *kt.unique_keep_ids[ds_i].get_unchecked(j) } as usize;
             let kev = &keep_ev[kid];
             // j+1 encoding: 0 is keep-all, so unique keep j gets encoded as j+1
+            // SAFETY: idx_slice is exactly 64 bytes (sliced as [idx_base..idx_base+64]), so cast to &mut [u8; 64] is valid.
             let mut idx_arr: &mut [u8; 64] =
                 unsafe { &mut *(idx_slice.as_mut_ptr() as *mut [u8; 64]) };
             unsafe { neon_max_64_argmax(row, kev, &mut idx_arr, (j + 1) as u8) };

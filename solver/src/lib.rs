@@ -5,7 +5,7 @@
 //!
 //! ## Algorithm overview
 //!
-//! The algorithm is described in `theory/optimal_yahtzee_pseudocode.md`.
+//! The algorithm is described in `theory/foundations/pseudocode.md`.
 //! It has three phases:
 //!
 //! | Phase | Pseudocode function | Rust module | Description |
@@ -79,4 +79,3 @@ pub mod storage;
 
 // Simulation module — partially gated internally
 pub mod simulation;
-

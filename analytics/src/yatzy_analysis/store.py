@@ -9,7 +9,12 @@ from numpy.typing import NDArray
 
 
 def save_scores(scores_dict: dict[float, NDArray[np.int32]], path: Path) -> None:
-    """Save {theta: scores_array} as a Parquet file with columns (theta, score)."""
+    """Save scores dict as a Parquet file with columns (theta, score).
+
+    Args:
+        scores_dict: Mapping from theta value to sorted int32 score array.
+        path: Output Parquet file path (parent dirs created automatically).
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     parts = []
     for t in sorted(scores_dict.keys()):

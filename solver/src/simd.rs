@@ -64,6 +64,9 @@ pub unsafe fn neon_min_64(dst: &mut [f32; 64], src: &[f32; 64]) {
 ///
 /// Used in Group 6 lower categories: `row[up] = max(row[up], scr + sv[base + up])`.
 /// The src pointer points to a contiguous 64-element block in the state values array.
+///
+/// # Safety
+/// `src` must point to at least 64 contiguous valid f32 values.
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
 pub unsafe fn neon_add_max_64(dst: &mut [f32; 64], src: *const f32, scalar: f32) {
@@ -79,6 +82,9 @@ pub unsafe fn neon_add_max_64(dst: &mut [f32; 64], src: *const f32, scalar: f32)
 /// dst[i] = min(dst[i], scalar + src[i]) for i in 0..64
 ///
 /// Risk-averse variant of add_max: for theta < 0 decision nodes.
+///
+/// # Safety
+/// `src` must point to at least 64 contiguous valid f32 values.
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
 pub unsafe fn neon_add_min_64(dst: &mut [f32; 64], src: *const f32, scalar: f32) {
@@ -97,6 +103,9 @@ pub unsafe fn neon_add_min_64(dst: &mut [f32; 64], src: *const f32, scalar: f32)
 /// `row[up] = max(row[up], scr + sv[succ_base + up + scr])`.
 /// The offset parameter is the category score (scr), making sv[base + offset + i]
 /// a sequential read starting from sv[base + scr].
+///
+/// # Safety
+/// `sv[base_plus_offset..base_plus_offset+64]` must be valid readable f32 values.
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
 pub unsafe fn neon_add_max_offset_64(
@@ -118,6 +127,9 @@ pub unsafe fn neon_add_max_offset_64(
 /// dst[i] = min(dst[i], scalar + sv[base + offset + i]) for i in 0..64
 ///
 /// Risk-averse variant of add_max_offset.
+///
+/// # Safety
+/// `sv[base_plus_offset..base_plus_offset+64]` must be valid readable f32 values.
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
 pub unsafe fn neon_add_min_offset_64(
@@ -140,6 +152,9 @@ pub unsafe fn neon_add_min_offset_64(
 ///
 /// Used in Group 6 utility-domain lower categories:
 /// `row[up] = max(row[up], exp_scr * sv[base + up])`.
+///
+/// # Safety
+/// `src` must point to at least 64 contiguous valid f32 values.
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
 pub unsafe fn neon_mul_max_64(dst: &mut [f32; 64], src: *const f32, scalar: f32) {
@@ -155,6 +170,9 @@ pub unsafe fn neon_mul_max_64(dst: &mut [f32; 64], src: *const f32, scalar: f32)
 /// dst[i] = min(dst[i], scalar * src[i]) for i in 0..64
 ///
 /// Risk-averse variant of mul_max.
+///
+/// # Safety
+/// `src` must point to at least 64 contiguous valid f32 values.
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
 pub unsafe fn neon_mul_min_64(dst: &mut [f32; 64], src: *const f32, scalar: f32) {
@@ -170,6 +188,9 @@ pub unsafe fn neon_mul_min_64(dst: &mut [f32; 64], src: *const f32, scalar: f32)
 /// dst[i] = max(dst[i], scalar * sv[base + offset + i]) for i in 0..64
 ///
 /// Used in Group 6 utility-domain upper categories with topological padding.
+///
+/// # Safety
+/// `sv[base_plus_offset..base_plus_offset+64]` must be valid readable f32 values.
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
 pub unsafe fn neon_mul_max_offset_64(
@@ -191,6 +212,9 @@ pub unsafe fn neon_mul_max_offset_64(
 /// dst[i] = min(dst[i], scalar * sv[base + offset + i]) for i in 0..64
 ///
 /// Risk-averse variant of mul_max_offset.
+///
+/// # Safety
+/// `sv[base_plus_offset..base_plus_offset+64]` must be valid readable f32 values.
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
 pub unsafe fn neon_mul_min_offset_64(
@@ -246,7 +270,7 @@ pub unsafe fn neon_max_64_argmax(
         let cmp3 = vcgtq_f32(s3, d3);
         vst1q_f32(dst.as_mut_ptr().add(i + 12), vmaxq_f32(d3, s3));
 
-        // Narrowing chain: 4 × uint32x4_t → uint8x16_t
+        // NEON has no direct f32-comparison-to-u8-mask instruction; narrow 4x u32 masks to one u8x16 for vbslq.
         // u32 all-1s (0xFFFFFFFF) narrows to u16 all-1s (0xFFFF) to u8 all-1s (0xFF)
         let n0 = vmovn_u32(cmp0); // uint16x4_t
         let n1 = vmovn_u32(cmp1);
@@ -314,6 +338,7 @@ pub unsafe fn neon_fast_exp_f32x4(x: float32x4_t) -> float32x4_t {
     let nf = vcvtq_f32_s32(n);
 
     // r = x - n * ln2 (in [-0.5*ln2, 0.5*ln2])
+    // vfmsq_f32(a, b, c) = a - b*c (fused multiply-subtract, opposite of vfmaq)
     let r = vfmsq_f32(x_clamped, nf, ln2_hi); // x - n*ln2_hi
     let r = vfmsq_f32(r, nf, ln2_lo); // r - n*ln2_lo
 
@@ -384,6 +409,8 @@ pub unsafe fn neon_min_64(dst: &mut [f32; 64], src: &[f32; 64]) {
     }
 }
 
+/// # Safety
+/// `src` must point to at least 64 contiguous valid f32 values.
 #[cfg(not(target_arch = "aarch64"))]
 #[inline(always)]
 pub unsafe fn neon_add_max_64(dst: &mut [f32; 64], src: *const f32, scalar: f32) {
@@ -395,6 +422,8 @@ pub unsafe fn neon_add_max_64(dst: &mut [f32; 64], src: *const f32, scalar: f32)
     }
 }
 
+/// # Safety
+/// `src` must point to at least 64 contiguous valid f32 values.
 #[cfg(not(target_arch = "aarch64"))]
 #[inline(always)]
 pub unsafe fn neon_add_min_64(dst: &mut [f32; 64], src: *const f32, scalar: f32) {
@@ -406,6 +435,8 @@ pub unsafe fn neon_add_min_64(dst: &mut [f32; 64], src: *const f32, scalar: f32)
     }
 }
 
+/// # Safety
+/// `sv[base_plus_offset..base_plus_offset+64]` must be valid readable f32 values.
 #[cfg(not(target_arch = "aarch64"))]
 #[inline(always)]
 pub unsafe fn neon_add_max_offset_64(
@@ -423,6 +454,8 @@ pub unsafe fn neon_add_max_offset_64(
     }
 }
 
+/// # Safety
+/// `sv[base_plus_offset..base_plus_offset+64]` must be valid readable f32 values.
 #[cfg(not(target_arch = "aarch64"))]
 #[inline(always)]
 pub unsafe fn neon_add_min_offset_64(
@@ -440,6 +473,8 @@ pub unsafe fn neon_add_min_offset_64(
     }
 }
 
+/// # Safety
+/// `src` must point to at least 64 contiguous valid f32 values.
 #[cfg(not(target_arch = "aarch64"))]
 #[inline(always)]
 pub unsafe fn neon_mul_max_64(dst: &mut [f32; 64], src: *const f32, scalar: f32) {
@@ -451,6 +486,8 @@ pub unsafe fn neon_mul_max_64(dst: &mut [f32; 64], src: *const f32, scalar: f32)
     }
 }
 
+/// # Safety
+/// `src` must point to at least 64 contiguous valid f32 values.
 #[cfg(not(target_arch = "aarch64"))]
 #[inline(always)]
 pub unsafe fn neon_mul_min_64(dst: &mut [f32; 64], src: *const f32, scalar: f32) {
@@ -462,6 +499,8 @@ pub unsafe fn neon_mul_min_64(dst: &mut [f32; 64], src: *const f32, scalar: f32)
     }
 }
 
+/// # Safety
+/// `sv[base_plus_offset..base_plus_offset+64]` must be valid readable f32 values.
 #[cfg(not(target_arch = "aarch64"))]
 #[inline(always)]
 pub unsafe fn neon_mul_max_offset_64(
@@ -479,6 +518,8 @@ pub unsafe fn neon_mul_max_offset_64(
     }
 }
 
+/// # Safety
+/// `sv[base_plus_offset..base_plus_offset+64]` must be valid readable f32 values.
 #[cfg(not(target_arch = "aarch64"))]
 #[inline(always)]
 pub unsafe fn neon_mul_min_offset_64(

@@ -30,7 +30,7 @@ body {
 
 /* App shell */
 .app {
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 16px;
 }
@@ -40,21 +40,72 @@ body {
   margin-bottom: 8px;
 }
 
-/* Two-column layout */
+/*
+ * Responsive grid layout — 3 breakpoints:
+ *
+ * Desktop (>1100px): 3 columns
+ *   col 1 (340px) = Decision Log    (spans both rows)
+ *   col 2 (340px) = Scorecard       (spans both rows)
+ *   col 3 (1fr)   = Dice (row 1) + Analysis (row 2)
+ *
+ * Tablet (721–1100px): 2 columns
+ *   row 1: Dice stretches full width
+ *   row 2: Scorecard + Analysis side by side
+ *   row 3: Decision Log full width
+ *
+ * Narrow (≤720px): single column in DOM order
+ *   Dice → Scorecard → Analysis → Log
+ *
+ * Breakpoint rationale:
+ *   1100px = 340 + 340 + 340 + 2×24gap + 2×16pad = 1100
+ *   720px  = two 340px columns no longer fit
+ */
 .app-columns {
-  display: flex;
-  gap: 24px;
-  align-items: flex-start;
+  display: grid;
+  column-gap: 24px;
+  row-gap: 12px;
+  align-items: start;
+  grid-template-columns: 340px 340px 1fr;
+  grid-template-rows: auto auto;
 }
 
-.app-col-left {
-  flex: 0 0 340px;
+/* Desktop (>1100px) — explicit grid placement */
+.app-section-log       { grid-column: 1; grid-row: 1 / 3; }
+.app-section-scorecard { grid-column: 2; grid-row: 1 / 3; }
+.app-section-dice      { grid-column: 3; grid-row: 1; }
+.app-section-analysis  { grid-column: 3; grid-row: 2; }
+
+.app-section-dice,
+.app-section-scorecard,
+.app-section-analysis,
+.app-section-log {
   min-width: 0;
 }
 
-.app-col-right {
-  flex: 1 1 0;
-  min-width: 0;
+/* Tablet: 2-column layout */
+@media (max-width: 1100px) {
+  .app-columns {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto;
+  }
+  .app-section-dice      { grid-column: 1 / -1; grid-row: 1; }
+  .app-section-scorecard { grid-column: 1; grid-row: 2; }
+  .app-section-analysis  { grid-column: 2; grid-row: 2; }
+  .app-section-log       { grid-column: 1 / -1; grid-row: 3; }
+}
+
+/* Narrow: single column stack */
+@media (max-width: 720px) {
+  .app-columns {
+    grid-template-columns: 1fr;
+  }
+  .app-section-dice,
+  .app-section-scorecard,
+  .app-section-analysis,
+  .app-section-log {
+    grid-column: 1;
+    grid-row: auto;
+  }
 }
 
 /* Action bar */
@@ -110,6 +161,11 @@ body {
   transition: opacity 0.15s;
 }
 
+.action-bar .game-btn-primary {
+  width: 140px;
+  text-align: center;
+}
+
 .game-btn-primary:hover {
   opacity: 0.85;
 }
@@ -145,6 +201,12 @@ body {
   background: var(--bg-alt);
   border-radius: 3px;
   color: var(--text);
+}
+
+.scorecard-action-btn.game-btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
 
 .scorecard-action-btn:disabled {
@@ -232,10 +294,9 @@ body {
   text-align: right;
 }
 
-/* Trajectory chart */
+/* Trajectory chart — height determined by SVG viewBox + legend content */
 .trajectory-chart {
   width: 100%;
-  height: 200px;
   margin: 12px 0;
   background: var(--bg-alt);
   border: 1px solid var(--border);
@@ -246,6 +307,45 @@ body {
 .trajectory-chart svg {
   display: block;
   width: 100%;
+}
+
+/* Chart legend — wraps naturally on narrow screens */
+.trajectory-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+}
+
+.trajectory-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.trajectory-legend-swatch {
+  flex-shrink: 0;
+}
+
+/* Chart tooltip */
+.trajectory-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  z-index: 10;
+  white-space: nowrap;
 }
 
 /* Scorecard */
@@ -292,6 +392,7 @@ body {
 
 .scorecard .total-row {
   font-weight: bold;
+  background: var(--bg-alt);
 }
 
 .scorecard .total-row td {
@@ -330,8 +431,6 @@ body {
   font-family: var(--font-mono);
   white-space: pre-wrap;
   word-break: break-all;
-  max-height: 400px;
-  overflow: auto;
 }
 
 .debug-panel .label {
@@ -349,4 +448,81 @@ body {
 .debug-toggle button {
   font-size: 12px;
   opacity: 0.6;
+}
+
+/* Decision log */
+.decision-log {
+  margin: 12px 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.decision-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.decision-log-total {
+  font-size: 12px;
+}
+
+.decision-log-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.decision-log-table th {
+  text-align: left;
+  padding: 2px 6px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.decision-log-table th:nth-child(1) { width: 28px; text-align: center; }
+.decision-log-table th:nth-child(3) { width: 140px; }
+.decision-log-table th:nth-child(4) { width: 56px; text-align: right; }
+
+.decision-log-table td {
+  padding: 2px 6px;
+  border-bottom: 1px solid var(--bg-alt);
+  height: 24px;
+  vertical-align: middle;
+}
+
+.decision-log-turn {
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.decision-log-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.decision-log-delta {
+  white-space: nowrap;
+}
+
+.decision-log-ev {
+  text-align: right;
+}
+
+.spark-bar {
+  display: inline-block;
+  height: 10px;
+  border-radius: 1px;
+  vertical-align: middle;
+}
+
+.spark-value {
+  margin-left: 4px;
+  font-size: 11px;
+  vertical-align: middle;
 }

@@ -146,6 +146,7 @@ fn density_evolution_inner(
                     let prob = t.prob;
 
                     // Shift-and-add using only the non-zero range
+                    // SAFETY: i <= max_i < MAX_SCORE, offset = t.points (max ~50), so i + offset < dense.len().
                     for i in 0..=max_i {
                         let p = unsafe { *src_dist.get_unchecked(i) };
                         if p > 0.0 {
@@ -243,7 +244,8 @@ fn density_evolution_inner(
     }
 }
 
-/// Run exact density evolution starting from an arbitrary mid-game state (oracle required).
+/// Separate entry point for mid-game density queries -- parameterized starting state
+/// and turn, otherwise identical to density_evolution_inner.
 ///
 /// Given a specific (upper_score, scored_categories, accumulated_score), propagates
 /// the distribution forward through the remaining turns. Fewer remaining turns = faster:

@@ -4,7 +4,7 @@
 
 Generate four D3-ready JSON datasets that tell the resource rationality story: how does strategic competence grow as a function of cognitive investment (rules, parameters, compute)?
 
-This report documents the pipeline that produces `blog/data/exp_{a,b,c,d}_*.json` from the existing regret data, skill ladder rules, surrogate benchmarks, and scaling law evaluations.
+This report documents the pipeline that produces `profiler/data/exp_{a,b,c,d}_*.json` from the existing regret data, skill ladder rules, surrogate benchmarks, and scaling law evaluations.
 
 ## Hypothesis
 
@@ -62,7 +62,7 @@ Evaluates rules 1..100 sequentially, tracking coverage and assigned actions. Cum
 
 The coverage-to-EV relationship is highly nonlinear: 27% coverage buys only 7 EV, but the jump from 27% to 77% coverage (rules 25-50) buys 13 EV. This confirms the phase transition documented in `scaling-laws.md` where rules 25-70 contain the structural strategies.
 
-**Output**: `blog/data/exp_a_power_law.json` — 25 KB, 100 rule entries.
+**Output**: `profiler/data/exp_a_power_law.json` — 25 KB, 100 rule entries.
 
 ## Experiment B: Anatomy of Mistakes
 
@@ -78,7 +78,7 @@ The disagreements are grouped by unique feature vector (98,592 unique states), t
 
 Five illustrative examples show the pattern: the oracle sees context-dependent trade-offs (upper bonus proximity, remaining categories) that flat rules cannot capture.
 
-**Output**: `blog/data/exp_b_mistakes.json` — 9 KB, 96 hex bins + 5 annotated examples.
+**Output**: `profiler/data/exp_b_mistakes.json` — 9 KB, 96 hex bins + 5 annotated examples.
 
 ## Experiment C: Cartography of Unhandled States
 
@@ -92,7 +92,7 @@ Sampled 5,000 Core + all 2,314 Unhandled = 7,314 points. Standardized 56 feature
 
 The unhandled population is smaller than expected (only 2,314 of 300K) because the greedy covering algorithm is aggressive. These are states where no single 1-2 condition rule achieves better-than-default regret. Visually, they occupy distinct regions in the UMAP embedding — they are not random noise but structurally different decision points that resist simple rule description.
 
-**Output**: `blog/data/exp_c_unhandled_umap.json` — 1040 KB, 7,314 points with coordinates, status, oracle action, regret.
+**Output**: `profiler/data/exp_c_unhandled_umap.json` — 1040 KB, 7,314 points with coordinates, status, oracle action, regret.
 
 ## Experiment D: Resource-Rational Pareto Frontier
 
@@ -112,7 +112,7 @@ Pareto frontier computed by ascending-params sweep tracking max EV seen.
 
 **Key finding**: **22 of 39 points lie on the Pareto frontier**. The symbolic rules dominate at low param counts (0-300 params), decision trees dominate the mid-range (6K-80K), and only the exact oracle reaches 248.4 EV. MLPs are Pareto-dominated across the entire range — every MLP is beaten by a decision tree with fewer parameters.
 
-**Output**: `blog/data/exp_d_pareto.json` — 5 KB, 39 points with family labels.
+**Output**: `profiler/data/exp_d_pareto.json` — 5 KB, 39 points with family labels.
 
 ## Bug Log
 

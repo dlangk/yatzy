@@ -127,6 +127,8 @@ pub fn compute_best_scoring_value_for_dice_set_by_index(
             let scr = ctx.precomputed_scores[ds_index][c];
             let new_up = update_upper_score(up_score, c, scr);
             let new_scored = scored | (1 << c);
+            // SAFETY: state_index returns scored*128+up, bounded by NUM_STATES.
+            // up ∈ [0,63], scored is a valid 15-bit mask with at least one more bit set.
             let val = scr as f32
                 + unsafe { *sv.get_unchecked(state_index(new_up as usize, new_scored as usize)) };
             if val > best_val {
@@ -140,6 +142,7 @@ pub fn compute_best_scoring_value_for_dice_set_by_index(
         if !is_category_scored(scored, c) {
             let scr = ctx.precomputed_scores[ds_index][c];
             let new_scored = scored | (1 << c);
+            // SAFETY: same invariant as upper loop — state_index bounded by NUM_STATES.
             let val = scr as f32
                 + unsafe { *sv.get_unchecked(state_index(up_score as usize, new_scored as usize)) };
             if val > best_val {
@@ -172,6 +175,8 @@ pub fn compute_expected_value_for_reroll_mask(
     let start = kt.row_start[kid] as usize;
     let end = kt.row_start[kid + 1] as usize;
     let mut ev: f32 = 0.0;
+    // SAFETY: k ∈ [start, end) from CSR row_start — bounded by KeepTable construction.
+    // cols[k] ∈ [0, 252) — valid dice set indices guaranteed by precomputation.
     for k in start..end {
         unsafe {
             ev += *vals.get_unchecked(k)
@@ -354,6 +359,8 @@ pub fn compute_max_ev_for_n_rerolls(
     for ds_i in 0..252 {
         let mut best_val = e_ds_prev[ds_i]; // mask=0: keep all
         for j in 0..kt.unique_count[ds_i] as usize {
+            // SAFETY: j < unique_count[ds_i] ≤ 31, bounded by KeepTable construction;
+            // kid < 462 (NUM_KEEP_MULTISETS), bounded by unique_keep_ids precomputation.
             let kid = unsafe { *kt.unique_keep_ids[ds_i].get_unchecked(j) } as usize;
             let ev = unsafe { *keep_ev.get_unchecked(kid) };
             if ev > best_val {
@@ -484,6 +491,7 @@ pub fn compute_expected_state_value(ctx: &YatzyContext, state: &YatzyState) -> f
     #[cfg(feature = "timing")]
     let t1 = Instant::now();
 
+    // split_at_mut avoids simultaneous mutable borrow of e[0] and e[1]
     let (e0, e1) = e.split_at_mut(1);
     compute_max_ev_for_n_rerolls(ctx, &e0[0], &mut e1[0]);
 
@@ -633,7 +641,8 @@ pub fn compute_opt_lse_for_n_rerolls(
         keep_ev[kid] = max_val + sum.ln();
     }
 
-    // Step 2: for each dice set, find opt (min or max) over its unique keeps (decision node)
+    // Step 2: for each dice set, find opt (min or max) over its unique keeps (decision node).
+    // When theta < 0, CE = L(S)/theta inverts the optimization direction, so we minimize the LSE.
     for ds_i in 0..252 {
         let mut best_val = e_ds_prev[ds_i]; // mask=0: keep all
         for j in 0..kt.unique_count[ds_i] as usize {
@@ -753,6 +762,8 @@ pub fn choose_best_reroll_mask_risk(
 }
 
 /// SOLVE_WIDGET for risk-sensitive (log-domain) mode with θ ≠ 0.
+///
+/// // PERF: intentional duplication of EV widget for risk-sensitive mode — avoids branch in inner loop
 ///
 /// The key transformations from the EV domain:
 /// - Group 6: `val = θ·scr + sv[successor]` — decision node (min if θ<0, max if θ>0)

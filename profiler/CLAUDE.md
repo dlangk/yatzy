@@ -1,21 +1,22 @@
 # CLAUDE.md — Profiler
 
-Static site with articles and interactive profiling quiz.
+Static site with 30-scenario cognitive profiling quiz. No build step, no framework.
 
 ## Commands
 
 ```bash
-python3 -m http.server # Serve locally for development
+# Served via Vite dev server (frontend/vite.config.ts)
+just dev-frontend
+# open http://localhost:5173/yatzy/profile/
 ```
 
 ## Pages
 
 | Page | File | Purpose |
 |------|------|---------|
-| Article | `index.html` | Data-driven Yatzy analysis with D3 charts |
-| Profile Quiz | `profile/index.html` | 30-scenario cognitive profiling |
+| Profile Quiz | `index.html` | 30-scenario cognitive profiling |
 
-## Profile Quiz Architecture
+## Architecture
 
 Flux-like state management with component-based rendering (no framework):
 
@@ -26,11 +27,13 @@ Flux-like state management with component-based rendering (no framework):
 | `js/profile/render.js` | Quiz orchestrator: DOM building + estimation |
 | `js/profile/api.js` | Scenario data loading from `data/scenarios.json` |
 | `js/profile/player-card-data.js` | Grid loader, nearest-neighbor, counterfactuals |
-| `components/scenario-card.js` | Interactive quiz question (dice, scorecard, actions) |
-| `components/question-list.js` | Clickable sidebar with question status |
-| `components/result-panel.js` | Parameter estimates (visible after all answered) |
-| `components/parameter-chart.js` | Real-time convergence chart |
-| `components/player-card.js` | Simulation-backed performance analytics |
+| `js/profile/components/scenario-card.js` | Interactive quiz question (dice, scorecard, actions) |
+| `js/profile/components/question-list.js` | Clickable sidebar with question status |
+| `js/profile/components/result-panel.js` | Parameter estimates (visible after all answered) |
+| `js/profile/components/parameter-chart.js` | Real-time convergence chart |
+| `js/profile/components/player-card.js` | Simulation-backed performance analytics |
+| `js/profile/components/progress-bar.js` | Quiz progress indicator |
+| `js/profile/components/profile-scorecard.js` | Scenario scorecard display |
 
 ## Data Files
 
@@ -38,8 +41,6 @@ Flux-like state management with component-based rendering (no framework):
 |------|--------|---------|
 | `data/scenarios.json` | `just profile-deploy` | 30 scenarios + Q-grids (108 combos each) |
 | `data/player_card_grid.json` | `just player-card-grid` | 648 combos × 10K games |
-| `data/kde_curves.json` | Custom export | KDE data for article charts |
-| `data/sweep_summary.json` | Custom export | Summary stats for article |
 
 ## Critical Notes
 

@@ -1,6 +1,7 @@
 import { getState, subscribe } from '../store.ts';
 import { computeRerollMask, mapMaskToSorted } from '../mask.ts';
 
+/** Render the evaluation panel showing state EV, mask EV, delta, and best category. */
 export function initEvalPanel(container: HTMLElement): void {
   container.className = 'eval-panel';
 
@@ -27,6 +28,7 @@ export function initEvalPanel(container: HTMLElement): void {
     const s = getState();
     const hasData = s.turnPhase === 'rolled' && s.lastEvalResponse !== null;
     const rerolls = s.rerollsRemaining;
+    const hints = s.showHints;
 
     let currentMaskEv: number | null = null;
     if (s.lastEvalResponse?.mask_evs && s.sortMap) {
@@ -48,15 +50,15 @@ export function initEvalPanel(container: HTMLElement): void {
     rows[0][1].textContent = hasData && stateEv !== null ? stateEv.toFixed(2) : dash;
 
     // Your mask EV
-    rows[1][1].textContent = hasData && rerolls > 0 && currentMaskEv !== null
+    rows[1][1].textContent = hasData && hints && rerolls > 0 && currentMaskEv !== null
       ? currentMaskEv.toFixed(2) : dash;
 
     // Best mask EV
-    rows[2][1].textContent = hasData && rerolls > 0 && optMaskEv !== null
+    rows[2][1].textContent = hasData && hints && rerolls > 0 && optMaskEv !== null
       ? optMaskEv.toFixed(2) : dash;
 
     // Delta
-    if (hasData && rerolls > 0 && currentMaskEv !== null && optMaskEv !== null) {
+    if (hasData && hints && rerolls > 0 && currentMaskEv !== null && optMaskEv !== null) {
       const delta = currentMaskEv - optMaskEv;
       rows[3][1].textContent = delta.toFixed(2);
       rows[3][1].style.color = Math.abs(delta) < 0.01 ? 'var(--color-success)' : 'var(--color-danger)';
@@ -66,10 +68,10 @@ export function initEvalPanel(container: HTMLElement): void {
     }
 
     // Best category
-    rows[4][1].textContent = hasData && optCatName ? optCatName : dash;
+    rows[4][1].textContent = hasData && hints && optCatName ? optCatName : dash;
 
     // Category EV
-    rows[5][1].textContent = hasData && optCatEv !== null ? optCatEv.toFixed(2) : dash;
+    rows[5][1].textContent = hasData && hints && optCatEv !== null ? optCatEv.toFixed(2) : dash;
   }
 
   render();

@@ -11,6 +11,8 @@ export interface TrajectoryPoint {
   accumulatedScore: number;
   stateEv: number;
   percentiles?: Record<string, number>;
+  label?: string;
+  delta?: number;
 }
 
 export interface CategoryState {
@@ -62,6 +64,9 @@ export interface GameState {
   turnPhase: TurnPhase;
   trajectory: TrajectoryPoint[];
   pendingTrajectoryEvent: 'roll' | 'reroll' | null;
+  pendingRerollLabel: string | null;
+  pendingRerollDelta: number | null;
+  showHints: boolean;
 }
 
 export type GameAction =
@@ -77,4 +82,5 @@ export type GameAction =
   | { type: 'SET_CATEGORY_SCORE'; categoryId: number; score: number }
   | { type: 'UNSET_CATEGORY'; categoryId: number }
   | { type: 'SET_INITIAL_EV'; ev: number }
-  | { type: 'SET_DENSITY_RESULT'; index: number; percentiles: Record<string, number> };
+  | { type: 'SET_DENSITY_RESULT'; index: number; percentiles: Record<string, number> }
+  | { type: 'TOGGLE_HINTS' };

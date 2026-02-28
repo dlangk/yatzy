@@ -1,5 +1,6 @@
 import { getState, subscribe } from '../store.ts';
 
+/** Render the dice color legend (held/reroll/optimal keep/optimal reroll). */
 export function initDiceLegend(container: HTMLElement): void {
   container.className = 'dice-legend';
 
@@ -23,7 +24,7 @@ export function initDiceLegend(container: HTMLElement): void {
 
   function render() {
     const s = getState();
-    const active = s.turnPhase === 'rolled' && s.rerollsRemaining > 0;
+    const active = s.showHints && s.turnPhase === 'rolled' && s.rerollsRemaining > 0;
     container.style.opacity = active ? '1' : '0';
   }
 

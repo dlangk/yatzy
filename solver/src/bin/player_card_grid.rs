@@ -7,7 +7,7 @@
 //! Options:
 //!   --games N      Games per parameter combo (default: 100000)
 //!   --seed S       Random seed (default: 42)
-//!   --output PATH  Output JSON file (default: blog/data/player_card_grid.json)
+//!   --output PATH  Output JSON file (default: profiler/data/player_card_grid.json)
 
 use std::io::Write;
 use std::path::Path;
@@ -98,7 +98,7 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let mut num_games = 100_000usize;
     let mut seed = 42u64;
-    let mut output_path = String::from("blog/data/player_card_grid.json");
+    let mut output_path = String::from("profiler/data/player_card_grid.json");
 
     let mut i = 1;
     while i < args.len() {
@@ -119,7 +119,7 @@ fn main() {
                 println!("Usage: yatzy-player-card-grid [OPTIONS]");
                 println!("  --games N      Games per combo (default: 100000)");
                 println!("  --seed S       Random seed (default: 42)");
-                println!("  --output PATH  Output JSON (default: blog/data/player_card_grid.json)");
+                println!("  --output PATH  Output JSON (default: profiler/data/player_card_grid.json)");
                 std::process::exit(0);
             }
             other => {

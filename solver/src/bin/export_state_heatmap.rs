@@ -2,7 +2,7 @@
 //!
 //! Loads `all_states.bin`, computes the average EV for each
 //! (num_scored_categories, upper_score) pair across all reachable category masks.
-//! Outputs `blog/data/state_heatmap.json`.
+//! Outputs `profiler/data/state_heatmap.json`.
 
 use yatzy::constants::*;
 use yatzy::phase0_tables;
@@ -61,8 +61,8 @@ fn main() {
     let output = serde_json::json!({ "states": rows });
     let json = serde_json::to_string(&output).unwrap();
 
-    let out_path = "blog/data/state_heatmap.json";
-    std::fs::create_dir_all("blog/data").unwrap();
+    let out_path = "profiler/data/state_heatmap.json";
+    std::fs::create_dir_all("profiler/data").unwrap();
     std::fs::write(out_path, json).unwrap();
     println!("Wrote {} rows to {}", rows.len(), out_path);
 }

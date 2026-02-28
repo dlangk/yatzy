@@ -198,7 +198,7 @@ export function normalPDF(x, mu, sigma) {
  * Format theta for display.
  */
 export function formatTheta(theta) {
-  if (theta === 0) return '0 (EV-optimal)';
+  if (theta === 0) return '\u00a00.000';
   const sign = theta > 0 ? '+' : '\u2212';
   return `${sign}${Math.abs(theta).toFixed(3)}`;
 }

@@ -19,7 +19,14 @@ from .config import KDE_POINTS, KDE_RANGE
 
 
 def discover_density_thetas(base_path: str = ".") -> list[float]:
-    """Scan outputs/density/ for density_*.json files, return sorted theta list."""
+    """Scan outputs/density/ for density_*.json files.
+
+    Args:
+        base_path: Repository root directory (default ".").
+
+    Returns:
+        Sorted list of theta values found as density_<theta>.json files.
+    """
     density_dir = Path(base_path) / "outputs" / "density"
     thetas: list[float] = []
     if not density_dir.is_dir():

@@ -70,9 +70,7 @@ cp -r "$PROJECT_ROOT/frontend/dist/"* "$FRONTEND_CTX/apps/play/"
 
 # Profiler at /profile/
 mkdir -p "$FRONTEND_CTX/apps/profile/css" "$FRONTEND_CTX/apps/profile/js" "$FRONTEND_CTX/apps/profile/data"
-cp "$PROJECT_ROOT/profiler/profile/index.html" "$FRONTEND_CTX/apps/profile/index.html"
-# Fix "Back to article" link to point to treatise root
-sed -i '' 's|href="index.html"|href="/yatzy/"|g' "$FRONTEND_CTX/apps/profile/index.html"
+cp "$PROJECT_ROOT/profiler/index.html" "$FRONTEND_CTX/apps/profile/index.html"
 cp -r "$PROJECT_ROOT/profiler/css/"* "$FRONTEND_CTX/apps/profile/css/"
 cp -r "$PROJECT_ROOT/profiler/js/"* "$FRONTEND_CTX/apps/profile/js/"
 cp -r "$PROJECT_ROOT/profiler/data/"* "$FRONTEND_CTX/apps/profile/data/"

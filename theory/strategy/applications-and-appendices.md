@@ -6,7 +6,7 @@ After quiz completion, the player's estimated (θ, β, γ, d) parameters are tra
 
 ### 1.1 Pre-Computed Simulation Grid
 
-The blog is fully static (no server), so all simulation results are pre-computed for a 4D parameter grid:
+The profiler is fully static (no server), so all simulation results are pre-computed for a 4D parameter grid:
 
 | Parameter | Grid values | Count |
 |---|---|---|
@@ -15,7 +15,7 @@ The blog is fully static (no server), so all simulation results are pre-computed
 | γ | 0.3, 0.6, 0.8, 0.9, 0.95, 1.0 | 6 |
 | d | 8, 20, 999 | 3 |
 
-Total: 648 combinations × 10K games each (~2.5 min on Apple Silicon). Output: `blog/data/player_card_grid.json` (~82 KB).
+Total: 648 combinations × 10K games each (~2.5 min on Apple Silicon). Output: `profiler/data/player_card_grid.json` (~82 KB).
 
 The simulation uses `simulate_game_profiled` — a streamlined noisy agent that plays full games using softmax(β·Q) action selection with γ-discounted values and depth noise σ_d. Q-value computation always uses EV-mode (never risk-sensitive LSE) — θ only affects which strategy table (state values) backs the decisions, matching the profiling estimator's model.
 

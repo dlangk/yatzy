@@ -650,12 +650,12 @@ fn cmd_select_diagnostic(
     pf.write_all(pool_json.as_bytes()).unwrap();
     println!("Wrote {}", pool_json_path);
 
-    // Copy to blog/data/ if exists
-    let blog_data_dir = "blog/data";
-    if std::path::Path::new(blog_data_dir).exists() {
-        let blog_dest = format!("{}/scenarios.json", blog_data_dir);
-        if std::fs::copy(&json_path, &blog_dest).is_ok() {
-            println!("Copied to {}", blog_dest);
+    // Copy to profiler/data/ if exists
+    let profiler_data_dir = "profiler/data";
+    if std::path::Path::new(profiler_data_dir).exists() {
+        let profiler_dest = format!("{}/scenarios.json", profiler_data_dir);
+        if std::fs::copy(&json_path, &profiler_dest).is_ok() {
+            println!("Copied to {}", profiler_dest);
         }
     }
 }

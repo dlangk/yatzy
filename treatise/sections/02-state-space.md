@@ -2,28 +2,15 @@
 
 ## The State Space
 
-A Yatzy game is a sequence of rolls, keeps, and category assignments spread across
-fifteen rounds. Played naively, the number of distinct game histories is
-astronomical--roughly 1.7 &times; 10<sup>170</sup>, vastly exceeding the number of atoms
-in the observable universe. Solving the game exactly requires a series of reductions
-that compress this enormity into something a laptop can handle in about a second.
+A Yatzy game is a sequence of rolls, keeps, and category assignments spread across fifteen rounds. Played naively, the number of distinct game histories is roughly 1.7 &times; 10<sup>170</sup>. That vastly exceeds the number of atoms in the observable universe. 🤯
 
-Each step in the chain replaces one view of the problem with a strictly smaller one,
-without losing any information relevant to optimal play.
+Fortunately, clever mathematicians like [CITE1, CITE2] figured out how to reduce the state space into something much, much smaller.
 
-### Step 1: What Matters, Not What Happened
+### Step 1: Don't Worry About The Details
 
-The key insight is that most of the game history is irrelevant. Two games that
-have scored different categories in different orders, but arrived at the same
-upper-section total and the same set of used categories, face identical futures.
-The
-::concept[state]{state-space}
-of the game collapses to two numbers: the upper-section score so far (an integer
-from 0 to 63, since any value above the
-::concept[bonus]{upper-section-bonus}
-threshold is equivalent) and the set of categories already used (a 15-bit bitmask).
-This gives 64 &times; 2<sup>15</sup> = 2,097,152 slots--a reduction of roughly
-100,000&times; from the raw game-history count.
+The most important insight is that most of the game history is irrelevant. Two games that have scored different categories in different orders, but arrived at the same upper-section total and the same set of used categories, face identical futures.
+
+The ::concept[state]{state-space} of the game collapses to two numbers: the upper-section score so far (an integer from 0 to 63, since any value above the ::concept[bonus]{upper-section-bonus} threshold is equivalent) and the set of categories already used (a 15-bit bitmask). This gives 64 &times; 2<sup>15</sup> = 2,097,152 slots--a reduction of roughly 100,000&times; from the raw game-history count.
 
 :::html
 <div class="chart-container" id="chart-reduction-funnel"></div>
@@ -31,16 +18,9 @@ This gives 64 &times; 2<sup>15</sup> = 2,097,152 slots--a reduction of roughly
 
 ### Step 2: Prune the Impossible
 
-Not every slot corresponds to a position that can actually arise in play.
-An upper score of 60, for instance, cannot occur if only Ones and Twos have been
-scored. A forward DP from the starting state identifies exactly which states are
-::concept[reachable]{reachability-pruning}: the result is that
-31.8% of slots are pruned, leaving roughly 1,430,000 states. This is exact--not
-an approximation--and it reduces both computation time and memory proportionally.
+Not every slot corresponds to a position that can actually arise in play. An upper score of 60, for instance, cannot occur if only Ones and Twos have been scored. A forward DP from the starting state identifies exactly which states are ::concept[reachable]{reachability-pruning}: the result is that 31.8% of slots are pruned, leaving roughly 1,430,000 states. This is exact and it reduces both computation time and memory proportionally.
 
-The heatmap below shows reachability by upper score and number of upper categories
-scored. Gray cells are provably unreachable. The triangular pattern reflects the
-combinatorial constraint: few categories cannot produce high upper scores.
+The heatmap below shows reachability by upper score and number of upper categories scored. Gray cells are provably unreachable. The triangular pattern reflects the combinatorial constraint: few categories cannot produce high upper scores.
 
 :::html
 <div class="chart-container" id="chart-reachability-grid"></div>

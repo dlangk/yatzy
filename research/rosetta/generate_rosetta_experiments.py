@@ -21,7 +21,7 @@ from yatzy_analysis.skill_ladder import (
 )
 
 BASE = Path(__file__).resolve().parents[2]
-OUT_DIR = BASE / "blog" / "data"
+OUT_DIR = BASE / "profiler" / "data"
 
 
 # ── Shared data loading ─────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-// Unified color palette (synced with blog/treatise design tokens)
+// Unified color palette (synced with treatise design tokens)
 // Only used by D3/SVG which can't use CSS var()
 export const COLORS = {
   success: '#2ca02c',

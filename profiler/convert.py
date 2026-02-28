@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert outputs/ CSV/JSON → blog/data/ JSON files."""
+"""Convert outputs/ CSV/JSON → profiler/data/ JSON files."""
 
 import csv
 import json
@@ -119,7 +119,7 @@ def convert_category_stats() -> None:
 
 
 def main() -> None:
-    print("Converting data → blog/data/")
+    print("Converting data → profiler/data/")
     convert_sweep_summary()
     convert_winrate()
     convert_game_eval()

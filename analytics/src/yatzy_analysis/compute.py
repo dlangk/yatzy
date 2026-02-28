@@ -15,14 +15,29 @@ def compute_cvar(scores: NDArray[np.int32], alpha: float) -> float:
     """Compute CVaR (Expected Shortfall) at level alpha.
 
     CVaR_alpha = mean of the worst alpha-fraction of scores.
-    Scores must be sorted ascending.
+
+    Args:
+        scores: Sorted ascending array of game scores.
+        alpha: Tail probability (e.g. 0.05 for 5th percentile).
+
+    Returns:
+        Mean score in the worst alpha fraction of outcomes.
     """
     n = max(1, int(alpha * len(scores)))
     return float(scores[:n].mean())
 
 
 def compute_summary(theta: float, scores: NDArray[np.int32]) -> dict:
-    """Compute percentiles, moments, extremes, and shape measures for one theta."""
+    """Compute percentiles, moments, extremes, and shape measures for one theta.
+
+    Args:
+        theta: Risk parameter value for this batch.
+        scores: Sorted ascending array of game scores.
+
+    Returns:
+        Dict with 34 keys: theta, n, mean, std, min, max, percentiles (p1-p9999),
+        CVaR, skewness, kurtosis, tail ratios, trimmed/winsorized means, and entropy.
+    """
     n = len(scores)
     top5_pct_n = max(1, int(0.005 * n))
     top1_pct_n = max(1, int(0.01 * n))
@@ -95,7 +110,16 @@ def compute_kde(
 ) -> pl.DataFrame:
     """Compute KDE density + integrated CDF + survival for one theta.
 
-    Returns DataFrame with columns: theta, score, density, cdf, survival.
+    Args:
+        theta: Risk parameter value for this batch.
+        scores: Sorted ascending array of game scores.
+        n_points: Number of evaluation points on the score grid.
+        score_range: (min, max) score range for the KDE grid.
+        subsample: Max number of scores to subsample for KDE fitting.
+        bandwidth: Bandwidth parameter for scipy gaussian_kde.
+
+    Returns:
+        Polars DataFrame with columns: theta, score, density, cdf, survival.
     """
     x_grid = np.linspace(score_range[0], score_range[1], n_points)
     dx = x_grid[1] - x_grid[0]
@@ -125,7 +149,13 @@ def compute_exchange_rates(
 
     MER_q(theta) = [mean(0) - mean(theta)] / [q(theta) - q(0)]
 
-    Returns DataFrame with theta and MER columns for each metric.
+    Args:
+        summary_df: Summary DataFrame with theta, mean, and quantile columns.
+        baseline: Theta value to use as the EV-maximizing baseline (default 0.0).
+
+    Returns:
+        Polars DataFrame with theta, mean_cost, and mer_<metric> columns for
+        p75, p90, p95, p99, max, top5_avg, top5_pct_avg.
     """
     base = summary_df.filter(pl.col("theta") == baseline).row(0, named=True)
     metrics = ["p75", "p90", "p95", "p99", "max", "top5_avg", "top5_pct_avg"]
@@ -156,7 +186,14 @@ def compute_sdva(
     A_better = integral of max(-D(x), 0) dx (region where theta has less mass below x)
     A_worse - A_better = mean(0) - mean(theta) by identity.
 
-    Returns dict with a_worse, a_better, ratio, x_cross.
+    Args:
+        kde_df: KDE DataFrame with theta, score, and cdf columns.
+        theta: Risk parameter value to compare against the baseline.
+        baseline: Theta value to use as the reference CDF (default 0.0).
+
+    Returns:
+        Dict with keys a_worse, a_better, ratio (a_worse/a_better), and
+        x_cross (primary crossing point where D goes from positive to negative).
     """
     base_cdf = kde_df.filter(pl.col("theta") == baseline)
     theta_cdf = kde_df.filter(pl.col("theta") == theta)

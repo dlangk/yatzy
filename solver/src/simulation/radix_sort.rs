@@ -1,8 +1,8 @@
 //! Radix sort for lockstep simulation — sort game indices by state_index.
 //!
-//! Uses a 2-pass counting sort on the 21-bit state_index (STATE_STRIDE * 32768):
+//! Uses a 2-pass counting sort on the 22-bit state_index (STATE_STRIDE * 32768):
 //! - Pass 1: sort by bits 0-10 (2048 buckets)
-//! - Pass 2: sort by bits 11-20 (1024 buckets)
+//! - Pass 2: sort by bits 11-21 (2048 buckets)
 //!
 //! Total: O(2N) work, no hashing, produces contiguous groups.
 //! For 10M games: ~80M memory accesses, ~1s at memory bandwidth limit.

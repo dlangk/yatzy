@@ -2,6 +2,7 @@ import { getState, dispatch, subscribe } from '../store.ts';
 import { unmapMask } from '../mask.ts';
 import { createDie, type DieElements } from './Die.ts';
 
+/** Render 5 interactive dice with hold/toggle and optimal-keep hints. */
 export function initDiceBar(container: HTMLElement): void {
   container.className = 'dice-bar';
 
@@ -37,7 +38,7 @@ export function initDiceBar(container: HTMLElement): void {
     if (s.lastEvalResponse?.optimal_mask != null && s.sortMap) {
       optimalMask = unmapMask(s.lastEvalResponse.optimal_mask, s.sortMap);
     }
-    const showMaskHints = active && hasEval && optimalMask !== null && s.rerollsRemaining > 0;
+    const showMaskHints = s.showHints && active && hasEval && optimalMask !== null && s.rerollsRemaining > 0;
 
     for (let i = 0; i < 5; i++) {
       const v = active ? s.dice[i].value : 0;

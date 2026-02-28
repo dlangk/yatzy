@@ -62,7 +62,4 @@ The frontend calls these solver endpoints via `api.ts`:
 
 ## No Layout Shifts (Hard Requirement)
 
-See `.claude/rules/frontend.md` for the full rule set. Key points:
-- Always render containers at fixed size. Use placeholders (`?`, `—`).
-- Fixed row heights, fixed column widths
-- Same element, different content — change text/style, never swap element types
+See `.claude/rules/frontend.md` for the full constraint list.

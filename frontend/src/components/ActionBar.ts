@@ -1,5 +1,6 @@
 import { getState, dispatch, subscribe } from '../store.ts';
 
+/** Render the action bar: Roll/Reroll button, reroll counter, hints toggle, and reset. */
 export function initActionBar(container: HTMLElement): void {
   container.className = 'action-bar';
 
@@ -34,6 +35,10 @@ export function initActionBar(container: HTMLElement): void {
 
   rerollControls.appendChild(minusBtn);
   rerollControls.appendChild(plusBtn);
+
+  const hintsBtn = document.createElement('button');
+  hintsBtn.className = 'game-btn-secondary';
+  hintsBtn.addEventListener('click', () => dispatch({ type: 'TOGGLE_HINTS' }));
 
   const resetBtn = document.createElement('button');
   resetBtn.className = 'game-btn-secondary';
@@ -90,6 +95,8 @@ export function initActionBar(container: HTMLElement): void {
     rerollControls.style.visibility = s.turnPhase === 'rolled' ? 'visible' : 'hidden';
     container.appendChild(rerollControls);
 
+    hintsBtn.textContent = s.showHints ? 'Hide Hints' : 'Show Hints';
+    container.appendChild(hintsBtn);
     container.appendChild(resetBtn);
   }
 

@@ -290,8 +290,8 @@ fn compute_all_state_values_impl(
                     }
                 }
                 // Fill topological padding: indices 64..127 get the capped value (index 63).
-                // This enables branchless upper-category access: sv[base + up + scr]
-                // reads correct values even when up + scr > 63.
+                // See constants.rs STATE_STRIDE — padding enables branchless upper-category access:
+                // sv[base + up + scr] reads correct values even when up + scr > 63.
                 let capped_val = results[63];
                 let base = state_index(0, scored as usize);
                 for pad in 64..STATE_STRIDE {
@@ -315,6 +315,8 @@ fn compute_all_state_values_impl(
                         .unwrap()
                         .load(std::sync::atomic::Ordering::Relaxed);
 
+                    // Transpose from batched [ds*64+up] layout to oracle's [si*252+ds] layout
+                    // for sequential forward-simulation access.
                     for up in 0..64 {
                         let si = state_index(up, scored as usize);
                         for ds in 0..NUM_DICE_SETS {
@@ -351,9 +353,8 @@ fn compute_all_state_values_impl(
 
     println!("\n\n=== Computation Complete ===");
 
-    // Convert utility-domain values U(S) to log-domain L(S) = ln(U(S))
-    // so that downstream consumers (simulation, analytics, profiling) see the
-    // same format regardless of which solver was used.
+    // Convert utility to log-domain: downstream consumers compute CE = L(S)/theta.
+    // U(S) = E[e^(θ·remaining)|S] → L(S) = ln(U(S)), giving consistent format for all θ.
     let was_utility = ctx.theta != 0.0 && ctx.theta.abs() <= UTILITY_THETA_LIMIT && !ctx.max_policy;
     if was_utility {
         let t_conv = Instant::now();
