@@ -4,15 +4,7 @@ import { getState, dispatch, subscribe } from '../store.ts';
 export function initActionBar(container: HTMLElement): void {
   container.className = 'action-bar';
 
-  const gameOverLabel = document.createElement('strong');
-  gameOverLabel.textContent = 'Game Over!';
-
   const mainBtn = document.createElement('button');
-
-  const newGameBtn = document.createElement('button');
-  newGameBtn.className = 'game-btn-primary';
-  newGameBtn.textContent = 'New Game';
-  newGameBtn.addEventListener('click', () => dispatch({ type: 'RESET_GAME' }));
 
   const rerollControls = document.createElement('span');
   rerollControls.className = 'reroll-controls';
@@ -59,15 +51,11 @@ export function initActionBar(container: HTMLElement): void {
     }
   });
 
-  // Placeholder for game-over hidden reset (keeps layout stable)
-  const hiddenPlaceholder = document.createElement('button');
-  hiddenPlaceholder.className = 'game-btn-secondary';
-  hiddenPlaceholder.style.visibility = 'hidden';
-  hiddenPlaceholder.textContent = 'Reset';
-
   mainBtn.addEventListener('click', () => {
     const s = getState();
-    if (s.turnPhase === 'idle') {
+    if (s.turnPhase === 'game_over') {
+      dispatch({ type: 'RESET_GAME' });
+    } else if (s.turnPhase === 'idle') {
       dispatch({ type: 'ROLL' });
     } else {
       dispatch({ type: 'REROLL' });
@@ -77,15 +65,13 @@ export function initActionBar(container: HTMLElement): void {
   function render() {
     const s = getState();
     container.innerHTML = '';
+    const isOver = s.turnPhase === 'game_over';
 
-    if (s.turnPhase === 'game_over') {
-      container.appendChild(gameOverLabel);
-      container.appendChild(newGameBtn);
-      container.appendChild(hiddenPlaceholder);
-      return;
-    }
-
-    if (s.turnPhase === 'idle') {
+    if (isOver) {
+      mainBtn.textContent = 'New Game';
+      mainBtn.disabled = false;
+      mainBtn.className = 'game-btn-primary';
+    } else if (s.turnPhase === 'idle') {
       mainBtn.textContent = 'Roll';
       mainBtn.disabled = false;
       mainBtn.className = 'game-btn-primary';
@@ -100,13 +86,13 @@ export function initActionBar(container: HTMLElement): void {
     }
     container.appendChild(mainBtn);
 
-    const rerollActive = s.turnPhase === 'rolled';
-    minusBtn.disabled = !rerollActive || s.rerollsRemaining <= 0;
-    plusBtn.disabled = !rerollActive || s.rerollsRemaining >= 2;
-    rerollControls.style.opacity = rerollActive ? '1' : '0.3';
+    minusBtn.disabled = isOver || s.turnPhase !== 'rolled' || s.rerollsRemaining <= 0;
+    plusBtn.disabled = isOver || s.turnPhase !== 'rolled' || s.rerollsRemaining >= 2;
+    rerollControls.style.opacity = (!isOver && s.turnPhase === 'rolled') ? '1' : '0.3';
     container.appendChild(rerollControls);
 
     hintsBtn.textContent = s.showHints ? 'Hide Hints' : 'Show Hints';
+    hintsBtn.disabled = isOver;
     container.appendChild(hintsBtn);
 
     undoBtn.disabled = s.undoStack.length === 0;
@@ -115,6 +101,7 @@ export function initActionBar(container: HTMLElement): void {
     redoBtn.disabled = s.redoStack.length === 0;
     container.appendChild(redoBtn);
 
+    resetBtn.disabled = isOver;
     container.appendChild(resetBtn);
   }
 

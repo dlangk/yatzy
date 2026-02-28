@@ -123,7 +123,8 @@ export function createScorecardRow(
     // EV cell (cumulative expected final score)
     // totalScore here is the raw scored sum (no bonus) — the solver's evIfScored
     // = cat_score + V(successor) already includes the terminal bonus.
-    const hasEv = showHints && !category.isScored && category.available;
+    // Only show when we have fresh eval data (canScore implies turnPhase=rolled).
+    const hasEv = showHints && canScore && !category.isScored && category.available;
     evTd.textContent = hasEv ? (totalScore + category.evIfScored).toFixed(0) : '';
     evTd.style.color = dimmed ? 'var(--text-muted)' : 'inherit';
     const evBarColor = isOptimal ? 'rgba(44, 160, 44, 0.18)' : 'rgba(59, 76, 192, 0.15)';

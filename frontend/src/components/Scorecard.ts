@@ -116,7 +116,6 @@ export function initScorecard(container: HTMLElement): void {
     const s = getState();
     const canScore = s.turnPhase === 'rolled';
     const mustScore = canScore && s.rerollsRemaining <= 0;
-    console.log('Scorecard render:', { turnPhase: s.turnPhase, rerollsRemaining: s.rerollsRemaining, canScore, mustScore });
     const optimalCategoryId = s.showHints ? (s.lastEvalResponse?.optimal_category ?? null) : null;
 
     // Compute normalization ranges
@@ -136,7 +135,7 @@ export function initScorecard(container: HTMLElement): void {
       const scoreVal = cat.isScored ? cat.score : cat.suggestedScore;
       const scoreFraction = normalize(scoreVal, scoreMin, scoreMax);
       const cumulativeEv = rawScoredSum + cat.evIfScored;
-      const evFraction = (!cat.isScored && cat.available) ? normalize(cumulativeEv, evMin, evMax) : null;
+      const evFraction = (canScore && !cat.isScored && cat.available) ? normalize(cumulativeEv, evMin, evMax) : null;
 
       rows[i].update({
         category: cat,
