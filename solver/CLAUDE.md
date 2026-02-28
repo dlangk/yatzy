@@ -82,8 +82,6 @@ Server: axum on port 9000, stateless, `Arc<YatzyContext>` shared state.
 | GET | `/state_value` | `?upper_score=N&scored_categories=N` | <1ms | E_table[S] lookup |
 | POST | `/evaluate` | `{dice, upper_score, scored_categories, rerolls_remaining}` | 2-9μs | All keep-mask EVs + category EVs |
 | POST | `/density` | `{upper_score, scored_categories, accumulated_score}` | ~100ms | Exact score distribution from mid-game |
-| GET | `/score_histogram` | — | <1ms | Binned score distribution |
-| GET | `/statistics` | — | <1ms | Aggregated game statistics |
 
 ## Concurrency Model
 

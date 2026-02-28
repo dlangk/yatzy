@@ -21,7 +21,7 @@ export const CATEGORY_NAMES = [
 ] as const;
 
 export const TOTAL_DICE = 5;
-export const BONUS_THRESHOLD = 63;
-export const BONUS_SCORE = 50;
+export const UPPER_SCORE_CAP = 63;
+export const UPPER_BONUS = 50;
 export const CATEGORY_COUNT = 15;
 export const UPPER_CATEGORIES = 6;

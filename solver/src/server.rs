@@ -9,8 +9,6 @@
 //! |--------|------|-------------|
 //! | GET | `/health` | Health check |
 //! | GET | `/state_value` | Look up E_table[S] for a given state |
-//! | GET | `/score_histogram` | Binned score distribution from CSV |
-//! | GET | `/statistics` | Aggregated game statistics from simulation |
 //! | POST | `/evaluate` | All mask EVs + category EVs for one roll |
 //! | POST | `/density` | Exact score distribution from a mid-game state |
 
@@ -19,7 +17,6 @@ use std::sync::Arc;
 use axum::{
     extract::{Query, State},
     http::StatusCode,
-    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
@@ -59,8 +56,6 @@ fn create_router_with_state(state: AppState) -> Router {
     Router::new()
         .route("/health", get(handle_health_check))
         .route("/state_value", get(handle_get_state_value))
-        .route("/score_histogram", get(handle_get_score_histogram))
-        .route("/statistics", get(handle_get_statistics))
         .route("/evaluate", post(handle_evaluate))
         .route("/density", post(handle_density))
         .layer(cors)
@@ -124,95 +119,6 @@ async fn handle_get_state_value(
         "scored_categories": params.scored_categories,
         "expected_final_score": val,
     })))
-}
-
-async fn handle_get_score_histogram(
-    State(_state): State<AppState>,
-) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    // File I/O is blocking — use spawn_blocking to avoid stalling the async runtime.
-    tokio::task::spawn_blocking(|| {
-        let file_path = "data/score_histogram.csv";
-        let content = match std::fs::read_to_string(file_path) {
-            Ok(c) => c,
-            Err(_) => {
-                return Err(error_response(
-                    StatusCode::NOT_FOUND,
-                    "Could not open score histogram file",
-                ))
-            }
-        };
-
-        let min_ev = 100;
-        let max_ev = 380;
-        let bin_count = 56;
-        let bin_width = (max_ev - min_ev) as f64 / bin_count as f64;
-        let mut bins = vec![0i32; bin_count];
-
-        for (i, line) in content.lines().enumerate() {
-            if i == 0 {
-                continue; // skip header
-            }
-            if let Ok(score) = line.trim().parse::<i32>() {
-                if score >= min_ev && score <= max_ev {
-                    let bin_index = ((score - min_ev) as f64 / bin_width) as usize;
-                    if bin_index < bin_count {
-                        bins[bin_index] += 1;
-                    }
-                }
-            }
-        }
-
-        Ok(Json(serde_json::json!({
-            "min_ev": min_ev,
-            "max_ev": max_ev,
-            "bin_count": bin_count,
-            "bins": bins,
-        })))
-    })
-    .await
-    .map_err(|_| {
-        error_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Histogram computation failed",
-        )
-    })?
-}
-
-async fn handle_get_statistics(
-    State(_state): State<AppState>,
-) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    // File I/O is blocking — use spawn_blocking to avoid stalling the async runtime.
-    tokio::task::spawn_blocking(|| {
-        let file_path = "outputs/aggregates/json/game_statistics.json";
-        let content = match std::fs::read_to_string(file_path) {
-            Ok(c) => c,
-            Err(_) => {
-                return Err(error_response(
-                    StatusCode::NOT_FOUND,
-                    "Statistics not found. Run yatzy-simulate --output results first.",
-                ))
-            }
-        };
-
-        let json: serde_json::Value = match serde_json::from_str(&content) {
-            Ok(v) => v,
-            Err(_) => {
-                return Err(error_response(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Failed to parse statistics JSON",
-                ))
-            }
-        };
-
-        Ok(Json(json))
-    })
-    .await
-    .map_err(|_| {
-        error_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Statistics computation failed",
-        )
-    })?
 }
 
 // ── POST handler ────────────────────────────────────────────────────

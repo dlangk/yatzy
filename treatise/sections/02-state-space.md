@@ -2,7 +2,7 @@
 
 ## The State Space
 
-A Yatzy game is a sequence of rolls, keeps, and category assignments spread across fifteen rounds. Played naively, the number of distinct game histories is roughly 1.7 &times; 10<sup>170</sup>. That vastly exceeds the number of atoms in the observable universe. 🤯
+A Yatzy game is a sequence of rolls, keeps, and category assignments spread across fifteen rounds. Played naively, the number of distinct game histories is roughly 1.7 &times; 10<sup>170</sup>. That vastly exceeds the number of atoms in the observable universe, which is "only" about 10^80! 🤯
 
 Fortunately, clever mathematicians like [CITE1, CITE2] figured out how to reduce the state space into something much, much smaller.
 
@@ -136,13 +136,13 @@ would push the total beyond 63. This topological padding eliminates a branch
 in the innermost loop at the cost of 2&times; memory (16 MB per strategy table).
 
 ```rust
-// constants.rs
+// constants.rs — notation: upper_score = m, scored_categories = C
 pub const STATE_STRIDE: usize = 128;
-pub const NUM_STATES: usize = 32768 * STATE_STRIDE; // 4,194,304
+pub const NUM_STATES: usize = STATE_STRIDE * (1 << 15); // 128 × 32,768 = 4,194,304
 
 #[inline(always)]
-pub fn state_index(upper: usize, scored: usize) -> usize {
-    scored * STATE_STRIDE + upper
+pub fn state_index(upper_score: usize, scored_categories: usize) -> usize {
+    scored_categories * STATE_STRIDE + upper_score
 }
 ```
 

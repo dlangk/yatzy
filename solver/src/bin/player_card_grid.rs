@@ -119,7 +119,9 @@ fn main() {
                 println!("Usage: yatzy-player-card-grid [OPTIONS]");
                 println!("  --games N      Games per combo (default: 100000)");
                 println!("  --seed S       Random seed (default: 42)");
-                println!("  --output PATH  Output JSON (default: profiler/data/player_card_grid.json)");
+                println!(
+                    "  --output PATH  Output JSON (default: profiler/data/player_card_grid.json)"
+                );
                 std::process::exit(0);
             }
             other => {

@@ -1,5 +1,5 @@
 import type { GameState, GameAction, CategoryState, TrajectoryPoint } from './types.ts';
-import { CATEGORY_NAMES, CATEGORY_COUNT, TOTAL_DICE, BONUS_THRESHOLD, BONUS_SCORE, UPPER_CATEGORIES } from './constants.ts';
+import { CATEGORY_NAMES, CATEGORY_COUNT, TOTAL_DICE, UPPER_SCORE_CAP, UPPER_BONUS, UPPER_CATEGORIES } from './constants.ts';
 
 const STORAGE_KEY = 'yatzy-game-state';
 
@@ -90,7 +90,7 @@ function computeUpperScore(categories: CategoryState[]): number {
       sum += categories[i].score;
     }
   }
-  return Math.min(sum, BONUS_THRESHOLD);
+  return Math.min(sum, UPPER_SCORE_CAP);
 }
 
 function computeTotalScore(categories: CategoryState[], bonus: number): number {
@@ -114,7 +114,7 @@ function recomputeDerived(categories: CategoryState[]) {
   const rawUpperSum = categories.slice(0, UPPER_CATEGORIES).reduce(
     (s, c) => s + (c.isScored ? c.score : 0), 0
   );
-  const bonus = rawUpperSum >= BONUS_THRESHOLD ? BONUS_SCORE : 0;
+  const bonus = rawUpperSum >= UPPER_SCORE_CAP ? UPPER_BONUS : 0;
   const totalScore = computeTotalScore(categories, bonus);
   const scoredCategories = computeScoredMask(categories);
   const scoredCount = categories.filter((c) => c.isScored).length;

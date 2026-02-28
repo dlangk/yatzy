@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { gameReducer } from './reducer.ts';
 import type { GameState, CategoryState, EvaluateResponse } from './types.ts';
-import { CATEGORY_NAMES, CATEGORY_COUNT, TOTAL_DICE, BONUS_THRESHOLD, BONUS_SCORE } from './constants.ts';
+import { CATEGORY_NAMES, CATEGORY_COUNT, TOTAL_DICE, UPPER_SCORE_CAP, UPPER_BONUS } from './constants.ts';
 
 // Stub localStorage so the reducer never touches real storage
 const storageMock = { getItem: vi.fn(), setItem: vi.fn(), removeItem: vi.fn() };
@@ -215,9 +215,9 @@ describe('gameReducer', () => {
       state.categories[5].suggestedScore = 18;
       state.categories[5].available = true;
       const next = gameReducer(state, { type: 'SCORE_CATEGORY', categoryId: 5 });
-      expect(next.upperScore).toBe(BONUS_THRESHOLD);
-      expect(next.bonus).toBe(BONUS_SCORE);
-      expect(next.totalScore).toBe(3 + 6 + 9 + 12 + 15 + 18 + BONUS_SCORE);
+      expect(next.upperScore).toBe(UPPER_SCORE_CAP);
+      expect(next.bonus).toBe(UPPER_BONUS);
+      expect(next.totalScore).toBe(3 + 6 + 9 + 12 + 15 + 18 + UPPER_BONUS);
     });
   });
 

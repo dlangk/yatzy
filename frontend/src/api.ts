@@ -1,3 +1,16 @@
+/**
+ * Solver API client.
+ *
+ * All endpoints are stateless lookups against the precomputed strategy table.
+ * See solver/CLAUDE.md § API Reference for the canonical endpoint spec.
+ *
+ * Request contracts (validated server-side in solver/src/server.rs):
+ *   - dice:                5-element array, each value in [1, 6]
+ *   - upper_score:         integer in [0, 63]
+ *   - scored_categories:   15-bit bitmask (0 = no categories scored)
+ *   - rerolls_remaining:   0, 1, or 2
+ *   - accumulated_score:   non-negative integer
+ */
 import { API_BASE_URL } from './config.ts';
 import type { EvaluateRequest, EvaluateResponse } from './types.ts';
 

@@ -11,7 +11,7 @@
 
 use rand::rngs::SmallRng;
 use rand::Rng;
-#[cfg(any(feature = "full", feature = "wasm", test))]
+#[cfg(any(feature = "full", test))]
 use rand::SeedableRng;
 #[cfg(feature = "full")]
 use rayon::prelude::*;

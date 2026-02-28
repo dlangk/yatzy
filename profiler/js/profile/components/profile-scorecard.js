@@ -9,7 +9,7 @@ const CATEGORY_NAMES = [
   'Small Straight', 'Large Straight', 'Full House', 'Chance', 'Yatzy',
 ];
 const UPPER_CATEGORIES = 6;
-const BONUS_THRESHOLD = 63;
+const UPPER_SCORE_CAP = 63;
 
 // Par = 3 × face value (3 of each gives 63 total)
 const UPPER_PAR = [3, 6, 9, 12, 15, 18];
@@ -211,8 +211,8 @@ export function createProfileScorecard() {
     // Bonus row — upper score progress + total delta
     if (bonusRow) {
       bonusRow.sepName.textContent = 'Bonus';
-      bonusRow.sepVal.textContent = `${upperScore}/${BONUS_THRESHOLD}`;
-      bonusRow.sepVal.className = upperScore >= BONUS_THRESHOLD
+      bonusRow.sepVal.textContent = `${upperScore}/${UPPER_SCORE_CAP}`;
+      bonusRow.sepVal.className = upperScore >= UPPER_SCORE_CAP
         ? 'scorecard-cell profile-scorecard-status profile-scorecard-bonus-yes'
         : 'scorecard-cell profile-scorecard-status profile-scorecard-bonus-no';
 

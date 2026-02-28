@@ -13,7 +13,7 @@ analytics/.venv/bin/yatzy-analyze --help
 
 Python 3.11+ with polars, numpy, scipy, matplotlib, seaborn, pyarrow, click.
 Polars is the primary DataFrame library. Use `.to_pandas()` only at the seaborn/matplotlib plot boundary.
-Optional: scikit-learn, torch, joblib (surrogate models).
+Optional: scikit-learn, joblib (surrogate models).
 
 ## CLI Commands
 
