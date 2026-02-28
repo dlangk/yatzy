@@ -19,6 +19,7 @@ export async function initDiceSymmetry() {
   // ------- State -------
   const state = {
     currentId: -1,        // active multiset id
+    displayDice: [],      // unsorted dice for display
     heldIndices: new Set(),
     hoveredId: -1,
   };
@@ -46,6 +47,14 @@ export async function initDiceSymmetry() {
   trayTop.appendChild(diceRow);
   trayTop.appendChild(rollBtn);
   tray.appendChild(trayTop);
+
+  const diceLegend = document.createElement('div');
+  diceLegend.className = 'dice-symmetry-legend';
+  diceLegend.innerHTML =
+    '<span><span class="legend-swatch legend-swatch-hold"></span>Hold</span>' +
+    '<span><span class="legend-swatch legend-swatch-reroll"></span>Reroll</span>';
+  tray.appendChild(diceLegend);
+
   container.appendChild(tray);
 
   // Zone 1b: Keeps Panel (absolute-positioned sidecar outside content column)
@@ -102,10 +111,9 @@ export async function initDiceSymmetry() {
 
   function renderDice() {
     if (state.currentId < 0) return;
-    const ms = multisets[state.currentId];
     diceRow.innerHTML = '';
 
-    diceRenderer = renderDiceSelectable(diceRow, ms.dice, {
+    diceRenderer = renderDiceSelectable(diceRow, state.displayDice, {
       selected: state.heldIndices,
       size: 56,
       onToggle(idx) {
@@ -121,19 +129,18 @@ export async function initDiceSymmetry() {
   // ------- Keeps Panel -------
   function getActiveKeepKey() {
     if (state.currentId < 0 || state.heldIndices.size === 0) return '';
-    const ms = multisets[state.currentId];
     const kept = [];
-    for (const i of state.heldIndices) kept.push(ms.dice[i]);
+    for (const i of state.heldIndices) kept.push(state.displayDice[i]);
     kept.sort((a, b) => a - b);
     return kept.join(',');
   }
 
-  function indicesForKeep(roll, keepDice) {
+  function indicesForKeep(keepDice) {
     const indices = new Set();
     const used = new Array(5).fill(false);
     for (const v of keepDice) {
       for (let j = 0; j < 5; j++) {
-        if (!used[j] && roll[j] === v) {
+        if (!used[j] && state.displayDice[j] === v) {
           indices.add(j);
           used[j] = true;
           break;
@@ -148,7 +155,7 @@ export async function initDiceSymmetry() {
     const ms = multisets[state.currentId];
     const activeKey = getActiveKeepKey();
 
-    keepsPanel.innerHTML = '';
+    keepsPanel.innerHTML = '<div class="keeps-panel-header">Possible Rerolls</div>';
     for (const keep of ms.keeps) {
       const key = keep.dice.join(',');
       const row = document.createElement('div');
@@ -159,11 +166,11 @@ export async function initDiceSymmetry() {
       const diceWrap = document.createElement('div');
       diceWrap.className = 'keep-row-dice';
       const keptSet = new Set();
-      // Map keep values to roll positions (greedy left-to-right)
+      // Map keep values to display positions (greedy left-to-right)
       const usedRoll = new Array(5).fill(false);
       for (let ki = 0; ki < keep.dice.length; ki++) {
         for (let ri = 0; ri < 5; ri++) {
-          if (!usedRoll[ri] && ms.dice[ri] === keep.dice[ki]) {
+          if (!usedRoll[ri] && state.displayDice[ri] === keep.dice[ki]) {
             keptSet.add(ri);
             usedRoll[ri] = true;
             break;
@@ -171,7 +178,7 @@ export async function initDiceSymmetry() {
         }
       }
       for (let i = 0; i < 5; i++) {
-        diceWrap.appendChild(makeMinDie(ms.dice[i], keptSet.has(i)));
+        diceWrap.appendChild(makeMinDie(state.displayDice[i], keptSet.has(i)));
       }
       row.appendChild(diceWrap);
 
@@ -185,7 +192,7 @@ export async function initDiceSymmetry() {
 
       // Click → update held indices
       row.addEventListener('click', () => {
-        state.heldIndices = indicesForKeep(ms.dice, keep.dice);
+        state.heldIndices = indicesForKeep(keep.dice);
         renderDice();
       });
 
@@ -195,35 +202,30 @@ export async function initDiceSymmetry() {
 
   // ------- Roll -------
   function rollDice() {
-    // Keep held dice values, re-roll the rest
-    const prev = state.currentId >= 0 ? multisets[state.currentId] : null;
-    const heldValues = [];
-    if (prev) {
-      for (const i of state.heldIndices) heldValues.push(prev.dice[i]);
-    }
-
-    const newDice = [...heldValues];
-    for (let i = 0; i < 5 - heldValues.length; i++) {
-      newDice.push(Math.floor(Math.random() * 6) + 1);
-    }
-    newDice.sort((a, b) => a - b);
-
-    const key = newDice.join(',');
-    const ms = multisets.find(m => m.dice.join(',') === key);
-    state.currentId = ms.id;
-
-    // Map held values back to positions in the sorted result
+    // Keep held dice at their positions, re-roll the rest
+    const display = new Array(5);
     const newHeld = new Set();
-    const used = new Array(5).fill(false);
-    for (const v of heldValues) {
-      for (let j = 0; j < 5; j++) {
-        if (!used[j] && newDice[j] === v) {
-          newHeld.add(j);
-          used[j] = true;
-          break;
-        }
+
+    if (state.currentId >= 0) {
+      // Preserve held dice in place
+      for (const i of state.heldIndices) {
+        display[i] = state.displayDice[i];
+        newHeld.add(i);
       }
     }
+    // Fill empty slots with new rolls
+    for (let i = 0; i < 5; i++) {
+      if (display[i] === undefined) {
+        display[i] = Math.floor(Math.random() * 6) + 1;
+      }
+    }
+
+    // Look up multiset from sorted values
+    const sorted = [...display].sort((a, b) => a - b);
+    const key = sorted.join(',');
+    const ms = multisets.find(m => m.dice.join(',') === key);
+    state.currentId = ms.id;
+    state.displayDice = display;
     state.heldIndices = newHeld;
 
     renderDice();
@@ -238,7 +240,7 @@ export async function initDiceSymmetry() {
     let html = '<table class="pattern-table">';
     html += '<colgroup><col class="col-swatch"><col class="col-pattern"><col class="col-num"><col class="col-num"><col class="col-num"></colgroup>';
     html += '<thead><tr>';
-    html += '<th></th><th>Pattern</th><th class="num">Combinations</th><th class="num">Ordered</th><th class="num">Keeps</th>';
+    html += '<th></th><th>Pattern</th><th class="num">Combinations</th><th class="num">Ordered</th><th class="num">Rerolls</th>';
     html += '</tr></thead><tbody>';
     let totalKeeps = 0;
     for (let i = 0; i < fams.length; i++) {
@@ -332,6 +334,7 @@ export async function initDiceSymmetry() {
     if (!q) return;
     const msid = parseInt(q.dataset.msid);
     state.currentId = msid;
+    state.displayDice = [...multisets[msid].dice];
     state.heldIndices.clear();
     renderDice();
     updateTable();

@@ -25,7 +25,10 @@ just dev-frontend              # Vite serves at /yatzy/
 | `css/charts.css` | D3 chart containers and controls |
 | `css/treatise.css` | Section-specific styles |
 | `js/yatzy-viz.js` | Main chart orchestrator (reads data, binds sliders) |
-| `js/charts/*.js` | Individual D3 chart modules |
+| `js/charts/*.js` | Individual chart modules |
+| `js/charts/dice-symmetry.js` | Interactive 252-multiset explorer with reroll sidecar |
+| `js/utils/dice-interactive.js` | Selectable dice renderer (shared by charts) |
+| `scripts/gen-dice-symmetry.mjs` | Generator for `data/dice_symmetry.json` |
 | `js/data-loader.js` | Fetch + cache JSON data files |
 | `js/concept-drawer.js` | Concept glossary drawer |
 | `js/depth-toggle.js` | Technical depth expand/collapse |

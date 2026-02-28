@@ -554,6 +554,36 @@ h2 .section-link:hover {
   font-weight: 600;
 }
 
+.dice-symmetry-legend {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.dice-symmetry-legend > span {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.legend-swatch-hold {
+  background: var(--bg);
+  border: 2px solid var(--accent);
+}
+
+.legend-swatch-reroll {
+  background: none;
+  border: 1.5px dashed var(--border);
+}
+
 /* Keeps Panel — floats outside content column on the right */
 .dice-symmetry-explorer {
   position: relative;
@@ -568,6 +598,15 @@ h2 .section-link:hover {
   background: var(--bg-alt);
   border-radius: 8px;
   padding: 0.2rem 0;
+}
+
+.keeps-panel-header {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.25rem 0.4rem 0.15rem;
 }
 
 .keeps-panel:empty {
@@ -586,6 +625,7 @@ h2 .section-link:hover {
 
 .keep-row:last-child {
   border-bottom: none;
+  border-radius: 0 0 8px 8px;
 }
 
 .keep-row:hover {
