@@ -40,6 +40,16 @@ export function initActionBar(container: HTMLElement): void {
   hintsBtn.className = 'game-btn-secondary';
   hintsBtn.addEventListener('click', () => dispatch({ type: 'TOGGLE_HINTS' }));
 
+  const undoBtn = document.createElement('button');
+  undoBtn.className = 'game-btn-secondary';
+  undoBtn.textContent = 'Undo';
+  undoBtn.addEventListener('click', () => dispatch({ type: 'UNDO' }));
+
+  const redoBtn = document.createElement('button');
+  redoBtn.className = 'game-btn-secondary';
+  redoBtn.textContent = 'Redo';
+  redoBtn.addEventListener('click', () => dispatch({ type: 'REDO' }));
+
   const resetBtn = document.createElement('button');
   resetBtn.className = 'game-btn-secondary';
   resetBtn.textContent = 'Reset';
@@ -90,13 +100,21 @@ export function initActionBar(container: HTMLElement): void {
     }
     container.appendChild(mainBtn);
 
-    minusBtn.disabled = s.rerollsRemaining <= 0;
-    plusBtn.disabled = s.rerollsRemaining >= 2;
-    rerollControls.style.visibility = s.turnPhase === 'rolled' ? 'visible' : 'hidden';
+    const rerollActive = s.turnPhase === 'rolled';
+    minusBtn.disabled = !rerollActive || s.rerollsRemaining <= 0;
+    plusBtn.disabled = !rerollActive || s.rerollsRemaining >= 2;
+    rerollControls.style.opacity = rerollActive ? '1' : '0.3';
     container.appendChild(rerollControls);
 
     hintsBtn.textContent = s.showHints ? 'Hide Hints' : 'Show Hints';
     container.appendChild(hintsBtn);
+
+    undoBtn.disabled = s.undoStack.length === 0;
+    container.appendChild(undoBtn);
+
+    redoBtn.disabled = s.redoStack.length === 0;
+    container.appendChild(redoBtn);
+
     container.appendChild(resetBtn);
   }
 

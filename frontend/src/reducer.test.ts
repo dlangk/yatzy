@@ -32,6 +32,8 @@ function freshState(): GameState {
     pendingRerollLabel: null,
     pendingRerollDelta: null,
     showHints: true,
+    undoStack: [],
+    redoStack: [],
   };
 }
 

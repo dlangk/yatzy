@@ -1,4 +1,4 @@
-import type { GameState, GameAction, CategoryState, TrajectoryPoint } from './types.ts';
+import type { GameState, GameAction, CategoryState, TrajectoryPoint, GameStateSnapshot } from './types.ts';
 import { CATEGORY_NAMES, CATEGORY_COUNT, TOTAL_DICE, UPPER_SCORE_CAP, UPPER_BONUS, UPPER_CATEGORIES } from './constants.ts';
 
 const STORAGE_KEY = 'yatzy-game-state';
@@ -32,7 +32,7 @@ function loadState(): GameState | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return { ...parsed, lastEvalResponse: parsed.lastEvalResponse ?? null, sortMap: parsed.sortMap ?? null, pendingTrajectoryEvent: null, pendingRerollLabel: null, pendingRerollDelta: null, trajectory: parsed.trajectory ?? [], showHints: parsed.showHints ?? true };
+    return { ...parsed, lastEvalResponse: parsed.lastEvalResponse ?? null, sortMap: parsed.sortMap ?? null, pendingTrajectoryEvent: null, pendingRerollLabel: null, pendingRerollDelta: null, trajectory: parsed.trajectory ?? [], showHints: parsed.showHints ?? true, undoStack: parsed.undoStack ?? [], redoStack: parsed.redoStack ?? [] };
   } catch {
     return null;
   }
@@ -76,6 +76,8 @@ function freshState(): GameState {
     pendingRerollLabel: null,
     pendingRerollDelta: null,
     showHints: true,
+    undoStack: [],
+    redoStack: [],
   };
 }
 
@@ -121,6 +123,37 @@ function recomputeDerived(categories: CategoryState[]) {
   return { upperScore, bonus, totalScore, scoredCategories, scoredCount };
 }
 
+/** Extract a snapshot (excludes undo/redo stacks and transient fields). */
+function takeSnapshot(state: GameState): GameStateSnapshot {
+  return {
+    dice: state.dice,
+    upperScore: state.upperScore,
+    scoredCategories: state.scoredCategories,
+    rerollsRemaining: state.rerollsRemaining,
+    categories: state.categories,
+    totalScore: state.totalScore,
+    bonus: state.bonus,
+    lastEvalResponse: state.lastEvalResponse,
+    sortMap: state.sortMap,
+    showDebug: state.showDebug,
+    turnPhase: state.turnPhase,
+    trajectory: state.trajectory,
+    showHints: state.showHints,
+  };
+}
+
+/** Restore a snapshot into a full GameState with empty transient fields. */
+function restoreSnapshot(snap: GameStateSnapshot, undoStack: GameStateSnapshot[], redoStack: GameStateSnapshot[]): GameState {
+  return {
+    ...snap,
+    pendingTrajectoryEvent: null,
+    pendingRerollLabel: null,
+    pendingRerollDelta: null,
+    undoStack,
+    redoStack,
+  };
+}
+
 export function computeAccumulatedScore(state: GameState): number {
   let sum = 0;
   for (const cat of state.categories) {
@@ -147,6 +180,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         sortMap: null,
         turnPhase: 'rolled',
         pendingTrajectoryEvent: 'roll',
+        redoStack: [],
       };
     }
 
@@ -209,6 +243,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const cat = state.categories[catId];
       if (!cat || cat.isScored || !cat.available) return state;
 
+      // Snapshot current state for undo before transitioning
+      const snapshot = takeSnapshot(state);
+
       const categories = state.categories.map((c) =>
         c.id === catId
           ? { ...c, isScored: true, score: c.suggestedScore }
@@ -257,6 +294,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         rerollsRemaining: 0,
         trajectory: [...trajectory, point],
         pendingTrajectoryEvent: null,
+        undoStack: [...state.undoStack, snapshot],
+        redoStack: [],
       };
     }
 
@@ -399,6 +438,20 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         sortMap: null,
         turnPhase,
       };
+    }
+
+    case 'UNDO': {
+      if (state.undoStack.length === 0) return state;
+      const snap = state.undoStack[state.undoStack.length - 1];
+      const newUndoStack = state.undoStack.slice(0, -1);
+      return restoreSnapshot(snap, newUndoStack, [...state.redoStack, takeSnapshot(state)]);
+    }
+
+    case 'REDO': {
+      if (state.redoStack.length === 0) return state;
+      const snap = state.redoStack[state.redoStack.length - 1];
+      const newRedoStack = state.redoStack.slice(0, -1);
+      return restoreSnapshot(snap, [...state.undoStack, takeSnapshot(state)], newRedoStack);
     }
 
     case 'RESET_GAME':

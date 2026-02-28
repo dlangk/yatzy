@@ -29,11 +29,20 @@ subscribe((state, prev) => {
   const traj = state.trajectory;
   if (traj.length > prev.trajectory.length) {
     const latest = traj[traj.length - 1];
-    if (latest.event === 'score' && !latest.percentiles && latest.turn < 15) {
-      const rawScoredSum = state.categories.reduce((sum, c) => c.isScored ? sum + c.score : sum, 0);
-      fetchDensity(state.upperScore, state.scoredCategories, rawScoredSum)
-        .then(res => dispatch({ type: 'SET_DENSITY_RESULT', index: latest.index, percentiles: res.percentiles }))
-        .catch(() => { /* density endpoint not available */ });
+    if (latest.event === 'score' && !latest.percentiles) {
+      if (latest.turn < 15) {
+        const rawScoredSum = state.categories.reduce((sum, c) => c.isScored ? sum + c.score : sum, 0);
+        fetchDensity(state.upperScore, state.scoredCategories, rawScoredSum)
+          .then(res => dispatch({ type: 'SET_DENSITY_RESULT', index: latest.index, percentiles: res.percentiles }))
+          .catch(() => { /* density endpoint not available */ });
+      } else {
+        const finalScore = state.totalScore;
+        const pctiles: Record<string, number> = {};
+        for (const k of ['p1','p5','p10','p25','p50','p75','p90','p95','p99']) {
+          pctiles[k] = finalScore;
+        }
+        dispatch({ type: 'SET_DENSITY_RESULT', index: latest.index, percentiles: pctiles });
+      }
     }
   }
 });
@@ -43,7 +52,12 @@ subscribe((state, prev) => {
   const s = getState();
   if (s.trajectory.length === 0 && s.turnPhase === 'idle') {
     getStateValue(s.upperScore, s.scoredCategories)
-      .then(res => dispatch({ type: 'SET_INITIAL_EV', ev: res.expected_final_score }))
+      .then(res => {
+        dispatch({ type: 'SET_INITIAL_EV', ev: res.expected_final_score });
+        fetchDensity(s.upperScore, s.scoredCategories, 0)
+          .then(d => dispatch({ type: 'SET_DENSITY_RESULT', index: 0, percentiles: d.percentiles }))
+          .catch(() => {});
+      })
       .catch(() => { /* server not available */ });
   }
 }

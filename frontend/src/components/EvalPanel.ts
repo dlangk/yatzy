@@ -11,7 +11,7 @@ export function initEvalPanel(container: HTMLElement): void {
 
   const dash = '\u2014';
   const rows: [string, HTMLSpanElement][] = [];
-  const labels = ['State EV', 'Your mask EV', 'Best mask EV', 'Delta', 'Best category', 'Category EV'];
+  const labels = ['Expected final score', 'Your reroll value', 'Best reroll value', 'Difference', 'Best category', 'Best category value'];
 
   for (const label of labels) {
     const lbl = document.createElement('span');

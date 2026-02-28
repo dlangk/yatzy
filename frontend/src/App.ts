@@ -1,18 +1,18 @@
 /**
  * App DOM skeleton.
  *
- * Four semantic sections ordered for narrow-screen stacking priority:
- *   1. Dice    — ActionBar + DiceBar + DiceLegend  (most interactive)
+ * Three grid sections:
+ *   1. Right   — Dice (ActionBar + DiceBar + DiceLegend) + Analysis (EvalPanel + TrajectoryChart)
  *   2. Scorecard — full scoring table
- *   3. Analysis — EvalPanel + TrajectoryChart
- *   4. Log     — DecisionLog (least critical on mobile)
+ *   3. Log     — DecisionLog
  *
  * CSS Grid places these into columns on wider viewports:
- *   Desktop (>1100px):  Log | Scorecard | Dice + Analysis (stacked in col 3)
- *   Tablet  (721–1100): Dice full-width, Scorecard + Analysis side-by-side, Log below
+ *   Desktop (>1100px):  Log | Scorecard | Right (dice + analysis stacked)
+ *   Tablet  (721–1100): Right full-width, Scorecard + Log below
  *   Narrow  (≤720px):  Single column in DOM order
  */
 import { initActionBar } from './components/ActionBar.ts';
+import { initAutoPlay } from './autoplay.ts';
 import { initDiceBar } from './components/DiceBar.ts';
 import { initDiceLegend } from './components/DiceLegend.ts';
 import { initEvalPanel } from './components/EvalPanel.ts';
@@ -36,14 +36,21 @@ export function initApp(container: HTMLElement): void {
   columns.className = 'app-columns';
   app.appendChild(columns);
 
-  // Section 1: Dice — desktop col 3 row 1, narrow stacks first
+  // Right column: Dice + Analysis stacked in a single grid cell (desktop col 3)
+  const rightSection = document.createElement('div');
+  rightSection.className = 'app-section-right';
+  columns.appendChild(rightSection);
+
   const diceSection = document.createElement('div');
-  diceSection.className = 'app-section-dice';
-  columns.appendChild(diceSection);
+  rightSection.appendChild(diceSection);
 
   const actionBarEl = document.createElement('div');
   diceSection.appendChild(actionBarEl);
   initActionBar(actionBarEl);
+
+  const autoplayBarEl = document.createElement('div');
+  diceSection.appendChild(autoplayBarEl);
+  initAutoPlay(autoplayBarEl);
 
   const diceBarEl = document.createElement('div');
   diceSection.appendChild(diceBarEl);
@@ -62,10 +69,9 @@ export function initApp(container: HTMLElement): void {
   scorecardSection.appendChild(scorecardEl);
   initScorecard(scorecardEl);
 
-  // Section 3: Analysis — desktop col 3 row 2, narrow stacks third
+  // Analysis — stacked below dice in the right column
   const analysisSection = document.createElement('div');
-  analysisSection.className = 'app-section-analysis';
-  columns.appendChild(analysisSection);
+  rightSection.appendChild(analysisSection);
 
   const evalPanelEl = document.createElement('div');
   analysisSection.appendChild(evalPanelEl);

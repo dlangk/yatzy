@@ -50,6 +50,23 @@ export interface EvaluateResponse {
 
 export type TurnPhase = 'idle' | 'rolled' | 'game_over';
 
+/** Snapshot of game state at a turn boundary (excludes undo/redo stacks to avoid nesting). */
+export interface GameStateSnapshot {
+  dice: DieState[];
+  upperScore: number;
+  scoredCategories: number;
+  rerollsRemaining: number;
+  categories: CategoryState[];
+  totalScore: number;
+  bonus: number;
+  lastEvalResponse: EvaluateResponse | null;
+  sortMap: number[] | null;
+  showDebug: boolean;
+  turnPhase: TurnPhase;
+  trajectory: TrajectoryPoint[];
+  showHints: boolean;
+}
+
 export interface GameState {
   dice: DieState[];
   upperScore: number;
@@ -67,6 +84,8 @@ export interface GameState {
   pendingRerollLabel: string | null;
   pendingRerollDelta: number | null;
   showHints: boolean;
+  undoStack: GameStateSnapshot[];
+  redoStack: GameStateSnapshot[];
 }
 
 export type GameAction =
@@ -83,4 +102,6 @@ export type GameAction =
   | { type: 'UNSET_CATEGORY'; categoryId: number }
   | { type: 'SET_INITIAL_EV'; ev: number }
   | { type: 'SET_DENSITY_RESULT'; index: number; percentiles: Record<string, number> }
-  | { type: 'TOGGLE_HINTS' };
+  | { type: 'TOGGLE_HINTS' }
+  | { type: 'UNDO' }
+  | { type: 'REDO' };

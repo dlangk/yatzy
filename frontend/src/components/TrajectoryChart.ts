@@ -109,8 +109,12 @@ function buildLegend(container: HTMLElement): void {
       label: 'Accumulated',
     },
     {
+      svg: `<svg width="16" height="12" viewBox="0 0 16 12"><rect x="0" y="1" width="16" height="10" fill="rgba(59,76,192,0.06)"/></svg>`,
+      label: 'p1–p99',
+    },
+    {
       svg: `<svg width="16" height="12" viewBox="0 0 16 12"><rect x="0" y="1" width="16" height="10" fill="rgba(59,76,192,0.12)"/></svg>`,
-      label: 'Percentile band',
+      label: 'p10–p90',
     },
     {
       svg: `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="3.5" fill="${COLORS.textMuted}" stroke="${COLORS.bg}" stroke-width="1"/></svg>`,
@@ -278,6 +282,13 @@ export function initTrajectoryChart(container: HTMLElement): void {
     if (p.label) {
       html += `<div style="color:${COLORS.textMuted}">${p.label}</div>`;
     }
+    if (p.percentiles) {
+      const pct = p.percentiles;
+      html += `<div style="color:${COLORS.textMuted};margin-top:2px;font-size:0.9em">`;
+      html += `p10–p90: ${Math.round(pct.p10)}–${Math.round(pct.p90)}`;
+      html += `<br>p1–p99: ${Math.round(pct.p1)}–${Math.round(pct.p99)}`;
+      html += `</div>`;
+    }
     tooltip.innerHTML = html;
     tooltip.style.display = '';
 
@@ -387,13 +398,13 @@ export function initTrajectoryChart(container: HTMLElement): void {
     currentTrajectory = trajectory;
     currentXPositions = xPositions;
 
-    // Percentile bands (use score points only)
-    const scorePoints = trajectory.filter(p => p.event === 'score' && p.percentiles);
-    if (scorePoints.length >= 2) {
-      drawBand(bandG, scorePoints, 'p10', 'p90', 'rgba(59, 76, 192, 0.08)', xPositions, x, y);
-      drawBand(bandG, scorePoints, 'p25', 'p75', 'rgba(59, 76, 192, 0.15)', xPositions, x, y);
-    } else if (scorePoints.length === 1 && scorePoints[0].percentiles) {
-      drawWhisker(bandG, scorePoints[0], xPositions, x, y);
+    // Percentile bands — include start point if it has percentiles
+    const bandPoints = trajectory.filter(p => (p.event === 'score' || p.event === 'start') && p.percentiles);
+    if (bandPoints.length >= 2) {
+      drawBand(bandG, bandPoints, 'p1', 'p99', 'rgba(59, 76, 192, 0.06)', xPositions, x, y);
+      drawBand(bandG, bandPoints, 'p10', 'p90', 'rgba(59, 76, 192, 0.12)', xPositions, x, y);
+    } else if (bandPoints.length === 1 && bandPoints[0].percentiles) {
+      drawWhisker(bandG, bandPoints[0], xPositions, x, y);
     }
 
     // Accumulated score floor (shaded area)
@@ -487,8 +498,8 @@ function drawWhisker(
   if (!p.percentiles) return;
   const px = x(xPositions[p.index]);
   for (const [lowKey, highKey, alpha] of [
-    ['p10', 'p90', 0.15],
-    ['p25', 'p75', 0.3],
+    ['p1', 'p99', 0.12],
+    ['p10', 'p90', 0.25],
   ] as [string, string, number][]) {
     const lo = p.percentiles[lowKey];
     const hi = p.percentiles[highKey];
