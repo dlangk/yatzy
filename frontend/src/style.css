@@ -314,13 +314,27 @@ body {
   font-size: 13px;
 }
 
-.eval-panel .grid {
+.eval-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px;
+  gap: 16px;
 }
 
-.eval-panel .val {
+.eval-col-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.eval-col-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+}
+
+.eval-col-grid .val {
   text-align: right;
 }
 

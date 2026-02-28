@@ -1,28 +1,79 @@
 import { getState, subscribe } from '../store.ts';
-import { computeRerollMask, mapMaskToSorted } from '../mask.ts';
+import { computeRerollMask, mapMaskToSorted, unmapMask } from '../mask.ts';
 
-/** Render the evaluation panel showing state EV, mask EV, delta, and best category. */
+const DASH = '\u2014';
+
+/** Given an expectedFinal and percentile map, return a bracket string like "Top 25%". */
+function percentileBracket(ev: number, pct: Record<string, number>): string {
+  if (ev >= pct.p99) return 'Top 1%';
+  if (ev >= pct.p95) return 'Top 5%';
+  if (ev >= pct.p90) return 'Top 10%';
+  if (ev >= pct.p75) return 'Top 25%';
+  if (ev >= pct.p50) return 'Top 50%';
+  if (ev >= pct.p25) return 'Top 75%';
+  if (ev >= pct.p10) return 'Top 90%';
+  return 'Bottom 10%';
+}
+
+/** Build a label/value grid column with a header. Returns refs to value spans. */
+function buildColumn(
+  parent: HTMLElement,
+  header: string,
+  labels: string[],
+): HTMLSpanElement[] {
+  const col = document.createElement('div');
+  col.className = 'eval-col';
+
+  const hdr = document.createElement('div');
+  hdr.className = 'eval-col-header';
+  hdr.textContent = header;
+  col.appendChild(hdr);
+
+  const grid = document.createElement('div');
+  grid.className = 'eval-col-grid';
+  col.appendChild(grid);
+
+  const vals: HTMLSpanElement[] = [];
+  for (const label of labels) {
+    const lbl = document.createElement('span');
+    lbl.textContent = label;
+    const val = document.createElement('span');
+    val.className = 'val';
+    val.textContent = DASH;
+    grid.appendChild(lbl);
+    grid.appendChild(val);
+    vals.push(val);
+  }
+
+  parent.appendChild(col);
+  return vals;
+}
+
+/** Render the two-column evaluation panel: turn-specific + game-level stats. */
 export function initEvalPanel(container: HTMLElement): void {
   container.className = 'eval-panel';
 
-  const grid = document.createElement('div');
-  grid.className = 'grid';
-  container.appendChild(grid);
+  const columns = document.createElement('div');
+  columns.className = 'eval-columns';
+  container.appendChild(columns);
 
-  const dash = '\u2014';
-  const rows: [string, HTMLSpanElement][] = [];
-  const labels = ['Expected final score', 'Your reroll value', 'Best reroll value', 'Difference', 'Best category', 'Best category value'];
+  // Left column: This Turn
+  const turnVals = buildColumn(columns, 'This Turn', [
+    'Best keep',
+    'Keep EV',
+    'Your keep EV',
+    'Best score',
+    'Score EV',
+  ]);
 
-  for (const label of labels) {
-    const lbl = document.createElement('span');
-    lbl.textContent = label + ':';
-    const val = document.createElement('span');
-    val.className = 'val';
-    val.textContent = dash;
-    grid.appendChild(lbl);
-    grid.appendChild(val);
-    rows.push([label, val]);
-  }
+  // Right column: Game
+  const gameVals = buildColumn(columns, 'Game', [
+    'Expected final',
+    'Score so far',
+    'Turn',
+    'Percentile',
+    'Finish range',
+  ]);
 
   function render() {
     const s = getState();
@@ -30,48 +81,92 @@ export function initEvalPanel(container: HTMLElement): void {
     const rerolls = s.rerollsRemaining;
     const hints = s.showHints;
 
+    // --- Turn column ---
+    const showKeep = hasData && hints && rerolls > 0;
+    const showScore = hasData && hints;
+
+    // Best keep (dice values held by optimal mask)
+    if (showKeep && s.lastEvalResponse?.optimal_mask != null && s.sortMap) {
+      const originalMask = unmapMask(s.lastEvalResponse.optimal_mask, s.sortMap);
+      const kept: number[] = [];
+      for (let i = 0; i < 5; i++) {
+        if (!(originalMask & (1 << i))) {
+          kept.push(s.dice[i].value);
+        }
+      }
+      turnVals[0].textContent = kept.length === 5 ? 'All' : kept.length === 0 ? 'None' : kept.join(', ');
+    } else {
+      turnVals[0].textContent = DASH;
+    }
+
+    // Keep EV (optimal mask EV)
+    const optMaskEv = s.lastEvalResponse?.optimal_mask_ev ?? null;
+    turnVals[1].textContent = showKeep && optMaskEv !== null ? optMaskEv.toFixed(2) : DASH;
+
+    // Your keep EV
     let currentMaskEv: number | null = null;
     if (s.lastEvalResponse?.mask_evs && s.sortMap) {
       const originalMask = computeRerollMask(s.dice.map(d => d.held));
       const sortedMask = mapMaskToSorted(originalMask, s.sortMap);
       currentMaskEv = s.lastEvalResponse.mask_evs[sortedMask] ?? null;
     }
+    turnVals[2].textContent = showKeep && currentMaskEv !== null ? currentMaskEv.toFixed(2) : DASH;
 
-    const optMaskEv = s.lastEvalResponse?.optimal_mask_ev ?? null;
+    // Best score (category name + score)
     const optCat = s.lastEvalResponse?.optimal_category ?? null;
     const optCatEv = s.lastEvalResponse?.optimal_category_ev ?? null;
-    const stateEv = s.lastEvalResponse?.state_ev ?? null;
-
     const optCatName = optCat !== null && optCat >= 0
       ? s.categories[optCat]?.name ?? '?'
       : null;
-
-    // State EV
-    rows[0][1].textContent = hasData && stateEv !== null ? stateEv.toFixed(2) : dash;
-
-    // Your mask EV
-    rows[1][1].textContent = hasData && hints && rerolls > 0 && currentMaskEv !== null
-      ? currentMaskEv.toFixed(2) : dash;
-
-    // Best mask EV
-    rows[2][1].textContent = hasData && hints && rerolls > 0 && optMaskEv !== null
-      ? optMaskEv.toFixed(2) : dash;
-
-    // Delta
-    if (hasData && hints && rerolls > 0 && currentMaskEv !== null && optMaskEv !== null) {
-      const delta = currentMaskEv - optMaskEv;
-      rows[3][1].textContent = delta.toFixed(2);
-      rows[3][1].style.color = Math.abs(delta) < 0.01 ? 'var(--color-success)' : 'var(--color-danger)';
+    if (showScore && optCatName) {
+      const catInfo = s.lastEvalResponse!.categories.find(c => c.id === optCat);
+      const score = catInfo?.score;
+      turnVals[3].textContent = score != null ? `${optCatName} (${score})` : optCatName;
     } else {
-      rows[3][1].textContent = dash;
-      rows[3][1].style.color = 'inherit';
+      turnVals[3].textContent = DASH;
     }
 
-    // Best category
-    rows[4][1].textContent = hasData && hints && optCatName ? optCatName : dash;
+    // Score EV
+    turnVals[4].textContent = showScore && optCatEv !== null ? optCatEv.toFixed(2) : DASH;
 
-    // Category EV
-    rows[5][1].textContent = hasData && hints && optCatEv !== null ? optCatEv.toFixed(2) : dash;
+    // --- Game column ---
+
+    // Expected final score
+    const stateEv = s.lastEvalResponse?.state_ev ?? null;
+    const latestScored = [...s.trajectory].reverse().find(p => p.event === 'score');
+    const expectedFinal = hasData && stateEv !== null
+      ? stateEv
+      : latestScored?.expectedFinal ?? null;
+    gameVals[0].textContent = expectedFinal !== null ? expectedFinal.toFixed(1) : DASH;
+
+    // Score so far
+    gameVals[1].textContent = String(s.totalScore);
+
+    // Turn X / 15
+    const scoredCount = s.categories.filter(c => c.isScored).length;
+    gameVals[2].textContent = `${scoredCount} / 15`;
+
+    // Percentile (from latest trajectory point with percentiles)
+    const latestWithPct = [...s.trajectory].reverse().find(p => p.percentiles);
+    const ef = expectedFinal ?? latestScored?.expectedFinal ?? null;
+    if (latestWithPct?.percentiles && ef !== null) {
+      gameVals[3].textContent = percentileBracket(ef, latestWithPct.percentiles);
+    } else {
+      gameVals[3].textContent = DASH;
+    }
+
+    // Finish range (p10–p90)
+    if (latestWithPct?.percentiles) {
+      const p10 = latestWithPct.percentiles.p10;
+      const p90 = latestWithPct.percentiles.p90;
+      if (p10 != null && p90 != null) {
+        gameVals[4].textContent = `${Math.round(p10)}–${Math.round(p90)}`;
+      } else {
+        gameVals[4].textContent = DASH;
+      }
+    } else {
+      gameVals[4].textContent = DASH;
+    }
   }
 
   render();
