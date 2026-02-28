@@ -217,14 +217,14 @@ async fn handle_density(
         ));
     }
 
-    // Guard: reject density with too many remaining turns — forward DP grows
-    // exponentially with remaining categories and can OOM/timeout low-resource servers.
-    // Require at least 5 scored categories (≤10 remaining, ~2-10s on 2-CPU server).
+    // Guard: reject density with >11 remaining turns. Forward DP cost grows
+    // combinatorially; on a 2-CPU/1GB server, turns 0-3 exceed 30s or OOM.
+    // Turn 4 (11 remaining) takes ~20s; turn 5+ is <3s.
     let turns_scored = (req.scored_categories as u32).count_ones();
-    if turns_scored < 5 {
+    if turns_scored < 4 {
         return Err(error_response(
             StatusCode::BAD_REQUEST,
-            "Density requires at least 5 scored categories (≤10 remaining turns).",
+            "Density requires at least 4 scored categories (≤11 remaining turns).",
         ));
     }
 

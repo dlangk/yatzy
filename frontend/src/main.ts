@@ -30,8 +30,8 @@ subscribe((state, prev) => {
   if (traj.length > prev.trajectory.length) {
     const latest = traj[traj.length - 1];
     if (latest.event === 'score' && !latest.percentiles) {
-      if (latest.turn < 15 && latest.turn >= 5) {
-        // Density requires ≥5 scored categories (≤10 remaining turns)
+      if (latest.turn >= 4 && latest.turn < 15) {
+        // Density available from turn 4 onward (turns 0-3 too slow on production server)
         const rawScoredSum = state.categories.reduce((sum, c) => c.isScored ? sum + c.score : sum, 0);
         fetchDensity(state.upperScore, state.scoredCategories, rawScoredSum)
           .then(res => dispatch({ type: 'SET_DENSITY_RESULT', index: latest.index, percentiles: res.percentiles }))
