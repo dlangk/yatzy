@@ -102,12 +102,18 @@ body {
     grid-column: 1;
     grid-row: auto;
   }
+
+  .action-bar .game-btn-primary {
+    width: 110px;
+    font-size: 14px;
+  }
 }
 
 /* Action bar */
 .action-bar {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   justify-content: center;
   align-items: center;
   margin: 12px 0;
