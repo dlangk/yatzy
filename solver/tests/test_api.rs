@@ -11,7 +11,7 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use yatzy::phase0_tables;
-use yatzy::server::create_router;
+use yatzy::server::{create_router, create_router_full};
 use yatzy::state_computation::compute_all_state_values;
 use yatzy::types::YatzyContext;
 
@@ -38,6 +38,12 @@ fn get_ctx() -> Arc<YatzyContext> {
 
 fn app() -> axum::Router {
     create_router(get_ctx())
+}
+
+fn app_with_density() -> axum::Router {
+    // Create router with state_values loaded (no oracle, no percentile table)
+    // — density endpoint will use real-time MC simulation for turns 5+
+    create_router_full(get_ctx(), None, None)
 }
 
 // ── GET /health ──────────────────────────────────────────────────────
@@ -179,17 +185,17 @@ async fn evaluate_invalid_rerolls() {
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 }
 
-// ── POST /density (no oracle) ────────────────────────────────────────
+// ── POST /density ───────────────────────────────────────────────────
 
 #[tokio::test]
-async fn density_without_oracle_returns_503() {
-    // Use scored_categories with ≥4 bits set to bypass the min-turns guard
+async fn density_game_over_returns_degenerate() {
+    // All 15 categories scored — game over, should return degenerate response
     let body = serde_json::json!({
-        "upper_score": 10,
-        "scored_categories": 15,
-        "accumulated_score": 40,
+        "upper_score": 63,
+        "scored_categories": 32767,
+        "accumulated_score": 280,
     });
-    let resp = app()
+    let resp = app_with_density()
         .oneshot(
             Request::post("/density")
                 .header("content-type", "application/json")
@@ -198,18 +204,24 @@ async fn density_without_oracle_returns_503() {
         )
         .await
         .unwrap();
-    assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(resp.status(), StatusCode::OK);
+    let json = body_json(resp.into_body()).await;
+    // With upper_score=63, bonus = 50, so final = 280 + 50 = 330
+    let mean = json["mean"].as_f64().unwrap();
+    assert_eq!(mean, 330.0);
+    let p50 = json["percentiles"]["p50"].as_i64().unwrap();
+    assert_eq!(p50, 330);
 }
 
 #[tokio::test]
-async fn density_too_few_scored_rejected() {
-    // 2 categories scored (< 4 minimum) — too expensive on production
+async fn density_mc_returns_percentiles() {
+    // 10 categories scored — should use real-time MC simulation
     let body = serde_json::json!({
-        "upper_score": 3,
-        "scored_categories": 3,
-        "accumulated_score": 15,
+        "upper_score": 30,
+        "scored_categories": 1023,
+        "accumulated_score": 150,
     });
-    let resp = app()
+    let resp = app_with_density()
         .oneshot(
             Request::post("/density")
                 .header("content-type", "application/json")
@@ -218,7 +230,19 @@ async fn density_too_few_scored_rejected() {
         )
         .await
         .unwrap();
-    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(resp.status(), StatusCode::OK);
+    let json = body_json(resp.into_body()).await;
+    // Should have mean, std_dev, percentiles
+    assert!(json.get("mean").is_some());
+    assert!(json.get("std_dev").is_some());
+    let pcts = json["percentiles"].as_object().unwrap();
+    assert!(pcts.contains_key("p50"));
+    assert!(pcts.contains_key("p10"));
+    assert!(pcts.contains_key("p90"));
+    // p50 should be reasonable (150 accumulated + some remaining)
+    let p50 = pcts["p50"].as_i64().unwrap();
+    assert!(p50 > 150, "p50={} should be > accumulated 150", p50);
+    assert!(p50 < 374, "p50={} should be < max possible 374", p50);
 }
 
 // ── Determinism ──────────────────────────────────────────────────────

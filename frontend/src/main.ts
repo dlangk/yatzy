@@ -30,8 +30,7 @@ subscribe((state, prev) => {
   if (traj.length > prev.trajectory.length) {
     const latest = traj[traj.length - 1];
     if (latest.event === 'score' && !latest.percentiles) {
-      if (latest.turn >= 4 && latest.turn < 15) {
-        // Density available from turn 4 onward (turns 0-3 too slow on production server)
+      if (latest.turn < 15) {
         const rawScoredSum = state.categories.reduce((sum, c) => c.isScored ? sum + c.score : sum, 0);
         fetchDensity(state.upperScore, state.scoredCategories, rawScoredSum)
           .then(res => dispatch({ type: 'SET_DENSITY_RESULT', index: latest.index, percentiles: res.percentiles }))
@@ -48,7 +47,7 @@ subscribe((state, prev) => {
   }
 });
 
-// Side effect: fetch initial EV (skip density at turn 0 — too expensive for production)
+// Side effect: fetch initial EV and density at turn 0
 {
   const s = getState();
   if (s.trajectory.length === 0 && s.turnPhase === 'idle') {
@@ -57,6 +56,17 @@ subscribe((state, prev) => {
         dispatch({ type: 'SET_INITIAL_EV', ev: res.expected_final_score });
       })
       .catch(() => { /* server not available */ });
+
+    // Fetch density for the initial state (turn 0)
+    fetchDensity(s.upperScore, s.scoredCategories, 0)
+      .then(res => {
+        // Dispatch as the first trajectory point (index 0) if it exists
+        const state = getState();
+        const traj = state.trajectory;
+        if (traj.length > 0 && !traj[0].percentiles) {
+          dispatch({ type: 'SET_DENSITY_RESULT', index: traj[0].index, percentiles: res.percentiles });
+        }
+      })
+      .catch(() => { /* density endpoint not available */ });
   }
 }
-

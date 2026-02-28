@@ -1,9 +1,12 @@
 use std::sync::Arc;
 
 use yatzy::phase0_tables;
-use yatzy::server::create_router_with_oracle;
+use yatzy::server::create_router_full;
 use yatzy::state_computation::compute_all_state_values;
-use yatzy::storage::{load_all_state_values, load_oracle, ORACLE_FILE_PATH};
+use yatzy::storage::{
+    load_all_state_values, load_oracle, load_percentile_table, ORACLE_FILE_PATH,
+    PERCENTILE_FILE_PATH,
+};
 use yatzy::types::YatzyContext;
 
 #[tokio::main]
@@ -23,13 +26,21 @@ async fn main() {
     // Load oracle for density endpoint (optional — skip if file missing)
     let oracle = load_oracle(ORACLE_FILE_PATH);
     if oracle.is_some() {
-        println!("Oracle loaded — /density endpoint available");
+        println!("Oracle loaded — /density endpoint available with exact DP for high-turn states");
     } else {
-        println!("Oracle not found — /density endpoint will return 503");
+        println!("Oracle not found — /density endpoint will use MC simulation only");
+    }
+
+    // Load percentile table for fast turn 0-4 density (optional)
+    let percentile_table = load_percentile_table(PERCENTILE_FILE_PATH);
+    if percentile_table.is_some() {
+        println!("Percentile table loaded — /density O(1) lookup for turns 0-4");
+    } else {
+        println!("Percentile table not found — /density will use MC for all turns");
     }
 
     let ctx = Arc::new(*ctx);
-    let app = create_router_with_oracle(ctx, oracle);
+    let app = create_router_full(ctx, oracle, percentile_table);
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port))
         .await

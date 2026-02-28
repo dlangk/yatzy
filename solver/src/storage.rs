@@ -14,7 +14,8 @@ use std::time::Instant;
 use memmap2::Mmap;
 
 use crate::constants::*;
-use crate::types::{PolicyOracle, StateValues, YatzyContext, ORACLE_ENTRIES};
+use crate::types::{PercentileEntry, PolicyOracle, StateValues, YatzyContext, ORACLE_ENTRIES};
+use std::collections::HashMap;
 
 /// Binary file header: magic + version + state count + theta_bits.
 ///
@@ -300,6 +301,170 @@ pub fn load_oracle(filename: &str) -> Option<PolicyOracle> {
     println!("Loaded oracle (zero-copy mmap) in {:.2}s", elapsed);
 
     Some(oracle)
+}
+
+// ── Percentile table I/O ────────────────────────────────────────────
+
+/// Default percentile table file path.
+pub const PERCENTILE_FILE_PATH: &str = "data/strategy_tables/percentiles.bin";
+
+/// Magic number for percentile table files: "PCTI".
+const PERCENTILE_MAGIC: u32 = 0x50435449;
+/// Percentile file version.
+const PERCENTILE_VERSION: u32 = 1;
+
+/// Binary header for percentile table.
+#[repr(C)]
+struct PercentileFileHeader {
+    magic: u32,
+    version: u32,
+    num_entries: u32,
+    num_games: u32,
+}
+
+/// Per-entry record in the binary file: state_index + 9 × i16 percentiles + mean_x100.
+#[repr(C, packed)]
+struct PercentileRecord {
+    state_index: u32,
+    percentiles: [i16; 9],
+    mean_x100: i32,
+}
+
+/// Save percentile table to binary file.
+pub fn save_percentile_table(entries: &[(u32, PercentileEntry)], num_games: u32, filename: &str) {
+    println!(
+        "Saving {} percentile entries to {}...",
+        entries.len(),
+        filename
+    );
+
+    if let Some(parent) = Path::new(filename).parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+
+    let mut f = match File::create(filename) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("Error creating percentile file: {}", e);
+            return;
+        }
+    };
+
+    let header = PercentileFileHeader {
+        magic: PERCENTILE_MAGIC,
+        version: PERCENTILE_VERSION,
+        num_entries: entries.len() as u32,
+        num_games,
+    };
+
+    let header_bytes = unsafe {
+        std::slice::from_raw_parts(
+            &header as *const PercentileFileHeader as *const u8,
+            std::mem::size_of::<PercentileFileHeader>(),
+        )
+    };
+    f.write_all(header_bytes).unwrap();
+
+    for (si, entry) in entries {
+        let mut pcts = [0i16; 9];
+        for (i, &p) in entry.percentiles.iter().enumerate() {
+            pcts[i] = p as i16;
+        }
+        let record = PercentileRecord {
+            state_index: *si,
+            percentiles: pcts,
+            mean_x100: (entry.mean * 100.0).round() as i32,
+        };
+        let record_bytes = unsafe {
+            std::slice::from_raw_parts(
+                &record as *const PercentileRecord as *const u8,
+                std::mem::size_of::<PercentileRecord>(),
+            )
+        };
+        f.write_all(record_bytes).unwrap();
+    }
+
+    let file_size = std::mem::size_of::<PercentileFileHeader>()
+        + entries.len() * std::mem::size_of::<PercentileRecord>();
+    println!(
+        "Saved {} entries ({:.1} KB)",
+        entries.len(),
+        file_size as f64 / 1024.0,
+    );
+}
+
+/// Load percentile table from binary file. Returns None if file not found.
+pub fn load_percentile_table(filename: &str) -> Option<HashMap<u32, PercentileEntry>> {
+    let start_time = Instant::now();
+    println!("Loading percentile table from {}...", filename);
+
+    let data = match fs::read(filename) {
+        Ok(d) => d,
+        Err(_) => {
+            println!("Percentile table not found: {}", filename);
+            return None;
+        }
+    };
+
+    let header_size = std::mem::size_of::<PercentileFileHeader>();
+    if data.len() < header_size {
+        println!("Percentile file too small");
+        return None;
+    }
+
+    let header = unsafe { &*(data.as_ptr() as *const PercentileFileHeader) };
+    if header.magic != PERCENTILE_MAGIC || header.version != PERCENTILE_VERSION {
+        println!(
+            "Invalid percentile format (magic=0x{:08x} version={})",
+            header.magic, header.version
+        );
+        return None;
+    }
+
+    let record_size = std::mem::size_of::<PercentileRecord>();
+    let expected_size = header_size + header.num_entries as usize * record_size;
+    if data.len() != expected_size {
+        println!(
+            "Percentile file size mismatch: expected {}, got {}",
+            expected_size,
+            data.len()
+        );
+        return None;
+    }
+
+    let mut map = HashMap::with_capacity(header.num_entries as usize);
+    let base_ptr = unsafe { data.as_ptr().add(header_size) };
+
+    for i in 0..header.num_entries as usize {
+        let record_ptr = unsafe { base_ptr.add(i * record_size) as *const PercentileRecord };
+        // Read packed fields via read_unaligned to avoid UB
+        let si = unsafe { std::ptr::addr_of!((*record_ptr).state_index).read_unaligned() };
+        let pcts_raw = unsafe { std::ptr::addr_of!((*record_ptr).percentiles).read_unaligned() };
+        let mean_x100 = unsafe { std::ptr::addr_of!((*record_ptr).mean_x100).read_unaligned() };
+
+        let mean = mean_x100 as f64 / 100.0;
+        let mut pcts = [0i32; 9];
+        for (j, &p) in pcts_raw.iter().enumerate() {
+            pcts[j] = p as i32;
+        }
+        map.insert(
+            si,
+            PercentileEntry {
+                mean,
+                std_dev: 0.0, // Not stored in compact format
+                percentiles: pcts,
+            },
+        );
+    }
+
+    let elapsed = start_time.elapsed().as_secs_f64() * 1000.0;
+    println!(
+        "Loaded {} percentile entries in {:.2} ms",
+        map.len(),
+        elapsed
+    );
+
+    Some(map)
 }
 
 #[cfg(test)]

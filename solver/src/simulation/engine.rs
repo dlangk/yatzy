@@ -1081,6 +1081,173 @@ fn percentile(sorted: &[f32], p: f32) -> f32 {
     sorted[lo] * (1.0 - frac) + sorted[hi] * frac
 }
 
+/// Percentile keys: p1, p5, p10, p25, p50, p75, p90, p95, p99.
+pub const PERCENTILE_KEYS: [u8; 9] = [1, 5, 10, 25, 50, 75, 90, 95, 99];
+
+/// Extract (mean, std_dev, [p1..p99]) from a sorted slice of remaining scores.
+pub fn extract_percentiles_i32(sorted: &[i32]) -> (f64, f64, [i32; 9]) {
+    let n = sorted.len();
+    if n == 0 {
+        return (0.0, 0.0, [0; 9]);
+    }
+    let sum: f64 = sorted.iter().map(|&s| s as f64).sum();
+    let mean = sum / n as f64;
+    let var: f64 = sorted
+        .iter()
+        .map(|&s| (s as f64 - mean).powi(2))
+        .sum::<f64>()
+        / n as f64;
+    let std_dev = var.sqrt();
+
+    let mut pcts = [0i32; 9];
+    for (i, &p) in PERCENTILE_KEYS.iter().enumerate() {
+        let idx = (p as f64 / 100.0) * (n - 1) as f64;
+        let lo = idx.floor() as usize;
+        let hi = (lo + 1).min(n - 1);
+        let frac = idx - lo as f64;
+        pcts[i] = (sorted[lo] as f64 * (1.0 - frac) + sorted[hi] as f64 * frac).round() as i32;
+    }
+
+    (mean, std_dev, pcts)
+}
+
+/// Simulate N games from a mid-game state, returning sorted remaining scores.
+///
+/// "Remaining score" = points scored from this state onward + bonus (if earned).
+/// The caller adds `accumulated_score` to shift into final-score space.
+///
+/// Uses rayon for parallelism. EV-optimal policy (θ=0) via `state_values`.
+#[cfg(feature = "full")]
+pub fn simulate_remaining_scores(
+    ctx: &YatzyContext,
+    upper_score: i32,
+    scored_categories: i32,
+    num_games: usize,
+    seed: u64,
+) -> Vec<i32> {
+    let sv = ctx.state_values.as_slice();
+    let scored_count_start = scored_categories.count_ones() as usize;
+    let remaining_turns = CATEGORY_COUNT - scored_count_start;
+
+    let mut scores: Vec<i32> = (0..num_games)
+        .into_par_iter()
+        .map(|i| {
+            let mut rng = SmallRng::seed_from_u64(seed.wrapping_add(i as u64));
+            let mut up = upper_score;
+            let mut scored = scored_categories;
+            let mut acc = 0i32;
+
+            let mut e_ds_0 = [0.0f32; 252];
+            let mut e_ds_1 = [0.0f32; 252];
+
+            for t in 0..remaining_turns {
+                let is_last_turn = scored_count_start + t == CATEGORY_COUNT - 1;
+                let mut dice = roll_dice(&mut rng);
+
+                compute_group6(ctx, sv, up, scored, &mut e_ds_0);
+                compute_max_ev_for_n_rerolls(ctx, &e_ds_0, &mut e_ds_1);
+
+                let mut best_ev = 0.0;
+                let mask1 = choose_best_reroll_mask(ctx, &e_ds_1, &dice, &mut best_ev);
+                if mask1 != 0 {
+                    apply_reroll(&mut dice, mask1, &mut rng);
+                }
+                let mask2 = choose_best_reroll_mask(ctx, &e_ds_0, &dice, &mut best_ev);
+                if mask2 != 0 {
+                    apply_reroll(&mut dice, mask2, &mut rng);
+                }
+
+                let ds_index = find_dice_set_index(ctx, &dice);
+                let (cat, scr) = if is_last_turn {
+                    find_best_category_final(ctx, up, scored, ds_index)
+                } else {
+                    find_best_category(ctx, sv, up, scored, ds_index)
+                };
+                up = update_upper_score(up, cat, scr);
+                scored |= 1 << cat;
+                acc += scr;
+            }
+
+            // Add bonus if qualified
+            acc + if up >= 63 { 50 } else { 0 }
+        })
+        .collect();
+
+    scores.sort_unstable();
+    scores
+}
+
+/// Oracle variant: simulate remaining scores using precomputed policy oracle.
+///
+/// Much faster than the EV variant since decisions are O(1) lookups.
+/// Used for offline precomputation of percentile tables.
+#[cfg(feature = "full")]
+pub fn simulate_remaining_scores_oracle(
+    ctx: &YatzyContext,
+    oracle: &crate::types::PolicyOracle,
+    upper_score: i32,
+    scored_categories: i32,
+    num_games: usize,
+    seed: u64,
+) -> Vec<i32> {
+    let kt = &ctx.keep_table;
+    let scored_count_start = scored_categories.count_ones() as usize;
+    let remaining_turns = CATEGORY_COUNT - scored_count_start;
+
+    let mut scores: Vec<i32> = (0..num_games)
+        .into_par_iter()
+        .map(|i| {
+            let mut rng = SmallRng::seed_from_u64(seed.wrapping_add(i as u64));
+            let mut up = upper_score;
+            let mut scored = scored_categories;
+            let mut acc = 0i32;
+
+            for _t in 0..remaining_turns {
+                let si = state_index(up as usize, scored as usize);
+                let base = si * 252;
+                let mut dice = roll_dice(&mut rng);
+
+                // First reroll (2 rerolls left)
+                let ds0 = find_dice_set_index(ctx, &dice);
+                let keep2 = oracle.keep2()[base + ds0];
+                if keep2 != 0 {
+                    let j = (keep2 - 1) as usize;
+                    let mask = kt.keep_to_mask[ds0 * 32 + j];
+                    apply_reroll(&mut dice, mask, &mut rng);
+
+                    // Second reroll (1 reroll left)
+                    let ds1 = find_dice_set_index(ctx, &dice);
+                    let keep1 = oracle.keep1()[base + ds1];
+                    if keep1 != 0 {
+                        let j1 = (keep1 - 1) as usize;
+                        let mask1 = kt.keep_to_mask[ds1 * 32 + j1];
+                        apply_reroll(&mut dice, mask1, &mut rng);
+                    }
+                } else {
+                    let keep1 = oracle.keep1()[base + ds0];
+                    if keep1 != 0 {
+                        let j1 = (keep1 - 1) as usize;
+                        let mask1 = kt.keep_to_mask[ds0 * 32 + j1];
+                        apply_reroll(&mut dice, mask1, &mut rng);
+                    }
+                }
+
+                let ds_final = find_dice_set_index(ctx, &dice);
+                let cat = oracle.cat()[base + ds_final] as usize;
+                let scr = ctx.precomputed_scores[ds_final][cat];
+                up = update_upper_score(up, cat, scr);
+                scored |= 1 << cat;
+                acc += scr;
+            }
+
+            acc + if up >= 63 { 50 } else { 0 }
+        })
+        .collect();
+
+    scores.sort_unstable();
+    scores
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

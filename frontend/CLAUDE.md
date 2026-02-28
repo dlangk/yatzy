@@ -67,7 +67,7 @@ The frontend calls these solver endpoints via `api.ts`:
 | Evaluate roll | `/evaluate` | POST | ~9μs |
 | Get state value | `/state_value` | GET | <1ms |
 | Health check | `/health` | GET | <1ms |
-| Score density | `/density` | POST | ~100ms |
+| Score density | `/density` | POST | <10ms-50ms |
 
 ## No Layout Shifts (Hard Requirement)
 

@@ -81,7 +81,7 @@ Server: axum on port 9000, stateless, `Arc<YatzyContext>` shared state.
 | GET | `/health` | — | <1ms | Health check |
 | GET | `/state_value` | `?upper_score=N&scored_categories=N` | <1ms | E_table[S] lookup |
 | POST | `/evaluate` | `{dice, upper_score, scored_categories, rerolls_remaining}` | 2-9μs | All keep-mask EVs + category EVs |
-| POST | `/density` | `{upper_score, scored_categories, accumulated_score}` | ~100ms | Exact score distribution from mid-game |
+| POST | `/density` | `{upper_score, scored_categories, accumulated_score}` | <10ms (precomputed) / ~50ms (MC) | Score distribution percentiles (hybrid: precomputed turns 0-4, MC turns 5-14) |
 
 ## Concurrency Model
 

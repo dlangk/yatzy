@@ -30,9 +30,13 @@ pub mod sweep;
 
 // Re-export commonly used items
 pub use engine::{
-    simulate_forecast, simulate_game, simulate_game_from_state, ForecastResult, ForecastTurn,
-    GameRecord, GameSummary, TurnRecord, TurnSummary,
+    extract_percentiles_i32, simulate_forecast, simulate_game, simulate_game_from_state,
+    ForecastResult, ForecastTurn, GameRecord, GameSummary, TurnRecord, TurnSummary,
+    PERCENTILE_KEYS,
 };
+
+#[cfg(feature = "full")]
+pub use engine::{simulate_remaining_scores, simulate_remaining_scores_oracle};
 
 #[cfg(feature = "full")]
 pub use engine::{

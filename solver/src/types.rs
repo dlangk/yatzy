@@ -232,6 +232,17 @@ impl PolicyOracle {
     }
 }
 
+/// Precomputed percentile entry for a single (upper_score, scored_categories) state.
+///
+/// Stores remaining-score percentiles computed via Monte Carlo simulation.
+/// At query time, add `accumulated_score` to get final-score percentiles.
+#[derive(Clone, Debug)]
+pub struct PercentileEntry {
+    pub mean: f64,
+    pub std_dev: f64,
+    pub percentiles: [i32; 9],
+}
+
 /// Core context: all precomputed tables (Phase 0) and the DP result array (Phase 2).
 ///
 /// This struct is ~10 MB and must be heap-allocated (use [`YatzyContext::new_boxed`]).

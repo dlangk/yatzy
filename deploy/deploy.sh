@@ -57,6 +57,11 @@ BACKEND_CTX="$BUILD_DIR/backend"
 mkdir -p "$BACKEND_CTX/data/strategy_tables"
 cp "$PROJECT_ROOT/solver/target/$TARGET/release/yatzy" "$BACKEND_CTX/yatzy"
 cp "$STRATEGY_TABLE" "$BACKEND_CTX/data/strategy_tables/all_states.bin"
+PERCENTILE_TABLE="$PROJECT_ROOT/data/strategy_tables/percentiles.bin"
+if [ -f "$PERCENTILE_TABLE" ]; then
+    cp "$PERCENTILE_TABLE" "$BACKEND_CTX/data/strategy_tables/"
+    echo "  Percentile table included ($(du -h "$PERCENTILE_TABLE" | cut -f1))"
+fi
 cp "$DEPLOY_DIR/Dockerfile.backend" "$BACKEND_CTX/Dockerfile"
 echo "✓ Backend context assembled"
 

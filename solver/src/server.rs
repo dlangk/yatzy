@@ -10,8 +10,9 @@
 //! | GET | `/health` | Health check |
 //! | GET | `/state_value` | Look up E_table[S] for a given state |
 //! | POST | `/evaluate` | All mask EVs + category EVs for one roll |
-//! | POST | `/density` | Exact score distribution from a mid-game state |
+//! | POST | `/density` | Score distribution percentiles from a mid-game state |
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::{
@@ -24,18 +25,25 @@ use serde::Deserialize;
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::api_computations::compute_roll_response;
-use crate::types::{PolicyOracle, YatzyContext};
+use crate::constants::state_index;
+use crate::simulation::engine::{extract_percentiles_i32, PERCENTILE_KEYS};
+use crate::types::{PercentileEntry, PolicyOracle, YatzyContext};
 
-/// Shared server state: context + optional oracle for density endpoint.
+/// Shared server state: context + optional oracle + optional percentile table.
 pub struct ServerState {
     pub ctx: Arc<YatzyContext>,
     pub oracle: Option<Arc<PolicyOracle>>,
+    pub percentile_table: Option<HashMap<u32, PercentileEntry>>,
 }
 
 pub type AppState = Arc<ServerState>;
 
 pub fn create_router(ctx: Arc<YatzyContext>) -> Router {
-    let state = Arc::new(ServerState { ctx, oracle: None });
+    let state = Arc::new(ServerState {
+        ctx,
+        oracle: None,
+        percentile_table: None,
+    });
     create_router_with_state(state)
 }
 
@@ -43,6 +51,20 @@ pub fn create_router_with_oracle(ctx: Arc<YatzyContext>, oracle: Option<PolicyOr
     let state = Arc::new(ServerState {
         ctx,
         oracle: oracle.map(Arc::new),
+        percentile_table: None,
+    });
+    create_router_with_state(state)
+}
+
+pub fn create_router_full(
+    ctx: Arc<YatzyContext>,
+    oracle: Option<PolicyOracle>,
+    percentile_table: Option<HashMap<u32, PercentileEntry>>,
+) -> Router {
+    let state = Arc::new(ServerState {
+        ctx,
+        oracle: oracle.map(Arc::new),
+        percentile_table,
     });
     create_router_with_state(state)
 }
@@ -193,6 +215,11 @@ async fn handle_evaluate(
 }
 
 // ── POST /density handler ──────────────────────────────────────────
+//
+// Three-tier approach:
+// - turns_scored <= 4: O(1) lookup from precomputed percentile table
+// - turns_scored 5-14: real-time MC simulation (~10K games)
+// - turns_scored == 15: degenerate (all percentiles = accumulated_score)
 
 async fn handle_density(
     State(state): State<AppState>,
@@ -217,62 +244,87 @@ async fn handle_density(
         ));
     }
 
-    // Guard: reject density with >11 remaining turns. Forward DP cost grows
-    // combinatorially; on a 2-CPU/1GB server, turns 0-3 exceed 30s or OOM.
-    // Turn 4 (11 remaining) takes ~20s; turn 5+ is <3s.
     let turns_scored = (req.scored_categories as u32).count_ones();
-    if turns_scored < 4 {
-        return Err(error_response(
-            StatusCode::BAD_REQUEST,
-            "Density requires at least 4 scored categories (≤11 remaining turns).",
-        ));
+
+    // Turn 15: game over — all percentiles equal accumulated score
+    if turns_scored >= 15 {
+        let final_score = req.accumulated_score + if req.upper_score >= 63 { 50 } else { 0 };
+        let mut percentiles = HashMap::new();
+        for &k in &PERCENTILE_KEYS {
+            percentiles.insert(format!("p{}", k), final_score);
+        }
+        return Ok(Json(serde_json::json!({
+            "mean": final_score as f64,
+            "std_dev": 0.0,
+            "percentiles": percentiles,
+        })));
     }
 
-    let oracle = match &state.oracle {
-        Some(o) => Arc::clone(o),
-        None => {
-            return Err(error_response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "Oracle not loaded. Run yatzy-precompute --oracle first.",
-            ))
+    // Turns 0-4: precomputed percentile lookup (O(1))
+    if turns_scored <= 4 {
+        if let Some(ref table) = state.percentile_table {
+            let si = state_index(req.upper_score as usize, req.scored_categories as usize) as u32;
+            if let Some(entry) = table.get(&si) {
+                let mut percentiles = HashMap::new();
+                for (i, &k) in PERCENTILE_KEYS.iter().enumerate() {
+                    percentiles.insert(
+                        format!("p{}", k),
+                        entry.percentiles[i] + req.accumulated_score,
+                    );
+                }
+                let mean = entry.mean + req.accumulated_score as f64;
+                return Ok(Json(serde_json::json!({
+                    "mean": mean,
+                    "std_dev": entry.std_dev,
+                    "percentiles": percentiles,
+                })));
+            }
         }
-    };
+        // Fall through to MC if table not loaded or state not found
+    }
 
+    // Turns 5-14: real-time MC simulation (no oracle needed)
     let ctx = Arc::clone(&state.ctx);
-    let upper_score = req.upper_score as usize;
-    let scored_categories = req.scored_categories as usize;
-    let accumulated_score = req.accumulated_score as usize;
+    let upper_score = req.upper_score;
+    let scored_categories = req.scored_categories;
+    let accumulated_score = req.accumulated_score;
 
     let computation = tokio::task::spawn_blocking(move || {
-        crate::density::forward::density_evolution_from_state(
+        let num_games: usize = 10_000;
+        let seed = (upper_score as u64)
+            .wrapping_mul(65537)
+            .wrapping_add(scored_categories as u64);
+        let sorted = crate::simulation::engine::simulate_remaining_scores(
             &ctx,
-            &oracle,
             upper_score,
             scored_categories,
-            accumulated_score,
-        )
+            num_games,
+            seed,
+        );
+        let (mean, std_dev, pcts) = extract_percentiles_i32(&sorted);
+
+        let mut percentiles = HashMap::new();
+        for (i, &k) in PERCENTILE_KEYS.iter().enumerate() {
+            percentiles.insert(format!("p{}", k), pcts[i] + accumulated_score);
+        }
+        let mean = mean + accumulated_score as f64;
+
+        serde_json::json!({
+            "mean": mean,
+            "std_dev": std_dev,
+            "percentiles": percentiles,
+        })
     });
 
-    let result = match tokio::time::timeout(std::time::Duration::from_secs(30), computation).await
-    {
-        Ok(Ok(r)) => r,
-        Ok(Err(_)) => {
-            return Err(error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Density computation failed",
-            ))
-        }
-        Err(_) => {
-            return Err(error_response(
-                StatusCode::REQUEST_TIMEOUT,
-                "Density computation timed out (>30s)",
-            ))
-        }
-    };
-
-    Ok(Json(serde_json::json!({
-        "mean": result.mean,
-        "std_dev": result.std_dev,
-        "percentiles": result.percentiles,
-    })))
+    match tokio::time::timeout(std::time::Duration::from_secs(10), computation).await {
+        Ok(Ok(result)) => Ok(Json(result)),
+        Ok(Err(_)) => Err(error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Density computation failed",
+        )),
+        Err(_) => Err(error_response(
+            StatusCode::REQUEST_TIMEOUT,
+            "Density computation timed out (>10s)",
+        )),
+    }
 }

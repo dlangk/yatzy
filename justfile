@@ -157,6 +157,10 @@ profile-deploy:
 forward-pass *args:
     YATZY_BASE_PATH=. solver/target/release/yatzy-forward-pass {{args}}
 
+# Precompute percentile table for turns 0-4 (requires oracle)
+precompute-percentiles:
+    YATZY_BASE_PATH=. solver/target/release/yatzy-precompute --percentiles
+
 # Exact density evolution: zero-variance score PMFs per θ (~6 min/theta)
 density *args:
     YATZY_BASE_PATH=. solver/target/release/yatzy-density {{args}}
