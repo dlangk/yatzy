@@ -150,8 +150,11 @@ export function initScorecard(container: HTMLElement): void {
       });
     }
 
-    // Upper Total
-    upperTotalScoreTd.textContent = String(s.upperScore);
+    // Upper Total (uncapped — actual sum, not min(sum, 63) used by solver)
+    const rawUpperTotal = s.categories.slice(0, UPPER_CATEGORIES).reduce(
+      (sum, c) => c.isScored ? sum + c.score : sum, 0,
+    );
+    upperTotalScoreTd.textContent = String(rawUpperTotal);
 
     // Bonus — show cumulative +/- par until bonus achieved
     if (s.bonus > 0) {
