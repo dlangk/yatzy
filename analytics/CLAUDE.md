@@ -21,22 +21,38 @@ Entry point: `analytics/.venv/bin/yatzy-analyze <command>`
 
 | Command | Purpose |
 |---------|---------|
+| `extract` | [Legacy] Read raw binaries to scores.parquet |
 | `compute [--csv] [--source density]` | Summary stats (34 columns), KDE, from scores.bin or density JSON |
-| `plot` | Generate all standard plots (CDF, density, quantile, mean-std) |
-| `categories` | Per-category statistics across θ |
+| `plot [--subset]` | Generate all standard plots (CDF, density, quantile, mean-std) |
 | `efficiency` | MER, SDVA, CVaR metrics |
-| `modality` | Score distribution mixture decomposition |
-| `summary` | Print sweep summary table |
+| `categories` | Per-category statistics across θ |
+| `yatzy-hypothesis` | Yatzy conditional hit-rate hypothesis tests |
+| `run` | Full pipeline: compute, plot, efficiency |
+| `tail` | Tail distribution analysis for max-policy simulations |
+| `adaptive` | Analyze adaptive θ policy simulations vs fixed-θ frontier |
+| `theta-questionnaire` | Interactive questionnaire to estimate risk preference (θ) |
+| `theta-replay` | Replay saved answers and print θ estimation results |
+| `theta-validate` | Validate θ estimator convergence with synthetic humans |
+| `sensitivity` | Plot decision sensitivity analysis (flip rates, gaps) |
+| `state-flow` | State-flow visualizations (alluvial, DAG, streamgraph) |
+| `state-frequency` | Board-state frequency distribution analysis |
 | `multiplayer` | Analyze multiplayer simulation results |
-| `surrogate-train` | Train DT + MLP surrogate models |
-| `surrogate-eval [--games N]` | Full-game simulation with surrogates |
-| `surrogate-plot` | Plot surrogate Pareto frontier |
+| `winrate` | Win rate analysis plots (θ vs win rate, PMF overlay) |
+| `summary` | Print sweep summary table to console |
+| `percentile-sweep-plots` | Percentile sweep curves, heatmap, cost-benefit |
+| `difficult-sensitivity-cards` | Sensitivity cards for difficult scenarios across θ |
+| `modality` | Score distribution mixture decomposition |
+| `compression` | Plot policy compression gaps |
 | `surrogate-diagnose` | Label noise + error distribution |
 | `surrogate-scaling` | Data scaling experiments |
 | `surrogate-features` | Feature ablation / forward selection |
-| `skill-ladder` | Induce human-readable rules from regret data |
+| `surrogate-train` | Train DT + MLP surrogate models |
+| `surrogate-plot` | Plot surrogate Pareto frontier |
+| `surrogate-eval [--games N]` | Full-game simulation with surrogates |
+| `surrogate-eval-plot` | Plot game-level surrogate results (params vs mean score) |
+| `difficult-cards` | Generate scenario cards for difficult scenarios |
 | `profile-validate [--trials N]` | Monte Carlo parameter recovery validation |
-| `compression` | Plot policy compression gaps |
+| `skill-ladder` | Induce human-readable rules from regret data |
 
 ## Custom Colormap
 
@@ -53,12 +69,14 @@ from yatzy_analysis.plots.style import CMAP, theta_color, make_norm, save_fig
 
 | File | Purpose |
 |------|---------|
-| `cli.py` | 40+ Click commands, main entry point |
+| `cli.py` | 32 Click commands, main entry point |
 | `compute.py` | KDE, summary stats, CVaR, MER, SDVA |
 | `config.py` | Path resolution, binary format constants, theta grids |
 | `io.py` | Binary file readers (scores.bin, simulation_raw.bin) |
 | `store.py` | Parquet save/load |
+| `adaptive.py` | Adaptive policy discovery, score extraction, summary computation |
 | `density.py` | Python forward-DP density reimplementation |
+| `tail_analysis.py` | Tail distribution analysis, log-linear extrapolation, P(374) |
 | `surrogate.py` | DT/MLP training, label noise analysis |
 | `surrogate_eval.py` | Full-game simulation with surrogates |
 | `skill_ladder.py` | Human-readable decision rules from regret |
@@ -66,6 +84,9 @@ from yatzy_analysis.plots.style import CMAP, theta_color, make_norm, save_fig
 | `theta_validation.py` | Parameter recovery (Monte Carlo) |
 | `feature_engineering.py` | Feature extraction for surrogates |
 | `scorecard.py` | Scorecard rendering |
+| `profiling/estimator.py` | Reference MLE estimator for profiling (Python/scipy mirror of JS) |
+| `profiling/synthetic.py` | Synthetic player simulation for profiling validation |
+| `profiling/validation.py` | Parameter recovery validation for cognitive profiling |
 | `plots/style.py` | CMAP, save_fig, theme, typography constants |
 | `plots/cdf.py` | CDF and survival curves |
 | `plots/density.py` | 2D/3D density heatmaps |
@@ -76,6 +97,20 @@ from yatzy_analysis.plots.style import CMAP, theta_color, make_norm, save_fig
 | `plots/efficiency.py` | MER/SDVA/CVaR panels |
 | `plots/scenario_cards.py` | Scenario card renders |
 | `plots/difficult_cards.py` | Difficult scenario renders |
+| `plots/difficult_sensitivity_cards.py` | Difficult scenario sensitivity cards across θ |
+| `plots/modality.py` | Score distribution modality analysis |
+| `plots/multiplayer.py` | Multiplayer simulation plots (1v1) |
+| `plots/percentiles.py` | Percentile curves vs θ |
+| `plots/percentile_sweep.py` | Percentile sweep curves, heatmap, frontier |
+| `plots/percentile_frontiers.py` | Percentile frontiers and risk tradeoff plots |
+| `plots/sensitivity.py` | Decision sensitivity plots (flip rates, θ distributions, gaps) |
+| `plots/state_flow.py` | State-flow visualizations (alluvial, DAG, streamgraph) |
+| `plots/surrogate.py` | Surrogate model Pareto frontier and accuracy plots |
+| `plots/compression.py` | Policy compression gap CDFs, heatmaps, visit coverage |
+| `plots/frontier.py` | Adaptive θ(s) vs constant-θ Pareto frontier |
+| `plots/winrate.py` | Win rate analysis (θ vs win rate, conditional breakdown) |
+| `plots/yatzy_hypothesis.py` | Yatzy conditional hit-rate hypothesis tests |
+| `plots/spec.py` | Plot specifications: purpose, design, theta-legend modes |
 
 ## Data Flow
 

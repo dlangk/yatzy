@@ -33,6 +33,8 @@ npm run lint      # ESLint
 | `reducer.ts` | Pure game state reducer + localStorage persistence |
 | `types.ts` | TypeScript interfaces for all data contracts |
 | `api.ts` | Backend API client (fetch wrappers) |
+| `autoplay.ts` | Auto-play side-effect loop: executes optimal moves with configurable delay |
+| `hoverBus.ts` | Lightweight event bus for cross-component hover coordination |
 | `mask.ts` | Dice sort-mapping utilities |
 | `constants.ts` | Colors, category names, game constants |
 | `config.ts` | API base URL configuration |

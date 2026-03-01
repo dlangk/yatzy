@@ -39,7 +39,7 @@ Single crate (not a workspace). Release profile: opt-level 3, fat LTO, codegen-u
 Central context holding all precomputed tables and state values.
 - `state_values: StateValues` — E[score | optimal play] for all 4,194,304 state slots
 - `keep_table: KeepTable` — CSR-format probability matrix (462 unique keeps × 252 dice sets)
-- `dice_set_probabilities: [f32; 252]` — P(dice set) for each of 252 ordered combinations
+- `dice_set_probabilities: [f64; NUM_DICE_SETS]` — P(dice set) for each of 252 ordered combinations
 - `precomputed_scores: [[i32; 15]; 252]` — s(r, c) for all dice sets and categories
 - `reachable: [[bool; 64]; 64]` — reachability mask indexed by [upper_mask][upper_score]
 - `theta: f32` — risk parameter (0 = EV-optimal)
@@ -127,6 +127,52 @@ Baseline: `.benchmarks/performance-baseline.json`. Threshold: `max(mean + 3σ, m
 | API `/evaluate` | 2-9μs |
 | Density evolution (oracle) | ~3.0s |
 | Density evolution (non-oracle) | ~381s |
+
+## Module Structure
+
+### `src/` (core)
+
+| File | Purpose |
+|------|---------|
+| `lib.rs` | Crate root, re-exports all public modules |
+| `constants.rs` | STATE_STRIDE=128, state_index(), NUM_STATES, category constants |
+| `types.rs` | YatzyContext, KeepTable (f32), StateValues, PolicyOracle |
+| `dice_mechanics.rs` | Dice operations: face counting, sorting, index lookup, probability |
+| `game_mechanics.rs` | Scoring rules s(S, r, c) and upper-score successor function |
+| `phase0_tables.rs` | Phase 0: precompute all static lookup tables (rolls, scores, keeps, reachability) |
+| `widget_solver.rs` | SOLVE_WIDGET with ping-pong buffers |
+| `batched_solver.rs` | BatchedBuffers, 4 solver variants (EV/risk/utility/max), oracle builder |
+| `state_computation.rs` | Phase 2 DP with rayon par_iter, optional oracle building |
+| `simd.rs` | NEON intrinsic kernels (14 functions + fast exp) |
+| `storage.rs` | Binary I/O, zero-copy mmap (version 6/7, 128-stride), oracle I/O |
+| `forward_pass.rs` | Exact forward pass: state visitation probabilities for D3 visualizations |
+| `env_config.rs` | Shared env config (YATZY_BASE_PATH, RAYON_NUM_THREADS, YATZY_PORT) |
+| `api_computations.rs` | Computation logic for API endpoints |
+| `server.rs` | axum HTTP server setup and route handlers |
+
+### `src/simulation/`
+
+| File | Purpose |
+|------|---------|
+| `mod.rs` | Module root, re-exports |
+| `engine.rs` | Sequential simulate_game, simulate_batch, GameRecord |
+| `lockstep.rs` | Horizontal lockstep simulation (radix sort + SplitMix64) |
+| `fast_prng.rs` | SplitMix64 PRNG (8-byte state, 5 dice from single u64) |
+| `radix_sort.rs` | 2-pass counting sort for O(N) grouping by state_index |
+| `adaptive.rs` | Adaptive θ policies (turn-dependent risk) |
+| `sweep.rs` | Theta sweep infrastructure (resumable) |
+| `raw_storage.rs` | Binary I/O for simulation data (mmap) |
+| `heuristic.rs` | Heuristic (human-like) strategy: pattern-matching rerolls + greedy scoring |
+| `multiplayer.rs` | N-player round-robin games with opponent-aware strategies |
+| `statistics.rs` | Statistics aggregation from GameRecord data (scores, categories, rerolls) |
+| `strategy.rs` | Strategy abstraction: PlayerState, GameView, CLI spec parsing |
+
+### `src/density/`
+
+| File | Purpose |
+|------|---------|
+| `forward.rs` | Forward density evolution (dense Vec<f64> arrays), oracle variant |
+| `transitions.rs` | Per-state transition computation, oracle variant (sort-merge) |
 
 ## Test Files
 
