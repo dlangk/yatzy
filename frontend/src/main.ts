@@ -37,9 +37,28 @@ subscribe((state) => {
   }
 });
 
-// Side effect: backfill missing percentiles on any trajectory point
+// Side effect: backfill missing percentiles on any trajectory point.
+// Density requests are serialized to avoid overloading the server.
 const pendingDensity = new Set<number>();
 const PCTL_KEYS = ['p1','p5','p10','p25','p50','p75','p90','p95','p99'];
+let densityQueueRunning = false;
+const densityQueue: Array<{ index: number; up: number; scored: number; rawAcc: number }> = [];
+
+async function drainDensityQueue() {
+  if (densityQueueRunning) return;
+  densityQueueRunning = true;
+  while (densityQueue.length > 0) {
+    const { index, up, scored, rawAcc } = densityQueue.shift()!;
+    try {
+      const res = await fetchDensity(up, scored, rawAcc);
+      pendingDensity.delete(index);
+      dispatch({ type: 'SET_DENSITY_RESULT', index, percentiles: res.percentiles });
+    } catch {
+      pendingDensity.delete(index);
+    }
+  }
+  densityQueueRunning = false;
+}
 
 function backfillPercentiles(state: { trajectory: readonly import('./types.ts').TrajectoryPoint[] }) {
   for (const p of state.trajectory) {
@@ -58,13 +77,9 @@ function backfillPercentiles(state: { trajectory: readonly import('./types.ts').
     const scored = p.scoredCategories ?? 0;
     const rawAcc = p.accumulatedScore - (up >= 63 ? 50 : 0);
     pendingDensity.add(p.index);
-    fetchDensity(up, scored, rawAcc)
-      .then(res => {
-        pendingDensity.delete(p.index);
-        dispatch({ type: 'SET_DENSITY_RESULT', index: p.index, percentiles: res.percentiles });
-      })
-      .catch(() => { pendingDensity.delete(p.index); });
+    densityQueue.push({ index: p.index, up, scored, rawAcc });
   }
+  drainDensityQueue();
 }
 
 subscribe((state) => backfillPercentiles(state));

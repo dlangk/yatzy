@@ -59,21 +59,27 @@ export interface DensityResponse {
   percentiles: Record<string, number>;
 }
 
-/** Compute exact score distribution from a mid-game state via forward density evolution. */
+/** Fetch score distribution percentiles, with one retry on 408/503 (server busy). */
 export async function fetchDensity(
   upperScore: number,
   scoredCategories: number,
   accumulatedScore: number,
 ): Promise<DensityResponse> {
-  const res = await fetch(`${API_BASE_URL}/density`, {
+  const body = JSON.stringify({
+    upper_score: upperScore,
+    scored_categories: scoredCategories,
+    accumulated_score: accumulatedScore,
+  });
+  const opts: RequestInit = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      upper_score: upperScore,
-      scored_categories: scoredCategories,
-      accumulated_score: accumulatedScore,
-    }),
-  });
+    body,
+  };
+  let res = await fetch(`${API_BASE_URL}/density`, opts);
+  if (res.status === 408 || res.status === 503) {
+    await new Promise(r => setTimeout(r, 500));
+    res = await fetch(`${API_BASE_URL}/density`, opts);
+  }
   if (!res.ok) {
     throw new Error(`/density failed: ${res.status} ${res.statusText}`);
   }

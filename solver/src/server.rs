@@ -22,6 +22,7 @@ use axum::{
     Json, Router,
 };
 use serde::Deserialize;
+use tokio::sync::Semaphore;
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::api_computations::compute_roll_response;
@@ -34,6 +35,8 @@ pub struct ServerState {
     pub ctx: Arc<YatzyContext>,
     pub oracle: Option<Arc<PolicyOracle>>,
     pub percentile_table: Option<HashMap<u32, PercentileEntry>>,
+    /// Limits concurrent MC density simulations to 1 at a time.
+    pub density_semaphore: Arc<Semaphore>,
 }
 
 pub type AppState = Arc<ServerState>;
@@ -43,6 +46,7 @@ pub fn create_router(ctx: Arc<YatzyContext>) -> Router {
         ctx,
         oracle: None,
         percentile_table: None,
+        density_semaphore: Arc::new(Semaphore::new(1)),
     });
     create_router_with_state(state)
 }
@@ -56,6 +60,7 @@ pub fn create_router_full(
         ctx,
         oracle: oracle.map(Arc::new),
         percentile_table,
+        density_semaphore: Arc::new(Semaphore::new(1)),
     });
     create_router_with_state(state)
 }
@@ -275,12 +280,35 @@ async fn handle_density(
     }
 
     // Turns 5-14: real-time MC simulation (no oracle needed)
+    // Acquire semaphore to limit concurrent simulations to 1.
+    let permit = match tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        Arc::clone(&state.density_semaphore).acquire_owned(),
+    )
+    .await
+    {
+        Ok(Ok(permit)) => permit,
+        Ok(Err(_)) => {
+            return Err(error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Density semaphore closed",
+            ));
+        }
+        Err(_) => {
+            return Err(error_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Server busy — density simulation already running",
+            ));
+        }
+    };
+
     let ctx = Arc::clone(&state.ctx);
     let upper_score = req.upper_score;
     let scored_categories = req.scored_categories;
     let accumulated_score = req.accumulated_score;
 
     let computation = tokio::task::spawn_blocking(move || {
+        let _permit = permit; // hold permit until simulation completes
         let num_games: usize = 1_000;
         let seed = (upper_score as u64)
             .wrapping_mul(65537)
