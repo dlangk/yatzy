@@ -63,7 +63,7 @@ fn apply_reroll(dice: &mut [i32; 5], mask: i32, rng: &mut SplitMix64) {
 }
 
 /// Find the best category (non-final turn).
-/// // PERF: intentional duplication of widget_solver Group 6 scoring logic
+// PERF: intentional duplication of widget_solver Group 6 scoring logic
 #[inline(always)]
 fn find_best_category(
     ctx: &YatzyContext,
@@ -76,11 +76,16 @@ fn find_best_category(
     let mut best_cat = 0usize;
     let mut best_score = 0i32;
 
+    // Upper categories (0-5): affect upper_score tracking, so the successor
+    // state index depends on update_upper_score(up_score, c, scr).
     for c in 0..6 {
         if !is_category_scored(scored, c) {
             let scr = ctx.precomputed_scores[ds_index][c];
             let new_up = update_upper_score(up_score, c, scr);
             let new_scored = scored | (1 << c);
+            // SAFETY: new_up = update_upper_score(..) is in 0..64,
+            // new_scored = scored | (1<<c) < 2^15. So
+            // state_index(new_up, new_scored) < NUM_STATES = sv.len().
             let val = scr as f32
                 + unsafe { *sv.get_unchecked(state_index(new_up as usize, new_scored as usize)) };
             if val > best_val {
@@ -91,10 +96,14 @@ fn find_best_category(
         }
     }
 
+    // Lower categories (6-14): do not affect upper_score, so the successor
+    // state index uses the unchanged up_score directly.
     for c in 6..CATEGORY_COUNT {
         if !is_category_scored(scored, c) {
             let scr = ctx.precomputed_scores[ds_index][c];
             let new_scored = scored | (1 << c);
+            // SAFETY: up_score is in 0..64, new_scored < 2^15. So
+            // state_index(up_score, new_scored) < NUM_STATES = sv.len().
             let val = scr as f32
                 + unsafe { *sv.get_unchecked(state_index(up_score as usize, new_scored as usize)) };
             if val > best_val {
@@ -108,7 +117,12 @@ fn find_best_category(
     (best_cat, best_score)
 }
 
-/// Find the best category for the last turn (maximize score + bonus).
+/// Find the best category for the final turn (turn 14, all categories scored after).
+///
+/// On the last turn there are no successor states, so we cannot look up E(successor).
+/// Instead we maximize `score + bonus_delta` directly. The bonus-crossing logic:
+/// if scoring an upper category (0-5) pushes upper_score to >= 63 when it was < 63,
+/// that triggers the +50 upper bonus. Lower categories (6-14) never affect the bonus.
 #[inline(always)]
 fn find_best_category_final(
     ctx: &YatzyContext,
@@ -146,7 +160,7 @@ fn find_best_category_final(
 }
 
 /// Compute Group 6: best category EV for each dice set.
-/// // PERF: intentional duplication of widget_solver Group 6 for lockstep self-containment
+// PERF: intentional duplication of widget_solver Group 6 for lockstep self-containment
 #[inline(always)]
 fn compute_group6(
     ctx: &YatzyContext,
@@ -155,9 +169,15 @@ fn compute_group6(
     scored: i32,
     e_ds_0: &mut [f32; 252],
 ) {
+    // Preload lower-category successor EVs: for categories 6-14 the successor
+    // state value sv[state_index(up, scored|(1<<c))] depends only on (up, scored),
+    // not on the dice roll. Reading these once here avoids 252 redundant sv lookups
+    // per lower category in the inner loop below.
     let mut lower_succ_ev = [0.0f32; CATEGORY_COUNT];
     for c in 6..CATEGORY_COUNT {
         if !is_category_scored(scored, c) {
+            // SAFETY: c in 6..15, scored < 2^15, up_score in 0..64. So
+            // state_index(up_score, scored | (1<<c)) < NUM_STATES = sv.len().
             lower_succ_ev[c] = unsafe {
                 *sv.get_unchecked(state_index(up_score as usize, (scored | (1 << c)) as usize))
             };
@@ -167,11 +187,14 @@ fn compute_group6(
     for ds_i in 0..252 {
         let mut best_val = f32::NEG_INFINITY;
 
+        // Upper categories (0-5): sv lookup varies per dice set (new_up depends on score)
         for c in 0..6 {
             if !is_category_scored(scored, c) {
                 let scr = ctx.precomputed_scores[ds_i][c];
                 let new_up = update_upper_score(up_score, c, scr);
                 let new_scored = scored | (1 << c);
+                // SAFETY: new_up = update_upper_score(..) in 0..64,
+                // new_scored < 2^15. state_index(new_up, new_scored) < NUM_STATES = sv.len().
                 let val = scr as f32
                     + unsafe {
                         *sv.get_unchecked(state_index(new_up as usize, new_scored as usize))
@@ -182,9 +205,11 @@ fn compute_group6(
             }
         }
 
+        // Lower categories (6-14): use preloaded successor EV (no sv read!)
         for c in 6..CATEGORY_COUNT {
             if !is_category_scored(scored, c) {
                 let scr = ctx.precomputed_scores[ds_i][c];
+                // SAFETY: c is in 6..CATEGORY_COUNT (15), so c < lower_succ_ev.len() (15).
                 let val = scr as f32 + unsafe { *lower_succ_ev.get_unchecked(c) };
                 if val > best_val {
                     best_val = val;

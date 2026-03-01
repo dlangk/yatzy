@@ -28,7 +28,16 @@ def save_scores(scores_dict: dict[float, NDArray[np.int32]], path: Path) -> None
 
 
 def load_scores(path: Path) -> dict[float, NDArray[np.int32]]:
-    """Load scores parquet back into {theta: sorted_scores} dict."""
+    """Load scores Parquet back into a {theta: sorted_scores} dict.
+
+    Args:
+        path: Path to a Parquet file with columns (theta, score),
+            as written by :func:`save_scores`.
+
+    Returns:
+        Mapping from theta value (rounded to 4 decimals) to a sorted
+        int32 NumPy array of scores, ordered by ascending theta.
+    """
     df = pl.read_parquet(path)
     df = df.with_columns(pl.col("theta").round(4))
     result: dict[float, NDArray[np.int32]] = {}

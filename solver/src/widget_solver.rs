@@ -763,8 +763,6 @@ pub fn choose_best_reroll_mask_risk(
 
 /// SOLVE_WIDGET for risk-sensitive (log-domain) mode with θ ≠ 0.
 ///
-/// // PERF: intentional duplication of EV widget for risk-sensitive mode — avoids branch in inner loop
-///
 /// The key transformations from the EV domain:
 /// - Group 6: `val = θ·scr + sv[successor]` — decision node (min if θ<0, max if θ>0)
 /// - Groups 5/3: LSE (stochastic) + opt over keeps (decision: min/max)
@@ -773,6 +771,7 @@ pub fn choose_best_reroll_mask_risk(
 /// For θ < 0 (risk-averse), decision nodes use min instead of max.
 /// This is because we maximize the certainty equivalent CE = L(S)/θ,
 /// and dividing by negative θ flips the ordering.
+// PERF: intentional duplication of EV widget for risk-sensitive mode — avoids branch in inner loop
 pub fn compute_expected_state_value_risk(ctx: &YatzyContext, state: &YatzyState) -> f64 {
     let mut e = [[0.0f32; 252]; 2];
     let theta = ctx.theta;

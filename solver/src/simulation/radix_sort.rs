@@ -29,13 +29,13 @@ pub fn radix_sort_by_state(keys: &[u32], n: usize) -> SortedGroups {
     const MASK1: u32 = (1 << BITS1) - 1; // 0x7FF
     const BUCKETS1: usize = 1 << BITS1; // 2048
 
-    // Histogram
+    // Phase 1: Histogram — count elements per bucket
     let mut hist = [0u32; BUCKETS1];
     for &k in keys.iter() {
         hist[(k & MASK1) as usize] += 1;
     }
 
-    // Prefix sum
+    // Phase 2: Prefix sum — convert counts to offsets
     let mut sum = 0u32;
     for h in hist.iter_mut() {
         let count = *h;
@@ -43,7 +43,7 @@ pub fn radix_sort_by_state(keys: &[u32], n: usize) -> SortedGroups {
         sum += count;
     }
 
-    // Scatter
+    // Phase 3: Scatter — place elements in sorted order
     for &idx in src.iter() {
         let bucket = (keys[idx as usize] & MASK1) as usize;
         dst[hist[bucket] as usize] = idx;
@@ -58,11 +58,13 @@ pub fn radix_sort_by_state(keys: &[u32], n: usize) -> SortedGroups {
     const MASK2: u32 = (1 << BITS2) - 1;
     const BUCKETS2: usize = 1 << BITS2; // 2048
 
+    // Phase 1: Histogram — count elements per bucket
     let mut hist2 = [0u32; BUCKETS2];
     for &idx in src.iter() {
         hist2[((keys[idx as usize] >> SHIFT2) & MASK2) as usize] += 1;
     }
 
+    // Phase 2: Prefix sum — convert counts to offsets
     let mut sum = 0u32;
     for h in hist2.iter_mut() {
         let count = *h;
@@ -70,6 +72,7 @@ pub fn radix_sort_by_state(keys: &[u32], n: usize) -> SortedGroups {
         sum += count;
     }
 
+    // Phase 3: Scatter — place elements in sorted order
     for &idx in src.iter() {
         let bucket = ((keys[idx as usize] >> SHIFT2) & MASK2) as usize;
         dst[hist2[bucket] as usize] = idx;

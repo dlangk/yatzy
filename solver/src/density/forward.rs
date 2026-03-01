@@ -4,8 +4,22 @@
 //! push the distribution forward through each turn using the transition
 //! probabilities from [`super::transitions::compute_transitions`].
 //!
+//! Each turn applies a three-phase algorithm:
+//!
+//! 1. **Phase 1 — Compute transitions**: For each active (state, score_distribution)
+//!    pair, determine which successor states can be reached, with what probability
+//!    and how many points are scored on each transition.
+//!
+//! 2. **Phase 2 — Build destination index**: Invert the source-to-dest mapping into
+//!    a `dest_state -> [(src_state_idx, transition_idx)]` HashMap, so each destination
+//!    knows all contributing sources.
+//!
+//! 3. **Phase 3 — Parallel merge**: For each destination state independently,
+//!    perform shift-and-add convolution of the contributing source PMFs to produce
+//!    the destination's score distribution.
+//!
 //! Uses dense f64 arrays for score distributions and parallelizes both the
-//! transition computation and the merge phase.
+//! transition computation (Phase 1) and the merge phase (Phase 3).
 
 use std::collections::HashMap;
 use std::time::Instant;
@@ -120,6 +134,8 @@ fn density_evolution_inner(
                 .collect();
 
         // Phase 2: Build destination index — group (src_idx, trans_idx) by dest state.
+        // dest_map: dest_state -> [(source_state_index, transition_index_within_that_source)]
+        // This inverts the source->dest direction so Phase 3 can process each dest independently.
         let mut dest_map: HashMap<u32, Vec<(usize, usize)>> = HashMap::new();
         for (src_idx, (trans, _)) in transitions_and_bounds.iter().enumerate() {
             for (t_idx, t) in trans.iter().enumerate() {
@@ -145,7 +161,10 @@ fn density_evolution_inner(
                     let offset = t.points as usize;
                     let prob = t.prob;
 
-                    // Shift-and-add using only the non-zero range
+                    // Shift-and-add convolution: dest_pmf[i + points] += prob * src_pmf[i].
+                    // This shifts the source PMF right by the scored points and weights by
+                    // transition probability, accumulating contributions from all sources.
+                    // Only iterates the non-zero range [0..max_i] for efficiency.
                     // SAFETY: i <= max_i < MAX_SCORE, offset = t.points (max ~50), so i + offset < dense.len().
                     for i in 0..=max_i {
                         let p = unsafe { *src_dist.get_unchecked(i) };
@@ -247,6 +266,11 @@ fn density_evolution_inner(
 /// Separate entry point for mid-game density queries -- parameterized starting state
 /// and turn, otherwise identical to density_evolution_inner.
 ///
+/// This is a separate function (not merged with `density_evolution_inner`) because it
+/// starts from a specific mid-game state rather than the initial (0, 0) state, requiring
+/// different initialization: the turn number is inferred from `scored_categories.count_ones()`,
+/// and the initial PMF is a delta at `accumulated_score` instead of at 0.
+///
 /// Given a specific (upper_score, scored_categories, accumulated_score), propagates
 /// the distribution forward through the remaining turns. Fewer remaining turns = faster:
 /// ~0.5s for 5 turns left, ~3s for full game.
@@ -319,6 +343,11 @@ pub fn density_evolution_from_state(
                     let offset = t.points as usize;
                     let prob = t.prob;
 
+                    // SAFETY: i <= max_i < MAX_SCORE (384), and offset = t.points
+                    // which is at most ~50. dense.len() = MAX_SCORE = 384, and
+                    // i + offset < 384 because max achievable accumulated score
+                    // per turn is bounded well below 384. src_dist.len() = MAX_SCORE,
+                    // so i < MAX_SCORE is safe.
                     for i in 0..=max_i {
                         let p = unsafe { *src_dist.get_unchecked(i) };
                         if p > 0.0 {

@@ -18,7 +18,18 @@ def adaptive_base_dir(base_path: str = ".") -> Path:
 
 
 def discover_adaptive_policies(base_path: str = ".") -> list[str]:
-    """Scan bin_files/adaptive/ for policy subdirs containing scores.bin or simulation_raw.bin."""
+    """Scan the adaptive simulations directory for available policy results.
+
+    Looks under ``<base_path>/data/simulations/adaptive/`` for subdirectories
+    that contain either ``scores.bin`` or ``simulation_raw.bin``.
+
+    Args:
+        base_path: Repository root or base directory for data files.
+            Defaults to the current working directory.
+
+    Returns:
+        Sorted list of policy directory names that have simulation data.
+    """
     base = adaptive_base_dir(base_path)
     policies: list[str] = []
     if not base.is_dir():

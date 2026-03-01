@@ -284,6 +284,11 @@ fn compute_all_state_values_impl(
                 let upper_mask = (scored & 0x3F) as usize;
                 for up in 0..=63 {
                     if ctx_ref.reachable[upper_mask][up] {
+                        // SAFETY: Each (up, scored) pair maps to a unique state_index
+                        // (scored * 128 + up). The outer par_iter processes distinct
+                        // scored masks, so no two threads write the same index.
+                        // state_index(up, scored) < NUM_STATES since up <= 63 < 128
+                        // and scored < 2^15. ptr points to an allocation of NUM_STATES f32s.
                         unsafe {
                             *ptr.add(state_index(up, scored as usize)) = results[up];
                         }
@@ -295,6 +300,10 @@ fn compute_all_state_values_impl(
                 let capped_val = results[63];
                 let base = state_index(0, scored as usize);
                 for pad in 64..STATE_STRIDE {
+                    // SAFETY: base + pad = scored * 128 + pad, where pad in 64..128.
+                    // These are the topological padding slots for this scored mask.
+                    // Each scored mask is processed by exactly one thread, so no
+                    // concurrent writes. base + pad < NUM_STATES since scored < 2^15.
                     unsafe {
                         *ptr.add(base + pad) = capped_val;
                     }
@@ -322,6 +331,13 @@ fn compute_all_state_values_impl(
                         for ds in 0..NUM_DICE_SETS {
                             let oracle_idx = si * NUM_DICE_SETS + ds;
                             let slice_idx = ds * 64 + up;
+                            // SAFETY: Each (si, ds) pair is unique across all parallel
+                            // workers because si is derived from (up, scored), and each
+                            // scored mask is processed by exactly one thread.
+                            // oracle_idx = si * 252 + ds < NUM_STATES * 252, which is
+                            // the allocated length of the oracle arrays.
+                            // slice_idx = ds * 64 + up < 252 * 64 = 16128, within the
+                            // per-mask OracleSlice allocation.
                             unsafe {
                                 *cat_ptr.add(oracle_idx) = os.cat[slice_idx];
                                 *k1_ptr.add(oracle_idx) = os.keep1[slice_idx];

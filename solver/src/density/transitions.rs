@@ -47,6 +47,10 @@ fn compute_group6_with_category(
     let mut lower_succ_ev = [0.0f32; CATEGORY_COUNT];
     for c in 6..CATEGORY_COUNT {
         if !is_category_scored(scored, c) {
+            // SAFETY: c in 6..15 and scored has fewer than 15 bits set, so
+            // scored | (1 << c) < 2^15. up_score is in 0..64. Thus
+            // state_index(up_score, scored | (1<<c)) < NUM_STATES, and sv
+            // has NUM_STATES elements.
             lower_succ_ev[c] = unsafe {
                 *sv.get_unchecked(state_index(up_score as usize, (scored | (1 << c)) as usize))
             };
@@ -66,6 +70,9 @@ fn compute_group6_with_category(
                 let scr = ctx.precomputed_scores[ds_i][c];
                 let new_up = update_upper_score(up_score, c, scr);
                 let new_scored = scored | (1 << c);
+                // SAFETY: c < 6 (upper category), so new_up = update_upper_score(up_score, c, scr)
+                // is in 0..64, and new_scored = scored | (1<<c) < 2^15. Thus
+                // state_index(new_up, new_scored) < NUM_STATES = sv.len().
                 let val = if use_risk {
                     theta * scr as f32
                         + unsafe {
@@ -92,6 +99,7 @@ fn compute_group6_with_category(
         for c in 6..CATEGORY_COUNT {
             if !is_category_scored(scored, c) {
                 let scr = ctx.precomputed_scores[ds_i][c];
+                // SAFETY: c is in 6..CATEGORY_COUNT (15), so c < lower_succ_ev.len() (15).
                 let val = if use_risk {
                     theta * scr as f32 + unsafe { *lower_succ_ev.get_unchecked(c) }
                 } else {
@@ -150,6 +158,10 @@ fn compute_reroll_with_decisions(
             // LSE for risk-sensitive mode
             let mut max_val = f32::NEG_INFINITY;
             for k in start..end {
+                // SAFETY: k is in start..end where start/end come from kt.row_start
+                // (CSR row pointers), so k < cols.len() and k < vals.len().
+                // cols[k] is a dice set index in 0..NUM_DICE_SETS (252), so
+                // cols[k] < e_ds_prev.len() (252).
                 let v = unsafe { *e_ds_prev.get_unchecked(*cols.get_unchecked(k) as usize) };
                 if v > max_val {
                     max_val = v;
@@ -157,6 +169,8 @@ fn compute_reroll_with_decisions(
             }
             let mut sum: f32 = 0.0;
             for k in start..end {
+                // SAFETY: same bounds as above — k indexes into CSR cols/vals arrays,
+                // and cols[k] indexes into e_ds_prev[0..252].
                 unsafe {
                     let v = *e_ds_prev.get_unchecked(*cols.get_unchecked(k) as usize);
                     sum += *vals.get_unchecked(k) * (v - max_val).exp();
@@ -167,6 +181,8 @@ fn compute_reroll_with_decisions(
             // Weighted sum for EV mode
             let mut ev: f32 = 0.0;
             for k in start..end {
+                // SAFETY: k is in start..end from CSR row pointers, so k < cols.len()
+                // and k < vals.len(). cols[k] < NUM_DICE_SETS = 252 = e_ds_prev.len().
                 unsafe {
                     ev += *vals.get_unchecked(k)
                         * e_ds_prev.get_unchecked(*cols.get_unchecked(k) as usize);
@@ -184,6 +200,9 @@ fn compute_reroll_with_decisions(
         let mut best_val = e_ds_prev[ds_i]; // mask=0: keep all
 
         for j in 0..kt.unique_count[ds_i] as usize {
+            // SAFETY: j < unique_count[ds_i], which is the number of valid entries
+            // in unique_keep_ids[ds_i]. The KeepTable guarantees unique_count[ds_i]
+            // entries are populated in unique_keep_ids[ds_i].
             let kid = unsafe { *kt.unique_keep_ids[ds_i].get_unchecked(j) } as usize;
             let ev = keep_ev[kid];
             let better = if minimize {
