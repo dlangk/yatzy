@@ -3,16 +3,18 @@ import { computeRerollMask, mapMaskToSorted, unmapMask } from '../mask.ts';
 
 const DASH = '\u2014';
 
-/** Given an expectedFinal and percentile map, return a bracket string like "Top 25%". */
-function percentileBracket(ev: number, pct: Record<string, number>): string {
-  if (ev >= pct.p99) return 'Top 1%';
-  if (ev >= pct.p95) return 'Top 5%';
-  if (ev >= pct.p90) return 'Top 10%';
-  if (ev >= pct.p75) return 'Top 25%';
-  if (ev >= pct.p50) return 'Top 50%';
-  if (ev >= pct.p25) return 'Top 75%';
-  if (ev >= pct.p10) return 'Top 90%';
-  return 'Bottom 10%';
+/** Optimal-play final score percentiles (θ=0, 1M games, sweep_summary.json). */
+const OPTIMAL_PCTLS: [number, string][] = [
+  [325, 'Top 1%'], [309, 'Top 5%'], [299, 'Top 10%'],
+  [276, 'Top 25%'], [249, 'Top 50%'], [225, 'Top 75%'],
+  [203, 'Top 90%'], [179, 'Top 95%'], [145, 'Top 99%'],
+];
+
+function optimalPercentile(ev: number): string {
+  for (const [cutoff, label] of OPTIMAL_PCTLS) {
+    if (ev >= cutoff) return label;
+  }
+  return 'Bottom 1%';
 }
 
 /** Build a label/value grid column with a header. Returns refs to value spans. */
@@ -71,7 +73,7 @@ export function initEvalPanel(container: HTMLElement): void {
     'Expected final',
     '80% Finish range',
     'Current score',
-    'Percentile',
+    'Optimal percentile',
     'Turn',
   ]);
 
@@ -159,13 +161,9 @@ export function initEvalPanel(container: HTMLElement): void {
     // [2] Current score
     gameVals[2].textContent = String(s.totalScore);
 
-    // [3] Percentile: compare latest scored expectedFinal against the turn-0
-    // (full-game) distribution. Using scored-point values avoids roll-by-roll
-    // volatility that causes flips near percentile boundaries.
-    const refPoint = s.trajectory.find(p => p.percentiles && p.turn < 15);
-    const scoredEf = latestScored?.expectedFinal ?? null;
-    if (refPoint?.percentiles && scoredEf !== null) {
-      gameVals[3].textContent = percentileBracket(scoredEf, refPoint.percentiles);
+    // [3] Optimal percentile
+    if (expectedFinal !== null) {
+      gameVals[3].textContent = optimalPercentile(expectedFinal);
     } else {
       gameVals[3].textContent = DASH;
     }
