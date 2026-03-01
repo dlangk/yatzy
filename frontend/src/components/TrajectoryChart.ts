@@ -27,7 +27,7 @@ const X_MIN = 0;
 const X_MAX = 15;
 
 const EVENT_COLORS: Record<string, string> = {
-  start: COLORS.textMuted,
+  start: COLORS.success,
   roll: COLORS.blue,
   reroll: COLORS.orange,
   score: COLORS.success,
@@ -117,7 +117,7 @@ function buildLegend(container: HTMLElement): void {
       label: 'p10–p90',
     },
     {
-      svg: `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="3.5" fill="${COLORS.textMuted}" stroke="${COLORS.bg}" stroke-width="1"/></svg>`,
+      svg: `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="3.5" fill="${COLORS.success}" stroke="${COLORS.bg}" stroke-width="1"/></svg>`,
       label: 'Start',
     },
     {

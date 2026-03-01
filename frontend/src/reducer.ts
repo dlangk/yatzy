@@ -277,6 +277,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         expectedFinal: turnPhase === 'game_over' ? accScore : rawScoredSum + successorEv,
         accumulatedScore: accScore,
         stateEv: turnPhase === 'game_over' ? 0 : successorEv,
+        upperScore: derived.upperScore,
+        scoredCategories: derived.scoredCategories,
         label: scoreLabel,
         delta: scoreDelta,
       };
@@ -467,6 +469,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         expectedFinal: action.ev,
         accumulatedScore: 0,
         stateEv: action.ev,
+        upperScore: 0,
+        scoredCategories: 0,
       };
       return { ...state, trajectory: [point] };
     }

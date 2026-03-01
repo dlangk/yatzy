@@ -362,6 +362,8 @@ describe('gameReducer', () => {
         expectedFinal: 247.3,
         accumulatedScore: 0,
         stateEv: 247.3,
+        upperScore: 0,
+        scoredCategories: 0,
       });
     });
 

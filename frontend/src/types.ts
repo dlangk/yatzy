@@ -10,6 +10,8 @@ export interface TrajectoryPoint {
   expectedFinal: number;
   accumulatedScore: number;
   stateEv: number;
+  upperScore?: number;
+  scoredCategories?: number;
   percentiles?: Record<string, number>;
   label?: string;
   delta?: number;

@@ -9,7 +9,7 @@ const root = document.getElementById('root')!;
 initApp(root);
 
 // Side effect: auto-evaluate after roll/reroll
-subscribe((state, prev) => {
+subscribe((state) => {
   if (state.turnPhase === 'rolled' && !state.lastEvalResponse) {
     const allValid = state.dice.every(d => d.value >= 1 && d.value <= 6);
     if (allValid) {
@@ -24,30 +24,39 @@ subscribe((state, prev) => {
         .catch(err => console.error('Evaluate failed:', err));
     }
   }
+});
 
-  // Side effect: density fetch after new score trajectory point
-  const traj = state.trajectory;
-  if (traj.length > prev.trajectory.length) {
-    const latest = traj[traj.length - 1];
-    if (latest.event === 'score' && !latest.percentiles) {
-      if (latest.turn < 15) {
-        const rawScoredSum = state.categories.reduce((sum, c) => c.isScored ? sum + c.score : sum, 0);
-        fetchDensity(state.upperScore, state.scoredCategories, rawScoredSum)
-          .then(res => dispatch({ type: 'SET_DENSITY_RESULT', index: latest.index, percentiles: res.percentiles }))
-          .catch(() => { /* density endpoint not available */ });
-      } else {
-        const finalScore = state.totalScore;
-        const pctiles: Record<string, number> = {};
-        for (const k of ['p1','p5','p10','p25','p50','p75','p90','p95','p99']) {
-          pctiles[k] = finalScore;
-        }
-        dispatch({ type: 'SET_DENSITY_RESULT', index: latest.index, percentiles: pctiles });
-      }
+// Side effect: backfill missing percentiles on any trajectory point
+const pendingDensity = new Set<number>();
+const PCTL_KEYS = ['p1','p5','p10','p25','p50','p75','p90','p95','p99'];
+
+subscribe((state) => {
+  for (const p of state.trajectory) {
+    if (p.event !== 'start' && p.event !== 'score') continue;
+    if (p.percentiles) continue;
+    if (pendingDensity.has(p.index)) continue;
+
+    if (p.turn >= 15) {
+      const pctiles: Record<string, number> = {};
+      for (const k of PCTL_KEYS) pctiles[k] = p.accumulatedScore;
+      dispatch({ type: 'SET_DENSITY_RESULT', index: p.index, percentiles: pctiles });
+      continue;
     }
+
+    const up = p.upperScore ?? 0;
+    const scored = p.scoredCategories ?? 0;
+    const rawAcc = p.accumulatedScore - (up >= 63 ? 50 : 0);
+    pendingDensity.add(p.index);
+    fetchDensity(up, scored, rawAcc)
+      .then(res => {
+        pendingDensity.delete(p.index);
+        dispatch({ type: 'SET_DENSITY_RESULT', index: p.index, percentiles: res.percentiles });
+      })
+      .catch(() => { pendingDensity.delete(p.index); });
   }
 });
 
-// Side effect: fetch initial EV and density at turn 0
+// Side effect: fetch initial EV at startup
 {
   const s = getState();
   if (s.trajectory.length === 0 && s.turnPhase === 'idle') {
@@ -56,17 +65,5 @@ subscribe((state, prev) => {
         dispatch({ type: 'SET_INITIAL_EV', ev: res.expected_final_score });
       })
       .catch(() => { /* server not available */ });
-
-    // Fetch density for the initial state (turn 0)
-    fetchDensity(s.upperScore, s.scoredCategories, 0)
-      .then(res => {
-        // Dispatch as the first trajectory point (index 0) if it exists
-        const state = getState();
-        const traj = state.trajectory;
-        if (traj.length > 0 && !traj[0].percentiles) {
-          dispatch({ type: 'SET_DENSITY_RESULT', index: traj[0].index, percentiles: res.percentiles });
-        }
-      })
-      .catch(() => { /* density endpoint not available */ });
   }
 }
