@@ -154,18 +154,17 @@ export function initScorecard(container: HTMLElement): void {
     const rawUpperTotal = s.categories.slice(0, UPPER_CATEGORIES).reduce(
       (sum, c) => c.isScored ? sum + c.score : sum, 0,
     );
-    const parDelta = s.categories.slice(0, UPPER_CATEGORIES).reduce(
-      (sum, c) => c.isScored ? sum + (c.score - 3 * (c.id + 1)) : sum, 0,
-    );
-    const parStr = parDelta > 0 ? `+${parDelta}` : parDelta < 0 ? `${parDelta}` : '±0';
-    upperTotalScoreTd.textContent = `${rawUpperTotal} (${parStr})`;
+    upperTotalScoreTd.textContent = String(rawUpperTotal);
 
     // Bonus — show cumulative +/- par until bonus achieved
     if (s.bonus > 0) {
       bonusScoreTd.textContent = `+${s.bonus}`;
       bonusScoreTd.style.color = 'var(--color-success)';
     } else {
-      bonusScoreTd.textContent = parStr;
+      const parDelta = s.categories.slice(0, UPPER_CATEGORIES).reduce(
+        (sum, c) => c.isScored ? sum + (c.score - 3 * (c.id + 1)) : sum, 0,
+      );
+      bonusScoreTd.textContent = parDelta > 0 ? `+${parDelta}` : parDelta < 0 ? `${parDelta}` : '±0';
       bonusScoreTd.style.color = parDelta > 0 ? 'var(--color-success)' : parDelta < 0 ? 'var(--color-danger)' : 'var(--text-muted)';
     }
 
