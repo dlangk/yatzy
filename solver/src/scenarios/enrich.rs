@@ -352,7 +352,6 @@ pub fn evaluate_scenario_sensitivity(
             let dist = tr.theta.abs();
             if dist < best_dist {
                 has_flip = true;
-                best_dist = dist;
                 flip_theta = tr.theta;
                 flip_action = tr.action.clone();
                 flip_action_id = tr.action_id;

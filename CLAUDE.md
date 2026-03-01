@@ -34,7 +34,7 @@ See component CLAUDE.md files for detailed guidance:
 # Build + test
 just setup              # Build solver + install analytics
 just build              # Production build (solver + frontend)
-just test               # Solver tests (182 tests)
+just test               # Solver tests (185 tests)
 just test-all           # All tests (solver + frontend + analytics)
 just check              # Full quality gate (lint + typecheck + test + bench)
 just bench-check        # Performance regression test (PASS/FAIL)

@@ -47,15 +47,6 @@ pub fn create_router(ctx: Arc<YatzyContext>) -> Router {
     create_router_with_state(state)
 }
 
-pub fn create_router_with_oracle(ctx: Arc<YatzyContext>, oracle: Option<PolicyOracle>) -> Router {
-    let state = Arc::new(ServerState {
-        ctx,
-        oracle: oracle.map(Arc::new),
-        percentile_table: None,
-    });
-    create_router_with_state(state)
-}
-
 pub fn create_router_full(
     ctx: Arc<YatzyContext>,
     oracle: Option<PolicyOracle>,

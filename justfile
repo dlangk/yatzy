@@ -13,7 +13,7 @@ setup:
 
 # ── Stage 1: Compute (expensive) ─────────────────────────────────────────
 
-# Precompute state values for θ=0 (~2.3s)
+# Precompute state values for θ=0 (~1.1s)
 precompute:
     YATZY_BASE_PATH=. solver/target/release/yatzy-precompute
 
@@ -263,7 +263,7 @@ fmt:
 lint-all:
     cd solver && cargo fmt --check && cargo clippy -- -D warnings
     cd frontend && npm run lint
-    analytics/.venv/bin/ruff check analytics/tests/
+    analytics/.venv/bin/ruff check analytics/src/ analytics/tests/
 
 # Type-check
 typecheck:

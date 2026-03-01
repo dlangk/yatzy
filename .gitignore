@@ -24,6 +24,7 @@ legacy/compile_commands.json
 .idea/
 .cache/
 .claude/settings.local.json
+.claude/plans/
 
 # Python
 __pycache__/

@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-yatzy = { path = "../../backend" }
+yatzy = { path = "../../../solver" }
 rand = { version = "0.9", features = ["small_rng"] }
 rayon = "1.10"
 
