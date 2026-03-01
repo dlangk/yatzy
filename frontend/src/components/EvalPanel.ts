@@ -147,11 +147,13 @@ export function initEvalPanel(container: HTMLElement): void {
     const scoredCount = s.categories.filter(c => c.isScored).length;
     gameVals[2].textContent = `${scoredCount} / 15`;
 
-    // Percentile: compare against earliest density (first scored turn's distribution)
+    // Percentile: compare latest scored expectedFinal against the turn-0
+    // (full-game) distribution. Using scored-point values avoids roll-by-roll
+    // volatility that causes flips near percentile boundaries.
     const refPoint = s.trajectory.find(p => p.percentiles && p.turn < 15);
-    const ef = expectedFinal ?? latestScored?.expectedFinal ?? null;
-    if (refPoint?.percentiles && ef !== null) {
-      gameVals[3].textContent = percentileBracket(ef, refPoint.percentiles);
+    const scoredEf = latestScored?.expectedFinal ?? null;
+    if (refPoint?.percentiles && scoredEf !== null) {
+      gameVals[3].textContent = percentileBracket(scoredEf, refPoint.percentiles);
     } else {
       gameVals[3].textContent = DASH;
     }
