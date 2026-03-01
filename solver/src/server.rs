@@ -281,7 +281,7 @@ async fn handle_density(
     let accumulated_score = req.accumulated_score;
 
     let computation = tokio::task::spawn_blocking(move || {
-        let num_games: usize = 10_000;
+        let num_games: usize = 1_000;
         let seed = (upper_score as u64)
             .wrapping_mul(65537)
             .wrapping_add(scored_categories as u64);
