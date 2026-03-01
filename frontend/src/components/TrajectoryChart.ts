@@ -29,14 +29,14 @@ const X_MAX = 15;
 const EVENT_COLORS: Record<string, string> = {
   start: COLORS.success,
   roll: COLORS.blue,
-  reroll: COLORS.orange,
+  reroll: COLORS.blue,
   score: COLORS.success,
 };
 
 const EVENT_LABELS: Record<string, string> = {
   start: 'Start',
-  roll: 'Roll',
-  reroll: 'Reroll',
+  roll: 'Dice roll',
+  reroll: 'Dice roll',
   score: 'Score',
 };
 
@@ -118,19 +118,11 @@ function buildLegend(container: HTMLElement): void {
     },
     {
       svg: `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="3.5" fill="${COLORS.success}" stroke="${COLORS.bg}" stroke-width="1"/></svg>`,
-      label: 'Start',
+      label: 'Start / Score',
     },
     {
       svg: `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="3.5" fill="${COLORS.blue}" stroke="${COLORS.bg}" stroke-width="1"/></svg>`,
-      label: 'Roll',
-    },
-    {
-      svg: `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="3.5" fill="${COLORS.orange}" stroke="${COLORS.bg}" stroke-width="1"/></svg>`,
-      label: 'Reroll',
-    },
-    {
-      svg: `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="3.5" fill="${COLORS.success}" stroke="${COLORS.bg}" stroke-width="1"/></svg>`,
-      label: 'Score',
+      label: 'Dice roll',
     },
   ];
 
