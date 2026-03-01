@@ -69,10 +69,10 @@ export function initEvalPanel(container: HTMLElement): void {
   // Right column: Game
   const gameVals = buildColumn(columns, 'Game', [
     'Expected final',
-    'Score so far',
-    'Turn',
-    'Percentile',
     'Finish range',
+    'Current score',
+    'Percentile',
+    'Turn',
   ]);
 
   function render() {
@@ -131,23 +131,35 @@ export function initEvalPanel(container: HTMLElement): void {
 
     // --- Game column ---
 
-    // Expected final score = accumulated + remaining EV
+    // [0] Expected final score = accumulated + remaining EV
     const stateEv = s.lastEvalResponse?.state_ev ?? null;
     const rawScoredSum = s.categories.reduce((sum, c) => c.isScored ? sum + c.score : sum, 0);
     const latestScored = [...s.trajectory].reverse().find(p => p.event === 'score');
     const expectedFinal = hasData && stateEv !== null
       ? rawScoredSum + stateEv
       : latestScored?.expectedFinal ?? null;
-    gameVals[0].textContent = expectedFinal !== null ? expectedFinal.toFixed(1) : DASH;
+    gameVals[0].textContent = expectedFinal !== null ? String(Math.round(expectedFinal)) : DASH;
 
-    // Score so far
-    gameVals[1].textContent = String(s.totalScore);
+    // [1] Finish range: "80% to finish in X–Y" (p10–p90 from latest density)
+    const latestWithPct = [...s.trajectory].reverse().find(
+      p => p.percentiles && p.event !== 'score' || (p.event === 'score' && p.turn < 15),
+    );
+    if (latestWithPct?.percentiles) {
+      const p10 = latestWithPct.percentiles.p10;
+      const p90 = latestWithPct.percentiles.p90;
+      if (p10 != null && p90 != null) {
+        gameVals[1].textContent = `80% to finish ${Math.round(p10)}–${Math.round(p90)}`;
+      } else {
+        gameVals[1].textContent = DASH;
+      }
+    } else {
+      gameVals[1].textContent = DASH;
+    }
 
-    // Turn X / 15
-    const scoredCount = s.categories.filter(c => c.isScored).length;
-    gameVals[2].textContent = `${scoredCount} / 15`;
+    // [2] Current score
+    gameVals[2].textContent = String(s.totalScore);
 
-    // Percentile: compare latest scored expectedFinal against the turn-0
+    // [3] Percentile: compare latest scored expectedFinal against the turn-0
     // (full-game) distribution. Using scored-point values avoids roll-by-roll
     // volatility that causes flips near percentile boundaries.
     const refPoint = s.trajectory.find(p => p.percentiles && p.turn < 15);
@@ -158,21 +170,9 @@ export function initEvalPanel(container: HTMLElement): void {
       gameVals[3].textContent = DASH;
     }
 
-    // Finish range (p10–p90 from latest non-degenerate density)
-    const latestWithPct = [...s.trajectory].reverse().find(
-      p => p.percentiles && p.event !== 'score' || (p.event === 'score' && p.turn < 15),
-    );
-    if (latestWithPct?.percentiles) {
-      const p10 = latestWithPct.percentiles.p10;
-      const p90 = latestWithPct.percentiles.p90;
-      if (p10 != null && p90 != null) {
-        gameVals[4].textContent = `${Math.round(p10)}–${Math.round(p90)}`;
-      } else {
-        gameVals[4].textContent = DASH;
-      }
-    } else {
-      gameVals[4].textContent = DASH;
-    }
+    // [4] Turn X / 15
+    const scoredCount = s.categories.filter(c => c.isScored).length;
+    gameVals[4].textContent = `${scoredCount} / 15`;
   }
 
   render();
