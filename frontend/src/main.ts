@@ -26,11 +26,22 @@ subscribe((state) => {
   }
 });
 
+// Side effect: fetch initial EV when trajectory is empty (startup + reset)
+subscribe((state) => {
+  if (state.trajectory.length === 0 && state.turnPhase === 'idle') {
+    getStateValue(state.upperScore, state.scoredCategories)
+      .then(res => {
+        dispatch({ type: 'SET_INITIAL_EV', ev: res.expected_final_score });
+      })
+      .catch(() => { /* server not available */ });
+  }
+});
+
 // Side effect: backfill missing percentiles on any trajectory point
 const pendingDensity = new Set<number>();
 const PCTL_KEYS = ['p1','p5','p10','p25','p50','p75','p90','p95','p99'];
 
-subscribe((state) => {
+function backfillPercentiles(state: { trajectory: readonly import('./types.ts').TrajectoryPoint[] }) {
   for (const p of state.trajectory) {
     if (p.event !== 'start' && p.event !== 'score') continue;
     if (p.percentiles) continue;
@@ -54,16 +65,9 @@ subscribe((state) => {
       })
       .catch(() => { pendingDensity.delete(p.index); });
   }
-});
-
-// Side effect: fetch initial EV at startup
-{
-  const s = getState();
-  if (s.trajectory.length === 0 && s.turnPhase === 'idle') {
-    getStateValue(s.upperScore, s.scoredCategories)
-      .then(res => {
-        dispatch({ type: 'SET_INITIAL_EV', ev: res.expected_final_score });
-      })
-      .catch(() => { /* server not available */ });
-  }
 }
+
+subscribe((state) => backfillPercentiles(state));
+
+// Kick backfill on startup for restored games (subscribers don't fire on registration)
+backfillPercentiles(getState());
