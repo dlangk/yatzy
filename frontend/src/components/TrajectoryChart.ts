@@ -16,6 +16,7 @@ import * as d3 from 'd3';
 import { getState, subscribe } from '../store.ts';
 import type { TrajectoryPoint } from '../types.ts';
 import { COLORS } from '../constants.ts';
+import { emitHover, onHover } from '../hoverBus.ts';
 
 const WIDTH = 568;
 const HEIGHT = 230;
@@ -222,38 +223,14 @@ export function initTrajectoryChart(container: HTMLElement): void {
   let currentXScale: d3.ScaleLinear<number, number> | null = null;
   let currentYScale: d3.ScaleLinear<number, number> | null = null;
 
-  /**
-   * Hover handler: find nearest trajectory point by x-position.
-   * Uses bisect on xPositions for O(log n) lookup.
-   */
-  hoverOverlay.on('mousemove', function (event: MouseEvent) {
-    if (!currentXScale || !currentYScale || currentTrajectory.length === 0) return;
+  /** Show tooltip + crosshair for a trajectory point by its array index. */
+  function showTooltipForIndex(idx: number) {
+    if (!currentXScale || !currentYScale || idx < 0 || idx >= currentTrajectory.length) return;
 
-    // Convert mouse position from screen to SVG viewBox coords
-    const svgNode = svg.node()!;
-    const pt = svgNode.createSVGPoint();
-    pt.x = event.clientX;
-    pt.y = event.clientY;
-    const svgPt = pt.matrixTransform(svgNode.getScreenCTM()!.inverse());
-
-    const mouseXValue = currentXScale.invert(svgPt.x);
-
-    // Find nearest point by x
-    let nearestIdx = 0;
-    let nearestDist = Infinity;
-    for (let i = 0; i < currentTrajectory.length; i++) {
-      const dist = Math.abs(currentXPositions[i] - mouseXValue);
-      if (dist < nearestDist) {
-        nearestDist = dist;
-        nearestIdx = i;
-      }
-    }
-
-    const p = currentTrajectory[nearestIdx];
-    const px = currentXScale(currentXPositions[nearestIdx]);
+    const p = currentTrajectory[idx];
+    const px = currentXScale(currentXPositions[idx]);
     const py = currentYScale(p.expectedFinal);
 
-    // Position crosshair and highlight
     hoverG.style('display', null);
     crosshairLine.attr('x1', px).attr('x2', px);
     highlightCircle
@@ -261,7 +238,6 @@ export function initTrajectoryChart(container: HTMLElement): void {
       .attr('cy', py)
       .attr('stroke', EVENT_COLORS[p.event] || COLORS.text);
 
-    // Build tooltip content
     const eventLabel = EVENT_LABELS[p.event] || p.event;
     let html = `<div><b>Turn ${p.turn} — ${eventLabel}</b></div>`;
     html += `<div>E[final]: ${p.expectedFinal.toFixed(1)}</div>`;
@@ -284,16 +260,14 @@ export function initTrajectoryChart(container: HTMLElement): void {
     tooltip.innerHTML = html;
     tooltip.style.display = '';
 
-    // Position tooltip in wrapper-relative coords.
-    // Convert SVG viewBox px → wrapper px using wrapper's actual width.
     const wrapperRect = wrapper.getBoundingClientRect();
+    const svgNode = svg.node()!;
     const svgRect = svgNode.getBoundingClientRect();
     const scaleX = svgRect.width / WIDTH;
     const scaleY = svgRect.height / HEIGHT;
     const tipX = (px * scaleX) + (svgRect.left - wrapperRect.left);
     const tipY = (py * scaleY) + (svgRect.top - wrapperRect.top);
 
-    // Flip horizontally when near right edge
     const tooltipWidth = tooltip.offsetWidth;
     if (tipX + tooltipWidth + 12 > wrapperRect.width) {
       tooltip.style.left = `${tipX - tooltipWidth - 8}px`;
@@ -301,11 +275,56 @@ export function initTrajectoryChart(container: HTMLElement): void {
       tooltip.style.left = `${tipX + 8}px`;
     }
     tooltip.style.top = `${tipY - 12}px`;
+  }
+
+  function hideTooltip() {
+    hoverG.style('display', 'none');
+    tooltip.style.display = 'none';
+  }
+
+  /**
+   * Hover handler: find nearest trajectory point by x-position.
+   */
+  hoverOverlay.on('mousemove', function (event: MouseEvent) {
+    if (!currentXScale || !currentYScale || currentTrajectory.length === 0) return;
+
+    const svgNode = svg.node()!;
+    const pt = svgNode.createSVGPoint();
+    pt.x = event.clientX;
+    pt.y = event.clientY;
+    const svgPt = pt.matrixTransform(svgNode.getScreenCTM()!.inverse());
+
+    const mouseXValue = currentXScale.invert(svgPt.x);
+
+    let nearestIdx = 0;
+    let nearestDist = Infinity;
+    for (let i = 0; i < currentTrajectory.length; i++) {
+      const dist = Math.abs(currentXPositions[i] - mouseXValue);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearestIdx = i;
+      }
+    }
+
+    showTooltipForIndex(nearestIdx);
+    emitHover(currentTrajectory[nearestIdx].index, 'chart');
   });
 
   hoverOverlay.on('mouseleave', () => {
-    hoverG.style('display', 'none');
-    tooltip.style.display = 'none';
+    hideTooltip();
+    emitHover(null, 'chart');
+  });
+
+  // Listen for hover events from other components (e.g. decision log)
+  onHover((trajectoryIndex, source) => {
+    if (source === 'chart') return;
+    if (trajectoryIndex === null) {
+      hideTooltip();
+      return;
+    }
+    // Find array position for this trajectory index
+    const arrIdx = currentTrajectory.findIndex(p => p.index === trajectoryIndex);
+    if (arrIdx >= 0) showTooltipForIndex(arrIdx);
   });
 
   function render() {

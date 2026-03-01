@@ -545,6 +545,15 @@ body {
   vertical-align: middle;
 }
 
+.decision-log-table tr {
+  cursor: default;
+  transition: background 0.1s;
+}
+
+.decision-log-table tr.decision-log-hover {
+  background: var(--accent-light);
+}
+
 .decision-log-turn {
   text-align: center;
   color: var(--text-muted);

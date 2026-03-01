@@ -1,5 +1,6 @@
 import { getState, subscribe } from '../store.ts';
 import type { TrajectoryPoint } from '../types.ts';
+import { emitHover, onHover } from '../hoverBus.ts';
 
 const MAX_BAR_WIDTH = 60;
 
@@ -38,6 +39,10 @@ export function initDecisionLog(container: HTMLElement): void {
   table.appendChild(tbody);
   container.appendChild(table);
 
+  // Map trajectory index → row element for external highlight
+  const rowMap = new Map<number, HTMLTableRowElement>();
+  let currentHighlight: HTMLTableRowElement | null = null;
+
   function render() {
     const s = getState();
     tbody.innerHTML = '';
@@ -62,8 +67,23 @@ export function initDecisionLog(container: HTMLElement): void {
     }
     if (maxAbsDelta === 0) maxAbsDelta = 1;
 
+    // Track row elements by trajectory index for external highlight
+    rowMap.clear();
+
     for (const d of [...decisions].reverse()) {
       const tr = document.createElement('tr');
+      tr.dataset.trajIndex = String(d.index);
+      rowMap.set(d.index, tr);
+
+      // Hover: emit to bus
+      tr.addEventListener('mouseenter', () => {
+        emitHover(d.index, 'log');
+        tr.classList.add('decision-log-hover');
+      });
+      tr.addEventListener('mouseleave', () => {
+        emitHover(null, 'log');
+        tr.classList.remove('decision-log-hover');
+      });
 
       // Turn #
       const turnTd = document.createElement('td');
@@ -136,4 +156,20 @@ export function initDecisionLog(container: HTMLElement): void {
 
   render();
   subscribe(render);
+
+  // Listen for hover events from other components (e.g. trajectory chart)
+  onHover((trajectoryIndex, source) => {
+    if (source === 'log') return;
+    // Clear previous highlight
+    if (currentHighlight) {
+      currentHighlight.classList.remove('decision-log-hover');
+      currentHighlight = null;
+    }
+    if (trajectoryIndex === null) return;
+    const row = rowMap.get(trajectoryIndex);
+    if (row) {
+      row.classList.add('decision-log-hover');
+      currentHighlight = row;
+    }
+  });
 }
