@@ -3,11 +3,17 @@ import { computeRerollMask, mapMaskToSorted, unmapMask } from '../mask.ts';
 
 const DASH = '\u2014';
 
-/** Optimal-play final score percentiles (θ=0, 1M games, sweep_summary.json). */
+/** Optimal-play final score percentiles (θ=0, 1M games, scores.bin). */
 const OPTIMAL_PCTLS: [number, string][] = [
-  [325, 'Top 1%'], [309, 'Top 5%'], [299, 'Top 10%'],
-  [276, 'Top 25%'], [249, 'Top 50%'], [225, 'Top 75%'],
-  [203, 'Top 90%'], [179, 'Top 95%'], [145, 'Top 99%'],
+  [343, 'Top 0.01%'], [336, 'Top 0.1%'],
+  [325, 'Top 1%'], [319, 'Top 2%'], [315, 'Top 3%'], [312, 'Top 4%'],
+  [309, 'Top 5%'], [307, 'Top 6%'], [305, 'Top 7%'], [303, 'Top 8%'],
+  [301, 'Top 9%'], [299, 'Top 10%'],
+  [282, 'Top 20%'], [269, 'Top 30%'], [258, 'Top 40%'], [249, 'Top 50%'],
+  [239, 'Top 60%'], [230, 'Top 70%'], [219, 'Top 80%'], [203, 'Top 90%'],
+  [200, 'Top 91%'], [197, 'Top 92%'], [192, 'Top 93%'], [186, 'Top 94%'],
+  [179, 'Top 95%'], [172, 'Top 96%'], [164, 'Top 97%'], [155, 'Top 98%'],
+  [145, 'Top 99%'],
 ];
 
 function optimalPercentile(ev: number): string {
