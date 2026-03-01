@@ -3,24 +3,27 @@ import { computeRerollMask, mapMaskToSorted, unmapMask } from '../mask.ts';
 
 const DASH = '\u2014';
 
-/** Optimal-play final score percentiles (θ=0, 1M games, scores.bin). */
-const OPTIMAL_PCTLS: [number, string][] = [
-  [343, 'Top 0.01%'], [336, 'Top 0.1%'],
-  [325, 'Top 1%'], [319, 'Top 2%'], [315, 'Top 3%'], [312, 'Top 4%'],
-  [309, 'Top 5%'], [307, 'Top 6%'], [305, 'Top 7%'], [303, 'Top 8%'],
-  [301, 'Top 9%'], [299, 'Top 10%'],
-  [282, 'Top 20%'], [269, 'Top 30%'], [258, 'Top 40%'], [249, 'Top 50%'],
-  [239, 'Top 60%'], [230, 'Top 70%'], [219, 'Top 80%'], [203, 'Top 90%'],
-  [200, 'Top 91%'], [197, 'Top 92%'], [192, 'Top 93%'], [186, 'Top 94%'],
-  [179, 'Top 95%'], [172, 'Top 96%'], [164, 'Top 97%'], [155, 'Top 98%'],
-  [145, 'Top 99%'],
+/** Optimal-play final score percentiles (θ=0, 1M games, scores.bin).
+ *  Each entry: [score_cutoff, percentile_rank]. Descending by score. */
+const OPTIMAL_PCTLS: [number, number][] = [
+  [343, 99.99], [336, 99.9],
+  [325, 99], [319, 98], [315, 97], [312, 96],
+  [309, 95], [307, 94], [305, 93], [303, 92],
+  [301, 91], [299, 90],
+  [282, 80], [269, 70], [258, 60], [249, 50],
+  [239, 40], [230, 30], [219, 20], [203, 10],
+  [200, 9], [197, 8], [192, 7], [186, 6],
+  [179, 5], [172, 4], [164, 3], [155, 2],
+  [145, 1],
 ];
 
 function optimalPercentile(ev: number): string {
-  for (const [cutoff, label] of OPTIMAL_PCTLS) {
-    if (ev >= cutoff) return label;
+  for (const [cutoff, pct] of OPTIMAL_PCTLS) {
+    if (ev >= cutoff) {
+      return pct >= 100 ? `p${pct.toFixed(2)}` : `p${pct}`;
+    }
   }
-  return 'Bottom 1%';
+  return 'p0';
 }
 
 /** Build a label/value grid column with a header. Returns refs to value spans. */
