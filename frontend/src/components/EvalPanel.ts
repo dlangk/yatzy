@@ -69,7 +69,7 @@ export function initEvalPanel(container: HTMLElement): void {
   // Right column: Game
   const gameVals = buildColumn(columns, 'Game', [
     'Expected final',
-    'Finish range',
+    '80% Finish range',
     'Current score',
     'Percentile',
     'Turn',
@@ -148,7 +148,7 @@ export function initEvalPanel(container: HTMLElement): void {
       const p10 = latestWithPct.percentiles.p10;
       const p90 = latestWithPct.percentiles.p90;
       if (p10 != null && p90 != null) {
-        gameVals[1].textContent = `80% to finish ${Math.round(p10)}–${Math.round(p90)}`;
+        gameVals[1].textContent = `${Math.round(p10)}–${Math.round(p90)}`;
       } else {
         gameVals[1].textContent = DASH;
       }
