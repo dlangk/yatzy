@@ -102,7 +102,7 @@ function buildLegend(container: HTMLElement): void {
   const items: { svg: string; label: string }[] = [
     {
       svg: `<svg width="16" height="12" viewBox="0 0 16 12"><line x1="0" y1="6" x2="16" y2="6" stroke="${COLORS.blue}" stroke-width="2"/></svg>`,
-      label: 'Expected final',
+      label: 'Expected Final',
     },
     {
       svg: `<svg width="16" height="12" viewBox="0 0 16 12"><rect x="0" y="1" width="16" height="10" fill="rgba(44,160,44,0.15)" stroke="rgba(44,160,44,0.3)" stroke-width="1"/></svg>`,
@@ -110,19 +110,19 @@ function buildLegend(container: HTMLElement): void {
     },
     {
       svg: `<svg width="16" height="12" viewBox="0 0 16 12"><rect x="0" y="1" width="16" height="10" fill="rgba(59,76,192,0.06)"/></svg>`,
-      label: 'p1–p99',
+      label: 'P1–P99',
     },
     {
       svg: `<svg width="16" height="12" viewBox="0 0 16 12"><rect x="0" y="1" width="16" height="10" fill="rgba(59,76,192,0.12)"/></svg>`,
-      label: 'p10–p90',
+      label: 'P10–P90',
     },
     {
       svg: `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="3.5" fill="${COLORS.success}" stroke="${COLORS.bg}" stroke-width="1"/></svg>`,
-      label: 'Start / Score',
+      label: 'Score Category',
     },
     {
       svg: `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="3.5" fill="${COLORS.blue}" stroke="${COLORS.bg}" stroke-width="1"/></svg>`,
-      label: 'Dice roll',
+      label: 'Dice Roll',
     },
   ];
 
