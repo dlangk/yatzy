@@ -5,7 +5,7 @@ vi.mock('./config.ts', () => ({
   API_BASE_URL: 'http://test:9000',
 }));
 
-import { evaluate, healthCheck, getStateValue, fetchDensity } from './api.ts';
+import { evaluate, getStateValue, fetchDensity } from './api.ts';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -50,20 +50,6 @@ describe('evaluate', () => {
     await expect(
       evaluate({ dice: [0, 1, 2, 3, 4], upper_score: 0, scored_categories: 0, rerolls_remaining: 2 }),
     ).rejects.toThrow('/evaluate failed');
-  });
-});
-
-describe('healthCheck', () => {
-  it('returns true on 200', async () => {
-    mockFetch.mockResolvedValueOnce(jsonResponse({ status: 'OK' }));
-    const result = await healthCheck();
-    expect(result).toBe(true);
-  });
-
-  it('returns false on network error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('network error'));
-    const result = await healthCheck();
-    expect(result).toBe(false);
   });
 });
 

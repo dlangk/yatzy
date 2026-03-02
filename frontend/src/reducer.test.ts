@@ -23,14 +23,11 @@ function freshState(): GameState {
     categories: buildCategories(),
     totalScore: 0,
     bonus: 0,
+    rawScoredSum: 0,
     lastEvalResponse: null,
-    sortMap: null,
     showDebug: false,
     turnPhase: 'idle',
     trajectory: [],
-    pendingTrajectoryEvent: null,
-    pendingRerollLabel: null,
-    pendingRerollDelta: null,
     showHints: true,
     undoStack: [],
     redoStack: [],
@@ -71,7 +68,6 @@ describe('gameReducer', () => {
       expect(next.rerollsRemaining).toBe(2);
       expect(next.turnPhase).toBe('rolled');
       expect(next.lastEvalResponse).toBeNull();
-      expect(next.sortMap).toBeNull();
     });
 
     it('is ignored when phase !== idle', () => {
@@ -128,8 +124,7 @@ describe('gameReducer', () => {
         optimal_category_ev: 180.5,
         state_ev: 200.0,
       };
-      const sortMap = [1, 3, 0, 2, 4];
-      const next = gameReducer(state, { type: 'SET_EVAL_RESPONSE', response, sortMap });
+      const next = gameReducer(state, { type: 'SET_EVAL_RESPONSE', response });
 
       // Category 0 (Ones): score=2
       expect(next.categories[0].suggestedScore).toBe(2);
@@ -144,7 +139,6 @@ describe('gameReducer', () => {
       expect(next.categories[14].suggestedScore).toBe(0);
 
       expect(next.lastEvalResponse).toBe(response);
-      expect(next.sortMap).toBe(sortMap);
     });
   });
 
@@ -271,24 +265,9 @@ describe('gameReducer', () => {
 
   // --- Trajectory ---
   describe('Trajectory', () => {
-    it('ROLL sets pendingTrajectoryEvent', () => {
-      const state = freshState();
-      const next = gameReducer(state, { type: 'ROLL' });
-      expect(next.pendingTrajectoryEvent).toBe('roll');
-      expect(next.trajectory).toHaveLength(0); // not yet pushed
-    });
-
-    it('REROLL sets pendingTrajectoryEvent', () => {
-      const state = { ...rolledState(), pendingTrajectoryEvent: null as 'roll' | 'reroll' | null };
-      state.dice[1].held = false;
-      const next = gameReducer(state, { type: 'REROLL' });
-      expect(next.pendingTrajectoryEvent).toBe('reroll');
-    });
-
-    it('SET_EVAL_RESPONSE pushes trajectory point when pendingTrajectoryEvent is set', () => {
+    it('SET_EVAL_RESPONSE pushes trajectory point when trajectoryEvent is provided', () => {
       const state: GameState = {
         ...rolledState(),
-        pendingTrajectoryEvent: 'roll',
         trajectory: [],
       };
       const response: EvaluateResponse = {
@@ -297,18 +276,16 @@ describe('gameReducer', () => {
         optimal_category_ev: 180,
         state_ev: 245.5,
       };
-      const next = gameReducer(state, { type: 'SET_EVAL_RESPONSE', response, sortMap: [0, 1, 2, 3, 4] });
+      const next = gameReducer(state, { type: 'SET_EVAL_RESPONSE', response, trajectoryEvent: 'roll' });
       expect(next.trajectory).toHaveLength(1);
       expect(next.trajectory[0].event).toBe('roll');
       expect(next.trajectory[0].stateEv).toBe(245.5);
       expect(next.trajectory[0].expectedFinal).toBe(245.5); // accumulated=0 + state_ev
-      expect(next.pendingTrajectoryEvent).toBeNull();
     });
 
-    it('SET_EVAL_RESPONSE does not push when no pendingTrajectoryEvent', () => {
+    it('SET_EVAL_RESPONSE does not push when no trajectoryEvent', () => {
       const state: GameState = {
         ...rolledState(),
-        pendingTrajectoryEvent: null,
         trajectory: [],
       };
       const response: EvaluateResponse = {
@@ -317,7 +294,7 @@ describe('gameReducer', () => {
         optimal_category_ev: 180,
         state_ev: 245.5,
       };
-      const next = gameReducer(state, { type: 'SET_EVAL_RESPONSE', response, sortMap: [0, 1, 2, 3, 4] });
+      const next = gameReducer(state, { type: 'SET_EVAL_RESPONSE', response });
       expect(next.trajectory).toHaveLength(0);
     });
 

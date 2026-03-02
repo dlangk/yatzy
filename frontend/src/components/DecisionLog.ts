@@ -7,8 +7,9 @@ const MAX_BAR_WIDTH = 60;
 /**
  * Scrollable decision log table showing per-turn reroll/score choices.
  *
- * Reads trajectory points from store (turn, event, label, delta, expectedFinal)
- * and re-renders the full table on every state change via subscribe().
+ * Append-only: rows are created once per decision and prepended (newest first).
+ * Delta bars and header are updated when showHints changes.
+ * Full clear only on RESET_GAME (trajectory becomes empty).
  */
 export function initDecisionLog(container: HTMLElement): void {
   container.className = 'decision-log';
@@ -43,81 +44,76 @@ export function initDecisionLog(container: HTMLElement): void {
   const rowMap = new Map<number, HTMLTableRowElement>();
   let currentHighlight: HTMLTableRowElement | null = null;
 
-  function render() {
-    const s = getState();
-    tbody.innerHTML = '';
+  // Track rendered state to avoid unnecessary work
+  let renderedDecisionCount = 0;
+  let prevShowHints: boolean | null = null;
+  let prevTrajectoryRef: TrajectoryPoint[] | null = null;
 
-    // Filter to reroll + score entries with labels
-    const decisions = s.trajectory.filter(
-      (p: TrajectoryPoint) =>
-        (p.event === 'reroll' || p.event === 'score') && p.label != null,
-    );
+  // Keep references to delta cells for showHints updates
+  interface RowData { tr: HTMLTableRowElement; deltaTd: HTMLTableCellElement; d: TrajectoryPoint }
+  const renderedRows: RowData[] = []; // in chronological order
 
-    if (decisions.length === 0) {
-      totalDelta.textContent = '';
-      return;
-    }
+  function createRow(d: TrajectoryPoint): RowData {
+    const tr = document.createElement('tr');
+    tr.dataset.trajIndex = String(d.index);
+    rowMap.set(d.index, tr);
 
-    // Compute running total delta
-    let runningDelta = 0;
-    // Find max |delta| for scaling bars
+    tr.addEventListener('mouseenter', () => {
+      emitHover(d.index, 'log');
+      tr.classList.add('decision-log-hover');
+    });
+    tr.addEventListener('mouseleave', () => {
+      emitHover(null, 'log');
+      tr.classList.remove('decision-log-hover');
+    });
+
+    const turnTd = document.createElement('td');
+    turnTd.className = 'decision-log-turn';
+    turnTd.textContent = String(d.turn);
+    tr.appendChild(turnTd);
+
+    const labelTd = document.createElement('td');
+    labelTd.className = 'decision-log-label';
+    labelTd.textContent = d.label ?? '';
+    tr.appendChild(labelTd);
+
+    const deltaTd = document.createElement('td');
+    deltaTd.className = 'decision-log-delta';
+    tr.appendChild(deltaTd);
+
+    const evTd = document.createElement('td');
+    evTd.className = 'decision-log-ev';
+    evTd.textContent = d.expectedFinal.toFixed(0);
+    tr.appendChild(evTd);
+
+    return { tr, deltaTd, d };
+  }
+
+  function updateDeltaCells(showHints: boolean) {
     let maxAbsDelta = 0;
-    for (const d of decisions) {
+    for (const { d } of renderedRows) {
       if (d.delta != null) maxAbsDelta = Math.max(maxAbsDelta, Math.abs(d.delta));
     }
     if (maxAbsDelta === 0) maxAbsDelta = 1;
 
-    // Track row elements by trajectory index for external highlight
-    rowMap.clear();
-
-    for (const d of [...decisions].reverse()) {
-      const tr = document.createElement('tr');
-      tr.dataset.trajIndex = String(d.index);
-      rowMap.set(d.index, tr);
-
-      // Hover: emit to bus
-      tr.addEventListener('mouseenter', () => {
-        emitHover(d.index, 'log');
-        tr.classList.add('decision-log-hover');
-      });
-      tr.addEventListener('mouseleave', () => {
-        emitHover(null, 'log');
-        tr.classList.remove('decision-log-hover');
-      });
-
-      // Turn #
-      const turnTd = document.createElement('td');
-      turnTd.className = 'decision-log-turn';
-      turnTd.textContent = String(d.turn);
-      tr.appendChild(turnTd);
-
-      // Decision label
-      const labelTd = document.createElement('td');
-      labelTd.className = 'decision-log-label';
-      labelTd.textContent = d.label ?? '';
-      tr.appendChild(labelTd);
-
-      // Delta with spark bar
-      const deltaTd = document.createElement('td');
-      deltaTd.className = 'decision-log-delta';
-      if (s.showHints && d.delta != null) {
+    let runningDelta = 0;
+    for (const { deltaTd, d } of renderedRows) {
+      deltaTd.innerHTML = '';
+      if (showHints && d.delta != null) {
         runningDelta += d.delta;
         const bar = document.createElement('span');
         bar.className = 'spark-bar';
         const pct = Math.abs(d.delta) / maxAbsDelta;
         const barWidth = Math.max(2, pct * MAX_BAR_WIDTH);
         if (Math.abs(d.delta) < 0.01) {
-          // Optimal
           bar.style.background = 'var(--color-success)';
           bar.style.width = `${barWidth}px`;
           bar.style.marginLeft = `${MAX_BAR_WIDTH}px`;
         } else if (d.delta < 0) {
-          // Suboptimal (loss)
           bar.style.background = 'var(--color-danger)';
           bar.style.width = `${barWidth}px`;
           bar.style.marginLeft = `${MAX_BAR_WIDTH - barWidth}px`;
         } else {
-          // Shouldn't happen (delta > 0 means better than optimal?)
           bar.style.background = 'var(--color-success)';
           bar.style.width = `${barWidth}px`;
           bar.style.marginLeft = `${MAX_BAR_WIDTH}px`;
@@ -130,19 +126,9 @@ export function initDecisionLog(container: HTMLElement): void {
       } else {
         deltaTd.textContent = '\u2014';
       }
-      tr.appendChild(deltaTd);
-
-      // E[final]
-      const evTd = document.createElement('td');
-      evTd.className = 'decision-log-ev';
-      evTd.textContent = d.expectedFinal.toFixed(0);
-      tr.appendChild(evTd);
-
-      tbody.appendChild(tr);
     }
 
-    // Update header total
-    if (s.showHints) {
+    if (showHints && renderedRows.length > 0) {
       totalDelta.textContent = `\u0394 ${runningDelta.toFixed(2)}`;
       totalDelta.style.color = Math.abs(runningDelta) < 0.01
         ? 'var(--color-success)'
@@ -154,13 +140,55 @@ export function initDecisionLog(container: HTMLElement): void {
     }
   }
 
+  function render() {
+    const s = getState();
+
+    // Skip if nothing relevant changed
+    if (s.trajectory === prevTrajectoryRef && s.showHints === prevShowHints) return;
+
+    const decisions = s.trajectory.filter(
+      (p: TrajectoryPoint) =>
+        (p.event === 'reroll' || p.event === 'score') && p.label != null,
+    );
+
+    // Reset: trajectory shrunk (game reset)
+    if (decisions.length < renderedDecisionCount) {
+      tbody.innerHTML = '';
+      rowMap.clear();
+      renderedRows.length = 0;
+      renderedDecisionCount = 0;
+    }
+
+    // Append new decisions (prepend to tbody since display is newest-first)
+    if (decisions.length > renderedDecisionCount) {
+      const newDecisions = decisions.slice(renderedDecisionCount);
+      for (const d of newDecisions) {
+        const rowData = createRow(d);
+        renderedRows.push(rowData);
+        // Prepend: newest row goes first
+        tbody.insertBefore(rowData.tr, tbody.firstChild);
+      }
+      renderedDecisionCount = decisions.length;
+    }
+
+    // Update delta cells (needed on new rows or showHints change)
+    if (s.showHints !== prevShowHints || decisions.length !== renderedRows.length) {
+      updateDeltaCells(s.showHints);
+    } else if (decisions.length > 0 && renderedRows.length > 0) {
+      // New rows were added — always update deltas for rescaling
+      updateDeltaCells(s.showHints);
+    }
+
+    prevTrajectoryRef = s.trajectory;
+    prevShowHints = s.showHints;
+  }
+
   render();
   subscribe(render);
 
   // Listen for hover events from other components (e.g. trajectory chart)
   onHover((trajectoryIndex, source) => {
     if (source === 'log') return;
-    // Clear previous highlight
     if (currentHighlight) {
       currentHighlight.classList.remove('decision-log-hover');
       currentHighlight = null;

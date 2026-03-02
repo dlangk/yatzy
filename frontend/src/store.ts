@@ -26,7 +26,3 @@ export function subscribe(fn: Listener): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
-
-export function initStore(): void {
-  state = initialState();
-}

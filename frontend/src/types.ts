@@ -61,31 +61,17 @@ export interface GameStateSnapshot {
   categories: CategoryState[];
   totalScore: number;
   bonus: number;
+  /** Sum of all scored category values without bonus — used to avoid double-counting
+   *  the terminal bonus that the solver's state_ev already includes. */
+  rawScoredSum: number;
   lastEvalResponse: EvaluateResponse | null;
-  sortMap: number[] | null;
   showDebug: boolean;
   turnPhase: TurnPhase;
   trajectory: TrajectoryPoint[];
   showHints: boolean;
 }
 
-export interface GameState {
-  dice: DieState[];
-  upperScore: number;
-  scoredCategories: number;
-  rerollsRemaining: number;
-  categories: CategoryState[];
-  totalScore: number;
-  bonus: number;
-  lastEvalResponse: EvaluateResponse | null;
-  sortMap: number[] | null;
-  showDebug: boolean;
-  turnPhase: TurnPhase;
-  trajectory: TrajectoryPoint[];
-  pendingTrajectoryEvent: 'roll' | 'reroll' | null;
-  pendingRerollLabel: string | null;
-  pendingRerollDelta: number | null;
-  showHints: boolean;
+export interface GameState extends GameStateSnapshot {
   undoStack: GameStateSnapshot[];
   redoStack: GameStateSnapshot[];
 }
@@ -95,7 +81,7 @@ export type GameAction =
   | { type: 'TOGGLE_DIE'; index: number }
   | { type: 'REROLL' }
   | { type: 'SCORE_CATEGORY'; categoryId: number }
-  | { type: 'SET_EVAL_RESPONSE'; response: EvaluateResponse; sortMap: number[] }
+  | { type: 'SET_EVAL_RESPONSE'; response: EvaluateResponse; trajectoryEvent?: 'roll' | 'reroll'; rerollLabel?: string; rerollDelta?: number }
   | { type: 'TOGGLE_DEBUG' }
   | { type: 'RESET_GAME' }
   | { type: 'SET_DIE_VALUE'; index: number; value: number }

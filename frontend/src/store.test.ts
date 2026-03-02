@@ -4,13 +4,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const storageMock = { getItem: vi.fn(), setItem: vi.fn(), removeItem: vi.fn() };
 vi.stubGlobal('localStorage', storageMock);
 
-import { getState, dispatch, subscribe, initStore } from './store.ts';
+import { getState, dispatch, subscribe } from './store.ts';
 
 describe('store', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     storageMock.getItem.mockReturnValue(null);
-    initStore();
+    dispatch({ type: 'RESET_GAME' });
   });
 
   it('returns initial state', () => {

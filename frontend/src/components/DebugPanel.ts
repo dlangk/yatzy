@@ -41,7 +41,7 @@ export function initDebugPanel(toggleContainer: HTMLElement, panelContainer: HTM
         totalScore: s.totalScore,
         bonus: s.bonus,
         turnPhase: s.turnPhase,
-        sortMap: s.sortMap,
+        rawScoredSum: s.rawScoredSum,
       }, null, 2);
 
       if (s.lastEvalResponse) {
@@ -56,5 +56,8 @@ export function initDebugPanel(toggleContainer: HTMLElement, panelContainer: HTM
   }
 
   render();
-  subscribe(render);
+  subscribe((state, prev) => {
+    if (state.showDebug === prev.showDebug && !state.showDebug) return;
+    render();
+  });
 }

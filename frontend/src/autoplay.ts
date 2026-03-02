@@ -6,7 +6,6 @@
  * configurable delay. Purely a side-effect loop — no reducer state.
  */
 import { getState, dispatch, subscribe } from './store.ts';
-import { unmapMask } from './mask.ts';
 
 let playing = false;
 let delay = 500;
@@ -45,12 +44,10 @@ function executeStep(): void {
     ev.optimal_mask_ev !== undefined &&
     ev.optimal_mask_ev > ev.optimal_category_ev;
 
-  if (shouldReroll && s.sortMap && ev.optimal_mask !== undefined) {
-    // Convert sorted-order reroll mask to original order
-    const rerollMaskOrig = unmapMask(ev.optimal_mask, s.sortMap);
+  if (shouldReroll && ev.optimal_mask !== undefined) {
     // Set holds: bit=1 in rerollMask means reroll, so held = !(bit set)
     for (let i = 0; i < s.dice.length; i++) {
-      const shouldHold = !(rerollMaskOrig & (1 << i));
+      const shouldHold = !(ev.optimal_mask & (1 << i));
       if (s.dice[i].held !== shouldHold) {
         dispatch({ type: 'TOGGLE_DIE', index: i });
       }

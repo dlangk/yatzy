@@ -62,9 +62,16 @@ export function initActionBar(container: HTMLElement): void {
     }
   });
 
+  // Append children once — update in place on state changes
+  container.appendChild(mainBtn);
+  container.appendChild(rerollControls);
+  container.appendChild(hintsBtn);
+  container.appendChild(undoBtn);
+  container.appendChild(redoBtn);
+  container.appendChild(resetBtn);
+
   function render() {
     const s = getState();
-    container.innerHTML = '';
     const isOver = s.turnPhase === 'game_over';
 
     if (isOver) {
@@ -84,27 +91,26 @@ export function initActionBar(container: HTMLElement): void {
       mainBtn.disabled = true;
       mainBtn.className = 'game-btn-primary';
     }
-    container.appendChild(mainBtn);
 
     minusBtn.disabled = isOver || s.turnPhase !== 'rolled' || s.rerollsRemaining <= 0;
     plusBtn.disabled = isOver || s.turnPhase !== 'rolled' || s.rerollsRemaining >= 2;
     rerollControls.style.opacity = (!isOver && s.turnPhase === 'rolled') ? '1' : '0.3';
-    container.appendChild(rerollControls);
 
     hintsBtn.textContent = s.showHints ? 'Hide Hints' : 'Show Hints';
     hintsBtn.disabled = isOver;
-    container.appendChild(hintsBtn);
 
     undoBtn.disabled = s.undoStack.length === 0;
-    container.appendChild(undoBtn);
-
     redoBtn.disabled = s.redoStack.length === 0;
-    container.appendChild(redoBtn);
-
     resetBtn.disabled = isOver;
-    container.appendChild(resetBtn);
   }
 
   render();
-  subscribe(render);
+  subscribe((state, prev) => {
+    if (state.turnPhase === prev.turnPhase &&
+        state.rerollsRemaining === prev.rerollsRemaining &&
+        state.showHints === prev.showHints &&
+        state.undoStack === prev.undoStack &&
+        state.redoStack === prev.redoStack) return;
+    render();
+  });
 }

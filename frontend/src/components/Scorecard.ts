@@ -122,11 +122,8 @@ export function initScorecard(container: HTMLElement): void {
     const scoreValues = s.categories.map(c => c.isScored ? c.score : c.suggestedScore);
     const scoreMin = Math.min(...scoreValues);
     const scoreMax = Math.max(...scoreValues);
-    // Raw scored sum without bonus — the solver's evIfScored already includes
-    // the terminal bonus, so using totalScore (which includes bonus) would double-count.
-    const rawScoredSum = s.categories.reduce((sum, c) => c.isScored ? sum + c.score : sum, 0);
     const unscoredAvailable = s.categories.filter(c => !c.isScored && c.available);
-    const evCumulativeValues = unscoredAvailable.map(c => rawScoredSum + c.evIfScored);
+    const evCumulativeValues = unscoredAvailable.map(c => s.rawScoredSum + c.evIfScored);
     const evMin = evCumulativeValues.length > 0 ? Math.min(...evCumulativeValues) : 0;
     const evMax = evCumulativeValues.length > 0 ? Math.max(...evCumulativeValues) : 0;
 
@@ -134,7 +131,7 @@ export function initScorecard(container: HTMLElement): void {
       const cat = s.categories[i];
       const scoreVal = cat.isScored ? cat.score : cat.suggestedScore;
       const scoreFraction = normalize(scoreVal, scoreMin, scoreMax);
-      const cumulativeEv = rawScoredSum + cat.evIfScored;
+      const cumulativeEv = s.rawScoredSum + cat.evIfScored;
       const evFraction = (canScore && !cat.isScored && cat.available) ? normalize(cumulativeEv, evMin, evMax) : null;
 
       rows[i].update({
@@ -144,7 +141,7 @@ export function initScorecard(container: HTMLElement): void {
         mustScore,
         scoreFraction,
         evFraction,
-        totalScore: rawScoredSum,
+        totalScore: s.rawScoredSum,
         showHints: s.showHints,
         bonusAchieved: s.bonus > 0,
       });
@@ -170,5 +167,16 @@ export function initScorecard(container: HTMLElement): void {
   }
 
   render();
-  subscribe(render);
+  subscribe((state, prev) => {
+    if (state.categories === prev.categories &&
+        state.turnPhase === prev.turnPhase &&
+        state.showHints === prev.showHints &&
+        state.lastEvalResponse === prev.lastEvalResponse &&
+        state.rerollsRemaining === prev.rerollsRemaining &&
+        state.rawScoredSum === prev.rawScoredSum &&
+        state.upperScore === prev.upperScore &&
+        state.bonus === prev.bonus &&
+        state.totalScore === prev.totalScore) return;
+    render();
+  });
 }

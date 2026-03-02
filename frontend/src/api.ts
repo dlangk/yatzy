@@ -27,16 +27,6 @@ export async function evaluate(req: EvaluateRequest): Promise<EvaluateResponse> 
   return res.json() as Promise<EvaluateResponse>;
 }
 
-/** Check if the solver backend is reachable. Returns false on any error. */
-export async function healthCheck(): Promise<boolean> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/health`);
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
 /** Look up the expected final score for a given scorecard state (mmap table lookup). */
 export async function getStateValue(
   upperScore: number,

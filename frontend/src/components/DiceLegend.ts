@@ -29,5 +29,10 @@ export function initDiceLegend(container: HTMLElement): void {
   }
 
   render();
-  subscribe(render);
+  subscribe((state, prev) => {
+    if (state.showHints === prev.showHints &&
+        state.turnPhase === prev.turnPhase &&
+        state.rerollsRemaining === prev.rerollsRemaining) return;
+    render();
+  });
 }

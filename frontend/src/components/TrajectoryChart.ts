@@ -220,12 +220,16 @@ export function initTrajectoryChart(container: HTMLElement): void {
   // Module-level data refs updated each render so hover handlers can access current data
   let currentTrajectory: TrajectoryPoint[] = [];
   let currentXPositions: number[] = [];
-  let currentXScale: d3.ScaleLinear<number, number> | null = null;
-  let currentYScale: d3.ScaleLinear<number, number> | null = null;
+  const currentXScale = d3.scaleLinear()
+    .domain([X_MIN, X_MAX])
+    .range([MARGIN.left, WIDTH - MARGIN.right]);
+  const currentYScale = d3.scaleLinear()
+    .domain([Y_MIN, Y_MAX])
+    .range([HEIGHT - MARGIN.bottom, MARGIN.top]);
 
   /** Show tooltip + crosshair for a trajectory point by its array index. */
   function showTooltipForIndex(idx: number) {
-    if (!currentXScale || !currentYScale || idx < 0 || idx >= currentTrajectory.length) return;
+    if (idx < 0 || idx >= currentTrajectory.length) return;
 
     const p = currentTrajectory[idx];
     const px = currentXScale(currentXPositions[idx]);
@@ -286,7 +290,7 @@ export function initTrajectoryChart(container: HTMLElement): void {
    * Hover handler: find nearest trajectory point by x-position.
    */
   hoverOverlay.on('mousemove', function (event: MouseEvent) {
-    if (!currentXScale || !currentYScale || currentTrajectory.length === 0) return;
+    if (currentTrajectory.length === 0) return;
 
     const svgNode = svg.node()!;
     const pt = svgNode.createSVGPoint();
@@ -338,21 +342,11 @@ export function initTrajectoryChart(container: HTMLElement): void {
     xAxisG.selectAll('*').remove();
     yAxisG.selectAll('*').remove();
 
-    // Fixed scales
-    const x = d3.scaleLinear()
-      .domain([X_MIN, X_MAX])
-      .range([MARGIN.left, WIDTH - MARGIN.right]);
-
-    const y = d3.scaleLinear()
-      .domain([Y_MIN, Y_MAX])
-      .range([HEIGHT - MARGIN.bottom, MARGIN.top]);
-
-    // Update module-level refs for hover handlers
-    currentXScale = x;
-    currentYScale = y;
+    const x = currentXScale;
+    const y = currentYScale;
 
     // Grid lines (Y)
-    const yStep = niceStep(Y_MIN, Y_MAX, 5);
+    const yStep = 100;
     const yTicks: number[] = [];
     for (let v = Math.ceil(Y_MIN / yStep) * yStep; v <= Y_MAX; v += yStep) {
       yTicks.push(v);
@@ -466,7 +460,12 @@ export function initTrajectoryChart(container: HTMLElement): void {
   }
 
   render();
-  subscribe(render);
+  let prevTrajectory = getState().trajectory;
+  subscribe((state) => {
+    if (state.trajectory === prevTrajectory) return;
+    prevTrajectory = state.trajectory;
+    render();
+  });
 
   // Re-render on container resize so hover overlay and legend stay correct
   const ro = new ResizeObserver(() => render());
@@ -524,14 +523,4 @@ function drawWhisker(
         .attr('stroke-width', 3);
     }
   }
-}
-
-function niceStep(min: number, max: number, targetTicks: number): number {
-  const range = max - min || 50;
-  const rough = range / targetTicks;
-  const mag = Math.pow(10, Math.floor(Math.log10(rough)));
-  const norm = rough / mag;
-  if (norm <= 2) return 2 * mag;
-  if (norm <= 5) return 5 * mag;
-  return 10 * mag;
 }

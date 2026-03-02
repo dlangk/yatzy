@@ -1,26 +1,72 @@
-import { initStore, getState, dispatch, subscribe } from './store.ts';
+import { TOTAL_DICE } from './constants.ts';
+import { getState, dispatch, subscribe } from './store.ts';
 import { initApp } from './App.ts';
 import { evaluate, getStateValue, fetchDensity } from './api.ts';
-import { sortDiceWithMapping } from './mask.ts';
-
-initStore();
 
 const root = document.getElementById('root')!;
 initApp(root);
 
-// Side effect: auto-evaluate after roll/reroll
-subscribe((state) => {
+// Side effect: auto-evaluate after roll/reroll.
+// Captures trajectory event info from the action that triggered the eval,
+// then passes it along with the SET_EVAL_RESPONSE action.
+let pendingTrajectoryEvent: 'roll' | 'reroll' | undefined;
+let pendingRerollLabel: string | undefined;
+let pendingRerollDelta: number | undefined;
+
+subscribe((state, prev, action) => {
+  // Capture trajectory context when a roll/reroll occurs
+  if (action.type === 'ROLL') {
+    pendingTrajectoryEvent = 'roll';
+    pendingRerollLabel = undefined;
+    pendingRerollDelta = undefined;
+  } else if (action.type === 'REROLL') {
+    pendingTrajectoryEvent = 'reroll';
+    // Compute label from pre-reroll state
+    const keptValues = prev.dice.filter(d => d.held).map(d => d.value).sort((a, b) => a - b);
+    pendingRerollLabel = keptValues.length === TOTAL_DICE
+      ? 'Kept all'
+      : keptValues.length === 0
+        ? 'Rerolled all'
+        : `Kept ${keptValues.join(',')}`;
+    // Compute delta from pre-reroll eval
+    pendingRerollDelta = undefined;
+    if (prev.lastEvalResponse?.mask_evs) {
+      let playerMask = 0;
+      for (let i = 0; i < prev.dice.length; i++) {
+        if (!prev.dice[i].held) playerMask |= 1 << i;
+      }
+      const playerMaskEv = prev.lastEvalResponse.mask_evs[playerMask] ?? null;
+      const optimalMaskEv = prev.lastEvalResponse.optimal_mask_ev ?? null;
+      if (playerMaskEv !== null && optimalMaskEv !== null) {
+        pendingRerollDelta = playerMaskEv - optimalMaskEv;
+      }
+    }
+  }
+
+  // Trigger evaluation when needed
   if (state.turnPhase === 'rolled' && !state.lastEvalResponse) {
     const allValid = state.dice.every(d => d.value >= 1 && d.value <= 6);
     if (allValid) {
-      const { sorted, sortMap } = sortDiceWithMapping(state.dice.map(d => d.value));
+      const trajEvent = pendingTrajectoryEvent;
+      const trajLabel = pendingRerollLabel;
+      const trajDelta = pendingRerollDelta;
+      pendingTrajectoryEvent = undefined;
+      pendingRerollLabel = undefined;
+      pendingRerollDelta = undefined;
+
       evaluate({
-        dice: sorted,
+        dice: state.dice.map(d => d.value),
         upper_score: state.upperScore,
         scored_categories: state.scoredCategories,
         rerolls_remaining: state.rerollsRemaining,
       })
-        .then(response => dispatch({ type: 'SET_EVAL_RESPONSE', response, sortMap }))
+        .then(response => dispatch({
+          type: 'SET_EVAL_RESPONSE',
+          response,
+          trajectoryEvent: trajEvent,
+          rerollLabel: trajLabel,
+          rerollDelta: trajDelta,
+        }))
         .catch(err => console.error('Evaluate failed:', err));
     }
   }

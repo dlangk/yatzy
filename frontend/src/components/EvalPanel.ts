@@ -1,5 +1,4 @@
 import { getState, subscribe } from '../store.ts';
-import { computeRerollMask, mapMaskToSorted, unmapMask } from '../mask.ts';
 
 const DASH = '\u2014';
 
@@ -96,12 +95,12 @@ export function initEvalPanel(container: HTMLElement): void {
     const showKeep = hasData && hints && rerolls > 0;
     const showScore = hasData && hints;
 
-    // Best keep (dice values held by optimal mask)
-    if (showKeep && s.lastEvalResponse?.optimal_mask != null && s.sortMap) {
-      const originalMask = unmapMask(s.lastEvalResponse.optimal_mask, s.sortMap);
+    // Best keep (dice values held by optimal mask — masks are in original dice order)
+    if (showKeep && s.lastEvalResponse?.optimal_mask != null) {
+      const mask = s.lastEvalResponse.optimal_mask;
       const kept: number[] = [];
       for (let i = 0; i < 5; i++) {
-        if (!(originalMask & (1 << i))) {
+        if (!(mask & (1 << i))) {
           kept.push(s.dice[i].value);
         }
       }
@@ -114,12 +113,14 @@ export function initEvalPanel(container: HTMLElement): void {
     const optMaskEv = s.lastEvalResponse?.optimal_mask_ev ?? null;
     turnVals[1].textContent = showKeep && optMaskEv !== null ? optMaskEv.toFixed(2) : DASH;
 
-    // Your keep EV
+    // Your keep EV (masks are in original dice order)
     let currentMaskEv: number | null = null;
-    if (s.lastEvalResponse?.mask_evs && s.sortMap) {
-      const originalMask = computeRerollMask(s.dice.map(d => d.held));
-      const sortedMask = mapMaskToSorted(originalMask, s.sortMap);
-      currentMaskEv = s.lastEvalResponse.mask_evs[sortedMask] ?? null;
+    if (s.lastEvalResponse?.mask_evs) {
+      let rerollMask = 0;
+      for (let i = 0; i < s.dice.length; i++) {
+        if (!s.dice[i].held) rerollMask |= 1 << i;
+      }
+      currentMaskEv = s.lastEvalResponse.mask_evs[rerollMask] ?? null;
     }
     turnVals[2].textContent = showKeep && currentMaskEv !== null ? currentMaskEv.toFixed(2) : DASH;
 
@@ -144,17 +145,19 @@ export function initEvalPanel(container: HTMLElement): void {
 
     // [0] Expected final score = accumulated + remaining EV
     const stateEv = s.lastEvalResponse?.state_ev ?? null;
-    const rawScoredSum = s.categories.reduce((sum, c) => c.isScored ? sum + c.score : sum, 0);
-    const latestScored = [...s.trajectory].reverse().find(p => p.event === 'score');
+    // Single backward scan for both latestScored and latestWithPct
+    let latestScored: typeof s.trajectory[number] | undefined;
+    let latestWithPct: typeof s.trajectory[number] | undefined;
+    for (let i = s.trajectory.length - 1; i >= 0; i--) {
+      const p = s.trajectory[i];
+      if (!latestScored && p.event === 'score') latestScored = p;
+      if (!latestWithPct && (p.percentiles && (p.event !== 'score' || p.turn < 15))) latestWithPct = p;
+      if (latestScored && latestWithPct) break;
+    }
     const expectedFinal = hasData && stateEv !== null
-      ? rawScoredSum + stateEv
+      ? s.rawScoredSum + stateEv
       : latestScored?.expectedFinal ?? null;
     gameVals[0].textContent = expectedFinal !== null ? String(Math.round(expectedFinal)) : DASH;
-
-    // [1] Finish range: "80% to finish in X–Y" (p10–p90 from latest density)
-    const latestWithPct = [...s.trajectory].reverse().find(
-      p => p.percentiles && p.event !== 'score' || (p.event === 'score' && p.turn < 15),
-    );
     if (latestWithPct?.percentiles) {
       const p10 = latestWithPct.percentiles.p10;
       const p90 = latestWithPct.percentiles.p90;
@@ -183,5 +186,16 @@ export function initEvalPanel(container: HTMLElement): void {
   }
 
   render();
-  subscribe(render);
+  subscribe((state, prev) => {
+    if (state.lastEvalResponse === prev.lastEvalResponse &&
+        state.turnPhase === prev.turnPhase &&
+        state.showHints === prev.showHints &&
+        state.rerollsRemaining === prev.rerollsRemaining &&
+        state.dice === prev.dice &&
+        state.trajectory === prev.trajectory &&
+        state.totalScore === prev.totalScore &&
+        state.rawScoredSum === prev.rawScoredSum &&
+        state.categories === prev.categories) return;
+    render();
+  });
 }
