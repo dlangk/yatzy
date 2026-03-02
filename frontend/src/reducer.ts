@@ -1,4 +1,4 @@
-import type { GameState, GameAction, CategoryState, TrajectoryPoint } from './types.ts';
+import type { GameState, GameStateSnapshot, GameAction, CategoryState, TrajectoryPoint } from './types.ts';
 import { CATEGORY_NAMES, CATEGORY_COUNT, TOTAL_DICE, UPPER_SCORE_CAP, UPPER_BONUS, UPPER_CATEGORIES } from './constants.ts';
 
 const STORAGE_KEY = 'yatzy-game-state';

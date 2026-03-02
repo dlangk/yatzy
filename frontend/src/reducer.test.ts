@@ -302,7 +302,6 @@ describe('gameReducer', () => {
       const state: GameState = {
         ...rolledState(),
         trajectory: [{ index: 0, turn: 0, event: 'start', expectedFinal: 245, accumulatedScore: 0, stateEv: 245 }],
-        pendingTrajectoryEvent: null,
       };
       state.categories[0].suggestedScore = 3;
       state.categories[0].evIfScored = 240.0;
