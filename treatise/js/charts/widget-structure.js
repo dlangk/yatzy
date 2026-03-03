@@ -1,6 +1,9 @@
 import {
+  COLORS,
   createChart,
-  getTextColor, getMutedColor, getGridColor, COLORS,
+  getGridColor,
+  getMutedColor,
+  getTextColor,
 } from '../yatzy-viz.js';
 
 export async function initWidgetStructure() {
@@ -8,18 +11,18 @@ export async function initWidgetStructure() {
   if (!container) return;
 
   const layers = [
-    { label: 'Entry',   count: 1,   type: 'start',    desc: 'State input' },
-    { label: 'Roll 1',  count: 252, type: 'chance',   desc: '252 dice outcomes' },
-    { label: 'Keep 1',  count: 462, type: 'decision', desc: '462 keep choices' },
-    { label: 'Roll 2',  count: 252, type: 'chance',   desc: '252 dice outcomes' },
-    { label: 'Keep 2',  count: 462, type: 'decision', desc: '462 keep choices' },
-    { label: 'Score',   count: 252, type: 'chance',   desc: '252 → category exit' },
+    { label: '',  count: 1,   type: 'start',    role: 'Start Node' },
+    { label: 'First roll of the dice', count: 252, type: 'chance',   role: 'Unique Dice Rolls' },
+    { label: 'Decide what to keep', count: 462, type: 'decision', role: 'Unique Keep Masks' },
+    { label: 'Second roll of the dice', count: 252, type: 'chance',   role: 'Unique Dice Rolls' },
+    { label: 'Decide what to keep', count: 462, type: 'decision', role: 'Unique Keep Masks' },
+    { label: 'Ready to score',  count: 252, type: 'chance',   role: 'Unique Dice Rolls' },
   ];
 
   const chart = createChart('chart-widget-structure', {
-    aspectRatio: 0.65,
+    aspectRatio: 0.55,
     marginLeft: 15,
-    marginBottom: 50,
+    marginBottom: 10,
     marginTop: 15,
     marginRight: 15,
   });
@@ -28,7 +31,7 @@ export async function initWidgetStructure() {
 
   const maxLog = Math.log10(462);
   const minBarW = 30;
-  const maxBarW = width * 0.85;
+  const maxBarW = width * 0.7;
 
   function barWidth(count) {
     if (count <= 1) return minBarW;
@@ -36,7 +39,8 @@ export async function initWidgetStructure() {
   }
 
   const layerH = 28;
-  const gap = (height - 50 - layers.length * layerH) / (layers.length - 1);
+  const totalH = height - 10;
+  const gap = (totalH - layers.length * layerH) / (layers.length - 1);
 
   const chanceColor = getGridColor();
   const decisionColor = COLORS.accent;
@@ -63,7 +67,7 @@ export async function initWidgetStructure() {
       .attr('stroke', isDecision ? COLORS.accent : getMutedColor())
       .attr('stroke-width', isDecision ? 1.5 : 0.5);
 
-    // Label inside bar
+    // Label inside bar: "Layer (count)"
     g.append('text')
       .attr('x', width / 2)
       .attr('y', by + layerH / 2)
@@ -74,15 +78,14 @@ export async function initWidgetStructure() {
       .style('font-weight', '600')
       .text(`${layer.label} (${layer.count})`);
 
-    // Type label on right
+    // Role description on the right
     g.append('text')
       .attr('x', bx + bw + 8)
       .attr('y', by + layerH / 2)
       .attr('dy', '0.35em')
       .attr('fill', getMutedColor())
-      .style('font-size', '9px')
-      .style('font-style', 'italic')
-      .text(layer.type === 'start' ? '' : layer.type);
+      .style('font-size', '10px')
+      .text(layer.role);
 
     // Connecting edges to next layer
     if (i < layers.length - 1) {
@@ -90,7 +93,6 @@ export async function initWidgetStructure() {
       const nextBx = (width - nextBw) / 2;
       const nextBy = (i + 1) * (layerH + gap);
 
-      // Draw a few representative bundled edges
       const nEdges = 5;
       for (let e = 0; e < nEdges; e++) {
         const frac = (e + 0.5) / nEdges;
@@ -109,60 +111,6 @@ export async function initWidgetStructure() {
       }
     }
   });
-
-  // Exit arrow to E-table
-  const lastBy = (layers.length - 1) * (layerH + gap) + layerH;
-  const arrowY = lastBy + 12;
-
-  g.append('line')
-    .attr('x1', width / 2).attr('x2', width / 2)
-    .attr('y1', lastBy).attr('y2', arrowY + 10)
-    .attr('stroke', COLORS.accent)
-    .attr('stroke-width', 1.5)
-    .attr('marker-end', 'url(#arrow-widget)');
-
-  // Arrow marker
-  g.append('defs').append('marker')
-    .attr('id', 'arrow-widget')
-    .attr('viewBox', '0 0 10 10')
-    .attr('refX', 8).attr('refY', 5)
-    .attr('markerWidth', 6).attr('markerHeight', 6)
-    .attr('orient', 'auto-start-reverse')
-    .append('path')
-    .attr('d', 'M 0 0 L 10 5 L 0 10 z')
-    .attr('fill', COLORS.accent);
-
-  // E-table box
-  const boxW = 100, boxH = 24;
-  g.append('rect')
-    .attr('x', width / 2 - boxW / 2)
-    .attr('y', arrowY + 14)
-    .attr('width', boxW)
-    .attr('height', boxH)
-    .attr('rx', 4)
-    .attr('fill', 'none')
-    .attr('stroke', COLORS.accent)
-    .attr('stroke-width', 1.5)
-    .attr('stroke-dasharray', '4,3');
-
-  g.append('text')
-    .attr('x', width / 2)
-    .attr('y', arrowY + 14 + boxH / 2)
-    .attr('dy', '0.35em')
-    .attr('text-anchor', 'middle')
-    .attr('fill', COLORS.accent)
-    .style('font-size', '11px')
-    .style('font-weight', '600')
-    .text('E-table');
-
-  // Summary annotation
-  g.append('text')
-    .attr('x', width / 2)
-    .attr('y', height - 4)
-    .attr('text-anchor', 'middle')
-    .attr('fill', getMutedColor())
-    .style('font-size', '10px')
-    .text('1,681 nodes · ≤21,000 edges · ~3 KB per widget');
 
   // Legend
   const legY = 0;

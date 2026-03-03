@@ -2,101 +2,255 @@
 
 ## The State Space
 
-A Yatzy game is a sequence of rolls, keeps, and category assignments spread across fifteen rounds. Played naively, the number of distinct game histories is roughly 1.7 &times; 10<sup>170</sup>, a number that vastly exceeds the number of atoms in the observable universe, estimated at "only" about 10^80! 🤯
+A Yatzy game is a sequence of rolls, keeps, and scoring decisions across fifteen rounds. The total number of possible games is 1.7 &times; 10<sup>170</sup>. That vastly exceeds the number of atoms in the observable universe, estimated at "only" about 10^80! 🤯
 
-Fortunately, clever mathematicians like [CITE1, CITE2] figured out how to reduce the state space into something much, much smaller. Before we begin the reduction, let's build some intuition. Roll five dice below and see how 7,776 ordered outcomes collapse into just 252 distinct multisets grouped by pattern.
+How do you solve something that big? You don't. You find ways to make it smaller. This section walks through five simplifications that shrink the problem from impossibly large to something a laptop can handle in about a second.
 
-:::html
-<div class="chart-container" id="chart-dice-symmetry"></div>
-:::
+### Step 1: Order Doesn't Matter
 
-### Step 1: Don't Worry About The Details
-
-The most important insight is that most of the game history is irrelevant. Two games that have scored different categories in different orders, but arrived at the same upper-section total and the same set of used categories, face identical futures.
-
-The ::concept[state]{state-space} of the game collapses to two numbers: the upper-section score so far (an integer from 0 to 63, since any value above the ::concept[bonus]{upper-section-bonus} threshold is equivalent) and the set of categories already used (a 15-bit bitmask). This gives 64 &times; 2<sup>15</sup> = 2,097,152 slots--a reduction of roughly 100,000&times; from the raw game-history count.
+When you roll five dice, the order they land in doesn't change anything. A roll of ⚂⚄⚁⚅⚃ is the same as ⚁⚂⚃⚄⚅. This means the 7,776 ways to roll five six-sided dice collapse into just 252 unique rolls, which fall into seven families (like "three of a kind" or "two pair"). On top of that, there are at most 32 ways to choose which dice to keep. Roll the dice below to explore:
 
 :::html
-<div class="chart-container" id="chart-reduction-funnel"></div>
-:::
-
-### Step 2: Prune the Impossible
-
-Not every slot corresponds to a position that can actually arise in play. An upper score of 60, for instance, cannot occur if only Ones and Twos have been scored. A forward DP from the starting state identifies exactly which states are ::concept[reachable]{reachability-pruning}: the result is that 31.8% of slots are pruned, leaving roughly 1,430,000 states. This is exact and it reduces both computation time and memory proportionally.
-
-The heatmap below shows reachability by upper score and number of upper categories scored. Gray cells are provably unreachable. The triangular pattern reflects the combinatorial constraint: few categories cannot produce high upper scores.
-
-:::html
-<div class="chart-container" id="chart-reachability-grid"></div>
-:::
-
-### Step 3: Decompose into Widgets
-
-Within each state, a single turn has a fixed structure: roll, keep, reroll, keep,
-final roll, then assign to a category. This six-layer decision tree--which we call a
-::concept[widget]{solve-widget}--is
-self-contained: 1 entry node, 252 chance nodes per roll layer, and 462 decision
-nodes per keep layer. In total: 1,681 nodes and at most 21,000 edges, fitting in
-about 3 KB of working memory.
-
-Every reachable state gets one widget evaluation. The widget reads only the
-successor expected values from a shared E-table and writes back a single number.
-This decomposition is what makes the problem embarrassingly parallel at the
-state level.
-
-:::html
-<div class="chart-container" id="chart-widget-structure"></div>
-:::
-
-### Step 4: Process in Topological Order
-
-The states form a
-::concept[Markov decision process]{markov-decision-process}
-whose transitions only move forward: from layer <var>k</var> (with <var>k</var>
-categories scored) to layer <var>k</var>+1. This means we can process all 16 layers
-in strict topological order, starting at the terminal layer (all 15 categories
-scored, where the only remaining value is the bonus) and working backward to
-layer 0 (game start).
-
-The number of widgets per layer follows
-C(15, <var>k</var>)--a binomial distribution peaking at
-<var>k</var> = 7 with 6,435 widgets. The animation below shows the wavefront
-sweeping from terminals to start. No layer ever needs to revisit a previous one.
-
-:::html
-<div class="chart-container" id="chart-topological-cascade">
-  <div class="chart-controls">
-    <button class="chart-btn" id="cascade-play-btn">&#9654; Play</button>
-    <button class="chart-btn" id="cascade-reset-btn">Reset</button>
-    <input type="range" class="chart-slider" id="cascade-scrub" min="-1" max="15" value="-1">
-    <span class="slider-value" id="cascade-label">All layers pending</span>
-  </div>
-  <div id="chart-topological-cascade-svg"></div>
+<div class="chart-container" id="chart-dice-symmetry">
+  <p class="chart-caption">Roll dice and explore the 252 unique rolls, grouped into seven family patterns.</p>
 </div>
 :::
 
-### Memory: What Lives and What Dies
+### Step 2: Forget the Past
 
-The topological structure has a dramatic consequence for memory. The solver
-maintains a single E-table of expected values--one float per reachable state,
-about 8 MB total. Each widget borrows ~3 KB of working memory, computes its
-answer, and releases it. At no point does the solver hold more than the
-E-table plus one widget's workspace.
+The second big insight: the past doesn't matter. Suppose two games took completely different paths, scored different categories in different orders, but ended up with the same upper-section total and the same categories remaining. From here on, the best strategy is identical. The history is irrelevant.
 
-Compare this with a naive approach that materializes all intermediate values
-for all states simultaneously: that would require roughly 8 GB. The actual
-solver uses 1,000 times less memory.
+This means a game position is fully described by just two things: the upper-section score so far (0 to 63, since anything above the ::concept[bonus]{upper-section-bonus} threshold is equivalent) and which of the 15 categories have been used. That gives 64 &times; 2<sup>15</sup> = 2,097,152 possible positions. A massive reduction from 10<sup>170</sup>.
+
+### Step 3: Prune the Impossible
+
+Not all of those 2 million positions can actually occur in a real game. For example, an upper score of 60 is impossible if you've only scored Ones and Twos. By checking which positions are actually reachable, we can throw out 31.8% of them, leaving about 1.43 million. The heatmap below shows which positions exist (colored) and which are impossible (gray).
 
 :::html
-<div class="chart-container" id="chart-memory-lifecycle"></div>
+<div class="chart-container" id="chart-reachability-grid">
+  <p class="chart-caption">Reachability heatmap: gray cells are impossible positions, pruning 31.8% of the state space.</p>
+</div>
+:::
+
+### Step 4: One Turn at a Time
+
+Within each position, a single turn always follows the same structure: roll, keep some dice, reroll, keep again, reroll again, then pick a category. We call this six-step decision tree a ::concept[widget]{solve-widget}.
+
+:::html
+<div class="chart-container" id="chart-widget-structure">
+  <p class="chart-caption">The six layers of a single-turn widget, from initial roll to final scoring decision.</p>
+</div>
+:::
+
+The 252 unique rolls were explained in Step 1. But where does 462 come from? After each roll you choose which dice to keep. With five dice there are 2<sup>5</sup>&nbsp;=&nbsp;32 ways to tick boxes on a "keep or reroll" checklist. But many of those 32 choices lead to the same outcome. Say you rolled 3, 3, 3, 5, 5. Keeping dice #1, #2, #3 or keeping dice #1, #2, #5 are very different checklist ticks, but if #3 and #5 both show a 3, the result is identical: you're holding three Threes either way. What matters is *how many of each face* you hold, not *which physical dice* you picked.
+
+:::html
+<div class="keep-equiv">
+  <div class="keep-equiv-row">
+    <span class="keep-equiv-label">Mask A</span>
+    <div class="keep-equiv-dice">
+      <div class="keep-die"><svg viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="8" fill="var(--bg)" stroke="var(--accent)" stroke-width="3"/><circle cx="14" cy="14" r="4.5" fill="var(--text)"/><circle cx="24" cy="24" r="4.5" fill="var(--text)"/><circle cx="34" cy="34" r="4.5" fill="var(--text)"/></svg></div>
+      <div class="keep-die"><svg viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="8" fill="var(--bg)" stroke="var(--accent)" stroke-width="3"/><circle cx="14" cy="14" r="4.5" fill="var(--text)"/><circle cx="24" cy="24" r="4.5" fill="var(--text)"/><circle cx="34" cy="34" r="4.5" fill="var(--text)"/></svg></div>
+      <div class="keep-die"><svg viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="8" fill="none" stroke="var(--border)" stroke-width="2" stroke-dasharray="4 3"/><circle cx="14" cy="14" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="24" cy="24" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="34" cy="34" r="4.5" fill="var(--text)" opacity="0.2"/></svg></div>
+      <div class="keep-die"><svg viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="8" fill="none" stroke="var(--border)" stroke-width="2" stroke-dasharray="4 3"/><circle cx="14" cy="14" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="34" cy="14" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="24" cy="24" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="14" cy="34" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="34" cy="34" r="4.5" fill="var(--text)" opacity="0.2"/></svg></div>
+      <div class="keep-die"><svg viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="8" fill="none" stroke="var(--border)" stroke-width="2" stroke-dasharray="4 3"/><circle cx="14" cy="14" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="34" cy="14" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="24" cy="24" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="14" cy="34" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="34" cy="34" r="4.5" fill="var(--text)" opacity="0.2"/></svg></div>
+    </div>
+    <span class="keep-equiv-arrow">&rarr;</span>
+    <div class="keep-equiv-result">
+      <div class="keep-die"><svg viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="8" fill="var(--bg)" stroke="var(--accent)" stroke-width="3"/><circle cx="14" cy="14" r="4.5" fill="var(--text)"/><circle cx="24" cy="24" r="4.5" fill="var(--text)"/><circle cx="34" cy="34" r="4.5" fill="var(--text)"/></svg></div>
+      <div class="keep-die"><svg viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="8" fill="var(--bg)" stroke="var(--accent)" stroke-width="3"/><circle cx="14" cy="14" r="4.5" fill="var(--text)"/><circle cx="24" cy="24" r="4.5" fill="var(--text)"/><circle cx="34" cy="34" r="4.5" fill="var(--text)"/></svg></div>
+    </div>
+  </div>
+  <div class="keep-equiv-row">
+    <span class="keep-equiv-label">Mask B</span>
+    <div class="keep-equiv-dice">
+      <div class="keep-die"><svg viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="8" fill="var(--bg)" stroke="var(--accent)" stroke-width="3"/><circle cx="14" cy="14" r="4.5" fill="var(--text)"/><circle cx="24" cy="24" r="4.5" fill="var(--text)"/><circle cx="34" cy="34" r="4.5" fill="var(--text)"/></svg></div>
+      <div class="keep-die"><svg viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="8" fill="none" stroke="var(--border)" stroke-width="2" stroke-dasharray="4 3"/><circle cx="14" cy="14" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="24" cy="24" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="34" cy="34" r="4.5" fill="var(--text)" opacity="0.2"/></svg></div>
+      <div class="keep-die"><svg viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="8" fill="var(--bg)" stroke="var(--accent)" stroke-width="3"/><circle cx="14" cy="14" r="4.5" fill="var(--text)"/><circle cx="24" cy="24" r="4.5" fill="var(--text)"/><circle cx="34" cy="34" r="4.5" fill="var(--text)"/></svg></div>
+      <div class="keep-die"><svg viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="8" fill="none" stroke="var(--border)" stroke-width="2" stroke-dasharray="4 3"/><circle cx="14" cy="14" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="34" cy="14" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="24" cy="24" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="14" cy="34" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="34" cy="34" r="4.5" fill="var(--text)" opacity="0.2"/></svg></div>
+      <div class="keep-die"><svg viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="8" fill="none" stroke="var(--border)" stroke-width="2" stroke-dasharray="4 3"/><circle cx="14" cy="14" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="34" cy="14" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="24" cy="24" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="14" cy="34" r="4.5" fill="var(--text)" opacity="0.2"/><circle cx="34" cy="34" r="4.5" fill="var(--text)" opacity="0.2"/></svg></div>
+    </div>
+    <span class="keep-equiv-arrow">&rarr;</span>
+    <div class="keep-equiv-result">
+      <div class="keep-die"><svg viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="8" fill="var(--bg)" stroke="var(--accent)" stroke-width="3"/><circle cx="14" cy="14" r="4.5" fill="var(--text)"/><circle cx="24" cy="24" r="4.5" fill="var(--text)"/><circle cx="34" cy="34" r="4.5" fill="var(--text)"/></svg></div>
+      <div class="keep-die"><svg viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="8" fill="var(--bg)" stroke="var(--accent)" stroke-width="3"/><circle cx="14" cy="14" r="4.5" fill="var(--text)"/><circle cx="24" cy="24" r="4.5" fill="var(--text)"/><circle cx="34" cy="34" r="4.5" fill="var(--text)"/></svg></div>
+    </div>
+  </div>
+  <span class="keep-equiv-result-label">Same keep</span>
+</div>
+:::
+
+The chart below starts with exactly that roll. Each colored cell is one of the 32 raw subsets; same color means same unique keep. Hover a keep on the right to highlight which subsets map to it, or click Roll to try another combination.
+
+:::html
+<div class="chart-container" id="chart-keep-funnel">
+  <p class="chart-caption">How 32 raw keep subsets collapse into unique keeps. Same color = same unique keep.</p>
+</div>
+:::
+
+For this Full House roll, 32 subsets collapse to just 12 unique keeps. But the total across all 252 rolls is 462. Counting all possible holds by how many dice you keep:
+
+| Dice kept | Unique keeps | Example |
+|-----------|----------:|---------|
+| 0 | 1 | *(reroll all)* |
+| 1 | 6 | keep one **3** |
+| 2 | 21 | keep **3,&thinsp;3** |
+| 3 | 56 | keep **1,&thinsp;3,&thinsp;5** |
+| 4 | 126 | keep **2,&thinsp;3,&thinsp;3,&thinsp;5** |
+| 5 | 252 | *(keep all)* |
+| **Total** | **462** | |
+
+Not every roll uses all 462. A Yatzy roll (e.g. five Threes) collapses to just 6 keeps; an all-different roll stays at the full 32.
+
+The solver doesn't need to think about all of this at once. It processes the widget one layer at a time, using two small buffers of 252 numbers each. It reads from one, writes to the other, then swaps. The total working memory per widget is about 2 KB, and when it's done it produces a single number: the expected score from this position.
+
+### Step 5: Start from the End
+
+Here's the trick that ties it all together. Because scoring a category always moves the game forward (you never un-score a category), we can group all 1.43 million positions into 16 layers: layer 0 has no categories scored, layer 1 has one scored, and so on up to layer 15 where the game is over. Each layer only depends on the one after it.
+
+That means we can solve the entire game by working backward: start at layer 15 (where the answer is trivial: just add the bonus if you earned it), then solve layer 14 using those answers, then layer 13, and so on. The first two dominoes make the whole cascade click:
+
+:::html
+<div class="backward-cascade">
+
+  <div class="cascade-card">
+    <div class="cascade-card-header">
+      <span class="cascade-layer-badge">Layer 15</span>
+      <span class="cascade-card-subtitle">Game over</span>
+    </div>
+    <div class="cascade-scorecard">
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+    </div>
+    <p class="cascade-desc">All 15 categories scored. Nothing to decide.</p>
+    <div class="cascade-bonus-fork">
+      <div class="cascade-bonus-box">
+        <span class="cascade-bonus-label">upper &lt; 63</span>
+        <span class="cascade-bonus-value">bonus: 0</span>
+      </div>
+      <div class="cascade-bonus-box cascade-bonus-earned">
+        <span class="cascade-bonus-label">upper &ge; 63</span>
+        <span class="cascade-bonus-value">bonus: +50 &#9733;</span>
+      </div>
+    </div>
+    <p class="cascade-footnote">1 state-check per position. No dice, no decisions.</p>
+  </div>
+
+  <div class="cascade-arrow">
+    <div class="cascade-arrow-line"></div>
+    <span class="cascade-arrow-label">already solved</span>
+    <div class="cascade-arrow-line"></div>
+  </div>
+
+  <div class="cascade-card">
+    <div class="cascade-card-header">
+      <span class="cascade-layer-badge">Layer 14</span>
+      <span class="cascade-card-subtitle">One category left</span>
+    </div>
+    <div class="cascade-scorecard">
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq empty"></div>
+    </div>
+    <p class="cascade-desc">One category remains. You must score it. Roll, keep, reroll, keep, reroll, score. Then look up the final answer from Layer 15.</p>
+    <p class="cascade-footnote">15 widgets &middot; 1 scoring choice each</p>
+  </div>
+
+  <div class="cascade-arrow">
+    <div class="cascade-arrow-line"></div>
+    <span class="cascade-arrow-label">already solved</span>
+    <div class="cascade-arrow-line"></div>
+  </div>
+
+  <div class="cascade-card">
+    <div class="cascade-card-header">
+      <span class="cascade-layer-badge">Layer 13</span>
+      <span class="cascade-card-subtitle">Two categories left</span>
+    </div>
+    <div class="cascade-scorecard">
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq filled"></div>
+      <div class="cascade-sq empty"></div>
+      <div class="cascade-sq empty"></div>
+    </div>
+    <p class="cascade-desc">Two categories remain. Try scoring each one. Each choice leads to a Layer 14 state, already solved. Pick whichever gives the higher expected score.</p>
+    <p class="cascade-footnote">105 widgets &middot; 2 scoring choices each</p>
+  </div>
+
+  <div class="cascade-ellipsis">
+    <div class="cascade-arrow-line"></div>
+    <span class="cascade-ellipsis-dots">&middot; &middot; &middot;</span>
+    <div class="cascade-arrow-line"></div>
+  </div>
+
+  <div class="cascade-card cascade-card-final">
+    <div class="cascade-card-header">
+      <span class="cascade-layer-badge">Layer 0</span>
+      <span class="cascade-card-subtitle">Game start</span>
+    </div>
+    <div class="cascade-scorecard">
+      <div class="cascade-sq empty"></div>
+      <div class="cascade-sq empty"></div>
+      <div class="cascade-sq empty"></div>
+      <div class="cascade-sq empty"></div>
+      <div class="cascade-sq empty"></div>
+      <div class="cascade-sq empty"></div>
+      <div class="cascade-sq empty"></div>
+      <div class="cascade-sq empty"></div>
+      <div class="cascade-sq empty"></div>
+      <div class="cascade-sq empty"></div>
+      <div class="cascade-sq empty"></div>
+      <div class="cascade-sq empty"></div>
+      <div class="cascade-sq empty"></div>
+      <div class="cascade-sq empty"></div>
+      <div class="cascade-sq empty"></div>
+    </div>
+    <p class="cascade-desc">All 15 open. 1 widget. <strong>E[start] = 248.4</strong></p>
+    <p class="cascade-footnote">The answer to the entire game.</p>
+  </div>
+
+</div>
 :::
 
 :::insight
 
-**The reduction chain: 10<sup>170</sup> &rarr; 8 MB.** Sufficient statistics
-collapse histories to 2.1M states. Reachability pruning removes 32%. Widget
-decomposition isolates each turn into 3 KB of working memory. Topological
-ordering ensures we never look back. The final footprint is a single 8 MB table.
+**From 10<sup>170</sup> to 1.43 million.** Ignoring dice order cuts 7,776 rolls to 252. Forgetting history collapses all possible games into 2.1 million positions. Pruning unreachable states removes another 32%. Breaking each turn into a six-layer widget makes every position solvable independently. Working backward, layer by layer, means we never revisit a decision.
 
 :::
 
@@ -148,31 +302,6 @@ pub const NUM_STATES: usize = STATE_STRIDE * (1 << 15); // 128 × 32,768 = 4,194
 pub fn state_index(upper_score: usize, scored_categories: usize) -> usize {
     scored_categories * STATE_STRIDE + upper_score
 }
-```
-
-The widget solver evaluates one turn for a single state. It reads successor
-expected values from the shared E-table and writes back a single optimal EV.
-Simplified pseudocode:
-
-```
-SOLVE_WIDGET(S = (C, m)):
-    // Layer 6: score final roll → choose best category
-    for each roll r in 252 outcomes:
-        E_exit[r] = max over unscored c of:
-            score(S, r, c) + E[successor(S, r, c)]
-
-    // Layer 5: choose best keep (1 reroll left)
-    for each roll r:
-        E_roll1[r] = max over keeps r' ⊆ r of:
-            Σ P(r' → r'') · E_exit[r'']
-
-    // Layers 3-4: choose best keep (2 rerolls left)
-    for each roll r:
-        E_roll2[r] = max over keeps r' ⊆ r of:
-            Σ P(r' → r'') · E_roll1[r'']
-
-    // Layer 1: expected value over initial roll
-    E[S] = Σ P(∅ → r) · E_roll2[r]
 ```
 
 :::

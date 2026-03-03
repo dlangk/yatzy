@@ -13,20 +13,23 @@ Instead of maximising the raw expected score E[<var>x</var>], the solver maximis
 E[&minus;exp(&minus;&theta;<var>x</var>)], where &theta; is a single real-valued
 parameter that controls risk attitude. When &theta; = 0, the exponential flattens
 and the solver recovers exactly the EV-optimal policy. When &theta; &lt; 0, the
-solver becomes risk-averse --it overweights bad outcomes and prefers
-consistent scores. When &theta; &gt; 0, it becomes risk-seeking --it chases
+solver becomes risk-averse: it overweights bad outcomes and prefers
+consistent scores. When &theta; &gt; 0, it becomes risk-seeking: it chases
 high-variance plays that lift the ceiling at the cost of the floor.
 
 This is the ::concept[CARA]{cara-utility}
 (constant absolute risk aversion) model from decision theory. Its defining
 property is that the risk premium for any gamble is independent of current
-wealth --the solver's willingness to take a risky reroll depends only on
+wealth. The solver's willingness to take a risky reroll depends only on
 &theta; and the gamble's shape, never on how many points have already been
 scored. This makes &theta; a clean, interpretable dial: turn it left for safety,
 turn it right for ambition.
 
 :::html
-<div class="chart-container" id="chart-exponential-utility"><div id="chart-exponential-utility-svg"></div></div>
+<div class="chart-container" id="chart-exponential-utility">
+  <div id="chart-exponential-utility-svg"></div>
+  <p class="chart-caption">Exponential utility: θ &lt; 0 overweights bad outcomes (risk-averse), θ &gt; 0 overweights good outcomes (risk-seeking).</p>
+</div>
 :::
 
 The solver sweeps 37 values of &theta; from &minus;3.0 to +3.0, with dense
@@ -37,7 +40,7 @@ induction, and each is evaluated over one million simulated games.
 Use the slider below to see how the score distribution changes across the
 full &theta; range. At &theta; = 0 the familiar left-skewed EV-optimal
 distribution appears. As &theta; moves negative the distribution compresses
---lower mean, tighter spread. As &theta; moves positive the distribution
+(lower mean, tighter spread). As &theta; moves positive the distribution
 stretches toward both tails before collapsing at extreme values.
 
 :::html
@@ -47,6 +50,7 @@ stretches toward both tails before collapsing at extreme values.
     <input type="range" class="chart-slider" min="0" max="36" value="18">
   </div>
   <div id="chart-score-distribution-svg"></div>
+  <p class="chart-caption">Score distribution across 37 θ values. Drag the slider to see the shape shift from compressed to stretched.</p>
 </div>
 :::
 
@@ -54,7 +58,10 @@ The results trace a ::concept[mean-variance frontier]{free-energy}
 that reveals the price of risk in exact quantitative terms.
 
 :::html
-<div class="chart-container" id="chart-mean-variance-frontier"><div id="chart-mean-variance-frontier-svg"></div></div>
+<div class="chart-container" id="chart-mean-variance-frontier">
+  <div id="chart-mean-variance-frontier-svg"></div>
+  <p class="chart-caption">The mean-variance frontier: two branches reveal the price of risk in exact quantitative terms.</p>
+</div>
 :::
 
 The frontier is not a single curve. It splits into two branches. The risk-averse
@@ -63,18 +70,21 @@ while mean score drops from 248.4 to 198.2 at &theta; = &minus;1.0. The
 risk-seeking branch (&theta; &gt; 0) first expands variance to a peak of 48.4
 at &theta; &asymp; 0.2, then contracts it as the mean falls to 194.5 at
 &theta; = +1.0. At the same mean of roughly 190, the two branches have
-different standard deviations --risk-seeking play is fundamentally
+different standard deviations: risk-seeking play is fundamentally
 noisier than risk-averse play at matched expected value.
 
 The practical sweet spots are narrow. The best &theta; for protecting the 5th
-percentile (the floor) is &minus;0.03, which lifts p5 to 183 --four
+percentile (the floor) is &minus;0.03, which lifts p5 to 183, four
 points above the EV-optimal floor of 179. The best &theta; for the 95th
 percentile (the ceiling) is +0.07, pushing p95 to 313 versus 309 at &theta; = 0.
 The best for p99 is +0.10, reaching 329. These gains are small but real, and
 they come at a precise, quantifiable cost in expected value.
 
 :::html
-<div class="chart-container" id="chart-risk-reward"><div id="chart-risk-reward-svg"></div></div>
+<div class="chart-container" id="chart-risk-reward">
+  <div id="chart-risk-reward-svg"></div>
+  <p class="chart-caption">Practical sweet spots: small θ shifts yield measurable percentile gains at precise cost in expected value.</p>
+</div>
 :::
 
 There is a deep analogy to statistical mechanics. The
@@ -89,7 +99,10 @@ concentrates on extreme outcomes (low temperature). The mean-variance frontier
 is the equation of state. The two-branch structure is a phase diagram.
 
 :::html
-<div class="chart-container" id="chart-free-energy-phase"><div id="chart-free-energy-phase-svg"></div></div>
+<div class="chart-container" id="chart-free-energy-phase">
+  <div id="chart-free-energy-phase-svg"></div>
+  <p class="chart-caption">The thermodynamic analogy: θ as inverse temperature, the mean-variance frontier as equation of state.</p>
+</div>
 :::
 
 ### Multiplayer and Adaptive Strategies
@@ -100,8 +113,8 @@ that setting the right question changes. It is no longer "what maximises my
 expected score?" but "what maximises my probability of winning?"
 
 Against an EV-optimal opponent, the EV-optimal policy wins exactly half the
-time by symmetry. But a slightly risk-seeking policy --&theta; around
-+0.05 to +0.07 --can gain an edge. The mechanism is straightforward:
+time by symmetry. But a slightly risk-seeking policy (&theta; around
++0.05 to +0.07) can gain an edge. The mechanism is straightforward:
 risk-seeking play increases variance, which pushes more probability mass into
 both tails. Since games are decided by the higher score, the increased upside
 (p95 rising from 309 to 313) matters more than the increased downside when
@@ -114,13 +127,16 @@ category selections, the two policies diverge. These disagreements cluster
 around two patterns. First,
 ::concept[Yatzy preservation]{backward-induction}:
 at &theta; &asymp; 0.05–0.07, the solver keeps Yatzy-seeking dice
-combinations in 42.8% of relevant states versus 38.8% at &theta; = 0 ---
-the risk-seeking policy holds out for the 50-point jackpot more often. Second,
+combinations in 42.8% of relevant states versus 38.8% at &theta; = 0.
+The risk-seeking policy holds out for the 50-point jackpot more often. Second,
 straight chasing: the risk-seeking solver is more willing to break a safe pair
 to chase a Large Straight, accepting the lower hit rate for the higher payoff.
 
 :::html
-<div class="chart-container" id="chart-adaptive-winrate"><div id="chart-adaptive-winrate-svg"></div></div>
+<div class="chart-container" id="chart-adaptive-winrate">
+  <div id="chart-adaptive-winrate-svg"></div>
+  <p class="chart-caption">Slightly risk-seeking play (θ ≈ 0.05–0.07) gains an edge in head-to-head matchups.</p>
+</div>
 :::
 
 The real insight is that the optimal &theta; depends on game state. A player
@@ -129,13 +145,13 @@ ahead should decrease it to protect the lead. This leads naturally to a
 ::concept[threshold policy]{threshold-policy}:
 estimate the score differential at each decision point and select the strategy
 table (indexed by &theta;) that maximises win probability given the current
-gap. The adaptive policy does not require solving a new DP --it simply
+gap. The adaptive policy does not require solving a new DP; it simply
 switches between pre-computed strategy tables based on a score-differential
 threshold.
 
 The cost of risk-seeking is visible in category hit rates. The EV-optimal
 solver achieves a 92% Full House hit rate across one million games. At
-&theta; = +3.0, this collapses to 54% --the solver sacrifices reliable
+&theta; = +3.0, this collapses to 54%. The solver sacrifices reliable
 mid-range categories to chase Yatzy and straights. The upper bonus achievement
 rate at &theta; = 0 is 83.6%, and it declines monotonically as &theta;
 increases. Both extremes converge to similarly poor mean scores: &theta; =
@@ -143,7 +159,10 @@ increases. Both extremes converge to similarly poor mean scores: &theta; =
 is as costly as excessive ambition.
 
 :::html
-<div class="chart-container" id="chart-threshold-policy"><div id="chart-threshold-policy-svg"></div></div>
+<div class="chart-container" id="chart-threshold-policy">
+  <div id="chart-threshold-policy-svg"></div>
+  <p class="chart-caption">Adaptive θ: increase risk when trailing, protect the lead when ahead.</p>
+</div>
 :::
 
 :::math
@@ -151,8 +170,8 @@ is as costly as excessive ambition.
 ### The Exponential Utility Framework
 
 The utility function is <var>u</var>(<var>x</var>) = &minus;exp(&minus;&theta;<var>x</var>).
-The certainty equivalent --the deterministic score that provides equal
-utility to the random outcome --is:
+The certainty equivalent (the deterministic score that provides equal
+utility to the random outcome) is:
 
 :::equation
 CE = (1/&theta;) &middot; ln(E[exp(&theta; &middot; total)])
@@ -184,7 +203,7 @@ with <var>m</var> = max(<var>x</var><sub>i</sub>).
 
 The solver uses f32 throughout for performance. This creates a numerical
 stability boundary. At |&theta;| &le; 0.15, the exponential utility can be
-computed in the "utility domain" --direct weighted averaging ---
+computed in the "utility domain" via direct weighted averaging,
 with the same speed as the EV solver. Beyond |&theta;| &asymp; 0.166,
 mantissa erasure in f32 subtraction corrupts the weighted sums. At
 |&theta;| &asymp; 0.235, raw exponentials overflow f32 entirely. The
@@ -207,16 +226,16 @@ std(&theta;) &asymp; 39.5 + 53.5&theta; &minus; 17&theta;<sup>2</sup>
 
 Mean loss is quadratic (second-order around the optimum, as expected from
 perturbing a maximum). Standard deviation gain is linear in &theta;
-(dominant term: 53.5&theta;). This asymmetry --quadratic cost, linear
-benefit --creates the narrow window where tail gains are cheap.
+(dominant term: 53.5&theta;). This asymmetry (quadratic cost, linear
+benefit) creates the narrow window where tail gains are cheap.
 
 ### Win Probability and Variance
 
 In a symmetric two-player game where both players use the same policy, the
 win probability is exactly 50% minus half the draw rate. With the EV-optimal
 policy, the draw rate is 0.76%, giving each player a 49.62% win probability.
-The winning margin distribution has mean 43.5 points and heavy right tail
---- blowout wins of 80+ points are common, reflecting the high variance
+The winning margin distribution has mean 43.5 points and heavy right tail;
+blowout wins of 80+ points are common, reflecting the high variance
 (&sigma; &asymp; 38) of individual game scores.
 
 For a risk-seeking player (&theta; = +0.07) facing an EV-optimal opponent,

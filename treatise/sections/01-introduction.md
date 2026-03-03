@@ -15,6 +15,7 @@ Yatzy has some really interesting properties that make it fun to both play, and 
   <div class="spray-legend" id="spray-legend"></div>
   <div class="spray-stats" id="spray-stats"></div>
   <div id="spray-scorecard-popup" class="spray-popup hidden"></div>
+  <p class="chart-caption">Two thousand games under optimal play. Each dot is one game. Scores range from ~120 to ~370.</p>
 </div>
 :::
 

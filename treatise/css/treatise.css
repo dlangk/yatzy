@@ -489,13 +489,170 @@ h2 .section-link:hover {
   transition: opacity 0.15s;
 }
 
-/* Topological Cascade */
-#chart-topological-cascade .chart-controls {
-  margin-bottom: 0.5rem;
+/* ===== Backward Cascade ===== */
+.backward-cascade {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  margin: 1.5rem 0;
 }
 
-#chart-topological-cascade-svg {
-  min-height: 300px;
+.cascade-card {
+  width: 100%;
+  max-width: 540px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+}
+
+.cascade-card-final {
+  border-color: var(--accent);
+  border-width: 2px;
+}
+
+.cascade-card-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.cascade-layer-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+
+.cascade-card-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Scorecard strip: 15 small squares */
+.cascade-scorecard {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 0.6rem;
+}
+
+.cascade-sq {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.cascade-sq.filled {
+  background: var(--text-muted);
+  opacity: 0.4;
+  border: 2px solid var(--text-muted);
+}
+
+.cascade-sq.empty {
+  background: none;
+  border: 2px dashed var(--text-muted);
+}
+
+.cascade-desc {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  margin: 0 0 0.3rem;
+}
+
+.cascade-footnote {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* Bonus fork on Layer 15 */
+.cascade-bonus-fork {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0.5rem 0;
+}
+
+.cascade-bonus-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+}
+
+.cascade-bonus-earned {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.cascade-bonus-label {
+  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.cascade-bonus-value {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.cascade-bonus-earned .cascade-bonus-value {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* Dependency arrows between cards */
+.cascade-arrow,
+.cascade-ellipsis {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 0.15rem 0;
+}
+
+.cascade-arrow-line {
+  width: 1.5px;
+  height: 14px;
+  background: var(--text-muted);
+  opacity: 0.4;
+}
+
+.cascade-arrow-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 0.1rem 0;
+}
+
+.cascade-ellipsis-dots {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  letter-spacing: 0.3em;
+  padding: 0.1rem 0;
+}
+
+@media (max-width: 720px) {
+  .cascade-card {
+    padding: 0.75rem 1rem;
+  }
+  .cascade-sq {
+    width: 16px;
+    height: 16px;
+  }
+  .cascade-bonus-fork {
+    flex-direction: column;
+    gap: 0.4rem;
+  }
 }
 
 /* Memory Lifecycle */
@@ -812,5 +969,203 @@ h2 .section-link:hover {
   }
   .keeps-panel {
     display: none;
+  }
+}
+
+/* ===== Keep Funnel Chart ===== */
+
+.keep-funnel {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  min-height: 420px;
+}
+
+.keep-funnel-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.keep-funnel-dice {
+  display: flex;
+  gap: 6px;
+}
+
+.keep-funnel-pattern {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+}
+
+.keep-funnel-center {
+  flex-shrink: 0;
+}
+
+.keep-funnel-center-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.35rem;
+}
+
+.keep-funnel-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 3px;
+}
+
+.keep-funnel-cell {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.12s, transform 0.12s;
+  border: 2px solid transparent;
+}
+
+.keep-funnel-cell:hover {
+  transform: scale(1.15);
+  z-index: 1;
+}
+
+.keep-funnel-cell.highlight {
+  border-color: var(--text);
+  transform: scale(1.15);
+  z-index: 1;
+}
+
+.keep-funnel-cell.dimmed {
+  opacity: 0.25;
+}
+
+.keep-funnel-right {
+  flex: 1;
+  min-width: 0;
+}
+
+.keep-funnel-right-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.35rem;
+}
+
+.keep-funnel-keeps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  align-content: start;
+}
+
+.keep-funnel-keep-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-left: 3px solid transparent;
+}
+
+.keep-funnel-keep-row:hover {
+  background: rgba(128, 128, 128, 0.08);
+}
+
+.keep-funnel-keep-row.highlight {
+  background: rgba(128, 128, 128, 0.12);
+}
+
+.keep-funnel-keep-row .keep-row-dice {
+  display: flex;
+  gap: 2px;
+}
+
+.keep-funnel-keep-row .keep-masks {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.keep-funnel-summary {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.75rem;
+  text-align: center;
+}
+
+.keep-funnel-summary strong {
+  color: var(--text);
+}
+
+/* Keep equivalence illustration (static) */
+.keep-equiv {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 1.25rem 0;
+}
+
+.keep-equiv-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.keep-equiv-dice {
+  display: flex;
+  gap: 3px;
+}
+
+.keep-equiv-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  width: 3rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.keep-equiv-arrow {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.keep-equiv-result {
+  display: flex;
+  gap: 3px;
+  padding: 0.2rem 0.35rem;
+  background: var(--accent-light);
+  border-radius: 6px;
+}
+
+.keep-equiv-result-label {
+  font-size: 0.65rem;
+  color: var(--accent);
+  font-weight: 600;
+  text-align: center;
+  margin-top: -0.1rem;
+}
+
+@media (max-width: 720px) {
+  .keep-funnel {
+    flex-direction: column;
+    align-items: stretch;
+    min-height: auto;
+  }
+  .keep-funnel-cell {
+    width: 22px;
+    height: 22px;
   }
 }

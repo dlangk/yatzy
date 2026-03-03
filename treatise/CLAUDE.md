@@ -39,6 +39,10 @@ just dev-frontend              # Vite serves at /yatzy/
 
 Charts are initialized by `yatzy-viz.js` which queries the DOM for `[data-chart]` containers. Each chart module exports an `init(container, data)` function. Slider controls use `<input type="range">` with a `.slider-value` span updated on input.
 
+## Writing Style
+
+- **No emdashes.** Never use `--`, `&mdash;`, or `—` as emdashes in prose or captions. Use periods, commas, colons, semicolons, or parentheses instead.
+
 ## Sections
 
 1. Introduction — game overview

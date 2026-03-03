@@ -26,15 +26,15 @@
   import { initScoreSpray } from './js/charts/score-spray.js';
   // Chart modules — State Space (Reduction Chain)
   import { initDiceSymmetry } from './js/charts/dice-symmetry.js';
+  import { initKeepFunnel } from './js/charts/keep-funnel.js';
   import { initReductionFunnel } from './js/charts/reduction-funnel.js';
   import { initReachabilityGrid } from './js/charts/reachability-grid.js';
   import { initWidgetStructure } from './js/charts/widget-structure.js';
-  import { initTopologicalCascade } from './js/charts/topological-cascade.js';
+
   import { initMemoryLifecycle } from './js/charts/memory-lifecycle.js';
   // Chart modules — Solver
   import { initWidgetInteractive } from './js/charts/widget-interactive.js';
   import { initBackwardWave } from './js/charts/backward-wave.js';
-  import { initOptimizationTimeline } from './js/charts/optimization-timeline.js';
   // Chart modules — Optimal Strategy
   import { initDecisionAnatomy } from './js/charts/decision-anatomy.js';
   import { initScoreDistribution } from './js/charts/score-distribution.js';
@@ -95,14 +95,14 @@
   const chartInits = {
     'chart-score-spray': { init: initScoreSpray, loaded: false },
     'chart-dice-symmetry': { init: initDiceSymmetry, loaded: false },
+    'chart-keep-funnel': { init: initKeepFunnel, loaded: false },
     'chart-reduction-funnel': { init: initReductionFunnel, loaded: false },
     'chart-reachability-grid': { init: initReachabilityGrid, loaded: false },
     'chart-widget-structure': { init: initWidgetStructure, loaded: false },
-    'chart-topological-cascade': { init: initTopologicalCascade, loaded: false },
+
     'chart-memory-lifecycle': { init: initMemoryLifecycle, loaded: false },
     'chart-widget-interactive': { init: initWidgetInteractive, loaded: false },
     'chart-backward-wave': { init: initBackwardWave, loaded: false },
-    'chart-optimization-timeline': { init: initOptimizationTimeline, loaded: false },
     'chart-decision-anatomy': { init: initDecisionAnatomy, loaded: false },
     'chart-score-distribution': { init: initScoreDistribution, loaded: false },
     'chart-mixture': { init: initMixtureDecomposition, loaded: false },

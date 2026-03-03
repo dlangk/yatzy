@@ -9,13 +9,16 @@ on bounded rationality.
 To visualize what the solver "knows," we embed game states and keep-multiset
 actions into a shared latent space using a two-tower network, then project with
 ::concept[UMAP]{umap}.
-The 462 unique keeps organize into clean semantic clusters --pairs,
-triples, straight draws --without supervision. The joint manifold reveals
+The 462 unique keeps organize into clean semantic clusters (pairs,
+triples, straight draws) without supervision. The joint manifold reveals
 that the solver has independently discovered the same decision categories
 humans name intuitively, but applies them with far greater contextual precision.
 
 :::html
-<div class="chart-container" id="chart-umap-manifold"><div id="chart-umap-manifold-svg"></div></div>
+<div class="chart-container" id="chart-umap-manifold">
+  <div id="chart-umap-manifold-svg"></div>
+  <p class="chart-caption">UMAP projection of the Q-network's latent space reveals 12 emergent decision clusters, without supervision.</p>
+</div>
 :::
 
 The gap concentrates in two regions. First, near the upper bonus threshold
@@ -23,8 +26,8 @@ The gap concentrates in two regions. First, near the upper bonus threshold
 and over half of all surrogate errors occur. Humans treat the bonus as binary
 ("on track" or "lost") rather than computing the marginal value of each point.
 Second, in multi-category tradeoff states where dice could reasonably go to
-Threes, Full House, or Chance --choices that require combinatorial
-assessment humans approximate with crude heuristics.
+Threes, Full House, or Chance (choices that require combinatorial
+assessment humans approximate with crude heuristics).
 
 To measure individual players, we built a cognitive profiling system grounded
 in ::concept[resource rationality]{resource-rationality}.

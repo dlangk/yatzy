@@ -122,8 +122,24 @@ for (const file of files) {
   const src = readFileSync(join(SECTIONS_DIR, file), "utf-8");
   const shortcoded = processShortcodes(src);
   let html = md.render(shortcoded);
-  // Kill all em dashes (Unicode and HTML entity)
-  html = html.replace(/\u2014/g, "--").replace(/&mdash;/g, "--");
+  // Warn and strip em dashes outside <code>/<pre> blocks
+  {
+    const EM_DASH = /\u2014|&mdash;/g;
+    // Split HTML on code/pre tags, only replace in non-code segments
+    const parts = html.split(/(<(?:code|pre)[^>]*>[\s\S]*?<\/(?:code|pre)>)/gi);
+    let warnings = 0;
+    for (let i = 0; i < parts.length; i++) {
+      if (i % 2 === 0) { // outside code blocks
+        const count = (parts[i].match(EM_DASH) || []).length;
+        warnings += count;
+        parts[i] = parts[i].replace(EM_DASH, ", ");
+      }
+    }
+    if (warnings > 0) {
+      console.warn(`\u26a0  ${file}: found ${warnings} em dash(es) in prose, replaced with ", "`);
+    }
+    html = parts.join("");
+  }
   // Inject section number + permalink into first h2
   const sec = fileSectionMap.get(file);
   if (sec) {

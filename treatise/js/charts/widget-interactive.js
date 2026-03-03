@@ -2,8 +2,23 @@ import { DataLoader } from '../data-loader.js';
 import {
   getTextColor, getMutedColor, getGridColor, COLORS,
 } from '../yatzy-viz.js';
-import { renderDiceSelectable } from '../utils/dice-interactive.js';
+import { PIPS, renderDiceSelectable } from '../utils/dice-interactive.js';
 import { renderProbabilityFan } from './probability-fan.js';
+
+function createDieSVG(value, size, options = {}) {
+  const { stroke = 'var(--border)', strokeWidth = 2, fill = 'var(--bg-alt)' } = options;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 48 48');
+  svg.setAttribute('width', String(size));
+  svg.setAttribute('height', String(size));
+  svg.classList.add('die-svg');
+  let html = `<rect x="1" y="1" width="46" height="46" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
+  (PIPS[value] || []).forEach(p => {
+    html += `<circle cx="${p.cx}" cy="${p.cy}" r="4.5" fill="var(--text)"/>`;
+  });
+  svg.innerHTML = html;
+  return svg;
+}
 
 export async function initWidgetInteractive() {
   const container = document.getElementById('chart-widget-interactive');
@@ -34,10 +49,7 @@ export async function initWidgetInteractive() {
     const diceRow = document.createElement('div');
     diceRow.className = 'dice-row';
     scenario.initial_dice.forEach((v) => {
-      const die = document.createElement('span');
-      die.className = 'die';
-      die.textContent = v;
-      diceRow.appendChild(die);
+      diceRow.appendChild(createDieSVG(v, 40));
     });
     col1.appendChild(diceRow);
 
@@ -66,10 +78,7 @@ export async function initWidgetInteractive() {
       const keptRow = document.createElement('div');
       keptRow.className = 'keep-dice-row';
       opt.kept_dice.forEach((v) => {
-        const die = document.createElement('span');
-        die.className = 'die die-small';
-        die.textContent = v;
-        keptRow.appendChild(die);
+        keptRow.appendChild(createDieSVG(v, 28));
       });
       card.appendChild(keptRow);
 
@@ -120,10 +129,7 @@ export async function initWidgetInteractive() {
           const dRow = document.createElement('div');
           dRow.className = 'keep-dice-row';
           roll.dice.forEach((v) => {
-            const die = document.createElement('span');
-            die.className = 'die die-small';
-            die.textContent = v;
-            dRow.appendChild(die);
+            dRow.appendChild(createDieSVG(v, 28));
           });
           rollCard.appendChild(dRow);
 

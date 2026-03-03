@@ -5,7 +5,7 @@
 A children's dice game contains a 1.43-million-state MDP that admits exact
 solution in 1.1 seconds. The optimal policy scores 248.4 with standard
 deviation 38.5. The gap between casual play and computed perfection is 82
-points --an entire category's worth of score hidden in plain sight.
+points: an entire category's worth of score hidden in plain sight.
 
 The optimal policy is compressible but not fully: 100 English rules recover
 227.5 EV (59.7% of the gap closed), while 40.3% resists compression into
@@ -15,7 +15,7 @@ and what must be computed.
 
 Risk-sensitive extensions reveal a rich mean-variance frontier. Sweeping
 &theta; from &minus;3 to +3 traces clear phase transitions, and the frontier
-is empirically tight --no adaptive policy beats a fixed-&theta; solution,
+is empirically tight; no adaptive policy beats a fixed-&theta; solution,
 because the Bellman equation already encodes state-dependent behavior within
 a constant risk attitude.
 
@@ -33,7 +33,7 @@ infrastructure built here: fast solver, simulation engine, profiling system,
 and exact distributions as ground truth.
 
 Scandinavian Yatzy is small enough to solve and large enough to exhibit the
-full complexity of sequential decision-making under uncertainty --a
+full complexity of sequential decision-making under uncertainty; a
 microcosm where optimality, engineering, compression, and human judgment
 converge on five dice and a scorecard.
 
@@ -52,9 +52,9 @@ The incompressible residual of 20.9 EV establishes a lower bound on the
 complexity of Yatzy strategy under sequential decision list representation.
 Whether alternative representations (gradient-boosted trees, attention
 mechanisms, or hybrid rule-plus-lookup architectures) can reduce this residual
-remains an open question. The scaling law --marginal value peaking at
+remains an open question. The scaling law (marginal value peaking at
 0.74 EV/rule in the 26–40 band, then decaying to 0.15 EV/rule by
-rule 100 --suggests that the greedy covering algorithm has largely
+rule 100) suggests that the greedy covering algorithm has largely
 exhausted the expressible structure.
 
 :::

@@ -6,24 +6,28 @@ Optimal-play Scandinavian Yatzy: backward-induction DP solver, risk-sensitive st
 
 | Component | Location | Purpose | Key Constraint |
 |-----------|----------|---------|----------------|
-| Solver | `solver/` | HPC Rust engine: DP, simulation, REST API | **Performance is sacred** — see hot path rules |
+| Solver | `solver/` | HPC Rust engine: DP, simulation, REST API | **Performance is sacred**:see hot path rules |
 | Frontend | `frontend/` | Vanilla TypeScript + D3.js game UI + Vite dev server | No layout shifts |
 | Treatise | `treatise/` | Markdown-driven static site: theory, D3 charts | Build with `just build-treatise` |
 | Profiler | `profiler/` | Cognitive profiling quiz (30 scenarios) | Pre-computed data, no runtime API |
 | Analytics | `analytics/` | Python analysis, visualization, pipelines | Custom colormap (`#F37021` center) |
 
 See component CLAUDE.md files for detailed guidance:
-- `solver/CLAUDE.md` — architecture, hot paths, API reference, perf baselines, θ parameter
-- `frontend/CLAUDE.md` — Vanilla TS patterns, store, layout rules
-- `treatise/CLAUDE.md` — build system, section structure, D3 chart pattern
-- `analytics/CLAUDE.md` — CLI commands, colormap, data flow, plotting
-- `profiler/CLAUDE.md` — quiz architecture, data files, critical notes
+- `solver/CLAUDE.md`:architecture, hot paths, API reference, perf baselines, θ parameter
+- `frontend/CLAUDE.md`:Vanilla TS patterns, store, layout rules
+- `treatise/CLAUDE.md`:build system, section structure, D3 chart pattern
+- `analytics/CLAUDE.md`:CLI commands, colormap, data flow, plotting
+- `profiler/CLAUDE.md`:quiz architecture, data files, critical notes
+
+## Writing Style
+
+- **No emdashes.** Never use `--`, `&mdash;`, or `—` as emdashes in prose, captions, or documentation. Use periods, commas, colons, semicolons, or parentheses instead.
 
 ## Critical Rules
 
-- NEVER trade solver performance for code aesthetics — run `just bench-check` after Rust changes
-- Intentionally duplicated hot-path code is marked `// PERF: intentional` — do not refactor it
-- All state values use f32 throughout — see `solver/CLAUDE.md` for state layout and θ parameter details
+- NEVER trade solver performance for code aesthetics. Run `just bench-check` after Rust changes
+- Intentionally duplicated hot-path code is marked `// PERF: intentional`. Do not refactor it
+- All state values use f32 throughout. See `solver/CLAUDE.md` for state layout and θ parameter details
 - Delete `data/strategy_tables/all_states_theta_*.bin` after changing solver code
 - When modifying an API endpoint, update `solver/CLAUDE.md` AND `frontend/src/api.ts` AND `frontend/CLAUDE.md`
 - When a conversation produces new insights, update the appropriate file in `theory/` (see `theory/README.md`)
@@ -93,11 +97,11 @@ All game intelligence lives in the solver. The three UIs are thin clients. Analy
 
 ### Computation Pipeline
 
-1. **Precompute** — backward induction DP over 1.43M reachable states → `data/strategy_tables/`
-2. **Simulate** — Monte Carlo with optimal policy → `data/simulations/`
-3. **Analyze** — KDE, percentiles, CVaR, MER → `outputs/aggregates/`
-4. **Serve** — mmap-load strategy table, stateless REST lookups
-5. **Visualize** — 50+ PNG plots → `outputs/plots/`
+1. **Precompute**:backward induction DP over 1.43M reachable states → `data/strategy_tables/`
+2. **Simulate**:Monte Carlo with optimal policy → `data/simulations/`
+3. **Analyze**:KDE, percentiles, CVaR, MER → `outputs/aggregates/`
+4. **Serve**:mmap-load strategy table, stateless REST lookups
+5. **Visualize**:50+ PNG plots → `outputs/plots/`
 
 ## Data Layout
 
@@ -142,9 +146,9 @@ profiler/data/                     # Pre-computed for static site
 
 See `theory/README.md` for the full directory index. Key entry points:
 
-- `theory/foundations/algorithm-and-dp.md` — DP algorithm and SOLVE_WIDGET
-- `theory/foundations/pseudocode.md` — optimal algorithm pseudocode
-- `theory/foundations/risk-parameter-theta.md` — risk-sensitive solver math
-- `theory/strategy/risk-sensitive-strategy.md` — θ sweep results and decision analysis
-- `theory/lab-reports/hardware-and-hot-path.md` — optimization history and hardware reference
-- `theory/research/human-cognition-and-compression.md` — human vs optimal, surrogate compression
+- `theory/foundations/algorithm-and-dp.md`:DP algorithm and SOLVE_WIDGET
+- `theory/foundations/pseudocode.md`:optimal algorithm pseudocode
+- `theory/foundations/risk-parameter-theta.md`:risk-sensitive solver math
+- `theory/strategy/risk-sensitive-strategy.md`:θ sweep results and decision analysis
+- `theory/lab-reports/hardware-and-hot-path.md`:optimization history and hardware reference
+- `theory/research/human-cognition-and-compression.md`:human vs optimal, surrogate compression

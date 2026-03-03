@@ -1,6 +1,28 @@
 import {
   getTextColor, getMutedColor, getGridColor, COLORS,
 } from '../yatzy-viz.js';
+import { PIPS } from '../utils/dice-interactive.js';
+
+function createFanDieSVG(value, isKept) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 48 48');
+  svg.setAttribute('width', '24');
+  svg.setAttribute('height', '24');
+  svg.classList.add('fan-die-svg');
+  if (isKept) svg.classList.add('fan-die-kept');
+
+  const stroke = isKept ? 'var(--accent)' : 'var(--border)';
+  const strokeWidth = isKept ? 3 : 2;
+  const fill = 'var(--bg-alt)';
+  const pipOpacity = isKept ? 1 : 0.6;
+
+  let html = `<rect x="1" y="1" width="46" height="46" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
+  (PIPS[value] || []).forEach(p => {
+    html += `<circle cx="${p.cx}" cy="${p.cy}" r="4.5" fill="var(--text)" opacity="${pipOpacity}"/>`;
+  });
+  svg.innerHTML = html;
+  return svg;
+}
 
 /**
  * Render a probability fan showing outcome distribution after a keep decision.
@@ -23,7 +45,7 @@ export function renderProbabilityFan(container, keepOption) {
   header.className = 'fan-header';
   header.innerHTML = `
     <div class="fan-title">After keeping <strong>${keepOption.label}</strong></div>
-    <div class="fan-subtitle">${freeCount} ${freeCount === 1 ? 'die' : 'dice'} to reroll \u2014 sample outcomes</div>
+    <div class="fan-subtitle">${freeCount} ${freeCount === 1 ? 'die' : 'dice'} to reroll</div>
   `;
   container.appendChild(header);
 
@@ -39,12 +61,8 @@ export function renderProbabilityFan(container, keepOption) {
     const diceRow = document.createElement('div');
     diceRow.className = 'fan-dice-row';
     roll.dice.forEach((v, idx) => {
-      const die = document.createElement('span');
-      die.className = 'fan-die';
       const isKept = idx < keptDice.length;
-      if (isKept) die.classList.add('fan-die-kept');
-      die.textContent = v;
-      diceRow.appendChild(die);
+      diceRow.appendChild(createFanDieSVG(v, isKept));
     });
     card.appendChild(diceRow);
 

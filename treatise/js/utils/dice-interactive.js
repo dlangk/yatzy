@@ -2,7 +2,7 @@
  * Selectable dice renderer — extends renderDice with click-to-toggle.
  */
 
-const PIPS = [
+export const PIPS = [
   [],
   [{ cx: 24, cy: 24 }],
   [{ cx: 14, cy: 14 }, { cx: 34, cy: 34 }],

@@ -2,14 +2,14 @@
 
 ## Compression
 
-The solver produces a 2-million-entry lookup table --a complete map from
+The solver produces a 2-million-entry lookup table: a complete map from
 every reachable game state to the optimal action. It is perfect and utterly
 opaque. No human could memorise it, and no simple rule set can replicate it.
 But how small a model can approximate it? This is the question of
 ::concept[supervised distillation]{supervised-distillation}:
 compressing an oracle's knowledge into a learnable function.
 
-The natural first instinct is reinforcement learning --let an agent
+The natural first instinct is reinforcement learning: let an agent
 play millions of games and learn from reward. But Yatzy presents a severe
 ::concept[credit assignment]{credit-assignment}
 problem. A single game spans 15 rounds with roughly 45 decisions. The final
@@ -20,7 +20,10 @@ propagate credit through this many steps without enormous sample budgets,
 and even then they plateau well below optimal play.
 
 :::html
-<div class="chart-container" id="chart-rl-barrier-diagram"><div id="chart-rl-barrier-diagram-svg"></div></div>
+<div class="chart-container" id="chart-rl-barrier-diagram">
+  <div id="chart-rl-barrier-diagram-svg"></div>
+  <p class="chart-caption">The credit assignment problem: 45 decisions per game, one delayed reward signal at the end.</p>
+</div>
 :::
 
 Supervised distillation sidesteps credit assignment entirely. The solver
@@ -35,20 +38,23 @@ The results reveal a clear winner:
 ::concept[decision trees]{decision-tree}
 dominate MLPs at every parameter budget. A depth-20 decision tree ensemble
 (413K total parameters across three decision types) achieves a mean game
-score of 245 --just 3 points below the optimal 248. A comparably-sized
+score of 245, just 3 points below the optimal 248. A comparably-sized
 MLP achieves only 241. The gap widens at smaller scales: at 2,000 parameters,
 a depth-10 decision tree scores 216 while a two-layer MLP of similar size
 manages 221 with five times the parameters.
 
 :::html
-<div class="chart-container" id="chart-surrogate-pareto"><div id="chart-surrogate-pareto-svg"></div></div>
+<div class="chart-container" id="chart-surrogate-pareto">
+  <div id="chart-surrogate-pareto-svg"></div>
+  <p class="chart-caption">Decision trees dominate MLPs at every parameter budget on the compression Pareto frontier.</p>
+</div>
 :::
 
 Why do trees win? The optimal policy contains many hard boundaries: "if Yatzy
 is available and you have four of a kind, always keep." These axis-aligned
 splits are exactly what decision trees learn. MLPs must waste capacity learning
 smooth approximations to step functions. The combinatorial, discrete nature of
-the action space --15 categories, 32 possible keeps --favours the
+the action space (15 categories, 32 possible keeps) favours the
 tree's ability to carve the feature space into crisp regions.
 
 The compression curve reveals where human-level play sits. A mean score of
@@ -64,12 +70,15 @@ human cognitive limits place us at a specific point on the Pareto frontier
 between model complexity and playing strength.
 
 :::html
-<div class="chart-container" id="chart-compression-long-tail"><div id="chart-compression-long-tail-svg"></div></div>
+<div class="chart-container" id="chart-compression-long-tail">
+  <div id="chart-compression-long-tail-svg"></div>
+  <p class="chart-caption">Residual errors concentrate near the upper bonus threshold (scores 40–62), the hardest region to compress.</p>
+</div>
 :::
 
 At the other end, even the best surrogate (a full unconstrained tree at 280K
 parameters) still loses 0.9 points per game to the lookup table. The residual
-errors cluster near the upper bonus threshold --states where the score
+errors cluster near the upper bonus threshold: states where the score
 is between 40 and 62 and the bonus decision is razor-thin. These are the
 hardest decisions in the game, and they resist compression because they depend
 on subtle interactions between remaining categories, current upper score, and
@@ -81,8 +90,8 @@ The solver's 16 MB strategy table encodes the optimal action for every reachable
 state. No human can read it. Can we distill that knowledge into something a
 person could memorize? A
 ::concept[sequential decision list]{sequential-decision-list}
-of 100 category-selection rules --each a simple IF-THEN with one or two
-conditions --recovers a mean score of 227.5 when paired with optimal
+of 100 category-selection rules (each a simple IF-THEN with one or two
+conditions) recovers a mean score of 227.5 when paired with optimal
 rerolls. Against the oracle's 248.4, that closes 59.7% of the gap, leaving a
 40.3% incompressible residual of 20.9 EV points.
 
@@ -91,7 +100,7 @@ drawn from 56 semantic features (dice topology, bonus tracking, category
 availability). Each condition is a simple threshold or equality test; rules
 combine at most two conditions via conjunction. The algorithm searches
 single conditions, then top-20 by top-30 conjunctions, selecting whichever
-minimizes mean regret over uncovered states. Early rules are obvious ---
+minimizes mean regret over uncovered states. Early rules are obvious:
 "if you have a large straight, score it." By rule 30, the algorithm discovers
 structural strategies that experienced players miss: when to sacrifice
 upper-section points for a better bonus trajectory, how to arbitrage Full
@@ -101,7 +110,7 @@ score equally.
 The scaling curve has three phases. The first 20 rules add only 2.7 EV,
 picking off zero-regret corner cases like Yatzy and completed straights.
 Then the curve accelerates: rules 26–40 deliver peak marginal value
-of 0.74 EV/rule, discovering the structural core of Yatzy ---
+of 0.74 EV/rule, discovering the structural core of Yatzy:
 upper-section management, Sixes accumulation, One Pair as the high-frequency
 workhorse category. After 70 rules, returns diminish to 0.15 EV/rule as the
 algorithm mops up context-dependent edge cases. The key landmarks: 0 rules
@@ -109,24 +118,30 @@ gives 196.7, 50 rules gives 216.5, 100 rules gives 227.5. Notably, roughly
 67 rules suffice to surpass a trained neural network baseline at 221 EV.
 
 :::html
-<div class="chart-container" id="chart-rosetta-rules"><div id="chart-rosetta-rules-svg"></div></div>
+<div class="chart-container" id="chart-rosetta-rules">
+  <div id="chart-rosetta-rules-svg"></div>
+  <p class="chart-caption">100 human-readable rules recover 227.5 EV, across three scaling phases from foundation to saturation.</p>
+</div>
 :::
 
 Reroll rules are harder. The natural action space is a 5-bit position bitmask,
 but "keep positions 0, 1, 2" means entirely different things for [1,1,1,4,6]
 versus [2,3,4,5,6]. Bitmask rules achieve only 168.7 EV. The fix is a
 ::concept[composable filter grammar]{composable-filter-grammar}
-of 15 semantic actions --"keep the triple," "keep face 6," "keep the
-straight draw" --that describe intent rather than position. Each verb
+of 15 semantic actions ("keep the triple," "keep face 6," "keep the
+straight draw") that describe intent rather than position. Each verb
 compiles to the correct bitmask at runtime. This recovers 184.4 EV, a +15.7
 improvement that confirms position-dependence was the bottleneck.
 
 :::html
-<div class="chart-container" id="chart-filter-grammar"><div id="chart-filter-grammar-svg"></div></div>
+<div class="chart-container" id="chart-filter-grammar">
+  <div id="chart-filter-grammar-svg"></div>
+  <p class="chart-caption">Semantic reroll verbs ("keep the triple") beat position-dependent bitmasks by 15.7 EV points.</p>
+</div>
 :::
 
 Yet semantic rules (184.4) still trail category-only mode (227.5) by 43 points.
-Reroll decisions are inherently more speculative --they require reasoning
+Reroll decisions are inherently more speculative; they require reasoning
 about potential future states, not just the current hand. The 15-verb vocabulary
 cannot represent every oracle decision, and the 56 features may not carry
 enough signal for a 100-rule list to approximate forward-looking reroll
@@ -187,13 +202,13 @@ conflicts exist. Every unique game state maps to exactly one optimal action.
 :::
 
 Error compounding is modest: the EV-loss proxy predicts the depth-20 tree
-should score 247.0, and actual game simulation yields 245 --roughly
-2 points of cascading cost from correlated errors.
+should score 247.0, and actual game simulation yields 245 (roughly
+2 points of cascading cost from correlated errors).
 
 ### Why MLPs Lag
 
-At matched parameter counts, MLPs trail decision trees on category decisions
---- the hardest task (15 classes, complex bonus interactions). A 14K-param
+At matched parameter counts, MLPs trail decision trees on category decisions,
+the hardest task (15 classes, complex bonus interactions). A 14K-param
 MLP achieves category EV loss comparable to a 2K-param depth-10 tree. The gap
 narrows for reroll decisions, where the MLP's soft decision boundaries help
 with near-tied actions. But overall, the combinatorial structure of Yatzy
@@ -213,8 +228,8 @@ Phase 1 (<var>N</var> = 0–20): foundation, +2.7 EV. Phase 2
 (<var>N</var> = 25–70): acceleration, +21.9 EV with peak marginal value
 of 0.74 EV/rule in the 26–40 band. Phase 3 (<var>N</var> = 70–100):
 saturation, +6.2 EV. The phase transition at <var>N</var> &approx; 25
-coincides with the algorithm's discovery of upper-section management rules
---- the structural backbone of good Yatzy play.
+coincides with the algorithm's discovery of upper-section management rules,
+the structural backbone of good Yatzy play.
 
 The greedy covering algorithm operates on a condition space of 370 candidates
 generated from the 56-feature DSL: boolean features produce `== 0`
@@ -277,7 +292,7 @@ for dtype in ['category', 'reroll1', 'reroll2']:
 
 The irreducible error floor (0.9 pts/game for the full tree) concentrates
 near the upper bonus threshold. At upper scores between 40 and 62, 53.4%
-of category errors occur --these are states where a 1-point
+of category errors occur; these are states where a 1-point
 difference in upper score determines whether the 50-point bonus is
 achievable. For reroll decisions, 35–41% of errors have near-zero
 gap (&lt;0.1 points), meaning many "errors" are functionally irrelevant

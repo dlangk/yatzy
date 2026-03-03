@@ -2,149 +2,100 @@
 
 ## The Optimal Strategy
 
-With the solver in hand, we can study what optimal play actually looks like. The strategy table tells us the best action in every conceivable game state, but the aggregate statistics reveal something deeper: the structural forces that shape outcomes even under perfect play.
+Now we have a solver that knows the best move in every possible situation. What does perfect play actually look like? The answer is surprising: even when you play perfectly, Yatzy is still wildly unpredictable.
 
 ### Anatomy of a Hard Decision
 
-Not all decisions are obvious. Consider this endgame position --most players
-take the safe guaranteed score, but the solver sees further.
+Not all decisions are obvious. Consider this endgame position. Most players take the safe guaranteed score, but the solver sees further.
 
 :::html
 <div class="chart-container" id="chart-decision-anatomy">
   <div id="chart-decision-anatomy-content"></div>
+  <p class="chart-caption">A hard endgame decision: the safe play vs. the solver's deeper calculation.</p>
 </div>
 :::
 
 ### The Score Distribution
 
-A solved game does not mean a predictable game. Even under perfect play, a
-single game of Yatzy is startlingly variable. The optimal policy produces a
-mean score of 248.4 with a standard deviation of 38.5 --a coefficient
-of variation above 15%. Two games played with identical, flawless strategy can
-easily differ by 100 points or more. Understanding where this variance comes
-from, and why it has the particular shape it does, is one of the most revealing
-aspects of the analysis.
+Playing perfectly does not mean scoring the same every time. The optimal strategy averages 248.4 points per game, but the spread is enormous: a standard deviation of 38.5 means that two perfectly played games can easily differ by 100 points or more.
 
-Simulating one million games under the optimal policy reveals a score
-distribution that is emphatically not Gaussian. Despite the game consisting of
-fifteen rounds --enough, one might think, for the
-::concept[central limit theorem]{central-limit-theorem}
-to take hold --the distribution is visibly skewed and heavy-tailed to
-the left. The reason lies in the structural dependencies between rounds.
+Simulating one million games shows that the scores do not follow the familiar bell curve. You might expect fifteen rounds to average out, but they don't. The distribution is lopsided, with a long tail stretching to the left. The reason? The rounds are not independent. What happens early in the game changes what is possible later.
 
-### Four Populations, One Game
+### Four Groups, One Game
 
-The non-Gaussian shape is not random noise; it has a precise structural
-explanation. Every game either hits or misses the
+The lopsided shape has a clean explanation. Two things dominate your final score more than anything else: whether you hit the
 ::concept[upper-section bonus]{upper-section-bonus}
-(at a rate of roughly 90%), and every game either lands or misses Yatzy
-(at about 39%). These two binary events create four sub-populations, each
-with its own roughly normal distribution:
+(about 90% of the time under perfect play), and whether you scored Yatzy (about 39%). These two yes-or-no outcomes split all games into four groups, each with its own score range:
 
-- Bonus missed, no Yatzy --mean around 164
-- Bonus missed, Yatzy scored --mean around 213
-- Bonus hit, no Yatzy --mean around 237
-- Bonus hit, Yatzy scored --mean around 288
+- Missed bonus, no Yatzy: average around 164
+- Missed bonus, scored Yatzy: average around 213
+- Hit bonus, no Yatzy: average around 237
+- Hit bonus, scored Yatzy: average around 288
 
-The overall distribution is a weighted mixture of these four components.
-Because the bonus event dominates (it separates 90% of games from 10%), the
-distribution looks roughly bimodal, with a long left tail formed by the
-bonus-miss groups.
+The overall score distribution is these four groups stacked on top of each other. Because the bonus matters so much (it separates 90% of games from the unlucky 10%), you can see a clear dip where the two populations meet.
 
 :::html
 <div class="chart-container" id="chart-mixture">
   <div id="chart-mixture-svg"></div>
+  <p class="chart-caption">The score distribution is a blend of four groups: bonus hit/miss × Yatzy hit/miss.</p>
 </div>
 :::
 
-### The Bonus Covariance
+### The Bonus Is Worth More Than You Think
 
 The ::concept[upper-section bonus]{upper-section-bonus}
-is worth 50 points on paper. But its true impact is 72 points --50 from
-the bonus itself, plus an additional 22 points of correlated scoring advantage.
-Players who reach the bonus threshold tend to have rolled well in the upper
-categories, which correlates with higher scores in the lower section too (more
-dice combinations available for straights, full houses, and multi-of-a-kind
-categories). This covariance structure means the bonus is not merely an additive
-reward; it is a marker of a globally favourable game trajectory.
+says 50 points in the rules. But its true impact is 72 points. Where do the extra 22 come from? Players who reach the bonus threshold tend to have been rolling well throughout the game. Good upper-section rolls also mean more options in the lower section: more straights, more full houses, more of-a-kind combinations. So hitting the bonus is not just a 50-point reward; it is a sign that the whole game went well.
 
 :::html
 <div class="chart-container" id="chart-bonus-covariance">
   <div id="chart-bonus-covariance-svg"></div>
+  <p class="chart-caption">The 50-point bonus is actually worth 72 points when you account for the 22 extra points from generally better rolls.</p>
 </div>
 :::
 
 :::insight
-**Key insight:** The 72-point bonus gap explains why good Yatzy
-players obsess over the upper section early in the game. The 50-point bonus
-is visible in the rules, but the 22-point correlated advantage is invisible
---- discoverable only through simulation or exact computation.
+**Key insight:** This is why good Yatzy players obsess over the upper section early in the game. The 50-point bonus is visible in the rules, but the 22-point hidden advantage is not. You can only discover it by running the numbers.
 :::
 
-### Why the Maximum Fails
+### Why "Best Case" Thinking Fails
 
-A natural first question: what is the highest possible score? If you compute the
-maximum achievable value at each state --replacing the expected value in the
-Bellman equation with a pure maximum --the answer is 374 points. This is
-the theoretical ceiling, the score you would get if every dice roll came up
-perfectly. But when you simulate this max-policy (which always chooses the action
-with the highest ceiling) in actual play with random dice, the mean score drops
-to just 118.7 --less than half the EV-optimal mean.
+What if you always played for the highest possible outcome? The theoretical ceiling is 374 points (every roll comes up perfect). But a strategy that always chases the ceiling, picking whatever move has the best possible upside, averages just 118.7 in actual play. That is less than half the optimal score.
 
 :::html
 <div class="chart-container" id="chart-max-policy-failure">
   <div id="chart-max-policy-failure-svg"></div>
+  <p class="chart-caption">Always chasing the best case averages just 118.7, less than half the optimal 248.4.</p>
 </div>
 :::
 
-The max-policy fails because it systematically overvalues unlikely outcomes. It
-will hold a single Six hoping for Yatzy (five of a kind) when the expected value
-of that gamble is far below a safe play like scoring a modest Full House. The
-gap of 130 points between optimal and max-policy play is a vivid illustration
-of why expected value, not best-case thinking, is the right objective for
-sequential decision-making under uncertainty.
+The ceiling-chasing strategy fails because it overvalues unlikely outcomes. It will hold a single Six hoping for Yatzy when the odds are terrible, instead of taking a safe Full House. The 130-point gap between optimal play and ceiling-chasing is a vivid reminder: in a game with dice, playing the odds beats wishful thinking every time.
 
-### The Forward Pass
+### What Does a Typical Game Look Like?
 
-The backward induction tells us the *value* of every state, but it does not
-tell us how often each state is actually *visited* during optimal play. For that
-we need the forward pass: starting from the initial state (turn 0, upper
-score 0, no categories scored), propagate exact Markov transition probabilities
-through the game tree. The result is three complementary views of what a
-perfectly played game looks like in aggregate.
+The solver tells us the *value* of every position, but not how often each position actually comes up. To see that, we trace a million games forward from the starting position and record what happens along the way. Three patterns emerge.
 
-**The race to 63.** The upper-section bonus threshold at 63 points is the
-single most important structural feature of Yatzy. This node-link diagram
-shows the exact probability of reaching each upper score at each turn. The
-bright channels trace the dominant flow of probability mass; most games
-converge toward the bonus threshold by turns 10--12, but a persistent
-low-probability channel hugs the bottom for games where lower-section
-categories consumed the early turns.
+**The race to 63.** The upper-section bonus at 63 points is the single most important target in the game. The chart below tracks how upper-section scores evolve turn by turn. Most games converge toward the bonus by turns 10 to 12, but a thin stream of unlucky games stays low throughout.
 
 :::html
-<div class="chart-container" id="chart-race-to-63"></div>
+<div class="chart-container" id="chart-race-to-63">
+  <p class="chart-caption">How upper-section scores build turn by turn, with most games converging toward the 63-point bonus.</p>
+</div>
 :::
 
-**When is each category scored?** The streamgraph below shows, for each turn,
-the probability that each of the 15 categories is chosen. Early turns
-favour high-value upper categories (Sixes, Fives, Fours) and multi-of-a-kind
-combinations. The lower-value categories (Ones, Twos) and Chance tend to
-be deferred to later turns, serving as dump slots when dice rolls are
-unfavourable.
+**When is each category scored?** The chart below shows, for each turn, which category the solver picks most often. High-value upper categories (Sixes, Fives, Fours) tend to get scored early, while low-value ones (Ones, Twos) and Chance get used as dump slots late in the game when the dice don't cooperate.
 
 :::html
-<div class="chart-container" id="chart-category-stream"></div>
+<div class="chart-container" id="chart-category-stream">
+  <p class="chart-caption">Category timing: high-value categories early, dump slots like Ones and Chance late.</p>
+</div>
 :::
 
-**The narrowing of uncertainty.** Before any dice are rolled, every game
-starts with the same expected value of 248. As turns progress, the
-distribution of conditional expected values fans out and then collapses
-toward the actual score. The ridgeline plot below shows this process: each
-row is one turn's distribution over expected final scores, from the single
-spike at turn 0 to the wide spread of realized outcomes at turn 15.
+**How uncertainty narrows.** Before any dice are rolled, every game has the same expected score of 248. As turns pass, some games get lucky and some don't, and the range of likely outcomes fans out. By the final turn, the spread covers everything from about 120 to 370.
 
 :::html
-<div class="chart-container" id="chart-ev-ridgeline"></div>
+<div class="chart-container" id="chart-ev-ridgeline">
+  <p class="chart-caption">Expected score by turn: starts as a single point at 248, fans out to the full range of final scores.</p>
+</div>
 :::
 
 :::math
