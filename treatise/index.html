@@ -30,6 +30,8 @@
   import { initReductionFunnel } from './js/charts/reduction-funnel.js';
   import { initReachabilityGrid } from './js/charts/reachability-grid.js';
   import { initWidgetStructure } from './js/charts/widget-structure.js';
+  import { initKeepEquivalence } from './js/charts/keep-equivalence.js';
+  import { initBackwardCascade } from './js/charts/backward-cascade.js';
 
   import { initMemoryLifecycle } from './js/charts/memory-lifecycle.js';
   // Chart modules — Solver
@@ -99,6 +101,8 @@
     'chart-reduction-funnel': { init: initReductionFunnel, loaded: false },
     'chart-reachability-grid': { init: initReachabilityGrid, loaded: false },
     'chart-widget-structure': { init: initWidgetStructure, loaded: false },
+    'chart-keep-equivalence': { init: initKeepEquivalence, loaded: false },
+    'chart-backward-cascade': { init: initBackwardCascade, loaded: false },
 
     'chart-memory-lifecycle': { init: initMemoryLifecycle, loaded: false },
     'chart-widget-interactive': { init: initWidgetInteractive, loaded: false },

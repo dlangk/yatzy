@@ -42,6 +42,7 @@ Charts are initialized by `yatzy-viz.js` which queries the DOM for `[data-chart]
 ## Writing Style
 
 - **No emdashes.** Never use `--`, `&mdash;`, or `—` as emdashes in prose or captions. Use periods, commas, colons, semicolons, or parentheses instead.
+- **No inline HTML in markdown.** `:::html` blocks in section `.md` files must contain only a container `<div>` with an `id` and optionally a `<p class="chart-caption">`. All rendering logic, SVG, and structural HTML belongs in `js/charts/*.js` modules. The chart's `init()` function populates the container at runtime.
 
 ## Sections
 
