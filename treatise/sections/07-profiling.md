@@ -93,6 +93,7 @@ The two-tower Q-network architecture embeds 56-dimensional state features and
 latent space via bilinear interaction:
 
 ```python
+# Two-tower Q-network architecture
 class TwoTowerQ(nn.Module):
     def __init__(self, n_features=56, n_action_dim=6, embed_dim=16):
         self.state_tower  = nn.Sequential(
@@ -120,6 +121,7 @@ that arise purely from the Q-value structure without label supervision.
 The Q-grid for cognitive profiling uses 108 parameter combinations:
 
 ```python
+# Q-grid parameter space (108 combinations)
 theta_grid = [-0.05, -0.02, 0.0, 0.02, 0.05, 0.1]    # 6 values
 gamma_grid = [0.3, 0.5, 0.7, 0.85, 0.95, 1.0]         # 6 values
 depth_grid = [8, 20, 999]                                # 3 values

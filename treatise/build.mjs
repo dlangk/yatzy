@@ -35,7 +35,7 @@ function processShortcodes(src) {
         out.push("</div>");
       } else {
         // math, code, equation, insight
-        out.push(`</div>`);
+        out.push(`\n</div>`);
       }
       continue;
     }
@@ -59,7 +59,7 @@ function processShortcodes(src) {
         // math, code, equation, insight
         const cls = CLASS_MAP[type] || type;
         stack.push({ type });
-        out.push(`<div class="${cls}">`);
+        out.push(`<div class="${cls}">\n`);
       }
       continue;
     }
@@ -140,6 +140,8 @@ for (const file of files) {
     }
     html = parts.join("");
   }
+  // Wrap Unicode dice faces (⚀-⚅) in a span for larger rendering
+  html = html.replace(/[\u2680-\u2685]/g, ch => `<span class="die-char">${ch}</span>`);
   // Inject section number + permalink into first h2
   const sec = fileSectionMap.get(file);
   if (sec) {
@@ -148,6 +150,34 @@ for (const file of files) {
       `<h2><a href="#${sec.id}" class="section-link">${sec.number}. $1</a></h2>`
     );
   }
+  // Wrap all code blocks with line numbers, hover highlighting, and header.
+  // Language-tagged blocks: extract first comment line as header label.
+  // Unlabeled blocks: header says "pseudocode".
+  html = html.replace(
+    /<pre><code(?:\s+class="language-(\w+)")?>([^]*?)<\/code><\/pre>/g,
+    (_, lang, body) => {
+      const lines = body.replace(/\n$/, "").split("\n");
+      let headerText = lang || "pseudocode";
+
+      // For language-tagged blocks, check if first line is a comment with a filename
+      if (lang && lines.length > 0) {
+        // Match comment patterns: // file.rs — desc, # file.py — desc, -- file.sql
+        const commentRe = /^(?:\/\/|#|--)\s*(.+)/;
+        const m = lines[0].match(commentRe);
+        if (m) {
+          headerText = m[1].trim();
+          lines.shift(); // remove comment line from body
+          // Strip leading blank line after removed comment
+          if (lines.length > 0 && lines[0].trim() === "") lines.shift();
+        }
+      }
+
+      const numbered = lines
+        .map((line, i) => `<span class="code-line"><span class="code-ln">${i + 1}</span>${line}</span>`)
+        .join("");
+      return `<div class="code-card"><div class="code-card-header">${headerText}</div><pre><code>${numbered}</code></pre></div>`;
+    }
+  );
   // Inject TOC where placeholder exists
   html = html.replace("<!-- TOC -->", tocHtml);
   const outName = file.replace(/\.md$/, ".html");

@@ -76,14 +76,11 @@ export async function initRaceTo63() {
     .style('font-weight', '600')
     .text('Bonus threshold (63)');
 
-  // Links — additive blending via mix-blend-mode
-  const isDark = document.documentElement.classList.contains('dark');
-  const linkColorScale = isDark
-    ? d3.scaleSequential(d3.interpolateBlues).domain([0, linkMassExtent[1]])
-    : d3.scaleSequential(d3.interpolateBlues).domain([0, linkMassExtent[1]]);
+  // Links — additive blending via mix-blend-mode (CSS class handles dark/light)
+  const linkColorScale = d3.scaleSequential(d3.interpolateBlues).domain([0, linkMassExtent[1]]);
 
   const linksG = g.append('g')
-    .style('mix-blend-mode', isDark ? 'lighten' : 'screen');
+    .attr('class', 'race-links');
 
   linksG.selectAll('path')
     .data(links)

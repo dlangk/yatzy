@@ -1,10 +1,14 @@
+:::insight
+**This treatise covers Scandinavian Yatzy, not American Yahtzee.** Scandinavian Yatzy has 15 scoring categories (Yahtzee has 13), awards a 50-point upper bonus (Yahtzee gives 35), and has no Yahtzee bonus. These differences make the state space larger and the strategy more complex.
+:::
+
 :::section{#introduction}
 
 ## Yatzy: The Family Game Balancing Skill and Luck 🎲
 
-I loved playing Yatzy as a kid. In fact, I still do 😊 Yatzy, for me, is closely associated with having fun as a family. In particular, I associate it with my wonderful dad. He is the most fun person I know to play Yatzy with! ❤️
+I loved playing Yatzy as a kid. In fact, I still do 😊 Yatzy, for me, is closely associated with having fun as a family. In particular, I associate it with my wonderful dad - he is the best person I know to play Yatzy with! ❤️
 
-Yatzy has some really interesting properties that make it fun to both play, and pick apart. To understand the game, let's start by taking a look at what happens if an optimal Yatzy players sits down and plays *a lifetime* worth of games, say  about two thousand:
+Yatzy has really interesting properties that make it fun to both play and pick apart. To understand the game, let's start by taking a look at what happens if an optimal Yatzy players sits down and plays *a lifetime* worth of games. I estimate that's about two thousand games. Try clicking the dots to see scorecards:
 
 :::html
 <div class="chart-container" id="chart-score-spray">
@@ -15,17 +19,16 @@ Yatzy has some really interesting properties that make it fun to both play, and 
   <div class="spray-legend" id="spray-legend"></div>
   <div class="spray-stats" id="spray-stats"></div>
   <div id="spray-scorecard-popup" class="spray-popup hidden"></div>
-  <p class="chart-caption">Two thousand games under optimal play. Each dot is one game. Scores range from ~120 to ~370.</p>
 </div>
 :::
 
-As you can see, scores vary wildly even for an optimal player.
+As you can see, scores vary wildly even for an optimal player. Even if you play *perfectly*, 1 out of 10 games will be below 203 points. And you will, during an entire lifetime, experience myabe a handful of games above 320 points.
 
-**I think that explains why it's fun for families: Yatzy has room for skill, but... it's mostly luck!** 😅 The best player will win slightly more, but anyone can get lucky and beat the strongest player by a wide margin. Even if parents win a bit more, their kids will regularly beat them.
+**This explains why Yatzy is fun for families: It has room for skill, but it's actually mostly luck!** 😅 The best player will win slightly more, but anyone can get lucky and beat the strongest player by a wide margin. Parents will win a bit more, but their kids will regularly beat them.
 
-Most family games require some mixture of skill and luck. The more skill, the less likely it is that your entire family will enjoy it together. For example, playing chess isn't really fun unless both players are about as good. There is zero luck involved in chess, just pure skill.
+Most family-games require some mixture of skill and luck. The more skill, the less likely it is that your entire family will enjoy it together. For example, playing chess isn't really fun unless both players are about as good. There is zero luck involved in chess, just pure skill.
 
-At the same time, *too much luck* and you don't feel like you earned your win anymore. There needs to be decisions that matter, and outcomes to celebrate. **Yatzy strikes the perfect balance. When you win, you feel skilled. When you loose, you were unlucky.**
+At the same time, *too much luck* and you don't feel like you earned your win anymore. There needs to be decisions that matter, and outcomes to celebrate. **Yatzy strikes a nice balance. When you win, you feel skilled. When you loose, you were unlucky.**
 
 Many years ago, I got it into my head to figure out: exactly how much skill is involved in Yatzy? Or put differently: how good can you be at Yatzy? Along the way, it also turned out that Yatzy was a good workbench for testing AI technologies. A few of the things that makes Yatzy interesting are:
 
@@ -33,7 +36,7 @@ Many years ago, I got it into my head to figure out: exactly how much skill is i
 
 - **The Significant Inherent Randomness.**  Five dices with six sides that are rolled over and over again means a whole lot of randomness.
 
-- **The Huge State Space.** There are about ~1.7 × 10^170 possible Yatzy games. That's significantly larger than chess. And the Universe 🤯 There are about 10^80 atoms in the universe.
+- **The Huge State Space.** There are about ~1.7 &times; 10<sup>170</sup> possible Yatzy games. That's significantly larger than chess. And the universe 🤯 There are about ~10<sup>80</sup> atoms in the universe.
 
 - **It Can Still Be Solved.** Clever mathematicians have figured out how to reduce the state space drastically, and as a result, Yatzy can be solved. I've implemented my own solver based on this math, and used AI to push that solver to extreme performance.
 

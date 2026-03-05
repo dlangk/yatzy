@@ -132,7 +132,7 @@ export async function initBackwardWave() {
         const upper = +this.getAttribute('data-upper');
         const ev = +this.getAttribute('data-ev');
         tt.show(
-          `<div class="tt-label">Layer ${layerIdx}, upper = ${upper}</div>
+          `<div class="tt-label">Layer ${layerIdx + 1}, upper = ${upper}</div>
            <div>EV: <span class="tt-value">${ev.toFixed(1)}</span></div>`,
           event
         );
@@ -141,11 +141,11 @@ export async function initBackwardWave() {
 
     // Update label
     if (activeLayer > 0) {
-      label.textContent = `Layer ${activeLayer} \u2014 ${activeLayer} categories scored`;
+      label.textContent = `Layer ${activeLayer + 1} \u2014 ${activeLayer} categories scored`;
     } else if (activeLayer === 0) {
-      label.textContent = 'Layer 0 \u2014 game start (EV = 248.4)';
+      label.textContent = 'Layer 1 \u2014 game start (EV = 248.4)';
     } else {
-      label.textContent = 'Layer 15 \u2014 terminal states';
+      label.textContent = 'Layer 16 \u2014 terminal states';
     }
   }
 

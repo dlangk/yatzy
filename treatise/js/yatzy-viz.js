@@ -27,18 +27,29 @@ export const COLORS = {
   humanRange: 'rgba(150, 150, 150, 0.15)',
 };
 
-const isDark = () => document.documentElement.classList.contains('dark');
+// Theme colors as CSS variable references. These work in SVG attributes
+// (fill, stroke) and inline styles, updating automatically on theme toggle.
+// For canvas contexts (which can't use CSS vars), use resolveColor() instead.
 
 export function getTextColor() {
-  return isDark() ? '#e0ddd5' : '#050505';
+  return 'var(--text)';
 }
 
 export function getMutedColor() {
-  return isDark() ? '#999' : '#555';
+  return 'var(--text-muted)';
 }
 
 export function getGridColor() {
-  return isDark() ? '#333' : '#ddd';
+  return 'var(--grid)';
+}
+
+/**
+ * Resolve a CSS variable to its computed color value.
+ * Use this for canvas contexts where var() references don't work.
+ * Example: ctx.fillStyle = resolveColor('--text');
+ */
+export function resolveColor(varName) {
+  return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
 }
 
 /**

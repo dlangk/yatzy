@@ -44,11 +44,10 @@ export async function initEvRidgeline() {
   const globalMaxMass = d3.max(raw, d => d.mass);
 
   // Color: from light slate (turn 0) to accent orange (turn 15)
-  const isDark = document.documentElement.classList.contains('dark');
-  const bgColor = isDark ? '#1a1a1a' : '#faf9f6';
+  const startColor = document.documentElement.classList.contains('dark') ? '#5a6a7a' : '#b0bec5';
   const turnColor = d3.scaleLinear()
     .domain([0, numTurns - 1])
-    .range([isDark ? '#5a6a7a' : '#b0bec5', COLORS.accent])
+    .range([startColor, COLORS.accent])
     .interpolate(d3.interpolateRgb);
 
   const tt = tooltip(container);
@@ -82,7 +81,7 @@ export async function initEvRidgeline() {
     g.append('path')
       .datum(entries)
       .attr('d', areaGen)
-      .attr('fill', bgColor)
+      .attr('fill', 'var(--bg)')
       .attr('stroke', 'none');
 
     // Colored fill on top

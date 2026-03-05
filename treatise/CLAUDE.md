@@ -39,6 +39,15 @@ just dev-frontend              # Vite serves at /yatzy/
 
 Charts are initialized by `yatzy-viz.js` which queries the DOM for `[data-chart]` containers. Each chart module exports an `init(container, data)` function. Slider controls use `<input type="range">` with a `.slider-value` span updated on input.
 
+## Theme Colors
+
+Charts must use CSS variable references for all theme-dependent colors so they update automatically on dark/light toggle without re-initialization (which would destroy interactive state).
+
+- **SVG attributes:** Use `getTextColor()`, `getMutedColor()`, `getGridColor()` from `yatzy-viz.js`. These return `var(--text)`, `var(--text-muted)`, `var(--grid)` respectively.
+- **Canvas contexts:** CSS vars don't work on canvas. Use `resolveColor('--text')` from `yatzy-viz.js` which reads the computed value. Canvas charts may need a theme-change listener to re-render.
+- **D3 color interpolation:** `d3.scaleLinear().range(...)` needs real color values, not CSS vars. Accept that gradients will keep their initial theme colors, or add a theme-change listener for the specific chart.
+- **Never call `isDark()` or check the dark class** to pick between hardcoded hex values. Use CSS variables instead.
+
 ## Writing Style
 
 - **No emdashes.** Never use `--`, `&mdash;`, or `—` as emdashes in prose or captions. Use periods, commas, colons, semicolons, or parentheses instead.

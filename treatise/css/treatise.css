@@ -129,7 +129,7 @@ h2 .section-link:hover {
   background: var(--bg-alt);
   padding: 0.75rem 1rem;
   border-radius: 6px;
-  overflow-x: auto;
+  overflow: visible;
   font-size: 0.8rem;
   line-height: 1.5;
 }
@@ -137,6 +137,14 @@ h2 .section-link:hover {
 .code-detail pre code {
   background: none;
   padding: 0;
+}
+
+/* Reset code-detail pre styles inside code-cards (code-card owns its own layout) */
+.code-detail .code-card pre {
+  padding: 0.3rem 0;
+  border-radius: 0;
+  font-size: inherit;
+  line-height: 1;
 }
 
 /* Key insight callout */
@@ -690,8 +698,8 @@ h2 .section-link:hover {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  margin-bottom: 1rem;
-  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 1rem;
   background: var(--bg-alt);
   border-radius: 8px;
 }
@@ -716,6 +724,7 @@ h2 .section-link:hover {
   gap: 1rem;
   font-size: 0.75rem;
   color: var(--text-muted);
+  margin-left: auto;
 }
 
 .dice-symmetry-legend > span {
@@ -823,7 +832,7 @@ h2 .section-link:hover {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
-  margin: 1rem 0;
+  margin: 0.5rem 0;
   table-layout: fixed;
 }
 
@@ -837,7 +846,7 @@ h2 .section-link:hover {
 
 .pattern-table th {
   text-align: left;
-  padding: 0.4rem 0.6rem;
+  padding: 0.2rem 0.5rem;
   border-bottom: 2px solid var(--border);
   font-weight: 600;
   font-size: 0.8rem;
@@ -847,7 +856,7 @@ h2 .section-link:hover {
 }
 
 .pattern-table td {
-  padding: 0.35rem 0.6rem;
+  padding: 0.15rem 0.5rem;
   border-bottom: 1px solid var(--border);
 }
 
@@ -892,7 +901,7 @@ h2 .section-link:hover {
 .grid-252 {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.3rem;
 }
 
 .grid-family-group {
@@ -906,6 +915,7 @@ h2 .section-link:hover {
   font-weight: 600;
   padding-left: 6px;
   margin-bottom: 2px;
+  border-left: 3px solid var(--family-color);
 }
 
 .grid-family-count {
@@ -978,7 +988,6 @@ h2 .section-link:hover {
   display: flex;
   gap: 1.5rem;
   align-items: flex-start;
-  min-height: 420px;
 }
 
 .keep-funnel-left {
@@ -1113,45 +1122,50 @@ h2 .section-link:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
   margin: 1.25rem 0;
 }
 
 .keep-equiv-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
+}
+
+.keep-equiv .keep-die {
+  width: 26px;
+  height: 26px;
 }
 
 .keep-equiv-dice {
   display: flex;
-  gap: 3px;
+  gap: 4px;
 }
 
 .keep-equiv-label {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
-  width: 3rem;
+  width: 3.5rem;
   text-align: right;
   flex-shrink: 0;
 }
 
 .keep-equiv-arrow {
-  font-size: 1.1rem;
+  font-size: 1.3rem;
   color: var(--text-muted);
   flex-shrink: 0;
 }
 
 .keep-equiv-result {
   display: flex;
-  gap: 3px;
-  padding: 0.2rem 0.35rem;
+  gap: 4px;
+  padding: 0.25rem 0.4rem;
   background: var(--accent-light);
   border-radius: 6px;
 }
 
 .keep-equiv-result-label {
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   color: var(--accent);
   font-weight: 600;
   text-align: center;

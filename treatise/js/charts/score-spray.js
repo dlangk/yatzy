@@ -6,7 +6,7 @@
  */
 
 import { DataLoader } from '../data-loader.js';
-import { getTextColor, getMutedColor, getGridColor, thetaColor } from '../yatzy-viz.js';
+import { getGridColor, getMutedColor, getTextColor, thetaColor } from '../yatzy-viz.js';
 const POP_LABELS = ['No bonus, no Yatzy', 'No bonus, Yatzy', 'Bonus, no Yatzy', 'Bonus + Yatzy'];
 
 // Physics
@@ -515,12 +515,14 @@ export async function initScoreSpray() {
   }
 
   // --- Reference stats from exact density evolution ---
+  const refMax = Math.max(...perfectKDE.filter(d => d[1] > 0).map(d => d[0]));
   const refStats = {
     p1: refTheta0.p1,
     p10: refTheta0.p10,
     mean: refTheta0.mean,
     p90: refTheta0.p90,
     p99: refTheta0.p99,
+    best: refMax,
   };
 
   // --- Stats box ---
@@ -537,18 +539,20 @@ export async function initScoreSpray() {
 
     const fmt = v => typeof v === 'number' ? v.toFixed(1) : '—';
     const liveMean = sn > 0 ? settledScores.reduce((a, b) => a + b, 0) / sn : null;
+    const liveMax = sn > 0 ? settledScores[sn - 1] : '—';
     const live = sn > 0 ? {
       p1: percentile(settledScores, 0.01),
       p10: percentile(settledScores, 0.1),
       mean: liveMean,
       p90: percentile(settledScores, 0.9),
       p99: percentile(settledScores, 0.99),
-    } : { p1: '—', p10: '—', mean: '—', p90: '—', p99: '—' };
+      best: liveMax,
+    } : { p1: '—', p10: '—', mean: '—', p90: '—', p99: '—', best: '—' };
 
     statsEl.innerHTML = `<table>
-      <tr><th></th><th>P1</th><th>P10</th><th>Mean</th><th>P90</th><th>P99</th></tr>
-      <tr><td class="spray-stats-label">Exact</td><td>${fmt(refStats.p1)}</td><td>${fmt(refStats.p10)}</td><td>${fmt(refStats.mean)}</td><td>${fmt(refStats.p90)}</td><td>${fmt(refStats.p99)}</td></tr>
-      <tr class="spray-stats-live"><td class="spray-stats-label">${sn.toLocaleString()} games</td><td>${fmt(live.p1)}</td><td>${fmt(live.p10)}</td><td>${fmt(live.mean)}</td><td>${fmt(live.p90)}</td><td>${fmt(live.p99)}</td></tr>
+      <tr><th></th><th>P1</th><th>P10</th><th>Mean</th><th>P90</th><th>P99</th><th>Best</th></tr>
+      <tr><td class="spray-stats-label">Exact</td><td>${fmt(refStats.p1)}</td><td>${fmt(refStats.p10)}</td><td>${fmt(refStats.mean)}</td><td>${fmt(refStats.p90)}</td><td>${fmt(refStats.p99)}</td><td>${fmt(refStats.best)}</td></tr>
+      <tr class="spray-stats-live"><td class="spray-stats-label">${sn.toLocaleString()} games</td><td>${fmt(live.p1)}</td><td>${fmt(live.p10)}</td><td>${fmt(live.mean)}</td><td>${fmt(live.p90)}</td><td>${fmt(live.p99)}</td><td>${fmt(live.best)}</td></tr>
     </table>`;
   }
 
@@ -574,11 +578,6 @@ export async function initScoreSpray() {
       legendEl.appendChild(item);
       legendItems.push(item);
     });
-
-    const hint = document.createElement('div');
-    hint.className = 'spray-hint';
-    hint.textContent = 'Click any dot to see its scorecard';
-    legendEl.appendChild(hint);
   }
 
   function updateLegend() {

@@ -264,6 +264,7 @@ decisions per 15-round game.
 The batched solver dispatches to one of three code paths based on &theta;:
 
 ```rust
+// batched_solver.rs — solver dispatch by θ regime
 match theta.classify() {
     ThetaClass::Zero     => solve_ev(buffers, ctx),      // ~1.1s
     ThetaClass::Utility  => solve_utility(buffers, ctx),  // |θ| ≤ 0.15, ~0.49s

@@ -85,13 +85,20 @@
   const htmls = await Promise.all(responses.map(r => r.text()));
   document.getElementById('treatise-root').innerHTML = htmls.join('\n');
 
+  // Restore scroll position after dynamic content injection
+  if (location.hash) {
+    const target = document.querySelector(location.hash);
+    if (target) target.scrollIntoView();
+  }
+
   // Initialize systems
   initConceptDrawer();
   initTheme();
   initDepthToggle();
+  document.querySelectorAll('a[href^="http"]').forEach(a => { a.target = '_blank'; a.rel = 'noopener'; });
 
-  // Re-render charts on theme change
-  document.getElementById('theme-toggle').addEventListener('click', () => initAll());
+  // Charts use CSS variables (var(--text), var(--grid), etc.) for theme colors,
+  // so they update automatically when the .dark class toggles. No re-init needed.
 
   // Lazy initialization with IntersectionObserver
   const chartInits = {
@@ -147,12 +154,27 @@
     if (el) observer.observe(el);
   });
 
-  function initAll() {
-    Object.values(chartInits).forEach(c => {
-      c.loaded = true;
-      c.init().catch(err => console.error(err));
+  // Scroll-driven URL hash: update #hash to current section
+  {
+    const sections = [...document.querySelectorAll('section[id]')];
+    let ticking = false;
+    window.addEventListener('scroll', () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        let current = null;
+        for (const s of sections) {
+          if (s.getBoundingClientRect().top <= 100) current = s.id;
+        }
+        const target = current ? '#' + current : location.pathname;
+        if (target !== location.hash && (current || !location.hash)) {
+          history.replaceState(null, '', target);
+        }
+        ticking = false;
+      });
     });
   }
+
 </script>
 
 </body>

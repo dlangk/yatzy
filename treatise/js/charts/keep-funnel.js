@@ -88,7 +88,7 @@ export async function initKeepFunnel() {
   centerZone.className = 'keep-funnel-center';
   const centerLabel = document.createElement('div');
   centerLabel.className = 'keep-funnel-center-label';
-  centerLabel.textContent = '32 raw subsets';
+  centerLabel.textContent = '32 Possible Keeps';
   const grid = document.createElement('div');
   grid.className = 'keep-funnel-grid';
   centerZone.appendChild(centerLabel);

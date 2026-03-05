@@ -53,7 +53,7 @@ export async function initDiceSymmetry() {
   diceLegend.innerHTML =
     '<span><span class="legend-swatch legend-swatch-hold"></span>Hold</span>' +
     '<span><span class="legend-swatch legend-swatch-reroll"></span>Reroll</span>';
-  tray.appendChild(diceLegend);
+  trayTop.appendChild(diceLegend);
 
   container.appendChild(tray);
 
@@ -280,7 +280,7 @@ export async function initDiceSymmetry() {
     for (let fi = 0; fi < fams.length; fi++) {
       const f = fams[fi];
       html += `<div class="grid-family-group">`;
-      html += `<div class="grid-family-label" style="border-left: 3px solid ${f.color}"><span class="pattern-glyph">${f.key}</span> <span class="grid-family-count">(${f.count})</span></div>`;
+      html += `<div class="grid-family-label" style="--family-color: ${f.color}"><span class="pattern-glyph">${f.key}</span> <span class="grid-family-count">(${f.count})</span></div>`;
       html += `<div class="grid-family-dice">`;
       const famMsets = msets.filter(m => m.familyIndex === fi);
       for (const ms of famMsets) {

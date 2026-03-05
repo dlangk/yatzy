@@ -271,6 +271,7 @@ YATZY_BASE_PATH=. solver/target/release/yatzy-export-training-data \
 ### Training a Decision Tree Ensemble
 
 ```python
+# Decision tree training pipeline
 from sklearn.tree import DecisionTreeClassifier
 import pandas as pd
 

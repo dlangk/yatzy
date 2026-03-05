@@ -10,7 +10,7 @@ export async function initBackwardCascade() {
   }
 
   function card(layer, subtitle, filled, desc, footnote, extra = '') {
-    const cls = layer === 0 ? 'cascade-card cascade-card-final' : 'cascade-card';
+    const cls = layer === 1 ? 'cascade-card cascade-card-final' : 'cascade-card';
     return `
       <div class="${cls}">
         <div class="cascade-card-header">
@@ -46,24 +46,24 @@ export async function initBackwardCascade() {
     </div>`;
 
   container.innerHTML = `<div class="backward-cascade">
-    ${card(15, 'Game over', 15,
+    ${card(16, 'Game over', 15,
       'All 15 categories scored. Nothing to decide.',
-      '1 state-check per position. No dice, no decisions.',
+      '1 state-check per state. No dice, no decisions.',
       bonusFork)}
     ${arrow()}
-    ${card(14, 'One category left', 14,
-      'One category remains. You must score it. Roll, keep, reroll, keep, reroll, score. Then look up the final answer from Layer 15.',
+    ${card(15, 'One category left', 14,
+      'One category remains. You must score it. Roll, keep, reroll, keep, reroll, score. Then look up the final answer from Layer 16.',
       '15 widgets &middot; 1 scoring choice each')}
     ${arrow()}
-    ${card(13, 'Two categories left', 13,
-      'Two categories remain. Try scoring each one. Each choice leads to a Layer 14 state, already solved. Pick whichever gives the higher expected score.',
+    ${card(14, 'Two categories left', 13,
+      'Two categories remain. Try scoring each one. Each choice leads to a Layer 15 state, already solved. Pick whichever gives the higher expected score.',
       '105 widgets &middot; 2 scoring choices each')}
     <div class="cascade-ellipsis">
       <div class="cascade-arrow-line"></div>
       <span class="cascade-ellipsis-dots">&middot; &middot; &middot;</span>
       <div class="cascade-arrow-line"></div>
     </div>
-    ${card(0, 'Game start', 0,
+    ${card(1, 'Game start', 0,
       'All 15 open. 1 widget. <strong>E[start] = 248.4</strong>',
       'The answer to the entire game.')}
   </div>`;

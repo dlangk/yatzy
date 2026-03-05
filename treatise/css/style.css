@@ -6,6 +6,7 @@
   --accent: rgba(243, 112, 33, 0.8);
   --accent-light: rgba(243, 112, 33, 0.15);
   --border: #d4d3cd;
+  --grid: #ddd;
   --font-serif: 'Newsreader', Georgia, 'Times New Roman', serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
   --content-width: 750px;
@@ -25,6 +26,7 @@
   --accent: rgba(243, 112, 33, 0.9);
   --accent-light: rgba(243, 112, 33, 0.15);
   --border: #3a3a3a;
+  --grid: #333;
   --color-blue: #6b8de3;
   --color-red: #e05252;
   --color-orange: #F37021;
@@ -215,6 +217,83 @@ code {
   background: var(--bg-alt);
   padding: 0.15em 0.4em;
   border-radius: 3px;
+}
+
+/* Inline dice faces */
+.die-char {
+  font-size: 1.5em;
+  vertical-align: baseline;
+  line-height: 1;
+}
+
+/* Code cards (pseudocode + source) */
+.code-card {
+  margin: 1.25rem 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: visible;
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.code-card-header {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 0.25rem 0.6rem;
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.code-card pre {
+  margin: 0;
+  padding: 0.3rem 0;
+  background: var(--bg-alt);
+  border-radius: 0;
+  line-height: 1;
+  overflow: visible;
+}
+
+.code-card code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+  line-height: 1;
+  display: block;
+}
+
+.code-line {
+  display: block;
+  line-height: 1.35;
+  padding: 0 0.5rem 0 0;
+  transition: background 0.1s;
+}
+
+.code-line:hover {
+  background: rgba(200, 140, 40, 0.12);
+}
+
+.dark .code-line:hover {
+  background: rgba(220, 170, 60, 0.15);
+}
+
+.code-ln {
+  display: inline-block;
+  width: 2.2ch;
+  margin-right: 0.6ch;
+  padding: 0 0.4ch 0 0.4ch;
+  text-align: right;
+  border-right: 1px solid rgba(0, 0, 0, 0.12);
+  color: var(--text-muted);
+  user-select: none;
+  font-size: 0.85em;
+  opacity: 0.6;
+}
+
+.dark .code-ln {
+  border-right-color: rgba(255, 255, 255, 0.1);
 }
 
 /* Blockquotes */

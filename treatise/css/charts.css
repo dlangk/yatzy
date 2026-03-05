@@ -1,3 +1,10 @@
+/* Widget fan panel — math-like styling without depth-toggle collapse */
+.widget-math {
+  border-left: 2px solid var(--border);
+  padding-left: 1rem;
+  margin: 0.75rem 0;
+}
+
 /* Chart containers */
 .chart-container {
   margin: 2rem 0;
@@ -465,6 +472,10 @@
 .spray-stats .spray-stats-live {
   color: var(--accent);
 }
+
+/* Race-to-63 link blending */
+.race-links { mix-blend-mode: screen; }
+.dark .race-links { mix-blend-mode: lighten; }
 
 /* Responsive chart adjustments */
 @media (max-width: 720px) {
