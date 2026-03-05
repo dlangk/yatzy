@@ -8,7 +8,7 @@ We are now ready to take on the ~1.43M states, connected through widgets and lay
 <div id="chart-backward-cascade"></div>
 :::
 
-This section explains what happens inside each state: how the solver [evaluates a single turn](https://github.com/dlangk/yatzy/blob/main/solver/src/widget_solver.rs#L430) and picks the best play. The entire computation finishes in about one second.
+This section explains what happens inside each state: how the solver [evaluates a single turn](https://github.com/dlangk/yatzy/blob/main/solver/src/widget_solver.rs#L430) and picks the best play.
 
 ### Scoring the Final Roll
 

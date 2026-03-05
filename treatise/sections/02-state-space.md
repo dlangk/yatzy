@@ -72,7 +72,7 @@ Not every roll uses all 462. A Yatzy roll (e.g. five Threes) collapses to just 6
 
 ### Step 5: Always Moving Forward
 
-There is one final structural property that simplifies Yatzy: it is "one-directional", i.e. you can never "unscore" a category. This means the ~1.43M states can be layred. The first layer has no categories scored, the second layer has exactly one scored, and so on up to the last layer where the game is over. Every transition goes strictly from one layer to the next. This is the final reduction of the state space. With this, we are ready to start solving.
+There is one final structural property that simplifies Yatzy: it is "one-directional", i.e. you can never "unscore" a category. This means the ~1.43M states can be layered. The first layer has no categories scored, the second layer has exactly one scored, and so on up to the last layer where the game is over. Every transition goes strictly from one layer to the next. This is the final reduction of the state space. With this, we are ready to start solving.
 
 :::insight
 
