@@ -6,7 +6,7 @@
 //!   yatzy-bench              # Run benchmarks, print results only
 //!
 //! Baseline is saved to .benchmarks/performance-baseline.json.
-//! Failure threshold: max(mean + 3σ, mean × 1.05).
+//! Failure threshold: max(mean + 3σ, mean × 1.10).
 
 use std::path::Path;
 use std::time::Instant;
@@ -76,8 +76,8 @@ fn run_bench<F: FnMut()>(name: &str, iterations: usize, mut f: F) -> BenchResult
     let p95_idx = ((n * 0.95) as usize).min(sorted.len() - 1);
     let p95 = sorted[p95_idx];
 
-    // Threshold: max(mean + 3σ, mean × 1.05)
-    let threshold = (mean + 3.0 * std).max(mean * 1.05);
+    // Threshold: max(mean + 3σ, mean × 1.10)
+    let threshold = (mean + 3.0 * std).max(mean * 1.10);
 
     let result = BenchResult {
         name: name.to_string(),

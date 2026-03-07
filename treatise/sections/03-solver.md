@@ -52,33 +52,67 @@ The solver runs this logic twice, in two identical passes: once for the second r
 
 ### Transition Probabilities
 
-Where does P(keep &rarr; reroll) come from? When you keep some dice and reroll the rest, each free die lands on 1 through 6 independently. The probability of reaching a specific outcome depends on how many ways the free dice can produce the required values.
+Every time you decide which dice to keep, you are not just holding onto numbers you like. You are choosing which possible futures to allow, and quietly closing off all the others.
 
-Say you keep (3, 3) and reroll 3 dice. To end up with (1, 3, 3, 4, 5), the free dice need to show {1, 4, 5}. Three distinct values across three dice: 3! = 6 arrangements out of 6<sup>3</sup> = 216, so P = 6/216. To end up with (3, 3, 3, 4, 4) instead, the free dice need {3, 4, 4}: only 3!/2! = 3 arrangements, so P = 3/216.
+A transition probability is simply the answer to the question: given the dice I am holding, how likely is each outcome when I reroll? It is the bridge between where you are now and where you could end up.
 
-In general, the probability is the multinomial coefficient (the number of distinguishable arrangements of the free dice) divided by 6<sup><var>k</var></sup>. These probabilities are precomputed once into a [sparse table](https://github.com/dlangk/yatzy/blob/main/solver/src/phase0_tables.rs#L82): 462 keeps &times; 252 outcomes, with only [4,368 non-zero entries](https://github.com/dlangk/yatzy/blob/main/solver/src/types.rs#L25-L40). The solver reads from this table in every widget evaluation, never recomputing it.
+#### How the probability is calculated
+
+When you keep some dice and reroll the rest, each free die lands on 1 through 6 independently. The probability of any specific outcome depends on how many ways the rerolled dice can produce the values you need.
+
+This compounds across a full turn. Each roll depends on what you kept from the previous one, so the probability of any specific three-roll sequence is the product of three individual probabilities, one per roll. That multiplication is where things get surprising.
+
+#### Try it: construct a path
+
+Use the tool below to set your dice at each roll, decide what to keep, and watch the joint probability of your path update in real time.
 
 :::html
-<div class="chart-container" id="chart-transition-matrix">
-  <p class="chart-caption">The 462 &times; 252 keep-to-outcome probability matrix. Each colored cell is a non-zero entry. Columns grouped by number of dice kept (k).</p>
+<div class="chart-container" id="chart-path-probability">
+  <p class="chart-caption">Use the arrows to set dice values and click a die to toggle keep/reroll. Each step's probability multiplies into the path total.</p>
 </div>
 :::
 
+The chain at the bottom shows what is happening: three probabilities being multiplied together. Each one is already a small fraction. Their product is almost always tiny, sometimes astronomically so.
+
+This is one of the most counterintuitive things in probability. Each individual step can feel completely reasonable. Getting two fives on a reroll: sure, that happens. But the specific sequence of all three rolls, each turning out exactly as it did? That combination is almost always far rarer than it feels. If a million people made the exact same keep decisions as you, only a handful would trace the exact same path.
+
+This does not mean your decisions were wrong. A rare path and a bad decision are completely different things. The best possible strategy still produces rare specific outcomes most of the time, because every specific path is rare. What good decisions do is aim your probability toward outcomes you want, not guarantee you arrive there.
+
+#### The full map of possibilities
+
+The interactive tool above shows one path at a time. The image below shows all of them at once.
+
+:::html
+<div class="chart-container" id="chart-transition-matrix">
+  <p class="chart-caption">The 462 &times; 252 keep-to-outcome transition probability matrix. Each colored cell is a non-zero entry. Rows grouped by number of dice kept (k).</p>
+</div>
+:::
+
+Each row is one of the 462 keeping decisions. Each column is one of the 252 possible outcomes. A colored cell means the outcome is reachable; a blank cell means the kept dice rule it out.
+
+At the top (keep nothing), every outcome is possible: the row is fully filled. At the bottom (keep all five), only one outcome remains: the dice you already hold. In between, each die you lock narrows the future. The filled region drifts diagonally because both axes are sorted the same way: keeping low dice only reaches low outcomes, keeping sixes only reaches outcomes containing sixes. Your keeping decision does not just narrow the future; it aims it.
+
+The solver [precomputes](https://github.com/dlangk/yatzy/blob/main/solver/src/phase0_tables.rs#L82) all 462 &times; 252 transition probabilities into a [sparse table](https://github.com/dlangk/yatzy/blob/main/solver/src/types.rs#L25-L40) with only 4,368 non-zero entries (roughly 4% of the full grid). Every widget on this page reads from that table rather than recomputing probabilities on demand.
+
 ### The Keep Shortcut
 
-Here is the key algorithmic insight. Many different rolls share the same keep. "Keep two Threes" from (1,3,3,5,6) and from (2,3,3,4,4) produces the same reroll distribution: two free dice, each uniform over 1 through 6. Instead of recomputing each keep's expected score for every roll, the solver computes it once for each of the 462 unique keep-multisets, then distributes:
+Here's a small insight that makes the whole solver fast.
+
+Many different rolls lead to the same keeping decision. "Keep my two threes" from (1,3,3,5,6) and from (2,3,3,4,4) are the same situation in disguise: two threes in hand, three free dice to reroll. The reroll distribution is identical. So the expected score for that keep only needs to be calculated once.
+
+The solver exploits this by splitting the work in two. First, it computes the expected score for each of the 462 unique keeps. This is the expensive step, done once. Then, for each actual roll, it simply looks up the best available keep from that precomputed table. This is a cheap step, done quickly.
+
+The result is that the hard probability work happens 462 times instead of once per roll per game state. That's what makes real-time evaluation possible.
 
 ```
 Step 1: Compute expected score for each unique keep (462)
     for each unique keep h:
-        keep_ev[h] = Σ P(h → reroll) × prev_exp[reroll]
+        keep_ev[h] = Σ P(h → outcome) × prev_exp[outcome]
 
 Step 2: For each roll, pick the best keep (252 lookups)
     for each roll r:
         keep_exp[r] = max over valid keeps h of r: keep_ev[h]
 ```
-
-Step 1 does the expensive probability work once. Step 2 is a cheap lookup. This separation reduces the inner loop work by an order of magnitude.
 
 ### The First Roll
 

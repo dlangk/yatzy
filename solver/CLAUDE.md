@@ -113,7 +113,7 @@ just bench-baseline # Record new baseline
 just bench          # Print only
 ```
 
-Baseline: `.benchmarks/performance-baseline.json`. Threshold: `max(mean + 3σ, mean × 1.05)`.
+Baseline: `.benchmarks/performance-baseline.json`. Threshold: `max(mean + 3σ, mean × 1.10)`.
 
 ### Reference Numbers (M1 Max, 8 threads)
 

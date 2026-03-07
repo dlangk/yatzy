@@ -477,23 +477,7 @@
 .race-links { mix-blend-mode: screen; }
 .dark .race-links { mix-blend-mode: lighten; }
 
-/* Transition matrix hover panel */
-.transition-hover-panel {
-  min-height: 2.4em;
-  padding: 0.5em 0;
-  font-size: 0.9em;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-  transition: opacity 0.15s;
-}
-.transition-hover-panel .keep-label,
-.transition-hover-panel .outcome-label {
-  font-weight: 600;
-  color: var(--text);
-}
-.transition-hover-panel .prob-value {
-  font-family: var(--font-mono);
-}
+/* Transition matrix (hover styles are inline in the chart module) */
 
 /* Responsive chart adjustments */
 @media (max-width: 720px) {

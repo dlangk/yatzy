@@ -1,16 +1,16 @@
 /**
- * Transition Matrix — sparse keep-to-outcome probability grid.
+ * Transition Matrix: sparse keep-to-outcome probability grid.
  *
  * Pure JS computation: enumerates all 462 keep-multisets and 252 outcome-multisets,
  * checks sub-multiset reachability, computes multinomial probabilities.
- * Renders a canvas pixel grid with k-group coloring and hover details.
+ * Renders a canvas pixel grid with interactive dice on left (keep) and right (outcome).
+ * Dice drive crosshairs + pulse on the matrix and an info panel below.
  */
 
 import { COLORS, resolveColor } from '../yatzy-viz.js';
 
 // ── Multiset enumeration ─────────────────────────────────────────
 
-/** Generate all sorted multisets of size k from {1..maxVal}. */
 function enumerateMultisets(k, maxVal = 6) {
   const results = [];
   const current = [];
@@ -26,14 +26,12 @@ function enumerateMultisets(k, maxVal = 6) {
   return results;
 }
 
-/** Count occurrences of each face value (1-6) in a multiset. */
 function frequencies(ms) {
   const f = [0, 0, 0, 0, 0, 0];
   for (const v of ms) f[v - 1]++;
   return f;
 }
 
-/** Check if keep h is a sub-multiset of outcome d. */
 function isSubMultiset(hFreq, dFreq) {
   for (let i = 0; i < 6; i++) {
     if (hFreq[i] > dFreq[i]) return false;
@@ -41,32 +39,24 @@ function isSubMultiset(hFreq, dFreq) {
   return true;
 }
 
-/** Compute P(keep -> outcome) = multinomial(free dice) / 6^(5-k). */
 function transitionProb(hFreq, dFreq, k) {
   const free = 5 - k;
-  if (free === 0) return 1; // keep all: deterministic
-
-  // Free dice frequencies
+  if (free === 0) return 1;
   const freeFreq = [];
   for (let i = 0; i < 6; i++) freeFreq.push(dFreq[i] - hFreq[i]);
-
-  // Multinomial coefficient: free! / product(freeFreq[i]!)
   let numer = 1;
   for (let i = 2; i <= free; i++) numer *= i;
   let denom = 1;
   for (const f of freeFreq) {
     for (let i = 2; i <= f; i++) denom *= i;
   }
-
   return (numer / denom) / Math.pow(6, free);
 }
 
 // ── Data builder ─────────────────────────────────────────────────
 
 function buildTransitionData() {
-  const outcomes = enumerateMultisets(5); // 252
-
-  // All keeps grouped by k
+  const outcomes = enumerateMultisets(5);
   const kGroups = [];
   const keeps = [];
   for (let k = 0; k <= 5; k++) {
@@ -74,10 +64,7 @@ function buildTransitionData() {
     kGroups.push({ k, start: keeps.length, count: ms.length });
     for (const h of ms) keeps.push({ ms: h, k, freq: frequencies(h) });
   }
-
   const outcomeFreqs = outcomes.map(d => frequencies(d));
-
-  // Build sparse rows
   let nnz = 0;
   const rows = keeps.map(h => {
     const entries = [];
@@ -90,7 +77,6 @@ function buildTransitionData() {
     }
     return entries;
   });
-
   return { keeps, outcomes, outcomeFreqs, rows, kGroups, nnz };
 }
 
@@ -105,26 +91,11 @@ const K_COLORS = [
   COLORS.riskSeeking, // k=5: red
 ];
 
-const K_LABELS = [
-  'k=0 (keep nothing)',
-  'k=1 (keep 1)',
-  'k=2 (keep 2)',
-  'k=3 (keep 3)',
-  'k=4 (keep 4)',
-  'k=5 (keep all)',
-];
-
 // ── Format helpers ───────────────────────────────────────────────
 
 function formatMultiset(ms) {
-  if (ms.length === 0) return '()';
+  if (ms.length === 0) return '(none)';
   return '(' + ms.join(', ') + ')';
-}
-
-function formatProb(p) {
-  // Express as fraction of 6^free if clean
-  if (p === 1) return '1';
-  return p.toFixed(4);
 }
 
 function formatFraction(p, k) {
@@ -133,6 +104,89 @@ function formatFraction(p, k) {
   const denom = Math.pow(6, free);
   const numer = Math.round(p * denom);
   return `${numer}/${denom}`;
+}
+
+// ── Lookup builders ──────────────────────────────────────────────
+
+function buildKeepLookup(keeps) {
+  const map = new Map();
+  for (let i = 0; i < keeps.length; i++) {
+    map.set(keeps[i].ms.join(','), i);
+  }
+  return map;
+}
+
+function buildOutcomeLookup(outcomes) {
+  const map = new Map();
+  for (let i = 0; i < outcomes.length; i++) {
+    map.set(outcomes[i].join(','), i);
+  }
+  return map;
+}
+
+// ── Die component (vertical, matches path-probability pattern) ──
+
+function makeDie(value, { kept = false, onToggle, onInc, onDec }) {
+  const container = document.createElement('div');
+  container.className = 'tm-die-container';
+
+  const upBtn = document.createElement('button');
+  upBtn.className = 'tm-die-arrow';
+  upBtn.innerHTML = '&#9650;';
+  upBtn.addEventListener('click', onInc);
+
+  const btn = document.createElement('button');
+  btn.className = 'tm-die-btn';
+  btn.textContent = String(value);
+
+  if (kept) {
+    btn.style.background = 'var(--bg)';
+    btn.style.border = '3px solid var(--accent)';
+    btn.title = 'Kept (click to reroll)';
+  } else {
+    btn.style.background = 'var(--bg-alt)';
+    btn.style.border = '2px solid var(--text)';
+    btn.title = 'Will reroll (click to keep)';
+  }
+  btn.style.cursor = 'pointer';
+  btn.addEventListener('click', onToggle);
+
+  const downBtn = document.createElement('button');
+  downBtn.className = 'tm-die-arrow';
+  downBtn.innerHTML = '&#9660;';
+  downBtn.addEventListener('click', onDec);
+
+  container.appendChild(upBtn);
+  container.appendChild(btn);
+  container.appendChild(downBtn);
+  return container;
+}
+
+function makeOutcomeDie(value, { onInc, onDec }) {
+  const container = document.createElement('div');
+  container.className = 'tm-die-container';
+
+  const upBtn = document.createElement('button');
+  upBtn.className = 'tm-die-arrow';
+  upBtn.innerHTML = '&#9650;';
+  upBtn.addEventListener('click', onInc);
+
+  const btn = document.createElement('button');
+  btn.className = 'tm-die-btn';
+  btn.textContent = String(value);
+  btn.style.background = 'var(--bg-alt)';
+  btn.style.border = '2px solid var(--text)';
+  btn.style.cursor = 'default';
+
+  const downBtn = document.createElement('button');
+  downBtn.className = 'tm-die-arrow';
+  downBtn.innerHTML = '&#9660;';
+  downBtn.addEventListener('click', onDec);
+
+  container.appendChild(upBtn);
+  container.appendChild(btn);
+  container.appendChild(downBtn);
+  return container;
 }
 
 // ── Canvas rendering ─────────────────────────────────────────────
@@ -145,38 +199,74 @@ export async function initTransitionMatrix() {
   const caption = container.querySelector('.chart-caption');
   container.innerHTML = '';
 
-  // Wrapper
-  const wrapper = document.createElement('div');
+  const keepLookup = buildKeepLookup(data.keeps);
+  const outcomeLookup = buildOutcomeLookup(data.outcomes);
 
-  // Canvas
+  const probMap = new Map();
+  for (let i = 0; i < data.rows.length; i++) {
+    for (const e of data.rows[i]) {
+      probMap.set(i * 252 + e.col, e.prob);
+    }
+  }
+
+  // ── State ──
+  const state = {
+    dice: [3, 3, 4, 5, 6],     // 5 dice values
+    kept: new Set([0, 1]),      // indices of kept dice
+    outcome: [1, 3, 3, 4, 5],  // 5 outcome dice values
+  };
+
+  // ── Layout: [left dice] [matrix] [right dice] ──
+  const row = document.createElement('div');
+  row.className = 'tm-layout';
+
+  // Left: keep dice column
+  const leftCol = document.createElement('div');
+  leftCol.className = 'tm-dice-col';
+  const leftLabel = document.createElement('div');
+  leftLabel.className = 'tm-dice-label';
+  leftLabel.textContent = 'Keep';
+  leftCol.appendChild(leftLabel);
+  const leftDice = document.createElement('div');
+  leftDice.className = 'tm-dice-stack';
+  leftCol.appendChild(leftDice);
+
+  // Center: canvas + overlay
+  const centerCol = document.createElement('div');
+  centerCol.className = 'tm-center';
+  centerCol.style.position = 'relative';
+
   const canvas = document.createElement('canvas');
   canvas.style.display = 'block';
-  canvas.style.margin = '0 auto';
-  canvas.style.cursor = 'crosshair';
-  wrapper.appendChild(canvas);
 
-  // Hover panel
-  const hoverPanel = document.createElement('div');
-  hoverPanel.className = 'transition-hover-panel';
-  hoverPanel.innerHTML = '<span style="opacity:0.5">Hover over the matrix to inspect entries</span>';
-  wrapper.appendChild(hoverPanel);
+  const overlay = document.createElement('canvas');
+  overlay.style.position = 'absolute';
+  overlay.style.top = '0';
+  overlay.style.left = '0';
+  overlay.style.pointerEvents = 'none';
 
-  // Legend
-  const legend = document.createElement('div');
-  legend.className = 'chart-legend';
-  legend.style.marginTop = '0.5rem';
-  for (let k = 0; k <= 5; k++) {
-    const item = document.createElement('div');
-    item.className = 'chart-legend-item';
-    const swatch = document.createElement('span');
-    swatch.className = 'legend-swatch';
-    swatch.style.background = K_COLORS[k];
-    const label = document.createElement('span');
-    label.textContent = `k=${k} (${data.kGroups[k].count})`;
-    item.append(swatch, label);
-    legend.appendChild(item);
-  }
-  wrapper.appendChild(legend);
+  centerCol.appendChild(canvas);
+  centerCol.appendChild(overlay);
+
+  // Right: outcome dice column
+  const rightCol = document.createElement('div');
+  rightCol.className = 'tm-dice-col';
+  const rightLabel = document.createElement('div');
+  rightLabel.className = 'tm-dice-label';
+  rightLabel.textContent = 'Outcome';
+  rightCol.appendChild(rightLabel);
+  const rightDice = document.createElement('div');
+  rightDice.className = 'tm-dice-stack';
+  rightCol.appendChild(rightDice);
+
+  row.appendChild(leftCol);
+  row.appendChild(centerCol);
+  row.appendChild(rightCol);
+
+  // Floating label (positioned over canvas)
+  const floatLabel = document.createElement('div');
+  floatLabel.className = 'tm-float-label';
+  centerCol.appendChild(floatLabel);
 
   // Stats bar
   const statsPanel = document.createElement('div');
@@ -194,124 +284,328 @@ export async function initTransitionMatrix() {
     card.innerHTML = `<div class="chart-stat-value">${s.value}</div><div class="chart-stat-label">${s.label}</div>`;
     statsPanel.appendChild(card);
   }
-  wrapper.appendChild(statsPanel);
 
-  container.appendChild(wrapper);
+  container.appendChild(row);
+  container.appendChild(statsPanel);
   if (caption) container.appendChild(caption);
 
-  // Build a fast lookup for probabilities: key = keepIdx * 252 + outcomeIdx
-  const probMap = new Map();
-  for (let i = 0; i < data.rows.length; i++) {
-    for (const e of data.rows[i]) {
-      probMap.set(i * 252 + e.col, e.prob);
-    }
-  }
+  // ── Draw matrix ────────────────────────────────────────────
 
-  // ── Draw (horizontal: x=keeps 462, y=outcomes 252) ─────────
+  const cellSize = 2;
+  const canvasW = cellSize * 252;
+  const canvasH = cellSize * 462;
 
-  let cellSize = 1;
-  let canvasW = 0;
-  let canvasH = 0;
-
-  function draw() {
-    cellSize = 2;
-    canvasW = cellSize * 462;  // 924px — bleeds past column, centered
-    canvasH = cellSize * 252;  // 504px
-
+  function drawMatrix() {
     const dpr = window.devicePixelRatio || 1;
     canvas.width = canvasW * dpr;
     canvas.height = canvasH * dpr;
     canvas.style.width = canvasW + 'px';
     canvas.style.height = canvasH + 'px';
 
+    overlay.width = canvasW * dpr;
+    overlay.height = canvasH * dpr;
+    overlay.style.width = canvasW + 'px';
+    overlay.style.height = canvasH + 'px';
+
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
 
-    // Background
     ctx.fillStyle = resolveColor('--bg-alt');
     ctx.fillRect(0, 0, canvasW, canvasH);
 
-    // Draw k-group vertical separators
     ctx.strokeStyle = resolveColor('--border');
     ctx.lineWidth = 0.5;
     for (const g of data.kGroups) {
       if (g.start > 0) {
-        const x = g.start * cellSize;
+        const y = g.start * cellSize;
         ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvasH);
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvasW, y);
         ctx.stroke();
       }
     }
 
-    // Draw non-zero cells: x=keep index, y=outcome index
     for (let i = 0; i < data.keeps.length; i++) {
       const color = K_COLORS[data.keeps[i].k];
       ctx.fillStyle = color;
       for (const e of data.rows[i]) {
-        ctx.fillRect(i * cellSize, e.col * cellSize, cellSize, cellSize);
+        ctx.fillRect(e.col * cellSize, i * cellSize, cellSize, cellSize);
       }
     }
   }
 
-  draw();
+  // ── Crosshairs + pulse ─────────────────────────────────────
 
-  // ── Hover ────────────────────────────────────────────────────
+  let pulseFrame = null;
 
-  let lastKeepIdx = -1;
-  let lastOutIdx = -1;
+  function clearOverlay() {
+    const dpr = window.devicePixelRatio || 1;
+    const ctx = overlay.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    ctx.scale(dpr, dpr);
+    return ctx;
+  }
 
-  canvas.addEventListener('mousemove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const keepIdx = Math.floor(x / cellSize);
-    const outIdx = Math.floor(y / cellSize);
+  function drawCrosshairs(keepIdx, outIdx) {
+    if (pulseFrame) cancelAnimationFrame(pulseFrame);
 
-    if (keepIdx === lastKeepIdx && outIdx === lastOutIdx) return;
-    lastKeepIdx = keepIdx;
-    lastOutIdx = outIdx;
-
-    if (keepIdx < 0 || keepIdx >= 462 || outIdx < 0 || outIdx >= 252) {
-      hoverPanel.innerHTML = '<span style="opacity:0.5">Hover over the matrix to inspect entries</span>';
+    if (keepIdx < 0 || outIdx < 0) {
+      clearOverlay();
+      pulseFrame = null;
       return;
     }
 
-    const keep = data.keeps[keepIdx];
-    const outcome = data.outcomes[outIdx];
+    const cx = outIdx * cellSize + cellSize / 2;
+    const cy = keepIdx * cellSize + cellSize / 2;
     const prob = probMap.get(keepIdx * 252 + outIdx);
+    const color = prob !== undefined ? K_COLORS[data.keeps[keepIdx].k] : resolveColor('--text-muted');
 
-    if (prob !== undefined) {
-      const free = 5 - keep.k;
-      hoverPanel.innerHTML =
-        `<span class="keep-label">Keep: ${formatMultiset(keep.ms)}</span>` +
-        ` &rarr; <span class="outcome-label">Outcome: ${formatMultiset(outcome)}</span>` +
-        ` &middot; <span class="prob-value">P = ${formatFraction(prob, keep.k)} = ${prob.toFixed(4)}</span>` +
-        ` &middot; ${free} free ${free === 1 ? 'die' : 'dice'}`;
-    } else {
-      hoverPanel.innerHTML =
-        `<span class="keep-label">Keep: ${formatMultiset(keep.ms)}</span>` +
-        ` &rarr; <span class="outcome-label">Outcome: ${formatMultiset(outcome)}</span>` +
-        ` &middot; <span style="opacity:0.5">not reachable</span>`;
+    function pulse() {
+      const t = (Date.now() % 1000) / 1000;
+      const r = cellSize + 2 + Math.sin(t * Math.PI * 2) * 2;
+      const alpha = 0.6 + Math.sin(t * Math.PI * 2) * 0.3;
+
+      const ctx = clearOverlay();
+
+      // Crosshair lines
+      ctx.strokeStyle = resolveColor('--text');
+      ctx.globalAlpha = 0.15;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, cy);
+      ctx.lineTo(canvasW, cy);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx, 0);
+      ctx.lineTo(cx, canvasH);
+      ctx.stroke();
+
+      // Pulse circle
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      pulseFrame = requestAnimationFrame(pulse);
     }
-  });
+    pulse();
+  }
 
-  canvas.addEventListener('mouseleave', () => {
-    lastKeepIdx = -1;
-    lastOutIdx = -1;
-    hoverPanel.innerHTML = '<span style="opacity:0.5">Hover over the matrix to inspect entries</span>';
-  });
+  // ── Resolve dice state to matrix indices ───────────────────
 
-  // ── Theme observer ───────────────────────────────────────────
+  function getKeepMultiset() {
+    const kept = [];
+    for (let i = 0; i < 5; i++) {
+      if (state.kept.has(i)) kept.push(state.dice[i]);
+    }
+    return kept.sort((a, b) => a - b);
+  }
 
-  const themeObserver = new MutationObserver(() => draw());
+  function getOutcomeMultiset() {
+    return [...state.outcome].sort((a, b) => a - b);
+  }
+
+  function lookupIndices() {
+    const keepMs = getKeepMultiset();
+    const outMs = getOutcomeMultiset();
+    const keepIdx = keepLookup.get(keepMs.join(','));
+    const outIdx = outcomeLookup.get(outMs.join(','));
+    return {
+      keepIdx: keepIdx !== undefined ? keepIdx : -1,
+      outIdx: outIdx !== undefined ? outIdx : -1,
+    };
+  }
+
+  // ── Update everything ──────────────────────────────────────
+
+  function renderAll() {
+    renderLeftDice();
+    renderRightDice();
+    const { keepIdx, outIdx } = lookupIndices();
+    drawCrosshairs(keepIdx, outIdx);
+    renderInfo(keepIdx, outIdx);
+  }
+
+  function renderLeftDice() {
+    leftDice.innerHTML = '';
+    for (let i = 0; i < 5; i++) {
+      const die = makeDie(state.dice[i], {
+        kept: state.kept.has(i),
+        onToggle: () => {
+          if (state.kept.has(i)) state.kept.delete(i);
+          else state.kept.add(i);
+          renderAll();
+        },
+        onInc: () => {
+          state.dice[i] = (state.dice[i] % 6) + 1;
+          renderAll();
+        },
+        onDec: () => {
+          state.dice[i] = ((state.dice[i] - 2 + 6) % 6) + 1;
+          renderAll();
+        },
+      });
+      leftDice.appendChild(die);
+    }
+  }
+
+  function renderRightDice() {
+    rightDice.innerHTML = '';
+    for (let i = 0; i < 5; i++) {
+      const die = makeOutcomeDie(state.outcome[i], {
+        onInc: () => {
+          state.outcome[i] = (state.outcome[i] % 6) + 1;
+          renderAll();
+        },
+        onDec: () => {
+          state.outcome[i] = ((state.outcome[i] - 2 + 6) % 6) + 1;
+          renderAll();
+        },
+      });
+      rightDice.appendChild(die);
+    }
+  }
+
+  function renderInfo(keepIdx, outIdx) {
+    const keepMs = getKeepMultiset();
+    const outMs = getOutcomeMultiset();
+    const keptCount = state.kept.size;
+
+    if (keepIdx < 0 || outIdx < 0) {
+      floatLabel.style.opacity = '0';
+      return;
+    }
+
+    // Position near the crosshair point
+    const cx = outIdx * cellSize + cellSize / 2;
+    const cy = keepIdx * cellSize + cellSize / 2;
+
+    // Flip sides to keep label on-canvas
+    const offsetX = cx < canvasW / 2 ? 10 : -10;
+    const anchor = cx < canvasW / 2 ? 'left' : 'right';
+
+    floatLabel.style.top = Math.max(0, Math.min(cy - 12, canvasH - 40)) + 'px';
+    floatLabel.style[anchor] = (anchor === 'left' ? cx + offsetX : canvasW - cx + Math.abs(offsetX)) + 'px';
+    floatLabel.style[anchor === 'left' ? 'right' : 'left'] = 'auto';
+
+    const prob = probMap.get(keepIdx * 252 + outIdx);
+    if (prob !== undefined) {
+      floatLabel.innerHTML =
+        `${formatMultiset(keepMs)} &rarr; ${formatMultiset(outMs)}<br>` +
+        `<span class="tm-float-prob">P = ${formatFraction(prob, keptCount)}</span>`;
+    } else {
+      floatLabel.innerHTML =
+        `${formatMultiset(keepMs)} &rarr; ${formatMultiset(outMs)}<br>` +
+        `<span style="opacity:0.5">not reachable</span>`;
+    }
+    floatLabel.style.opacity = '1';
+  }
+
+  // ── Initial draw ───────────────────────────────────────────
+
+  drawMatrix();
+  renderAll();
+
+  // ── Theme observer ─────────────────────────────────────────
+
+  const themeObserver = new MutationObserver(() => { drawMatrix(); renderAll(); });
   themeObserver.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ['class'],
   });
 
-  // ── Resize observer ──────────────────────────────────────────
+  // ── Scoped styles ──────────────────────────────────────────
 
-  const resizeObserver = new ResizeObserver(() => draw());
-  resizeObserver.observe(container);
+  if (!document.getElementById('tm-styles')) {
+    const style = document.createElement('style');
+    style.id = 'tm-styles';
+    style.textContent = `
+      .tm-layout {
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        gap: 0.75rem;
+      }
+      .tm-dice-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+        padding-top: 0.25rem;
+      }
+      .tm-dice-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        margin-bottom: 0.25rem;
+      }
+      .tm-dice-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .tm-die-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+      .tm-die-arrow {
+        width: 36px;
+        height: 14px;
+        font-size: 9px;
+        padding: 0;
+        border: 1px solid var(--border);
+        background: var(--bg-alt);
+        cursor: pointer;
+        border-radius: 3px;
+        line-height: 12px;
+        color: var(--text);
+      }
+      .tm-die-arrow:hover {
+        background: var(--accent-light);
+      }
+      .tm-die-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 18px;
+        font-weight: bold;
+        font-family: var(--font-mono);
+        border-radius: 6px;
+        color: var(--text);
+      }
+      .tm-center {
+        flex-shrink: 0;
+      }
+      .tm-float-label {
+        position: absolute;
+        pointer-events: none;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 0.3rem 0.5rem;
+        font-size: 0.75rem;
+        line-height: 1.4;
+        font-weight: 600;
+        color: var(--text);
+        white-space: nowrap;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+        opacity: 0;
+        transition: opacity 0.15s;
+        z-index: 10;
+      }
+      .tm-float-prob {
+        font-family: var(--font-mono);
+        color: var(--accent);
+      }
+      @media (max-width: 620px) {
+        .tm-layout { flex-direction: column; align-items: center; }
+        .tm-dice-col { flex-direction: row; }
+        .tm-dice-stack { flex-direction: row; gap: 4px; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
 }
