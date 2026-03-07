@@ -1,11 +1,11 @@
 import { getState, subscribe } from '../store.ts';
 
-/** Render the dice color legend (held/reroll/optimal keep/optimal reroll). */
+/** Render the dice color legend (kept/reroll/optimal keep/optimal reroll). */
 export function initDiceLegend(container: HTMLElement): void {
   container.className = 'dice-legend';
 
   const items: [string, string, string][] = [
-    ['var(--bg)', '1px solid var(--text)', 'Held'],
+    ['var(--bg)', '1px solid var(--text)', 'Kept'],
     ['var(--bg-alt)', '1px solid var(--text)', 'Reroll'],
     ['var(--bg)', '2px solid var(--color-success)', 'Optimal keep'],
     ['var(--bg-alt)', '2px solid var(--color-danger)', 'Optimal reroll'],

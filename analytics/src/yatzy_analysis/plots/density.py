@@ -1,4 +1,5 @@
 """Probability density plot."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,7 +11,18 @@ import polars as pl
 
 from ..config import MAX_SCORE
 from .spec import PLOT_SPECS, PlotSpec
-from .style import CMAP, FONT_AXIS_LABEL, FONT_LEGEND, FONT_TICK, FONT_TITLE, apply_theta_legend, fmt_theta, make_norm, setup_theme, theta_color
+from .style import (
+    CMAP,
+    FONT_AXIS_LABEL,
+    FONT_LEGEND,
+    FONT_TICK,
+    FONT_TITLE,
+    apply_theta_legend,
+    fmt_theta,
+    make_norm,
+    setup_theme,
+    theta_color,
+)
 
 
 def plot_density(
@@ -37,8 +49,11 @@ def plot_density(
         lw = 2.5 if t == 0 else 1.4
         alpha = 0.9 if t == 0 else 0.7
         ax.plot(
-            subset["score"], subset["density"],
-            color=color, linewidth=lw, alpha=alpha,
+            subset["score"],
+            subset["density"],
+            color=color,
+            linewidth=lw,
+            alpha=alpha,
         )
 
     ax.set_xlabel("Total Score", fontsize=FONT_AXIS_LABEL)
@@ -86,8 +101,11 @@ def plot_density_with_adaptive(
         lw = 2.5 if t == 0 else 1.0
         alpha = 0.9 if t == 0 else 0.45
         ax.plot(
-            subset["score"], subset["density"],
-            color=color, linewidth=lw, alpha=alpha,
+            subset["score"],
+            subset["density"],
+            color=color,
+            linewidth=lw,
+            alpha=alpha,
         )
 
     # Adaptive strategy densities (thick, dashed, prominent)
@@ -96,16 +114,21 @@ def plot_density_with_adaptive(
         color = _ADAPTIVE_COLORS.get(policy, "tab:brown")
         dashes = _ADAPTIVE_DASHES.get(policy, (4, 2))
         ax.plot(
-            subset["score"], subset["density"],
-            color=color, linewidth=2.8, alpha=0.95,
-            dashes=dashes, label=policy,
+            subset["score"],
+            subset["density"],
+            color=color,
+            linewidth=2.8,
+            alpha=0.95,
+            dashes=dashes,
+            label=policy,
         )
 
     ax.set_xlabel("Total Score", fontsize=FONT_AXIS_LABEL)
     ax.set_ylabel("Density", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "Score Distribution: Fixed-θ Sweep + Adaptive Strategies",
-        fontsize=FONT_TITLE, fontweight="bold",
+        fontsize=FONT_TITLE,
+        fontweight="bold",
     )
     ax.set_xlim(50, MAX_SCORE)
     # Colorbar for fixed-θ lines
@@ -158,9 +181,12 @@ def plot_density_3d(
     ax = fig.add_subplot(111, projection="3d")
 
     ax.plot_surface(
-        X, Y, Z,
+        X,
+        Y,
+        Z,
         facecolors=theta_colors,
-        rstride=1, cstride=4,
+        rstride=1,
+        cstride=4,
         shade=True,
         alpha=0.92,
         linewidth=0,
@@ -173,8 +199,7 @@ def plot_density_3d(
         idx = sorted_thetas.index(t)
         color = CMAP(norm(t))
         lw = 2.0 if t == 0 else 1.2
-        ax.plot(score_grid, [t] * len(score_grid), Z[idx, :],
-                color=color, linewidth=lw, zorder=5)
+        ax.plot(score_grid, [t] * len(score_grid), Z[idx, :], color=color, linewidth=lw, zorder=5)
 
     ax.set_xlabel("Score", fontsize=FONT_AXIS_LABEL, labelpad=10)
     ax.set_ylabel("θ", fontsize=FONT_AXIS_LABEL, labelpad=10)
@@ -236,11 +261,16 @@ def plot_density_3d_gif(
     ax = fig.add_subplot(111, projection="3d")
 
     ax.plot_surface(
-        X, Y, Z,
+        X,
+        Y,
+        Z,
         facecolors=theta_colors,
-        rstride=1, cstride=4,
-        shade=True, alpha=1.0,
-        linewidth=0, antialiased=True,
+        rstride=1,
+        cstride=4,
+        shade=True,
+        alpha=1.0,
+        linewidth=0,
+        antialiased=True,
     )
 
     key_thetas = [t for t in [-1.0, -0.1, 0.0, 0.1, 1.0] if t in sorted_thetas]
@@ -248,8 +278,7 @@ def plot_density_3d_gif(
         idx = sorted_thetas.index(t)
         color = CMAP(norm(t))
         lw = 2.5 if t == 0 else 1.5
-        ax.plot(score_grid, [t] * len(score_grid), Z[idx, :],
-                color=color, linewidth=lw, zorder=5)
+        ax.plot(score_grid, [t] * len(score_grid), Z[idx, :], color=color, linewidth=lw, zorder=5)
 
     ax.set_xlabel("Score", fontsize=FONT_AXIS_LABEL, labelpad=8)
     ax.set_ylabel("θ", fontsize=FONT_AXIS_LABEL, labelpad=8)

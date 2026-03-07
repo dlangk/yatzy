@@ -1,4 +1,5 @@
 """CLI entry point: yatzy-analyze extract / compute / plot / run / summary."""
+
 from __future__ import annotations
 
 import time
@@ -42,7 +43,9 @@ def extract(base_path: str):
 @click.option("--base-path", default=".", help="Base path (repo root).")
 @click.option("--csv", "write_csv", is_flag=True, help="Also write sweep_summary.csv.")
 @click.option(
-    "--source", type=click.Choice(["mc", "density"]), default="mc",
+    "--source",
+    type=click.Choice(["mc", "density"]),
+    default="mc",
     help="Data source: 'mc' for MC simulation binaries, 'density' for exact density evolution JSONs.",
 )
 def compute(base_path: str, write_csv: bool, source: str):
@@ -99,7 +102,9 @@ def compute(base_path: str, write_csv: bool, source: str):
 @cli.command()
 @click.option("--base-path", default=".", help="Base path (repo root).")
 @click.option(
-    "--subset", default="all", type=click.Choice(["all", "dense", "sparse"]),
+    "--subset",
+    default="all",
+    type=click.Choice(["all", "dense", "sparse"]),
     help="Which theta subset to plot.",
 )
 @click.option("--format", "fmt", default="png", type=click.Choice(["png", "svg"]))
@@ -107,6 +112,7 @@ def compute(base_path: str, write_csv: bool, source: str):
 def plot(base_path: str, subset: str, fmt: str, dpi: int):
     """Step 3: summary.parquet + kde.parquet → plot PNGs/SVGs."""
     import matplotlib
+
     matplotlib.use("Agg")
 
     from .config import PLOT_SUBSETS, analysis_dir, plots_dir
@@ -216,10 +222,12 @@ def efficiency(base_path: str):
     click.echo("-" * 72)
     mer_pos = mer_df.filter(pl.col("theta") > 0)
     for row in mer_pos.iter_rows(named=True):
+
         def _fmt(v: float) -> str:
             if abs(v) > 99 or v == float("inf") or v == float("-inf"):
                 return "    dom"
             return f"{v:8.1f}"
+
         t = row["theta"]
         tstr = f"{t:g}" if t != int(t) or abs(t) < 1 else f"{int(t)}"
         click.echo(
@@ -267,6 +275,7 @@ def efficiency(base_path: str):
 
     # Generate efficiency plot
     import matplotlib
+
     matplotlib.use("Agg")
     from .plots.efficiency import plot_efficiency
 
@@ -285,6 +294,7 @@ def efficiency(base_path: str):
 def categories(base_path: str, fmt: str, dpi: int):
     """Plot per-category statistics from category_stats.csv."""
     import matplotlib
+
     matplotlib.use("Agg")
 
     from .config import plots_dir
@@ -309,6 +319,7 @@ def categories(base_path: str, fmt: str, dpi: int):
 def yatzy_hypothesis(base_path: str, fmt: str, dpi: int):
     """Plot Yatzy conditional hit-rate hypothesis tests from yatzy_conditional.csv."""
     import matplotlib
+
     matplotlib.use("Agg")
 
     from .config import plots_dir
@@ -397,25 +408,17 @@ def tail(base_path: str, scores_bin: str | None):
         # Log-linear fit
         lf = fit_log_linear(scores)
         if lf["n_points"] >= 2:
-            click.echo(
-                f"Log-linear fit: log10(P(X >= t)) = "
-                f"{lf['a']:.4f} + {lf['b']:.6f} * t"
-            )
+            click.echo(f"Log-linear fit: log10(P(X >= t)) = {lf['a']:.4f} + {lf['b']:.6f} * t")
             click.echo(
                 f"  Decay rate: ~10^({lf['b']:.4f}) per point "
                 f"= {lf['decay_per_point']:.6f}x per point"
             )
             click.echo()
             click.echo(
-                f"Extrapolated P(score >= 374) ~ "
-                f"10^({lf['log10_p374']:.1f}) ~ {lf['p374']:.2e}"
+                f"Extrapolated P(score >= 374) ~ 10^({lf['log10_p374']:.1f}) ~ {lf['p374']:.2e}"
             )
-            click.echo(
-                f"Expected games to see 374:    ~ {lf['games_needed']:.2e}"
-            )
-            click.echo(
-                "(NOTE: this underestimates -- see analytical estimate below)"
-            )
+            click.echo(f"Expected games to see 374:    ~ {lf['games_needed']:.2e}")
+            click.echo("(NOTE: this underestimates -- see analytical estimate below)")
         else:
             click.echo("Insufficient data points for log-linear fit.")
         click.echo()
@@ -447,10 +450,7 @@ def tail(base_path: str, scores_bin: str | None):
     click.echo(f"Product (assuming independence): {result['overall']:.3e}")
     click.echo(f"Expected games for 374:          {result['games_needed']:.3e}")
     click.echo()
-    click.echo(
-        f"At {result['games_per_sec']:,} games/sec: "
-        f"~{result['years']:.2e} years"
-    )
+    click.echo(f"At {result['games_per_sec']:,} games/sec: ~{result['years']:.2e} years")
 
 
 @cli.command()
@@ -545,6 +545,7 @@ def adaptive(base_path: str):
     # Generate efficiency frontier with adaptive overlay
     if theta_summary_path.exists():
         import matplotlib
+
         matplotlib.use("Agg")
         from .plots.efficiency import (
             plot_efficiency_adaptive_combined,
@@ -583,11 +584,14 @@ def adaptive(base_path: str):
 
 @cli.command("theta-questionnaire")
 @click.option(
-    "--scenarios", default="outputs/scenarios/pivotal_scenarios.json",
+    "--scenarios",
+    default="outputs/scenarios/pivotal_scenarios.json",
     help="Path to pivotal scenarios JSON.",
 )
 @click.option(
-    "--save", "save_path", default="outputs/scenarios/answers.json",
+    "--save",
+    "save_path",
+    default="outputs/scenarios/answers.json",
     help="Path to save answers JSON.",
 )
 @click.option("--batch-size", default=15, type=int, help="Questions in first batch.")
@@ -607,11 +611,13 @@ def theta_questionnaire(scenarios: str, save_path: str, batch_size: int):
 
 @cli.command("theta-replay")
 @click.option(
-    "--scenarios", default="outputs/scenarios/pivotal_scenarios.json",
+    "--scenarios",
+    default="outputs/scenarios/pivotal_scenarios.json",
     help="Path to pivotal scenarios JSON.",
 )
 @click.option(
-    "--answers", default="outputs/scenarios/answers.json",
+    "--answers",
+    default="outputs/scenarios/answers.json",
     help="Path to saved answers JSON (scenario_id/category_id pairs or legacy indices).",
 )
 def theta_replay(scenarios: str, answers: str):
@@ -628,7 +634,8 @@ def theta_replay(scenarios: str, answers: str):
 
 @cli.command("theta-validate")
 @click.option(
-    "--scenarios", default="outputs/scenarios/pivotal_scenarios.json",
+    "--scenarios",
+    default="outputs/scenarios/pivotal_scenarios.json",
     help="Path to pivotal scenarios JSON.",
 )
 @click.option("--trials", default=100, type=int, help="Number of trials per (θ, β) pair.")
@@ -650,7 +657,9 @@ def theta_validate(scenarios: str, trials: int, max_questions: int):
     click.echo(f"  {len(scenario_list)} scenarios loaded")
     click.echo()
 
-    click.echo(f"Running convergence validation ({trials} trials, up to {max_questions} questions)...")
+    click.echo(
+        f"Running convergence validation ({trials} trials, up to {max_questions} questions)..."
+    )
     results = run_validation(scenario_list, n_trials=trials, max_questions=max_questions)
     print_validation_results(results)
 
@@ -662,6 +671,7 @@ def theta_validate(scenarios: str, trials: int, max_questions: int):
 def sensitivity(base_path: str, fmt: str, dpi: int):
     """Plot decision sensitivity analysis from yatzy-decision-sensitivity output."""
     import matplotlib
+
     matplotlib.use("Agg")
 
     from .config import plots_dir
@@ -680,6 +690,7 @@ def sensitivity(base_path: str, fmt: str, dpi: int):
 def state_flow(base_path: str, dpi: int):
     """Plot state-flow visualizations (alluvial, DAG, streamgraph) from state_frequency.csv."""
     import matplotlib
+
     matplotlib.use("Agg")
 
     from .config import plots_dir
@@ -716,13 +727,15 @@ def state_frequency(base_path: str, top_n: int):
     with open(csv_path) as f:
         reader = csv.DictReader(f)
         for row in reader:
-            rows.append({
-                "turn": int(row["turn"]),
-                "scored_categories": int(row["scored_categories"]),
-                "upper_score": int(row["upper_score"]),
-                "visit_count": int(row["visit_count"]),
-                "fraction": float(row["fraction"]),
-            })
+            rows.append(
+                {
+                    "turn": int(row["turn"]),
+                    "scored_categories": int(row["scored_categories"]),
+                    "upper_score": int(row["upper_score"]),
+                    "visit_count": int(row["visit_count"]),
+                    "fraction": float(row["fraction"]),
+                }
+            )
 
     total_visits = sum(r["visit_count"] for r in rows)
 
@@ -793,7 +806,8 @@ def state_frequency(base_path: str, top_n: int):
 @cli.command()
 @click.option("--base-path", default=".", help="Base path (repo root).")
 @click.option(
-    "--input-path", default=None,
+    "--input-path",
+    default=None,
     help="Direct path to multiplayer_raw.bin. Default: data/simulations/multiplayer/ev_vs_ev/multiplayer_raw.bin",
 )
 @click.option("--format", "fmt", default="png", type=click.Choice(["png", "svg"]))
@@ -801,6 +815,7 @@ def state_frequency(base_path: str, top_n: int):
 def multiplayer(base_path: str, input_path: str | None, fmt: str, dpi: int):
     """Analyze multiplayer recording and generate 5 plots."""
     import matplotlib
+
     matplotlib.use("Agg")
     import numpy as np
 
@@ -836,9 +851,9 @@ def multiplayer(base_path: str, input_path: str | None, fmt: str, dpi: int):
     draws = n - p1_wins - p2_wins
 
     click.echo(f"  {n:,d} games, {data['num_players']} players")
-    click.echo(f"  P1 wins: {p1_wins:,d} ({100*p1_wins/n:.1f}%)")
-    click.echo(f"  P2 wins: {p2_wins:,d} ({100*p2_wins/n:.1f}%)")
-    click.echo(f"  Draws:   {draws:,d} ({100*draws/n:.1f}%)")
+    click.echo(f"  P1 wins: {p1_wins:,d} ({100 * p1_wins / n:.1f}%)")
+    click.echo(f"  P2 wins: {p2_wins:,d} ({100 * p2_wins / n:.1f}%)")
+    click.echo(f"  Draws:   {draws:,d} ({100 * draws / n:.1f}%)")
     click.echo(f"  P1 mean: {s1.mean():.1f}, P2 mean: {s2.mean():.1f}")
     click.echo()
 
@@ -858,6 +873,7 @@ def multiplayer(base_path: str, input_path: str | None, fmt: str, dpi: int):
 def winrate(base_path: str, fmt: str, dpi: int):
     """Plot head-to-head win rate analysis."""
     import matplotlib
+
     matplotlib.use("Agg")
 
     from .plots.winrate import generate_winrate_plots
@@ -905,8 +921,20 @@ def summary(base_path: str):
 
     click.echo()
     click.echo("=== Best theta per Metric ===")
-    for metric in ["bot5_avg", "min", "p5", "p10", "p25", "p50",
-                    "p75", "p90", "p95", "p99", "max", "top5_avg"]:
+    for metric in [
+        "bot5_avg",
+        "min",
+        "p5",
+        "p10",
+        "p25",
+        "p50",
+        "p75",
+        "p90",
+        "p95",
+        "p99",
+        "max",
+        "top5_avg",
+    ]:
         best_idx = df[metric].arg_max()
         best_row = df.row(best_idx, named=True)
         val = best_row[metric]
@@ -922,6 +950,7 @@ def summary(base_path: str):
 def percentile_sweep_plots(base_path: str, fmt: str, dpi: int):
     """Plot percentile sweep results (curves, heatmap, cost-benefit)."""
     import matplotlib
+
     matplotlib.use("Agg")
 
     from .plots.percentile_sweep import plot_percentile_sweep
@@ -938,7 +967,9 @@ def percentile_sweep_plots(base_path: str, fmt: str, dpi: int):
     coarse_path = Path(base_path) / "outputs" / "aggregates" / "parquet" / "summary.parquet"
     out_dir = Path(base_path) / "outputs" / "plots"
     t0 = time.time()
-    paths = plot_percentile_sweep(sweep_path, peaks_path, out_dir, coarse_path=coarse_path, dpi=dpi, fmt=fmt)
+    paths = plot_percentile_sweep(
+        sweep_path, peaks_path, out_dir, coarse_path=coarse_path, dpi=dpi, fmt=fmt
+    )
     click.echo(f"Done in {time.time() - t0:.1f}s — {len(paths)} plots in {out_dir}")
 
 
@@ -949,6 +980,7 @@ def percentile_sweep_plots(base_path: str, fmt: str, dpi: int):
 def difficult_sensitivity_cards(base_path: str, dpi: int, max_theta_rows: int):
     """Generate sensitivity cards for difficult scenarios across all θ values."""
     import matplotlib
+
     matplotlib.use("Agg")
 
     from .plots.difficult_sensitivity_cards import generate_difficult_sensitivity_cards
@@ -961,7 +993,10 @@ def difficult_sensitivity_cards(base_path: str, dpi: int, max_theta_rows: int):
     out_dir = Path(base_path) / "outputs" / "plots" / "scenarios"
     t0 = time.time()
     paths = generate_difficult_sensitivity_cards(
-        json_path, out_dir, max_theta_rows=max_theta_rows, dpi=dpi,
+        json_path,
+        out_dir,
+        max_theta_rows=max_theta_rows,
+        dpi=dpi,
     )
     click.echo(f"Done in {time.time() - t0:.1f}s — {len(paths)} cards in {out_dir}")
 
@@ -973,6 +1008,7 @@ def difficult_sensitivity_cards(base_path: str, dpi: int, max_theta_rows: int):
 def modality(base_path: str, fmt: str, dpi: int):
     """Score distribution modality analysis: why Yatzy scores aren't normal."""
     import matplotlib
+
     matplotlib.use("Agg")
     import numpy as np
 
@@ -1037,8 +1073,10 @@ def modality(base_path: str, fmt: str, dpi: int):
     sum_diag = np.diag(cov_matrix).sum()
     click.echo(f"=== Variance Decomposition ===")
     click.echo(f"Var(Total Score) = {total_var:.1f}")
-    click.echo(f"  Sum of Var(X_i) = {sum_diag:.1f} ({100*sum_diag/total_var:.1f}%)")
-    click.echo(f"  Sum of Cov(X_i,X_j) = {total_var - sum_diag:.1f} ({100*(total_var-sum_diag)/total_var:.1f}%)")
+    click.echo(f"  Sum of Var(X_i) = {sum_diag:.1f} ({100 * sum_diag / total_var:.1f}%)")
+    click.echo(
+        f"  Sum of Cov(X_i,X_j) = {total_var - sum_diag:.1f} ({100 * (total_var - sum_diag) / total_var:.1f}%)"
+    )
 
     # Generate plots
     out_dir = plots_dir(base_path)
@@ -1046,9 +1084,17 @@ def modality(base_path: str, fmt: str, dpi: int):
 
     click.echo(f"\nGenerating plots → {out_dir}/")
     from .plots.modality import plot_all_modality
+
     paths = plot_all_modality(
-        game_data, scores, mixture_df, cov_matrix, means, labels,
-        out_dir, dpi=dpi, fmt=fmt,
+        game_data,
+        scores,
+        mixture_df,
+        cov_matrix,
+        means,
+        labels,
+        out_dir,
+        dpi=dpi,
+        fmt=fmt,
     )
     for p in paths:
         click.echo(f"  {p.name}")
@@ -1063,6 +1109,7 @@ def modality(base_path: str, fmt: str, dpi: int):
 def compression(base_path: str, fmt: str, dpi: int):
     """Plot policy compression analysis (gap distributions, coverage)."""
     import matplotlib
+
     matplotlib.use("Agg")
 
     from .plots.compression import plot_all_compression
@@ -1089,6 +1136,7 @@ def compression(base_path: str, fmt: str, dpi: int):
 def surrogate_diagnose(base_path: str, data_dir: str | None, fmt: str, dpi: int):
     """Run surrogate diagnostics: label noise + error distribution analysis."""
     import matplotlib
+
     matplotlib.use("Agg")
 
     from .surrogate import (
@@ -1118,9 +1166,9 @@ def surrogate_diagnose(base_path: str, data_dir: str | None, fmt: str, dpi: int)
             click.echo(f"  [skip] {path} not found")
             continue
 
-        click.echo(f"\n{'='*50}")
+        click.echo(f"\n{'=' * 50}")
         click.echo(f"  {dtype} ({n_features} features)")
-        click.echo(f"{'='*50}")
+        click.echo(f"{'=' * 50}")
 
         features, labels, gaps = load_training_data(path)
 
@@ -1138,6 +1186,7 @@ def surrogate_diagnose(base_path: str, data_dir: str | None, fmt: str, dpi: int)
         model_path = models_dir / f"{dtype}_dt_full.pkl"
         if model_path.exists():
             import joblib
+
             model = joblib.load(model_path)
 
             records_per_game = 15
@@ -1152,18 +1201,25 @@ def surrogate_diagnose(base_path: str, data_dir: str | None, fmt: str, dpi: int)
 
             click.echo("\n  --- Error Distribution Analysis ---")
             error = analyze_error_distribution(
-                X_test, y_test, gaps_test, model, n_test_games, dtype,
+                X_test,
+                y_test,
+                gaps_test,
+                model,
+                n_test_games,
+                dtype,
             )
             error_data[dtype] = error
             click.echo(f"    Errors: {error['n_wrong']:,d} / {error['n_total']:,d}")
             click.echo(f"    Error rate: {error['error_rate']:.2%}")
-            if error['n_wrong'] > 0:
+            if error["n_wrong"] > 0:
                 gs = error["gap_stats"]
                 click.echo(f"    Mean gap of errors: {gs['mean']:.3f}")
                 click.echo(f"    Near-zero gap (<0.1): {gs['near_zero_frac']:.1%}")
                 click.echo(f"    Near bonus threshold: {error['near_bonus_fraction']:.1%}")
         else:
-            click.echo(f"\n  [skip] {model_path} not found. Run surrogate-train first for error analysis.")
+            click.echo(
+                f"\n  [skip] {model_path} not found. Run surrogate-train first for error analysis."
+            )
 
     # Generate error analysis plot
     if error_data:
@@ -1183,6 +1239,7 @@ def surrogate_diagnose(base_path: str, data_dir: str | None, fmt: str, dpi: int)
 def surrogate_scaling(base_path: str, data_dir: str | None, fmt: str, dpi: int):
     """Data scaling experiment: train dt_full on increasing data subsets."""
     import matplotlib
+
     matplotlib.use("Agg")
 
     from .surrogate import load_training_data, run_data_scaling_experiment
@@ -1210,7 +1267,11 @@ def surrogate_scaling(base_path: str, data_dir: str | None, fmt: str, dpi: int):
         n_total_games = len(features) // 15
 
         results = run_data_scaling_experiment(
-            features, labels, gaps, dtype, n_total_games,
+            features,
+            labels,
+            gaps,
+            dtype,
+            n_total_games,
         )
         scaling_data[dtype] = results
 
@@ -1234,12 +1295,18 @@ def surrogate_scaling(base_path: str, data_dir: str | None, fmt: str, dpi: int):
 @click.option("--format", "fmt", default="png", type=click.Choice(["png", "svg"]))
 @click.option("--dpi", default=200, type=int)
 def surrogate_features(
-    base_path: str, data_dir: str | None,
-    ablation: bool, forward_select: bool, augment: bool, run_all: bool,
-    fmt: str, dpi: int,
+    base_path: str,
+    data_dir: str | None,
+    ablation: bool,
+    forward_select: bool,
+    augment: bool,
+    run_all: bool,
+    fmt: str,
+    dpi: int,
 ):
     """Feature engineering experiments: ablation, forward selection, augmented training."""
     import matplotlib
+
     matplotlib.use("Agg")
 
     from .surrogate import (
@@ -1254,7 +1321,9 @@ def surrogate_features(
         ablation = forward_select = augment = True
 
     if not (ablation or forward_select or augment):
-        click.echo("Specify at least one experiment: --ablation, --forward-select, --augment, or --all-experiments")
+        click.echo(
+            "Specify at least one experiment: --ablation, --forward-select, --augment, or --all-experiments"
+        )
         raise SystemExit(1)
 
     t0 = time.time()
@@ -1291,17 +1360,29 @@ def surrogate_features(
         if ablation:
             click.echo(f"\n  Feature ablation: {dtype}")
             ablation_data[dtype] = run_feature_ablation(
-                X_train, y_train, gaps_train,
-                X_test, y_test, gaps_test,
-                n_train_games, n_test_games, dtype,
+                X_train,
+                y_train,
+                gaps_train,
+                X_test,
+                y_test,
+                gaps_test,
+                n_train_games,
+                n_test_games,
+                dtype,
             )
 
         if forward_select:
             click.echo(f"\n  Forward selection: {dtype}")
             selection_data[dtype] = run_forward_selection(
-                X_train, y_train, gaps_train,
-                X_test, y_test, gaps_test,
-                n_train_games, n_test_games, dtype,
+                X_train,
+                y_train,
+                gaps_train,
+                X_test,
+                y_test,
+                gaps_test,
+                n_train_games,
+                n_test_games,
+                dtype,
             )
 
     if ablation and ablation_data:
@@ -1326,7 +1407,9 @@ def surrogate_features(
 
 @cli.command("surrogate-train")
 @click.option("--base-path", default=".", help="Base path (repo root).")
-@click.option("--data-dir", default=None, help="Path to training data dir (default: data/surrogate).")
+@click.option(
+    "--data-dir", default=None, help="Path to training data dir (default: data/surrogate)."
+)
 def surrogate_train(base_path: str, data_dir: str | None):
     """Train surrogate models (DTs + MLPs) on exported training data."""
     from .surrogate import run_training_pipeline
@@ -1353,6 +1436,7 @@ def surrogate_train(base_path: str, data_dir: str | None):
 def surrogate_plot(base_path: str, fmt: str, dpi: int):
     """Plot surrogate model results (Pareto frontier, accuracy)."""
     import matplotlib
+
     matplotlib.use("Agg")
 
     from .plots.surrogate import plot_all_surrogate
@@ -1414,6 +1498,7 @@ def surrogate_eval(base_path: str, games: int, seed: int):
 def surrogate_eval_plot(base_path: str, fmt: str, dpi: int):
     """Plot game-level results: params vs mean score."""
     import matplotlib
+
     matplotlib.use("Agg")
 
     from .plots.surrogate import plot_game_level_results
@@ -1438,6 +1523,7 @@ def surrogate_eval_plot(base_path: str, fmt: str, dpi: int):
 def difficult_cards(base_path: str, dpi: int):
     """Generate scenario cards for all difficult scenarios."""
     import matplotlib
+
     matplotlib.use("Agg")
 
     from .plots.difficult_cards import generate_difficult_cards
@@ -1481,7 +1567,9 @@ def profile_validate(base_path: str, trials: int, seed: int):
 @click.option("--base-path", default=".", help="Base path (repo root).")
 @click.option("--max-rules", default=100, type=int, help="Max rules per decision type.")
 @click.option("--min-coverage", default=100, type=int, help="Min records to cover per rule.")
-@click.option("--lam", default=0.0, type=float, help="Resource-rational complexity penalty (0=pure regret).")
+@click.option(
+    "--lam", default=0.0, type=float, help="Resource-rational complexity penalty (0=pure regret)."
+)
 def skill_ladder(base_path: str, max_rules: int, min_coverage: int, lam: float):
     """Induce human-readable skill ladder from regret export data (CFG actions)."""
     from .skill_ladder import generate_skill_ladder
@@ -1494,7 +1582,10 @@ def skill_ladder(base_path: str, max_rules: int, min_coverage: int, lam: float):
 
     output_dir = rosetta_dir
     result = generate_skill_ladder(
-        rosetta_dir, output_dir, max_rules=max_rules, min_coverage=min_coverage,
+        rosetta_dir,
+        output_dir,
+        max_rules=max_rules,
+        min_coverage=min_coverage,
         lam=lam,
     )
     total = result["meta"]["total_rules"]

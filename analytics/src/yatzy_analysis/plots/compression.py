@@ -1,4 +1,5 @@
 """Policy compression analysis plots: gap CDFs, heatmaps, visit coverage."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -61,7 +62,12 @@ def plot_gap_cdf(
     for thresh, ls in [(0.1, ":"), (0.5, "--"), (1.0, "-"), (5.0, "-.")]:
         ax.axvline(thresh, color="gray", linestyle=ls, alpha=0.4, linewidth=0.8)
         ax.text(
-            thresh, 0.02, f"{thresh}", ha="center", fontsize=8, color="gray",
+            thresh,
+            0.02,
+            f"{thresh}",
+            ha="center",
+            fontsize=8,
+            color="gray",
         )
 
     ax.set_xscale("log")
@@ -106,7 +112,11 @@ def plot_gap_by_turn(
                 matrix[t, j] = row[col]
 
         im = ax.imshow(
-            matrix, aspect="auto", cmap="YlOrRd", vmin=0, vmax=1,
+            matrix,
+            aspect="auto",
+            cmap="YlOrRd",
+            vmin=0,
+            vmax=1,
             origin="lower",
         )
         ax.set_xticks(range(len(threshold_labels)))
@@ -122,8 +132,7 @@ def plot_gap_by_turn(
             for tj in range(len(thresholds)):
                 val = matrix[ti, tj]
                 color = "white" if val > 0.6 else "black"
-                ax.text(tj, ti, f"{val:.0%}", ha="center", va="center",
-                        fontsize=8, color=color)
+                ax.text(tj, ti, f"{val:.0%}", ha="center", va="center", fontsize=8, color=color)
 
     fig.colorbar(im, ax=axes, label="Fraction below threshold", shrink=0.8)
     fig.tight_layout(rect=[0, 0, 1, 0.95])
@@ -197,13 +206,38 @@ def plot_policy_distinct(
     width = 0.2
 
     x = np.arange(len(turns))
-    ax.bar(x - 1.5 * width, total, width, label="Total reachable states", color="lightgray", edgecolor="gray")
-    ax.bar(x - 0.5 * width, distinct_df["distinct_category"].to_numpy(), width,
-           label="Distinct category policies", color=COLOR_BLUE, alpha=0.8)
-    ax.bar(x + 0.5 * width, distinct_df["distinct_reroll1"].to_numpy(), width,
-           label="Distinct reroll1 policies", color=COLOR_ORANGE, alpha=0.8)
-    ax.bar(x + 1.5 * width, distinct_df["distinct_reroll2"].to_numpy(), width,
-           label="Distinct reroll2 policies", color=COLOR_RED, alpha=0.8)
+    ax.bar(
+        x - 1.5 * width,
+        total,
+        width,
+        label="Total reachable states",
+        color="lightgray",
+        edgecolor="gray",
+    )
+    ax.bar(
+        x - 0.5 * width,
+        distinct_df["distinct_category"].to_numpy(),
+        width,
+        label="Distinct category policies",
+        color=COLOR_BLUE,
+        alpha=0.8,
+    )
+    ax.bar(
+        x + 0.5 * width,
+        distinct_df["distinct_reroll1"].to_numpy(),
+        width,
+        label="Distinct reroll1 policies",
+        color=COLOR_ORANGE,
+        alpha=0.8,
+    )
+    ax.bar(
+        x + 1.5 * width,
+        distinct_df["distinct_reroll2"].to_numpy(),
+        width,
+        label="Distinct reroll2 policies",
+        color=COLOR_RED,
+        alpha=0.8,
+    )
 
     ax.set_xlabel("Turn", fontsize=FONT_AXIS_LABEL)
     ax.set_ylabel("Count", fontsize=FONT_AXIS_LABEL)

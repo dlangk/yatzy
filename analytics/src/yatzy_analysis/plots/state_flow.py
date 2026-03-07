@@ -6,6 +6,7 @@ Three complementary views of how 100K optimal games traverse the state space:
 2. State DAG — pruned layered graph of the most frequent states
 3. Category streamgraph — when each category gets filled
 """
+
 from __future__ import annotations
 
 import csv
@@ -67,12 +68,14 @@ def _load_state_frequency(path: Path) -> list[dict]:
     with open(path) as f:
         reader = csv.DictReader(f)
         for r in reader:
-            rows.append({
-                "turn": int(r["turn"]),
-                "scored": int(r["scored_categories"]),
-                "upper": int(r["upper_score"]),
-                "count": int(r["visit_count"]),
-            })
+            rows.append(
+                {
+                    "turn": int(r["turn"]),
+                    "scored": int(r["scored_categories"]),
+                    "upper": int(r["upper_score"]),
+                    "count": int(r["visit_count"]),
+                }
+            )
     return rows
 
 
@@ -138,8 +141,9 @@ def plot_bonus_alluvial(data_path: Path, out_path: Path, dpi: int = 200) -> None
     bottom = np.zeros_like(x_smooth)
     for g in stack_order:
         vals = smooth[g]
-        ax.fill_between(x_smooth, bottom, bottom + vals,
-                        color=BONUS_COLORS[g], alpha=0.85, linewidth=0)
+        ax.fill_between(
+            x_smooth, bottom, bottom + vals, color=BONUS_COLORS[g], alpha=0.85, linewidth=0
+        )
         ax.plot(x_smooth, bottom + vals, color="white", linewidth=0.6)
         bottom += vals
 
@@ -150,8 +154,14 @@ def plot_bonus_alluvial(data_path: Path, out_path: Path, dpi: int = 200) -> None
         if val > 0.03:
             y_mid = y_accum + val / 2
             label = f"{val:.0%}"
-            ax.annotate(label, xy=(15.1, y_mid), fontsize=10, fontweight="bold",
-                        color=BONUS_COLORS[g], va="center")
+            ax.annotate(
+                label,
+                xy=(15.1, y_mid),
+                fontsize=10,
+                fontweight="bold",
+                color=BONUS_COLORS[g],
+                va="center",
+            )
         y_accum += val
 
     ax.set_xlim(1, 15.8)
@@ -159,14 +169,17 @@ def plot_bonus_alluvial(data_path: Path, out_path: Path, dpi: int = 200) -> None
     ax.set_xticks(range(1, 16))
     ax.set_xlabel("Turn", fontsize=13)
     ax.set_ylabel("Fraction of games", fontsize=13)
-    ax.set_title("Upper Bonus Trajectory — 100K Optimal Games",
-                 fontsize=15, fontweight="bold", pad=15)
+    ax.set_title(
+        "Upper Bonus Trajectory — 100K Optimal Games", fontsize=15, fontweight="bold", pad=15
+    )
     ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f"{y:.0%}"))
 
-    handles = [mpatches.Patch(color=BONUS_COLORS[g], label=g) for g in stack_order
-               if max(fractions[g]) > 0.005]
-    ax.legend(handles=handles[::-1], loc="upper left", fontsize=11,
-              framealpha=0.9)
+    handles = [
+        mpatches.Patch(color=BONUS_COLORS[g], label=g)
+        for g in stack_order
+        if max(fractions[g]) > 0.005
+    ]
+    ax.legend(handles=handles[::-1], loc="upper left", fontsize=11, framealpha=0.9)
     ax.grid(axis="x", alpha=0.3)
 
     fig.tight_layout()
@@ -208,17 +221,30 @@ def _bezier_ribbon(ax, x0, y0_bot, y0_top, x1, y1_bot, y1_top, color, alpha):
     """Draw a smooth ribbon (filled bezier) between two vertical extents."""
     dx = (x1 - x0) * 0.4
     verts = [
-        (x0, y0_bot), (x0 + dx, y0_bot), (x1 - dx, y1_bot), (x1, y1_bot),  # bottom curve
-        (x1, y1_top), (x1 - dx, y1_top), (x0 + dx, y0_top), (x0, y0_top),  # top curve (reversed)
+        (x0, y0_bot),
+        (x0 + dx, y0_bot),
+        (x1 - dx, y1_bot),
+        (x1, y1_bot),  # bottom curve
+        (x1, y1_top),
+        (x1 - dx, y1_top),
+        (x0 + dx, y0_top),
+        (x0, y0_top),  # top curve (reversed)
         (x0, y0_bot),  # close
     ]
     codes = [
-        MplPath.MOVETO, MplPath.CURVE4, MplPath.CURVE4, MplPath.CURVE4,
-        MplPath.LINETO, MplPath.CURVE4, MplPath.CURVE4, MplPath.CURVE4,
+        MplPath.MOVETO,
+        MplPath.CURVE4,
+        MplPath.CURVE4,
+        MplPath.CURVE4,
+        MplPath.LINETO,
+        MplPath.CURVE4,
+        MplPath.CURVE4,
+        MplPath.CURVE4,
         MplPath.CLOSEPOLY,
     ]
-    patch = mpatches.PathPatch(MplPath(verts, codes), facecolor=color,
-                               edgecolor="none", alpha=alpha, zorder=1)
+    patch = mpatches.PathPatch(
+        MplPath(verts, codes), facecolor=color, edgecolor="none", alpha=alpha, zorder=1
+    )
     ax.add_patch(patch)
 
 
@@ -242,7 +268,9 @@ def plot_state_dag(data_path: Path, out_path: Path, dpi: int = 200) -> None:
 
     x_spacing = 1.0
     max_bar_height = 8.0  # total y-range for stacking
-    node_positions: dict[int, list[tuple[float, float, float, dict]]] = {}  # turn -> [(x, y_center, height, state)]
+    node_positions: dict[
+        int, list[tuple[float, float, float, dict]]
+    ] = {}  # turn -> [(x, y_center, height, state)]
     other_positions: dict[int, tuple[float, float, float]] = {}  # turn -> (x, y_center, height)
 
     for t in turns:
@@ -295,9 +323,17 @@ def plot_state_dag(data_path: Path, out_path: Path, dpi: int = 200) -> None:
                 ox, oy, oh = other_positions[t_next]
                 if oh > 0:
                     ribbon_h = sh * 0.3
-                    _bezier_ribbon(ax, sx + 0.15, sy - ribbon_h / 2, sy + ribbon_h / 2,
-                                   ox - 0.15, oy - ribbon_h / 2, oy + ribbon_h / 2,
-                                   "#cccccc", 0.15)
+                    _bezier_ribbon(
+                        ax,
+                        sx + 0.15,
+                        sy - ribbon_h / 2,
+                        sy + ribbon_h / 2,
+                        ox - 0.15,
+                        oy - ribbon_h / 2,
+                        oy + ribbon_h / 2,
+                        "#cccccc",
+                        0.15,
+                    )
                 continue
 
             # Distribute proportionally to dest counts
@@ -322,9 +358,17 @@ def plot_state_dag(data_path: Path, out_path: Path, dpi: int = 200) -> None:
                 dst_top = dst_bot + ribbon_h_dst
 
                 color = BONUS_COLORS.get(_classify_bonus(ds["upper"], ds["scored"]), "#cccccc")
-                _bezier_ribbon(ax, sx + 0.15, src_y_cursor_bot, src_top,
-                               dx - 0.15, dst_bot, dst_top,
-                               color, 0.2)
+                _bezier_ribbon(
+                    ax,
+                    sx + 0.15,
+                    src_y_cursor_bot,
+                    src_top,
+                    dx - 0.15,
+                    dst_bot,
+                    dst_top,
+                    color,
+                    0.2,
+                )
 
                 dst_y_offsets[di] += ribbon_h_dst
                 src_y_cursor_bot += ribbon_h_src
@@ -334,9 +378,14 @@ def plot_state_dag(data_path: Path, out_path: Path, dpi: int = 200) -> None:
         for x, y, h, s in node_positions[t]:
             color = BONUS_COLORS.get(_classify_bonus(s["upper"], s["scored"]), "#cccccc")
             rect = mpatches.FancyBboxPatch(
-                (x - 0.12, y - h / 2), 0.24, max(h, 0.05),
-                boxstyle="round,pad=0.02", facecolor=color,
-                edgecolor="white", linewidth=0.8, zorder=3,
+                (x - 0.12, y - h / 2),
+                0.24,
+                max(h, 0.05),
+                boxstyle="round,pad=0.02",
+                facecolor=color,
+                edgecolor="white",
+                linewidth=0.8,
+                zorder=3,
             )
             ax.add_patch(rect)
 
@@ -344,9 +393,14 @@ def plot_state_dag(data_path: Path, out_path: Path, dpi: int = 200) -> None:
         ox, oy, oh = other_positions[t]
         if oh > 0.01:
             rect = mpatches.FancyBboxPatch(
-                (ox - 0.12, oy - oh / 2), 0.24, oh,
-                boxstyle="round,pad=0.02", facecolor="#e0e0e0",
-                edgecolor="white", linewidth=0.8, zorder=3,
+                (ox - 0.12, oy - oh / 2),
+                0.24,
+                oh,
+                boxstyle="round,pad=0.02",
+                facecolor="#e0e0e0",
+                edgecolor="white",
+                linewidth=0.8,
+                zorder=3,
             )
             ax.add_patch(rect)
 
@@ -356,31 +410,48 @@ def plot_state_dag(data_path: Path, out_path: Path, dpi: int = 200) -> None:
             for x, y, h, s in node_positions[t]:
                 if h > 0.2:
                     label = _state_label(s, t)
-                    ax.text(x, y, label, fontsize=6, ha="center", va="center",
-                            fontweight="bold", zorder=5, color="#333333")
+                    ax.text(
+                        x,
+                        y,
+                        label,
+                        fontsize=6,
+                        ha="center",
+                        va="center",
+                        fontweight="bold",
+                        zorder=5,
+                        color="#333333",
+                    )
 
     # Turn labels
     for t in turns:
-        ax.text(t * x_spacing, -0.6, f"T{t + 1}", fontsize=9, ha="center",
-                fontweight="bold", color="#555555")
+        ax.text(
+            t * x_spacing,
+            -0.6,
+            f"T{t + 1}",
+            fontsize=9,
+            ha="center",
+            fontweight="bold",
+            color="#555555",
+        )
 
     # Unique state counts
     for t in turns:
         n_states = len(bt[t])
-        ax.text(t * x_spacing, -1.1, f"{n_states:,}", fontsize=7, ha="center",
-                color="#999999")
+        ax.text(t * x_spacing, -1.1, f"{n_states:,}", fontsize=7, ha="center", color="#999999")
     ax.text(-0.6, -1.1, "states:", fontsize=7, ha="right", color="#999999")
 
     # Legend
-    legend_handles = [mpatches.Patch(color=BONUS_COLORS[g], label=g)
-                      for g in BONUS_GROUPS if g != "Bonus lost"]
+    legend_handles = [
+        mpatches.Patch(color=BONUS_COLORS[g], label=g) for g in BONUS_GROUPS if g != "Bonus lost"
+    ]
     legend_handles.append(mpatches.Patch(color="#e0e0e0", label="Other states"))
     ax.legend(handles=legend_handles, loc="upper right", fontsize=9, framealpha=0.9)
 
     ax.set_xlim(-0.8, 14.8)
     ax.set_ylim(-1.5, max_bar_height + 1)
-    ax.set_title("State-Space DAG — Top-8 Board States per Turn",
-                 fontsize=15, fontweight="bold", pad=15)
+    ax.set_title(
+        "State-Space DAG — Top-8 Board States per Turn", fontsize=15, fontweight="bold", pad=15
+    )
     ax.axis("off")
 
     fig.tight_layout()
@@ -444,8 +515,9 @@ def plot_category_streamgraph(data_path: Path, out_path: Path, dpi: int = 200) -
     fig, ax = plt.subplots(figsize=(14, 7), facecolor="white")
 
     colors = [META_COLORS[g] for g in group_names]
-    ax.stackplot(x_smooth, smooth_data, labels=group_names, colors=colors,
-                 alpha=0.85, baseline="wiggle")
+    ax.stackplot(
+        x_smooth, smooth_data, labels=group_names, colors=colors, alpha=0.85, baseline="wiggle"
+    )
 
     # Add stream labels at the widest point of each stream
     # Compute cumulative for label placement
@@ -453,8 +525,9 @@ def plot_category_streamgraph(data_path: Path, out_path: Path, dpi: int = 200) -
     # Recompute with wiggle baseline (need the actual positions)
     # stackplot returns PolyCollection; extract positions from the stacks
     ax.clear()
-    polys = ax.stackplot(x_smooth, smooth_data, labels=group_names, colors=colors,
-                         alpha=0.85, baseline="wiggle")
+    polys = ax.stackplot(
+        x_smooth, smooth_data, labels=group_names, colors=colors, alpha=0.85, baseline="wiggle"
+    )
 
     # Place labels on right edge of each stream for clear identification
     for gi, poly in enumerate(polys):
@@ -464,19 +537,30 @@ def plot_category_streamgraph(data_path: Path, out_path: Path, dpi: int = 200) -
         verts = paths[0].vertices
         n = len(x_smooth)
         top_y = verts[:n, 1]
-        bot_y = verts[n:2 * n, 1][::-1] if len(verts) >= 2 * n else top_y
+        bot_y = verts[n : 2 * n, 1][::-1] if len(verts) >= 2 * n else top_y
         center_y = (top_y + bot_y) / 2
         # Label at x=14.5 (near right edge)
         idx = np.argmin(np.abs(x_smooth - 14.5))
-        ax.text(15.2, center_y[idx], group_names[gi],
-                fontsize=8.5, ha="left", va="center",
-                color=META_COLORS[group_names[gi]], fontweight="bold")
+        ax.text(
+            15.2,
+            center_y[idx],
+            group_names[gi],
+            fontsize=8.5,
+            ha="left",
+            va="center",
+            color=META_COLORS[group_names[gi]],
+            fontweight="bold",
+        )
 
     ax.set_xlim(1, 17.5)
     ax.set_xticks(range(1, 16))
     ax.set_xlabel("Turn", fontsize=13)
-    ax.set_title("Category Fill Timing — When Does Each Category Get Scored?",
-                 fontsize=15, fontweight="bold", pad=15)
+    ax.set_title(
+        "Category Fill Timing — When Does Each Category Get Scored?",
+        fontsize=15,
+        fontweight="bold",
+        pad=15,
+    )
 
     # Clean y-axis — streamgraphs are about shape, not exact values
     ax.set_ylabel("")

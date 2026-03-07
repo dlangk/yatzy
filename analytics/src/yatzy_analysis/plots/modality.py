@@ -1,4 +1,5 @@
 """Score distribution modality analysis: why Yatzy scores aren't normal."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -54,7 +55,9 @@ def plot_histogram_vs_kde(
 
     # Left panel: narrow bandwidth
     ax = axes[0]
-    ax.hist(scores, bins=bins, density=True, color=COLOR_BLUE, alpha=0.3, label="Histogram (1-pt bins)")
+    ax.hist(
+        scores, bins=bins, density=True, color=COLOR_BLUE, alpha=0.3, label="Histogram (1-pt bins)"
+    )
     kde_narrow = gaussian_kde(sub, bw_method=0.04)
     ax.plot(x_grid, kde_narrow(x_grid), color=COLOR_RED, lw=1.5, label="KDE bw=0.04")
     ax.set_title("Narrow KDE (bw=0.04) — artifact spikes", fontsize=FONT_TITLE)
@@ -65,7 +68,9 @@ def plot_histogram_vs_kde(
 
     # Right panel: reasonable bandwidths
     ax = axes[1]
-    ax.hist(scores, bins=bins, density=True, color=COLOR_BLUE, alpha=0.3, label="Histogram (1-pt bins)")
+    ax.hist(
+        scores, bins=bins, density=True, color=COLOR_BLUE, alpha=0.3, label="Histogram (1-pt bins)"
+    )
     for bw, color, label in [
         (1.0, COLOR_ORANGE, "KDE bw=1"),
         (3.0, COLOR_GREEN, "KDE bw=3"),
@@ -80,7 +85,9 @@ def plot_histogram_vs_kde(
 
     fig.suptitle(
         "Score Distribution: Histogram vs KDE Bandwidth Choice",
-        fontsize=FONT_SUPTITLE, fontweight="bold", y=1.02,
+        fontsize=FONT_SUPTITLE,
+        fontweight="bold",
+        y=1.02,
     )
     fig.tight_layout()
     return save_fig(fig, out_dir, "modality_histogram_vs_kde", dpi=dpi, fmt=fmt)
@@ -123,7 +130,7 @@ def plot_bonus_yatzy_decomposition(
         subset = total[mask]
 
         if count < 10:
-            ax.set_title(f"{label}\n(n={count}, {100*count/n:.1f}%)", fontsize=FONT_TITLE)
+            ax.set_title(f"{label}\n(n={count}, {100 * count / n:.1f}%)", fontsize=FONT_TITLE)
             ax.text(0.5, 0.5, "Too few games", ha="center", va="center", transform=ax.transAxes)
             continue
 
@@ -134,13 +141,18 @@ def plot_bonus_yatzy_decomposition(
         ax.hist(subset, bins=bins, density=True, color=colors[idx], alpha=0.4, label="Histogram")
 
         # Normal fit overlay
-        ax.plot(x_grid, norm.pdf(x_grid, mu, sigma), color="black", lw=1.5, ls="--", label="Normal fit")
+        ax.plot(
+            x_grid, norm.pdf(x_grid, mu, sigma), color="black", lw=1.5, ls="--", label="Normal fit"
+        )
 
-        ax.set_title(f"{label}\n(n={count:,}, {100*frac:.1f}%)", fontsize=FONT_TITLE)
+        ax.set_title(f"{label}\n(n={count:,}, {100 * frac:.1f}%)", fontsize=FONT_TITLE)
         ax.annotate(
             f"mean={mu:.1f}\nstd={sigma:.1f}",
-            xy=(0.97, 0.95), xycoords="axes fraction",
-            ha="right", va="top", fontsize=FONT_ANNOTATION,
+            xy=(0.97, 0.95),
+            xycoords="axes fraction",
+            ha="right",
+            va="top",
+            fontsize=FONT_ANNOTATION,
             bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.8),
         )
         ax.legend(fontsize=FONT_ANNOTATION, loc="upper left")
@@ -152,7 +164,8 @@ def plot_bonus_yatzy_decomposition(
 
     fig.suptitle(
         "Score Distribution Decomposed by Bonus x Yatzy",
-        fontsize=FONT_SUPTITLE, fontweight="bold",
+        fontsize=FONT_SUPTITLE,
+        fontweight="bold",
     )
     fig.tight_layout()
     return save_fig(fig, out_dir, "modality_bonus_yatzy", dpi=dpi, fmt=fmt)
@@ -182,7 +195,9 @@ def plot_category_pmf_grid(
         probs = counts / n
 
         color = COLOR_ORANGE if i in binary_cats else COLOR_BLUE
-        ax.bar(unique_vals, probs, width=0.8, color=color, alpha=0.7, edgecolor="white", linewidth=0.3)
+        ax.bar(
+            unique_vals, probs, width=0.8, color=color, alpha=0.7, edgecolor="white", linewidth=0.3
+        )
 
         ax.set_title(CATEGORY_SHORT[i], fontsize=FONT_TICK, fontweight="bold")
         ax.tick_params(labelsize=7)
@@ -193,8 +208,11 @@ def plot_category_pmf_grid(
         if zero_frac > 0.01:
             ax.annotate(
                 f"P(0)={zero_frac:.0%}",
-                xy=(0.97, 0.95), xycoords="axes fraction",
-                ha="right", va="top", fontsize=7,
+                xy=(0.97, 0.95),
+                xycoords="axes fraction",
+                ha="right",
+                va="top",
+                fontsize=7,
                 bbox=dict(boxstyle="round,pad=0.2", fc="white", alpha=0.7),
             )
 
@@ -206,7 +224,8 @@ def plot_category_pmf_grid(
 
     fig.suptitle(
         "Per-Category Score Distributions (orange = binary categories)",
-        fontsize=FONT_SUPTITLE, fontweight="bold",
+        fontsize=FONT_SUPTITLE,
+        fontweight="bold",
     )
     fig.tight_layout()
     return save_fig(fig, out_dir, "modality_category_pmf", dpi=dpi, fmt=fmt)
@@ -238,17 +257,24 @@ def plot_variance_decomposition(
     sorted_pct = 100 * sorted_vars / total_var
 
     # Per-variable total covariance contribution: sum of row i (off-diagonal)
-    cov_contributions = np.array([
-        cov_matrix[i, :].sum() - cov_matrix[i, i] for i in range(n_vars)
-    ])
+    cov_contributions = np.array([cov_matrix[i, :].sum() - cov_matrix[i, i] for i in range(n_vars)])
     sorted_cov = cov_contributions[order]
     sorted_cov_pct = 100 * sorted_cov / total_var
 
     y = np.arange(n_vars)
     bar_height = 0.35
 
-    bars1 = ax.barh(y + bar_height / 2, sorted_pct, bar_height, color=COLOR_BLUE, alpha=0.7, label="Var(X_i)")
-    bars2 = ax.barh(y - bar_height / 2, sorted_cov_pct, bar_height, color=COLOR_ORANGE, alpha=0.7, label="Cov contribution")
+    bars1 = ax.barh(
+        y + bar_height / 2, sorted_pct, bar_height, color=COLOR_BLUE, alpha=0.7, label="Var(X_i)"
+    )
+    bars2 = ax.barh(
+        y - bar_height / 2,
+        sorted_cov_pct,
+        bar_height,
+        color=COLOR_ORANGE,
+        alpha=0.7,
+        label="Cov contribution",
+    )
 
     ax.set_yticks(y)
     ax.set_yticklabels(sorted_labels, fontsize=FONT_TICK)
@@ -256,7 +282,8 @@ def plot_variance_decomposition(
     ax.set_title(
         f"Variance Decomposition: Var(Total)={total_var:.1f}  "
         f"(ΣVar={sum_var:.1f} + ΣCov={total_cov:.1f})",
-        fontsize=FONT_TITLE, fontweight="bold",
+        fontsize=FONT_TITLE,
+        fontweight="bold",
     )
     ax.legend(fontsize=FONT_ANNOTATION, loc="lower right")
     ax.invert_yaxis()
@@ -322,9 +349,13 @@ def plot_mixture_waterfall(
     for i, (bar, rate, delta) in enumerate(zip(bars, hit_rates, deltas)):
         y_pos = delta + (1 if delta > 0 else -1)
         ax.text(
-            i, y_pos, f"hit={rate:.0%}\n\u0394={delta:+.1f}",
-            ha="center", va="bottom" if delta > 0 else "top",
-            fontsize=FONT_ANNOTATION, fontweight="bold",
+            i,
+            y_pos,
+            f"hit={rate:.0%}\n\u0394={delta:+.1f}",
+            ha="center",
+            va="bottom" if delta > 0 else "top",
+            fontsize=FONT_ANNOTATION,
+            fontweight="bold",
         )
 
     ax.set_xticks(x)
@@ -332,7 +363,8 @@ def plot_mixture_waterfall(
     ax.set_ylabel("Mean Score Difference (hit - miss)", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "Impact of Binary Categories on Total Score",
-        fontsize=FONT_TITLE, fontweight="bold",
+        fontsize=FONT_TITLE,
+        fontweight="bold",
     )
     ax.axhline(0, color="black", lw=0.8)
     ax.grid(axis="y", alpha=GRID_ALPHA)

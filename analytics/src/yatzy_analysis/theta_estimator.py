@@ -27,23 +27,70 @@ from .scorecard import scorecard_from_scenario
 
 # ── Theta/Beta grids ──────────────────────────────────────────────────────────
 
-THETA_GRID = np.array([
-    -3.00, -2.00, -1.50, -1.00, -0.75, -0.50, -0.30,
-    -0.200, -0.150, -0.100, -0.070, -0.050, -0.040, -0.030, -0.020, -0.015, -0.010, -0.005,
-    0.000,
-    0.005, 0.010, 0.015, 0.020, 0.030, 0.040, 0.050, 0.070, 0.100, 0.150, 0.200,
-    0.30, 0.50, 0.75, 1.00, 1.50, 2.00, 3.00,
-])  # 37 values: progressive spacing, dense near 0, sparse at tails
+THETA_GRID = np.array(
+    [
+        -3.00,
+        -2.00,
+        -1.50,
+        -1.00,
+        -0.75,
+        -0.50,
+        -0.30,
+        -0.200,
+        -0.150,
+        -0.100,
+        -0.070,
+        -0.050,
+        -0.040,
+        -0.030,
+        -0.020,
+        -0.015,
+        -0.010,
+        -0.005,
+        0.000,
+        0.005,
+        0.010,
+        0.015,
+        0.020,
+        0.030,
+        0.040,
+        0.050,
+        0.070,
+        0.100,
+        0.150,
+        0.200,
+        0.30,
+        0.50,
+        0.75,
+        1.00,
+        1.50,
+        2.00,
+        3.00,
+    ]
+)  # 37 values: progressive spacing, dense near 0, sparse at tails
 BETA_GRID = np.array([0.5, 1.0, 2.0, 5.0, 10.0, 50.0])  # 6 rationality levels
 
 CATEGORY_NAMES = [
-    "Ones", "Twos", "Threes", "Fours", "Fives", "Sixes",
-    "One Pair", "Two Pairs", "Three of a Kind", "Four of a Kind",
-    "Small Straight", "Large Straight", "Full House", "Chance", "Yatzy",
+    "Ones",
+    "Twos",
+    "Threes",
+    "Fours",
+    "Fives",
+    "Sixes",
+    "One Pair",
+    "Two Pairs",
+    "Three of a Kind",
+    "Four of a Kind",
+    "Small Straight",
+    "Large Straight",
+    "Full House",
+    "Chance",
+    "Yatzy",
 ]
 
 
 # ── Scenario loading ─────────────────────────────────────────────────────────
+
 
 def load_scenarios(path: str | Path) -> list[dict[str, Any]]:
     """Load pivotal scenarios from JSON file."""
@@ -66,6 +113,7 @@ def _scenario_values(scenario: dict, theta_str: str) -> dict[int, float]:
 
 # ── Core estimator ────────────────────────────────────────────────────────────
 
+
 class ThetaEstimator:
     """Bayesian grid estimator for (θ, β) from category decisions.
 
@@ -86,11 +134,11 @@ class ThetaEstimator:
 
         # ── Precompute scenario value matrices ────────────────────────────
         self._sid_to_idx: dict[int, int] = {}
-        self._action_ids: list[np.ndarray] = []       # per-scenario: (n_actions,)
-        self._values: list[np.ndarray] = []            # per-scenario: (n_theta, n_actions)
+        self._action_ids: list[np.ndarray] = []  # per-scenario: (n_actions,)
+        self._values: list[np.ndarray] = []  # per-scenario: (n_theta, n_actions)
         self._action_id_to_col: list[dict[int, int]] = []
         # Per-scenario, per-theta: which column is the argmax action
-        self._optimal_col: list[np.ndarray] = []       # per-scenario: (n_theta,)
+        self._optimal_col: list[np.ndarray] = []  # per-scenario: (n_theta,)
 
         for i, scenario in enumerate(scenarios):
             self._sid_to_idx[scenario["id"]] = i
@@ -247,9 +295,8 @@ class ThetaEstimator:
 
             # Hypothetical log-posteriors: (n_actions, n_theta, n_beta)
             # log_post_new[a] = log_posterior + log_lik[:, :, a]
-            log_post_all = (
-                self.log_posterior[np.newaxis, :, :]
-                + log_lik.transpose(2, 0, 1)
+            log_post_all = self.log_posterior[np.newaxis, :, :] + log_lik.transpose(
+                2, 0, 1
             )  # (n_actions, n_theta, n_beta)
 
             # Normalize each → (n_actions, n_theta * n_beta)
@@ -292,10 +339,7 @@ class ThetaEstimator:
             p_actions = np.einsum("ijk,ij->k", all_probs, posterior)
             log_lik = np.log(np.clip(all_probs, 1e-30, None))
 
-            log_post_all = (
-                self.log_posterior[np.newaxis, :, :]
-                + log_lik.transpose(2, 0, 1)
-            )
+            log_post_all = self.log_posterior[np.newaxis, :, :] + log_lik.transpose(2, 0, 1)
             lp_flat = log_post_all.reshape(n_actions, -1)
             lp_flat = lp_flat - lp_flat.max(axis=1, keepdims=True)
             p_flat = np.exp(lp_flat)
@@ -400,6 +444,7 @@ class ThetaEstimator:
 
 
 # ── Interactive questionnaire ─────────────────────────────────────────────────
+
 
 def run_questionnaire(
     scenarios_path: str | Path,
@@ -549,7 +594,9 @@ def _print_results(estimator: ThetaEstimator, final: bool = False) -> None:
         print("    Warning: Inconsistent risk profile detected.")
         phase_thetas = estimator.per_phase_theta()
         for phase, theta in phase_thetas.items():
-            label = "conservative" if theta < 0.03 else "moderate" if theta < 0.08 else "risk-seeking"
+            label = (
+                "conservative" if theta < 0.03 else "moderate" if theta < 0.08 else "risk-seeking"
+            )
             print(f"    {phase} theta: {theta:.2f} ({label})")
         print("    This suggests you adapt your strategy based on game state.")
 
@@ -562,7 +609,8 @@ def _print_results(estimator: ThetaEstimator, final: bool = False) -> None:
 
         for qi, (scenario_id, action_id) in enumerate(estimator.history, 1):
             scenario = next(
-                (s for s in estimator.scenarios if s["id"] == scenario_id), None,
+                (s for s in estimator.scenarios if s["id"] == scenario_id),
+                None,
             )
             if scenario is None:
                 continue
@@ -608,10 +656,7 @@ def save_answers(
     Format: list of {"scenario_id": int, "category_id": int} dicts.
     This is robust to grid changes — scenario IDs are stable.
     """
-    data = [
-        {"scenario_id": sid, "category_id": cid}
-        for sid, cid in history
-    ]
+    data = [{"scenario_id": sid, "category_id": cid} for sid, cid in history]
     Path(path).write_text(json.dumps(data, indent=2) + "\n")
     print(f"  Saved {len(data)} answers to {path}")
 
@@ -672,7 +717,9 @@ def _replay_legacy(
     answers: list[int],
 ) -> None:
     """Replay legacy answers (1-based choice indices). Fragile — breaks if scenarios change."""
-    print("  WARNING: Legacy answer format (position indices). May be invalid if scenarios changed.")
+    print(
+        "  WARNING: Legacy answer format (position indices). May be invalid if scenarios changed."
+    )
     print()
     estimator = ThetaEstimator(scenarios)
     pool = list(scenarios)
@@ -690,8 +737,10 @@ def _replay_legacy(
         estimator.update(scenario, action_id)
 
         mean, ci_low, ci_high = estimator.theta_estimate()
-        print(f"  Q{i:>2}: chose [{choice_idx}] {CATEGORY_NAMES[action_id]:<20s} "
-              f"-> θ = {mean:.3f} [{ci_low:.2f}, {ci_high:.2f}]")
+        print(
+            f"  Q{i:>2}: chose [{choice_idx}] {CATEGORY_NAMES[action_id]:<20s} "
+            f"-> θ = {mean:.3f} [{ci_low:.2f}, {ci_high:.2f}]"
+        )
 
     print()
     _print_results(estimator, final=True)

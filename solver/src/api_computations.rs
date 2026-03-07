@@ -55,15 +55,27 @@ pub fn compute_roll_response(
 ) -> RollResponse {
     // Sort dice and track original indices for mask remapping.
     let mut indexed: [(i32, usize); 5] = [
-        (dice[0], 0), (dice[1], 1), (dice[2], 2), (dice[3], 3), (dice[4], 4),
+        (dice[0], 0),
+        (dice[1], 1),
+        (dice[2], 2),
+        (dice[3], 3),
+        (dice[4], 4),
     ];
     indexed.sort_by_key(|&(v, _)| v);
     // sort_map[sorted_position] = original_position
     let sort_map: [usize; 5] = [
-        indexed[0].1, indexed[1].1, indexed[2].1, indexed[3].1, indexed[4].1,
+        indexed[0].1,
+        indexed[1].1,
+        indexed[2].1,
+        indexed[3].1,
+        indexed[4].1,
     ];
     let sorted_dice: [i32; 5] = [
-        indexed[0].0, indexed[1].0, indexed[2].0, indexed[3].0, indexed[4].0,
+        indexed[0].0,
+        indexed[1].0,
+        indexed[2].0,
+        indexed[3].0,
+        indexed[4].0,
     ];
     let ds_index = find_dice_set_index(ctx, &sorted_dice);
     let sv = ctx.state_values.as_slice();

@@ -22,7 +22,7 @@ subscribe((state, prev, action) => {
   } else if (action.type === 'REROLL') {
     pendingTrajectoryEvent = 'reroll';
     // Compute label from pre-reroll state
-    const keptValues = prev.dice.filter(d => d.held).map(d => d.value).sort((a, b) => a - b);
+    const keptValues = prev.dice.filter(d => d.kept).map(d => d.value).sort((a, b) => a - b);
     pendingRerollLabel = keptValues.length === TOTAL_DICE
       ? 'Kept all'
       : keptValues.length === 0
@@ -33,7 +33,7 @@ subscribe((state, prev, action) => {
     if (prev.lastEvalResponse?.mask_evs) {
       let playerMask = 0;
       for (let i = 0; i < prev.dice.length; i++) {
-        if (!prev.dice[i].held) playerMask |= 1 << i;
+        if (!prev.dice[i].kept) playerMask |= 1 << i;
       }
       const playerMaskEv = prev.lastEvalResponse.mask_evs[playerMask] ?? null;
       const optimalMaskEv = prev.lastEvalResponse.optimal_mask_ev ?? null;

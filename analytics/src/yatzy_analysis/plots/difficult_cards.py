@@ -5,6 +5,7 @@ Generates a single PNG per scenario combining:
 - Right top: horizontal bar chart of all action EVs
 - Right bottom: action details table
 """
+
 from __future__ import annotations
 
 import json
@@ -54,20 +55,21 @@ def _build_state_text(scenario: dict) -> str:
     ru_id = runner_up.get("id", runner_up.get("action_id")) if show_markers else -1
 
     # Box-drawing table: Category(18) | Scored(7) | Avail(7) | marker(6)
-    lines.append("  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2510")
-    lines.append("  \u2502 Category         "
-                 "\u2502Scored "
-                 "\u2502 Avail "
-                 "\u2502      \u2502")
-    lines.append("  \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2524")
+    lines.append(
+        "  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2510"
+    )
+    lines.append("  \u2502 Category         \u2502Scored \u2502 Avail \u2502      \u2502")
+    lines.append(
+        "  \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2524"
+    )
 
     cat_scores = scenario.get("category_scores")
     for c in range(15):
@@ -77,10 +79,7 @@ def _build_state_text(scenario: dict) -> str:
                 scored_str = f" {cat_scores[c]:>5} "
             else:
                 scored_str = "   \u2713   "
-            lines.append(
-                f"  \u2502 {name:<16} \u2502{scored_str}"
-                f"\u2502       \u2502      \u2502"
-            )
+            lines.append(f"  \u2502 {name:<16} \u2502{scored_str}\u2502       \u2502      \u2502")
         else:
             scr = compute_score(dice, c)
             marker = ""
@@ -90,9 +89,7 @@ def _build_state_text(scenario: dict) -> str:
                 elif c == ru_id:
                     marker = "\u25c0 2nd"
             lines.append(
-                f"  \u2502 {name:<16} \u2502       "
-                f"\u2502 {scr:>5} "
-                f"\u2502 {marker:<5}\u2502"
+                f"  \u2502 {name:<16} \u2502       \u2502 {scr:>5} \u2502 {marker:<5}\u2502"
             )
         if c == 5:
             lines.append(
@@ -103,11 +100,13 @@ def _build_state_text(scenario: dict) -> str:
                 "\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2524"
             )
 
-    lines.append("  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2518")
+    lines.append(
+        "  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2518"
+    )
 
     # Unique-to-panel metric
     lines.append("")
@@ -160,24 +159,34 @@ def _plot_action_bars(scenario: dict, ax: plt.Axes) -> None:
             bar.get_width() + ev_range * 0.02,
             bar.get_y() + bar.get_height() / 2,
             f"{ev:.2f}",
-            va="center", fontsize=7.5,
+            va="center",
+            fontsize=7.5,
         )
 
     # Gap annotation
     gap = scenario["ev_gap"]
     ax.text(
-        0.98, 0.02,
+        0.98,
+        0.02,
         f"Gap: {gap:.4f} EV pts",
-        transform=ax.transAxes, ha="right", va="bottom",
-        fontsize=9, fontstyle="italic", color="#555555",
+        transform=ax.transAxes,
+        ha="right",
+        va="bottom",
+        fontsize=9,
+        fontstyle="italic",
+        color="#555555",
     )
 
     if len(actions) > 15:
         ax.text(
-            0.98, 0.07,
+            0.98,
+            0.07,
             f"({len(actions)} total actions, showing top 15)",
-            transform=ax.transAxes, ha="right", va="bottom",
-            fontsize=8, color="#999999",
+            transform=ax.transAxes,
+            ha="right",
+            va="bottom",
+            fontsize=8,
+            color="#999999",
         )
 
     ax.grid(True, axis="x", alpha=0.3)
@@ -203,12 +212,14 @@ def _plot_action_table(scenario: dict, ax: plt.Axes) -> None:
             bg = "#fff3e0"
         else:
             bg = "#ffffff"
-        cell_text.append([
-            str(i + 1),
-            a.get("label", a.get("action_name")),
-            f"{a['ev']:.2f}",
-            f"{delta:+.4f}" if i > 0 else "best",
-        ])
+        cell_text.append(
+            [
+                str(i + 1),
+                a.get("label", a.get("action_name")),
+                f"{a['ev']:.2f}",
+                f"{delta:+.4f}" if i > 0 else "best",
+            ]
+        )
         cell_colors.append([bg] * 4)
 
     table = ax.table(
@@ -239,11 +250,16 @@ def plot_difficult_card(
     fig = plt.figure(figsize=(CARD_WIDTH, CARD_HEIGHT), facecolor="white")
 
     gs = fig.add_gridspec(
-        2, 2,
+        2,
+        2,
         width_ratios=[0.8, 1.4],
         height_ratios=[1.3, 1],
-        hspace=0.25, wspace=0.01,
-        left=0.01, right=0.98, top=0.88, bottom=0.04,
+        hspace=0.25,
+        wspace=0.01,
+        left=0.01,
+        right=0.98,
+        top=0.88,
+        bottom=0.04,
     )
 
     # Title
@@ -260,17 +276,25 @@ def plot_difficult_card(
     fig.suptitle(
         f"{id_prefix}Difficult Scenario #{scenario['rank']}: "
         f"{dtype_label} at Turn {turn}    Dice [{dice_str}]",
-        fontsize=14, fontweight="bold", x=0.5, y=0.96,
+        fontsize=14,
+        fontweight="bold",
+        x=0.5,
+        y=0.96,
     )
 
     best = scenario["best_action"].get("label", scenario["best_action"].get("action_name"))
-    runner_up = scenario["runner_up_action"].get("label", scenario["runner_up_action"].get("action_name"))
+    runner_up = scenario["runner_up_action"].get(
+        "label", scenario["runner_up_action"].get("action_name")
+    )
     gap = scenario["ev_gap"]
     fig.text(
-        0.5, 0.92,
+        0.5,
+        0.92,
         f"Best: {best}  vs  Runner-up: {runner_up}  "
         f"(gap: {gap:.4f} EV pts, {scenario['visit_count']:,} visits)",
-        ha="center", fontsize=11, color="#555555",
+        ha="center",
+        fontsize=11,
+        color="#555555",
     )
 
     # Left: big dice + monospace scorecard (spans both rows)
@@ -283,21 +307,29 @@ def plot_difficult_card(
     dice = scenario["dice"]
     faces = "  ".join(DIE_FACES.get(d, str(d)) for d in dice)
     ax_text.text(
-        0.06, 0.97, faces,
+        0.06,
+        0.97,
+        faces,
         transform=ax_text.transAxes,
-        fontsize=28, verticalalignment="top",
+        fontsize=28,
+        verticalalignment="top",
     )
 
     # Compact state text below dice
     text = _build_state_text(scenario)
     ax_text.text(
-        0.03, 0.88, text,
+        0.03,
+        0.88,
+        text,
         transform=ax_text.transAxes,
-        fontfamily="monospace", fontsize=9.5,
+        fontfamily="monospace",
+        fontsize=9.5,
         verticalalignment="top",
         bbox=dict(
-            boxstyle="square,pad=0.6", facecolor="#f8f9fa",
-            edgecolor="#dee2e6", linewidth=1,
+            boxstyle="square,pad=0.6",
+            facecolor="#f8f9fa",
+            edgecolor="#dee2e6",
+            linewidth=1,
         ),
     )
 

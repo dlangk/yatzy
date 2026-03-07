@@ -47,7 +47,7 @@ function buildInitialCategories(): CategoryState[] {
 
 function freshState(): GameState {
   return {
-    dice: Array.from({ length: TOTAL_DICE }, () => ({ value: 0, held: false })),
+    dice: Array.from({ length: TOTAL_DICE }, () => ({ value: 0, kept: false })),
     upperScore: 0,
     scoredCategories: 0,
     rerollsRemaining: 0,
@@ -135,7 +135,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (state.turnPhase !== 'idle') return state;
       const dice = Array.from({ length: TOTAL_DICE }, () => ({
         value: randomDie(),
-        held: true,
+        kept: true,
       }));
       return {
         ...state,
@@ -149,7 +149,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'TOGGLE_DIE': {
       const dice = state.dice.map((d, i) =>
-        i === action.index ? { ...d, held: !d.held } : d
+        i === action.index ? { ...d, kept: !d.kept } : d
       );
       return { ...state, dice };
     }
@@ -157,7 +157,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'REROLL': {
       if (state.rerollsRemaining <= 0) return state;
       const dice = state.dice.map((d) =>
-        d.held ? d : { value: randomDie(), held: true }
+        d.kept ? d : { value: randomDie(), kept: true }
       );
       return {
         ...state,
@@ -283,7 +283,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         rerollsRemaining = 2;
         dice = dice.map((d) => ({
           value: d.value === 0 ? 1 : d.value,
-          held: true,
+          kept: true,
         }));
       }
       return {

@@ -1,4 +1,5 @@
 """Tests for analytics plot styling."""
+
 from __future__ import annotations
 
 from pathlib import Path

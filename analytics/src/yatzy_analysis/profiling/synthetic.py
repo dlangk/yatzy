@@ -2,6 +2,7 @@
 
 Generates quiz answers from players with known (θ, β, γ, d) parameters.
 """
+
 from __future__ import annotations
 
 import json
@@ -21,9 +22,7 @@ class SyntheticPlayer:
     d: int
     name: str = ""
 
-    def answer_scenario(
-        self, scenario: dict, rng: np.random.Generator | None = None
-    ) -> dict:
+    def answer_scenario(self, scenario: dict, rng: np.random.Generator | None = None) -> dict:
         """Choose an action for a scenario using softmax(β · Q)."""
         if rng is None:
             rng = np.random.default_rng()
@@ -85,7 +84,11 @@ class SyntheticPlayer:
                 kt, kg, kd = float(parts[0]), float(parts[1]), int(float(parts[2]))
             except ValueError:
                 continue
-            dist = abs(kt - nearest_theta) + abs(kg - nearest_gamma) + (0 if kd == int(nearest_d) else 1e6)
+            dist = (
+                abs(kt - nearest_theta)
+                + abs(kg - nearest_gamma)
+                + (0 if kd == int(nearest_d) else 1e6)
+            )
             if dist < best_dist:
                 best_dist = dist
                 best_key = key

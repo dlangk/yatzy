@@ -2,17 +2,27 @@
 
 ## The Solver
 
-We are now ready to take on the ~1.43M states, connected through widgets and layered into 16 layers. Since each layer only depends on the previous layer, we can solve the entire game by working backward: start at layer 16 (where the answer is trivial: just add the bonus if you earned it), then solve layer 15 using those answers, then layer 14, and so on.
+We have established that there are ~1.43M reachable states, organized into 16 layers, connected by widgets. Every transition goes strictly forward (from layer *l* to layer *l*+1), and layer 16 is trivial: just check whether the upper bonus was earned. This one-directional structure is the key to solving the entire game. We can work backward: solve layer 16 first (trivial), then use those answers to solve layer 15, then layer 14, and so on until we reach layer 1.
 
 :::html
 <div id="chart-backward-cascade"></div>
 :::
 
-This section explains what happens inside each state: how the solver [evaluates a single turn](https://github.com/dlangk/yatzy/blob/main/solver/src/widget_solver.rs#L430) and picks the best play.
+### Solving a Widget
+
+To compute the value of a state, the solver [evaluates its widget](https://github.com/dlangk/yatzy/blob/main/solver/src/widget_solver.rs#L430): the complete decision tree of one turn. The trick is to work backward through the turn: start from the last decision (which category to score) and reason back toward the first roll. Since the solver already knows the value of every end state (from the next layer) and the probability of every dice outcome, it can compute the expected score of every possible choice.
+
+The visualization below demonstrates this live, using the actual solver. It first highlights the backward reasoning, sweeping from the scoring decision up to the initial roll, then lets you play a turn yourself.
+
+:::html
+<div class="chart-container" id="chart-widget-interactive">
+  <p class="chart-caption">Walk through the solver's backward reasoning, then play a turn with live evaluation.</p>
+</div>
+:::
 
 ### Scoring the Final Roll
 
-After the last reroll, the solver has a final roll of five dice and must choose which category to score. Each unscored category gives an immediate score plus a future value (the expected score from the resulting state, already computed in a later layer). The solver tries every option and picks the best:
+The solver starts at the end of the turn. After the last reroll, there is a final roll of five dice and the player must choose which category to score. Each unscored category gives an immediate score plus a future value (the expected score from the resulting state, already computed in a later layer). The solver tries every option and picks the best:
 
 ```
 for each final roll (252 possibilities):
@@ -27,75 +37,65 @@ This is the innermost decision. Everything else in the turn feeds into it.
 
 ### Choosing What to Keep
 
-Before that final roll, the player chose which dice to hold. Each possible hold leads to a probability distribution over rerolls. The expected value of a hold is the weighted sum over those outcomes, using the scoring EVs just computed:
+One step further back: the player sees a roll and decides which dice to keep. Each possible keep leads to a probability distribution over rerolls. The expected score of a keep is the weighted sum over those outcomes, using the scoring expected scores just computed:
 
 ```
 for each roll (252):
     best = -∞
-    for each way to hold dice:
-        ev = Σ P(hold → reroll) × scoring_ev[reroll]
-        best = max(best, ev)
-    keep_ev[roll] = best
+    for each way to keep dice:
+        exp = Σ P(keep → reroll) × scoring_exp[reroll]
+        best = max(best, exp)
+    keep_exp[roll] = best
 ```
 
-The solver runs this twice: once for the second reroll (using scoring EVs as input) and once for the first reroll (using second-reroll EVs as input). Two identical passes, reading from one buffer and writing to the other.
+The solver runs this logic twice, in two identical passes: once for the second reroll (using scoring expected scores as input) and once for the first reroll (using second-reroll expected scores as input). It reads from one buffer and writes to the other, then swaps.
 
 ### Transition Probabilities
 
-Where does P(hold &rarr; reroll) come from? When you hold some dice and reroll the rest, each free die lands on 1 through 6 independently. The probability of reaching a specific outcome depends on how many ways the free dice can produce the required values.
+Where does P(keep &rarr; reroll) come from? When you keep some dice and reroll the rest, each free die lands on 1 through 6 independently. The probability of reaching a specific outcome depends on how many ways the free dice can produce the required values.
 
-Say you hold (3, 3) and reroll 3 dice. To end up with (1, 3, 3, 4, 5), the free dice need to show {1, 4, 5}. Three distinct values across three dice: 3! = 6 arrangements out of 6<sup>3</sup> = 216, so P = 6/216. To end up with (3, 3, 3, 4, 4) instead, the free dice need {3, 4, 4}: only 3!/2! = 3 arrangements, so P = 3/216.
+Say you keep (3, 3) and reroll 3 dice. To end up with (1, 3, 3, 4, 5), the free dice need to show {1, 4, 5}. Three distinct values across three dice: 3! = 6 arrangements out of 6<sup>3</sup> = 216, so P = 6/216. To end up with (3, 3, 3, 4, 4) instead, the free dice need {3, 4, 4}: only 3!/2! = 3 arrangements, so P = 3/216.
 
 In general, the probability is the multinomial coefficient (the number of distinguishable arrangements of the free dice) divided by 6<sup><var>k</var></sup>. These probabilities are precomputed once into a [sparse table](https://github.com/dlangk/yatzy/blob/main/solver/src/phase0_tables.rs#L82): 462 keeps &times; 252 outcomes, with only [4,368 non-zero entries](https://github.com/dlangk/yatzy/blob/main/solver/src/types.rs#L25-L40). The solver reads from this table in every widget evaluation, never recomputing it.
 
+:::html
+<div class="chart-container" id="chart-transition-matrix">
+  <p class="chart-caption">The 462 &times; 252 keep-to-outcome probability matrix. Each colored cell is a non-zero entry. Columns grouped by number of dice kept (k).</p>
+</div>
+:::
+
 ### The Keep Shortcut
 
-Here is the key algorithmic insight. Many different rolls share the same hold. "Keep two Threes" from (1,3,3,5,6) and from (2,3,3,4,4) produces the same reroll distribution: two free dice, each uniform over 1 through 6. Instead of recomputing each hold's expected value for every roll, the solver computes it once for each of the 462 unique hold-multisets, then distributes:
+Here is the key algorithmic insight. Many different rolls share the same keep. "Keep two Threes" from (1,3,3,5,6) and from (2,3,3,4,4) produces the same reroll distribution: two free dice, each uniform over 1 through 6. Instead of recomputing each keep's expected score for every roll, the solver computes it once for each of the 462 unique keep-multisets, then distributes:
 
 ```
-Step 1: Compute EV for each unique hold (462)
-    for each unique hold h:
-        hold_ev[h] = Σ P(h → reroll) × prev_ev[reroll]
+Step 1: Compute expected score for each unique keep (462)
+    for each unique keep h:
+        keep_ev[h] = Σ P(h → reroll) × prev_exp[reroll]
 
-Step 2: For each roll, pick the best hold (252 lookups)
+Step 2: For each roll, pick the best keep (252 lookups)
     for each roll r:
-        keep_ev[r] = max over valid holds h of r: hold_ev[h]
+        keep_exp[r] = max over valid keeps h of r: keep_ev[h]
 ```
 
 Step 1 does the expensive probability work once. Step 2 is a cheap lookup. This separation reduces the inner loop work by an order of magnitude.
 
 ### The First Roll
 
-At the start of a turn, before any dice are thrown, the expected value is just the weighted average over all 252 possible initial rolls:
+At the start of a turn, before any dice are thrown, the expected score is just the weighted average over all 252 possible initial rolls:
 
 ```
-E(state) = Σ P(initial roll = r) × keep_ev[r]   /   7776
+E(state) = Σ P(initial roll = r) × keep_exp[r]   /   7776
 ```
 
 One number comes out: the expected score from this state under optimal play.
 
 ### The Backward Sweep
 
-All 1.43 million widgets are [solved layer by layer](https://github.com/dlangk/yatzy/blob/main/solver/src/state_computation.rs#L251), starting from the terminal states (layer 16, where the game is over) and working backward to layer 1. Each layer depends only on the next, and states within a layer are independent of each other. This means every state in a layer can be solved in parallel across all CPU cores. The full sweep completes in about one second.
-
-:::html
-<div class="chart-container" id="chart-widget-interactive">
-  <div class="chart-controls">
-    <select id="widget-scenario-select" class="chart-select">
-      <option value="0">Scenario: Keep triple or chase straight?</option>
-    </select>
-    <button class="chart-btn" id="widget-solver-btn">Let Solver Play</button>
-    <button class="chart-btn" id="widget-reset-btn">Reset</button>
-  </div>
-  <div id="widget-flow"></div>
-  <div id="widget-fan-panel" class="widget-math"></div>
-  <p class="chart-caption">Step through a concrete scenario to see how the widget solver evaluates keeps, rerolls, and scoring.</p>
-</div>
-:::
-
+That is how a single widget is solved. Now we zoom out. All 1.43 million widgets are [solved layer by layer](https://github.com/dlangk/yatzy/blob/main/solver/src/state_computation.rs#L251), starting from layer 16 and working backward to layer 1. Each layer depends only on the next, and states within a layer are independent of each other, so every state in a layer can be solved in parallel across all CPU cores. The full sweep completes in about one second.
 
 :::insight
-**462 shared holds make the inner loop tractable.** Without the keep shortcut, each of the 252 rolls would need its own set of sparse dot products against the reroll distribution. Sharing the computation across the 462 unique hold-multisets reduces the work by an order of magnitude, turning a minutes-long solve into a one-second sweep.
+**462 shared keeps make the inner loop tractable.** Without the keep shortcut, each of the 252 rolls would need its own set of sparse dot products against the reroll distribution. Sharing the computation across the 462 unique keep-multisets reduces the work by an order of magnitude, turning a minutes-long solve into a one-second sweep.
 :::
 
 :::math
@@ -125,7 +125,7 @@ max<sub><var>h</var> &sube; <var>d</var></sub>
 <var>Q</var><sub>prev</sub>(<var>u</var>, <var>S</var>, <var>d</var>&prime;, <var>t</var>&minus;1)
 :::
 
-**Turn-start expected value:**
+**Turn-start expected score:**
 
 :::equation
 <var>V</var>(<var>u</var>, <var>S</var>) =
@@ -251,7 +251,7 @@ The full backward sweep over 1.43 million reachable states completes in **1.10 s
 
 ### Memory Lifecycle ([source](https://github.com/dlangk/yatzy/blob/main/solver/src/widget_solver.rs#L430))
 
-The solver uses two flat `[f32; 252]` buffers (1,008 bytes each) in a ping-pong pattern. At each reroll stage, it reads expected values from one buffer (the results of the previous stage) and writes best-keep values into the other. Then it swaps: the output buffer becomes the input for the next stage. The same two buffers handle all three passes (scoring, second reroll, first reroll). Total scratch memory per widget: 2,016 bytes.
+The solver uses two flat `[f32; 252]` buffers (1,008 bytes each) in a ping-pong pattern. At each reroll stage, it reads expected scores from one buffer (the results of the previous stage) and writes best-keep scores into the other. Then it swaps: the output buffer becomes the input for the next stage. The same two buffers handle all three passes (scoring, second reroll, first reroll). Total scratch memory per widget: 2,016 bytes.
 
 At the global level, the solver keeps one `f32` per state slot: `4,194,304 &times; 4 bytes = 16 MB` (of which ~1.43M entries are reachable). Because each layer only reads from the next, all layers share this single table. A naive approach that stored intermediate values for every roll at every stage of every widget would need roughly 8 GB.
 

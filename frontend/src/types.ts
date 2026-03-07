@@ -1,6 +1,6 @@
 export interface DieState {
   value: number;
-  held: boolean;
+  kept: boolean;
 }
 
 export interface TrajectoryPoint {

@@ -5,6 +5,7 @@ from forward DP — zero variance, no KDE smoothing needed. This module converts
 them into the same summary.parquet and kde.parquet schemas that the MC pipeline
 produces, so all downstream plot modules work unchanged.
 """
+
 from __future__ import annotations
 
 import json
@@ -67,7 +68,10 @@ def _cdf_quantile(scores: np.ndarray, cdf: np.ndarray, q: float) -> float:
 
 
 def _conditional_expectation_below(
-    scores: np.ndarray, probs: np.ndarray, cdf: np.ndarray, alpha: float,
+    scores: np.ndarray,
+    probs: np.ndarray,
+    cdf: np.ndarray,
+    alpha: float,
 ) -> float:
     """Compute E[X | X <= VaR_alpha] = CVaR at level alpha.
 
@@ -96,7 +100,10 @@ def _conditional_expectation_below(
 
 
 def _conditional_expectation_above(
-    scores: np.ndarray, probs: np.ndarray, cdf: np.ndarray, alpha: float,
+    scores: np.ndarray,
+    probs: np.ndarray,
+    cdf: np.ndarray,
+    alpha: float,
 ) -> float:
     """Compute E[X | X >= quantile(1-alpha)].
 
@@ -268,13 +275,15 @@ def compute_kde_from_pmf(theta: float, data: dict) -> pl.DataFrame:
     if cdf_vals[-1] > 0:
         cdf_vals = cdf_vals / cdf_vals[-1]
 
-    return pl.DataFrame({
-        "theta": np.full(KDE_POINTS, theta, dtype=np.float64),
-        "score": x_grid.astype(np.float32),
-        "density": density.astype(np.float32),
-        "cdf": cdf_vals.astype(np.float32),
-        "survival": (1.0 - cdf_vals).astype(np.float32),
-    })
+    return pl.DataFrame(
+        {
+            "theta": np.full(KDE_POINTS, theta, dtype=np.float64),
+            "score": x_grid.astype(np.float32),
+            "density": density.astype(np.float32),
+            "cdf": cdf_vals.astype(np.float32),
+            "survival": (1.0 - cdf_vals).astype(np.float32),
+        }
+    )
 
 
 def compute_all_from_density(

@@ -1,4 +1,5 @@
 """KDE, CDF, and summary statistics computation."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -52,8 +53,9 @@ def compute_summary(theta: float, scores: NDArray[np.int32]) -> dict:
 
     # Histogram for entropy (bin per integer score value)
     score_min, score_max = int(scores[0]), int(scores[-1])
-    hist_counts, _ = np.histogram(scores, bins=score_max - score_min + 1,
-                                  range=(score_min - 0.5, score_max + 0.5))
+    hist_counts, _ = np.histogram(
+        scores, bins=score_max - score_min + 1, range=(score_min - 0.5, score_max + 0.5)
+    )
     hist_probs = hist_counts / hist_counts.sum()
 
     return {
@@ -132,13 +134,15 @@ def compute_kde(
     cdf_vals = np.cumsum(density) * dx
     cdf_vals = cdf_vals / cdf_vals[-1]
 
-    return pl.DataFrame({
-        "theta": np.full(n_points, theta, dtype=np.float64),
-        "score": x_grid.astype(np.float32),
-        "density": density.astype(np.float32),
-        "cdf": cdf_vals.astype(np.float32),
-        "survival": (1.0 - cdf_vals).astype(np.float32),
-    })
+    return pl.DataFrame(
+        {
+            "theta": np.full(n_points, theta, dtype=np.float64),
+            "score": x_grid.astype(np.float32),
+            "density": density.astype(np.float32),
+            "cdf": cdf_vals.astype(np.float32),
+            "survival": (1.0 - cdf_vals).astype(np.float32),
+        }
+    )
 
 
 def compute_exchange_rates(
@@ -265,9 +269,9 @@ def compute_mixture_decomposition(game_data: dict) -> pl.DataFrame:
 
     # Binary indicators: score > 0 for each binary category
     got_bonus = game_data["got_bonus"]
-    got_yatzy = cat_scores[:, 14] > 0       # category 14 = Yatzy
-    got_small_str = cat_scores[:, 10] > 0   # category 10 = Small Straight
-    got_large_str = cat_scores[:, 11] > 0   # category 11 = Large Straight
+    got_yatzy = cat_scores[:, 14] > 0  # category 14 = Yatzy
+    got_small_str = cat_scores[:, 10] > 0  # category 10 = Small Straight
+    got_large_str = cat_scores[:, 11] > 0  # category 11 = Large Straight
 
     rows = []
     for b_val in [False, True]:
@@ -275,28 +279,30 @@ def compute_mixture_decomposition(game_data: dict) -> pl.DataFrame:
             for ss_val in [False, True]:
                 for ls_val in [False, True]:
                     mask = (
-                        (got_bonus == b_val) &
-                        (got_yatzy == y_val) &
-                        (got_small_str == ss_val) &
-                        (got_large_str == ls_val)
+                        (got_bonus == b_val)
+                        & (got_yatzy == y_val)
+                        & (got_small_str == ss_val)
+                        & (got_large_str == ls_val)
                     )
                     count = int(mask.sum())
                     if count == 0:
                         continue
                     subset = total[mask]
-                    rows.append({
-                        "bonus": "yes" if b_val else "no",
-                        "yatzy": "yes" if y_val else "no",
-                        "small_straight": "yes" if ss_val else "no",
-                        "large_straight": "yes" if ls_val else "no",
-                        "count": count,
-                        "fraction": count / n,
-                        "mean": float(subset.mean()),
-                        "std": float(subset.std()),
-                        "median": float(np.median(subset)),
-                        "min": int(subset.min()),
-                        "max": int(subset.max()),
-                    })
+                    rows.append(
+                        {
+                            "bonus": "yes" if b_val else "no",
+                            "yatzy": "yes" if y_val else "no",
+                            "small_straight": "yes" if ss_val else "no",
+                            "large_straight": "yes" if ls_val else "no",
+                            "count": count,
+                            "fraction": count / n,
+                            "mean": float(subset.mean()),
+                            "std": float(subset.std()),
+                            "median": float(np.median(subset)),
+                            "min": int(subset.min()),
+                            "max": int(subset.max()),
+                        }
+                    )
     return pl.DataFrame(rows)
 
 

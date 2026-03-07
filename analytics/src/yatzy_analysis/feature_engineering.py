@@ -4,6 +4,7 @@ Computes derived features from the base feature set exported by the Rust solver.
 All features are derivable from existing features (no Rust changes needed):
 un-normalize face counts, apply Yatzy scoring rules, compute pattern indicators.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -80,11 +81,26 @@ def compute_category_scores(features: np.ndarray) -> np.ndarray:
     result = np.zeros((n, CATEGORY_COUNT), dtype=np.float32)
 
     # Normalization constants per category (approximate max scores)
-    max_scores = np.array([
-        5, 10, 15, 20, 25, 30,  # upper: face * 5
-        12, 22, 18, 24,  # pair, 2pair, 3kind, 4kind
-        15, 20, 30, 30, 50,  # sm_str, lg_str, full_house, chance, yatzy
-    ], dtype=np.float32)
+    max_scores = np.array(
+        [
+            5,
+            10,
+            15,
+            20,
+            25,
+            30,  # upper: face * 5
+            12,
+            22,
+            18,
+            24,  # pair, 2pair, 3kind, 4kind
+            15,
+            20,
+            30,
+            30,
+            50,  # sm_str, lg_str, full_house, chance, yatzy
+        ],
+        dtype=np.float32,
+    )
 
     for i in range(n):
         d = dice[i]
@@ -107,10 +123,10 @@ def compute_pattern_indicators(features: np.ndarray) -> np.ndarray:
 
     for i in range(n):
         d = dice[i]
-        result[i, 0] = 1.0 if calculate_score(d, 6) > 0 else 0.0   # pair
-        result[i, 1] = 1.0 if calculate_score(d, 7) > 0 else 0.0   # two pair
-        result[i, 2] = 1.0 if calculate_score(d, 8) > 0 else 0.0   # three kind
-        result[i, 3] = 1.0 if calculate_score(d, 9) > 0 else 0.0   # four kind
+        result[i, 0] = 1.0 if calculate_score(d, 6) > 0 else 0.0  # pair
+        result[i, 1] = 1.0 if calculate_score(d, 7) > 0 else 0.0  # two pair
+        result[i, 2] = 1.0 if calculate_score(d, 8) > 0 else 0.0  # three kind
+        result[i, 3] = 1.0 if calculate_score(d, 9) > 0 else 0.0  # four kind
         result[i, 4] = 1.0 if calculate_score(d, 12) > 0 else 0.0  # full house
         result[i, 5] = 1.0 if calculate_score(d, 10) > 0 else 0.0  # small straight
         result[i, 6] = 1.0 if calculate_score(d, 11) > 0 else 0.0  # large straight
@@ -190,10 +206,18 @@ def augment_features(
     if pattern_indicators:
         pi = compute_pattern_indicators(features)
         parts.append(pi)
-        names.extend([
-            "has_pair", "has_two_pair", "has_three_kind", "has_four_kind",
-            "has_full_house", "has_small_straight", "has_large_straight", "has_yatzy",
-        ])
+        names.extend(
+            [
+                "has_pair",
+                "has_two_pair",
+                "has_three_kind",
+                "has_four_kind",
+                "has_full_house",
+                "has_small_straight",
+                "has_large_straight",
+                "has_yatzy",
+            ]
+        )
 
     if best_available:
         ba = compute_best_available_score(features)

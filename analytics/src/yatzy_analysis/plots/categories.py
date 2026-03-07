@@ -1,4 +1,5 @@
 """Per-category statistics visualizations across the θ sweep."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -46,6 +47,7 @@ def _section_color(cat_id: int) -> str:
 
 # ── Heatmap helper ───────────────────────────────────────────────────────
 
+
 def _heatmap_panel(
     df: pl.DataFrame,
     ax: plt.Axes,
@@ -65,11 +67,17 @@ def _heatmap_panel(
     annot = n_thetas <= 21
 
     sns.heatmap(
-        pivot, ax=ax, cmap=cmap,
-        xticklabels=theta_labels, yticklabels=True,
-        linewidths=0.3, linecolor="#e0e0e0",
+        pivot,
+        ax=ax,
+        cmap=cmap,
+        xticklabels=theta_labels,
+        yticklabels=True,
+        linewidths=0.3,
+        linecolor="#e0e0e0",
         cbar_kws={"label": title, "shrink": 0.8},
-        annot=annot, annot_kws={"size": 7}, fmt=annot_fmt,
+        annot=annot,
+        annot_kws={"size": 7},
+        fmt=annot_fmt,
     )
     ax.set_title(title, fontsize=FONT_TITLE, fontweight="bold", pad=8)
     ax.set_xlabel("θ", fontsize=FONT_AXIS_LABEL)
@@ -80,6 +88,7 @@ def _heatmap_panel(
 
 
 # ── Plot 1a: Mean Score + % of Score Ceiling ────────────────────────────
+
 
 def plot_category_score_heatmaps(
     df: pl.DataFrame,
@@ -96,7 +105,9 @@ def plot_category_score_heatmaps(
     fig, axes = plt.subplots(2, 1, figsize=(max(14, n_thetas * 0.55), 9))
     fig.suptitle(
         "Category Scoring Across θ Sweep",
-        fontsize=FONT_SUPTITLE, fontweight="bold", y=0.995,
+        fontsize=FONT_SUPTITLE,
+        fontweight="bold",
+        y=0.995,
     )
 
     _heatmap_panel(df, axes[0], "mean_score", "Mean Score", CMAP, n_thetas=n_thetas)
@@ -110,6 +121,7 @@ def plot_category_score_heatmaps(
 
 
 # ── Plot 1b: Zero Rate + Hit Rate ───────────────────────────────────────
+
 
 def plot_category_rate_heatmaps(
     df: pl.DataFrame,
@@ -126,7 +138,9 @@ def plot_category_rate_heatmaps(
     fig, axes = plt.subplots(2, 1, figsize=(max(14, n_thetas * 0.55), 9))
     fig.suptitle(
         "Category Rates Across θ Sweep",
-        fontsize=FONT_SUPTITLE, fontweight="bold", y=0.995,
+        fontsize=FONT_SUPTITLE,
+        fontweight="bold",
+        y=0.995,
     )
 
     _heatmap_panel(df, axes[0], "zero_rate", "Zero Rate", CMAP, ".2f", n_thetas=n_thetas)
@@ -140,6 +154,7 @@ def plot_category_rate_heatmaps(
 
 
 # ── Plot 1c: Mean Fill Turn ─────────────────────────────────────────────
+
 
 def plot_category_fill_turn_heatmaps(
     df: pl.DataFrame,
@@ -155,10 +170,14 @@ def plot_category_fill_turn_heatmaps(
 
     fig, ax = plt.subplots(1, 1, figsize=(max(14, n_thetas * 0.55), 5.5))
 
-    _heatmap_panel(df, ax, "mean_fill_turn", "Mean Fill Turn (1-indexed)", "coolwarm_r", n_thetas=n_thetas)
+    _heatmap_panel(
+        df, ax, "mean_fill_turn", "Mean Fill Turn (1-indexed)", "coolwarm_r", n_thetas=n_thetas
+    )
     fig.suptitle(
         "Category Fill Turn Across θ Sweep",
-        fontsize=FONT_SUPTITLE, fontweight="bold", y=1.01,
+        fontsize=FONT_SUPTITLE,
+        fontweight="bold",
+        y=1.01,
     )
 
     plt.tight_layout()
@@ -169,6 +188,7 @@ def plot_category_fill_turn_heatmaps(
 
 
 # ── Plot 2: Small multiples sparklines ─────────────────────────────────────
+
 
 def plot_category_sparklines(
     df: pl.DataFrame,
@@ -190,7 +210,9 @@ def plot_category_sparklines(
     fig, axes = plt.subplots(3, 5, figsize=(22, 10), sharex=True)
     fig.suptitle(
         f"Per-Category {stat_label} vs θ",
-        fontsize=FONT_SUPTITLE, fontweight="bold", y=0.98,
+        fontsize=FONT_SUPTITLE,
+        fontweight="bold",
+        y=0.98,
     )
 
     thetas = sorted(df["theta"].unique().to_list())
@@ -205,8 +227,10 @@ def plot_category_sparklines(
 
         ax.plot(pdf_cat["theta"], pdf_cat[stat], color=color, linewidth=2)
         ax.fill_between(
-            pdf_cat["theta"], pdf_cat[stat],
-            alpha=0.15, color=color,
+            pdf_cat["theta"],
+            pdf_cat[stat],
+            alpha=0.15,
+            color=color,
         )
 
         # Mark θ=0 with a dot
@@ -235,6 +259,7 @@ def plot_category_sparklines(
 
 
 # ── Plot 3: Faceted bar charts ─────────────────────────────────────────────
+
 
 def plot_category_bars(
     df: pl.DataFrame,
@@ -267,8 +292,14 @@ def plot_category_bars(
     # Mean score bars
     ax = axes[0]
     sns.barplot(
-        data=pdf_sub, x="category_name", y="mean_score", hue="θ",
-        palette=palette, ax=ax, edgecolor="white", linewidth=0.5,
+        data=pdf_sub,
+        x="category_name",
+        y="mean_score",
+        hue="θ",
+        palette=palette,
+        ax=ax,
+        edgecolor="white",
+        linewidth=0.5,
     )
     ax.set_title("Mean Score by Category", fontsize=FONT_TITLE, fontweight="bold")
     ax.set_xlabel("")
@@ -281,8 +312,14 @@ def plot_category_bars(
     # Zero rate bars
     ax = axes[1]
     sns.barplot(
-        data=pdf_sub, x="category_name", y="zero_rate", hue="θ",
-        palette=palette, ax=ax, edgecolor="white", linewidth=0.5,
+        data=pdf_sub,
+        x="category_name",
+        y="zero_rate",
+        hue="θ",
+        palette=palette,
+        ax=ax,
+        edgecolor="white",
+        linewidth=0.5,
     )
     ax.set_title("Zero Rate by Category", fontsize=FONT_TITLE, fontweight="bold")
     ax.set_xlabel("")
@@ -299,6 +336,7 @@ def plot_category_bars(
 
 
 # ── Plot 4: Slope / bump chart for fill turn reordering ────────────────────
+
 
 def plot_category_slope(
     df: pl.DataFrame,
@@ -351,13 +389,23 @@ def plot_category_slope(
 
         # Labels on left and right
         ax.text(
-            -0.02, l, f"{CATEGORY_NAMES[cat_id]} ({l:.1f})",
-            ha="right", va="center", fontsize=FONT_LEGEND, fontweight="bold",
+            -0.02,
+            l,
+            f"{CATEGORY_NAMES[cat_id]} ({l:.1f})",
+            ha="right",
+            va="center",
+            fontsize=FONT_LEGEND,
+            fontweight="bold",
             color=color,
         )
         ax.text(
-            1.02, r, f"({r:.1f}) {CATEGORY_NAMES[cat_id]}",
-            ha="left", va="center", fontsize=FONT_LEGEND, fontweight="bold",
+            1.02,
+            r,
+            f"({r:.1f}) {CATEGORY_NAMES[cat_id]}",
+            ha="left",
+            va="center",
+            fontsize=FONT_LEGEND,
+            fontweight="bold",
             color=color,
         )
 
@@ -373,9 +421,9 @@ def plot_category_slope(
     ax.set_xticklabels([f"θ = {t_left}", f"θ = {t_right}"], fontsize=FONT_TITLE, fontweight="bold")
     ax.set_ylabel("Mean Fill Turn (earlier = top)", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
-        "How θ Reorders Category Filling\n"
-        "Blue = filled earlier at high θ, Red = filled later",
-        fontsize=FONT_TITLE, fontweight="bold",
+        "How θ Reorders Category Filling\nBlue = filled earlier at high θ, Red = filled later",
+        fontsize=FONT_TITLE,
+        fontweight="bold",
     )
 
     # Light grid for turn reference
@@ -396,6 +444,7 @@ def plot_category_slope(
 
 
 # ── Plot 5: Multi-column slope chart ──────────────────────────────────────
+
 
 def plot_category_slope_dense(
     df: pl.DataFrame,
@@ -461,12 +510,24 @@ def plot_category_slope_dense(
 
         # Labels on left and right
         ax.text(
-            x_pos[0] - 0.02, ys[0], f"{CATEGORY_NAMES[cat_id]} ({ys[0]:.1f})",
-            ha="right", va="center", fontsize=FONT_TICK, fontweight="bold", color=color,
+            x_pos[0] - 0.02,
+            ys[0],
+            f"{CATEGORY_NAMES[cat_id]} ({ys[0]:.1f})",
+            ha="right",
+            va="center",
+            fontsize=FONT_TICK,
+            fontweight="bold",
+            color=color,
         )
         ax.text(
-            x_pos[-1] + 0.02, ys[-1], f"({ys[-1]:.1f}) {CATEGORY_NAMES[cat_id]}",
-            ha="left", va="center", fontsize=FONT_TICK, fontweight="bold", color=color,
+            x_pos[-1] + 0.02,
+            ys[-1],
+            f"({ys[-1]:.1f}) {CATEGORY_NAMES[cat_id]}",
+            ha="left",
+            va="center",
+            fontsize=FONT_TICK,
+            fontweight="bold",
+            color=color,
         )
 
     ax.set_xlim(x_pos[0] - 0.25, x_pos[-1] + 0.25)
@@ -489,7 +550,8 @@ def plot_category_slope_dense(
     ax.set_title(
         "Category Fill Order Across θ Spectrum\n"
         "Blue = filled earlier at high θ, Red = filled later",
-        fontsize=FONT_TITLE, fontweight="bold",
+        fontsize=FONT_TITLE,
+        fontweight="bold",
     )
 
     for turn in range(1, 16):
@@ -509,6 +571,7 @@ def plot_category_slope_dense(
 
 
 # ── Plot 6: Fill-turn heatmap ─────────────────────────────────────────────
+
 
 def plot_fill_turn_heatmap(
     df: pl.DataFrame,
@@ -539,16 +602,24 @@ def plot_fill_turn_heatmap(
     fig, ax = plt.subplots(figsize=(max(16, len(pivot.columns) * 0.55), 8))
 
     sns.heatmap(
-        pivot, ax=ax, cmap="coolwarm_r",
-        xticklabels=theta_labels, yticklabels=True,
-        linewidths=0.3, linecolor="#e0e0e0",
+        pivot,
+        ax=ax,
+        cmap="coolwarm_r",
+        xticklabels=theta_labels,
+        yticklabels=True,
+        linewidths=0.3,
+        linecolor="#e0e0e0",
         cbar_kws={"label": "Mean Fill Turn (lower = earlier)", "shrink": 0.8},
-        annot=True, annot_kws={"size": 7}, fmt=".1f",
+        annot=True,
+        annot_kws={"size": 7},
+        fmt=".1f",
     )
 
     ax.set_title(
         "Category Fill Order Across All θ Values",
-        fontsize=FONT_TITLE, fontweight="bold", pad=12,
+        fontsize=FONT_TITLE,
+        fontweight="bold",
+        pad=12,
     )
     ax.set_xlabel("θ (risk parameter)", fontsize=FONT_AXIS_LABEL)
     ax.set_ylabel("")
@@ -566,6 +637,7 @@ def plot_fill_turn_heatmap(
 
 
 # ── Orchestrator ───────────────────────────────────────────────────────────
+
 
 def plot_all_category_stats(
     csv_path: Path,
@@ -609,20 +681,38 @@ def plot_all_category_stats(
         ("mean_fill_turn", "Mean Fill Turn"),
     ]:
         plot_category_sparklines(
-            zdf, out_dir, stat=stat, stat_label=label, suffix=sfx, dpi=dpi, fmt=fmt,
+            zdf,
+            out_dir,
+            stat=stat,
+            stat_label=label,
+            suffix=sfx,
+            dpi=dpi,
+            fmt=fmt,
         )
     plot_category_bars(
-        zdf, out_dir,
+        zdf,
+        out_dir,
         selected_thetas=[-0.20, -0.05, 0.0, 0.05, 0.20],
-        suffix=sfx, dpi=dpi, fmt=fmt,
+        suffix=sfx,
+        dpi=dpi,
+        fmt=fmt,
     )
     plot_category_slope(
-        zdf, out_dir, t_left=-0.2, t_right=0.2, suffix=sfx, dpi=dpi, fmt=fmt,
+        zdf,
+        out_dir,
+        t_left=-0.2,
+        t_right=0.2,
+        suffix=sfx,
+        dpi=dpi,
+        fmt=fmt,
     )
     plot_category_slope_dense(
-        zdf, out_dir,
+        zdf,
+        out_dir,
         selected_thetas=[-0.20, -0.10, -0.05, 0.0, 0.05, 0.10, 0.20],
-        suffix=sfx, dpi=dpi, fmt=fmt,
+        suffix=sfx,
+        dpi=dpi,
+        fmt=fmt,
     )
     plot_fill_turn_heatmap(zdf, out_dir, suffix=sfx, dpi=dpi, fmt=fmt)
     print("Done.")

@@ -26,9 +26,7 @@ export const DataLoader = {
   categoryStats: () => load('category_stats_theta0.json'),
 
   // New treatise data
-  backwardWave: () => load('backward_wave.json'),
-  widgetScenarios: () => load('widget_scenarios.json'),
-  decisionAnatomy: () => load('decision_anatomy.json'),
+  backwardWave: () => load('backward_wave.json'),  decisionAnatomy: () => load('decision_anatomy.json'),
   reachability: () => load('reachability.json'),
   optimizationTimeline: () => load('optimization_timeline.json'),
   maxPolicy: () => load('max_policy.json'),

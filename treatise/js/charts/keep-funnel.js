@@ -19,19 +19,19 @@ const PIPS = [
   [{ cx: 14, cy: 12 }, { cx: 34, cy: 12 }, { cx: 14, cy: 24 }, { cx: 34, cy: 24 }, { cx: 14, cy: 36 }, { cx: 34, cy: 36 }],
 ];
 
-function makeMinDie(face, held) {
+function makeMinDie(face, kept) {
   const pips = (PIPS[face] || []).map(p =>
-    held
+    kept
       ? `<circle cx="${p.cx}" cy="${p.cy}" r="4.5" fill="var(--text)"/>`
       : `<circle cx="${p.cx}" cy="${p.cy}" r="4.5" fill="var(--text)" opacity="0.2"/>`
   ).join('');
 
-  const rect = held
+  const rect = kept
     ? `<rect x="1" y="1" width="46" height="46" rx="8" fill="var(--bg)" stroke="var(--accent)" stroke-width="3"/>`
     : `<rect x="1" y="1" width="46" height="46" rx="8" fill="none" stroke="var(--border)" stroke-width="2" stroke-dasharray="4 3"/>`;
 
   const wrap = document.createElement('div');
-  wrap.className = held ? 'keep-die keep-die-held' : 'keep-die keep-die-reroll';
+  wrap.className = kept ? 'keep-die keep-die-kept' : 'keep-die keep-die-reroll';
   wrap.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">${rect}${pips}</svg>`;
   return wrap;
 }

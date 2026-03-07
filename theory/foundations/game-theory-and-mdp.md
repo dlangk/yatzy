@@ -359,7 +359,7 @@ The mathematical optimum operates ~20–30 points higher than the average casual
 
 2. **Flexibility Preservation (medium gain):** Humans use Chance or Ones when they get a bad roll early. The solver guards these categories, saving them to absorb catastrophic variance in Turns 13 and 14.
 
-3. **Combinatorial Micro-Hedging (final 5%):** The realm of the DP solver. Knowing exactly when to hold a pair versus chase a straight based on the exact fractional EV of the remaining scorecard.
+3. **Combinatorial Micro-Hedging (final 5%):** The realm of the DP solver. Knowing exactly when to keep a pair versus chase a straight based on the exact fractional EV of the remaining scorecard.
 
 ---
 

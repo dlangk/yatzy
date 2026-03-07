@@ -1,4 +1,5 @@
 """CDF and tail plots."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -44,8 +45,11 @@ def plot_cdf(
         lw = 2.5 if t == 0 else 1.4
         alpha = 1.0 if t == 0 else 0.85
         ax.plot(
-            subset["score"], subset["cdf"],
-            color=color, linewidth=lw, alpha=alpha,
+            subset["score"],
+            subset["cdf"],
+            color=color,
+            linewidth=lw,
+            alpha=alpha,
         )
 
     ax.set_xlabel("Total Score", fontsize=FONT_AXIS_LABEL)
@@ -89,14 +93,20 @@ def plot_tails(
 
         left = subset[subset["cdf"] <= 0.05]
         ax_left.plot(
-            left["score"], left["cdf"],
-            color=color, linewidth=lw, alpha=alpha,
+            left["score"],
+            left["cdf"],
+            color=color,
+            linewidth=lw,
+            alpha=alpha,
         )
 
         right = subset[subset["cdf"] >= 0.97]
         ax_right.plot(
-            right["score"], right["survival"],
-            color=color, linewidth=lw, alpha=alpha,
+            right["score"],
+            right["survival"],
+            color=color,
+            linewidth=lw,
+            alpha=alpha,
         )
 
     _spec = spec or PLOT_SPECS["tails_zoomed"]
@@ -115,7 +125,10 @@ def plot_tails(
 
     if standalone:
         fig.suptitle(
-            "Tail Behavior by Risk Parameter θ", fontsize=FONT_SUPTITLE, fontweight="bold", y=1.02,
+            "Tail Behavior by Risk Parameter θ",
+            fontsize=FONT_SUPTITLE,
+            fontweight="bold",
+            y=1.02,
         )
         fig.tight_layout()
         fig.savefig(out_dir / f"tails_zoomed.{fmt}", dpi=dpi, bbox_inches="tight")

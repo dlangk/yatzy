@@ -1,4 +1,5 @@
 """Adaptive policy discovery, score extraction, and summary computation."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -42,9 +43,7 @@ def discover_adaptive_policies(base_path: str = ".") -> list[str]:
     return policies
 
 
-def read_adaptive_scores(
-    policies: list[str], base_path: str = "."
-) -> dict[str, NDArray[np.int32]]:
+def read_adaptive_scores(policies: list[str], base_path: str = ".") -> dict[str, NDArray[np.int32]]:
     """Read scores for each adaptive policy. Returns {policy_name: sorted_scores}.
 
     Prefers scores.bin over simulation_raw.bin.

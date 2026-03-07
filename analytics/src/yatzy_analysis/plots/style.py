@@ -1,4 +1,5 @@
 """Shared plot styling: custom diverging colormap, theta_color, seaborn theme."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -48,14 +49,38 @@ ADAPTIVE_COLORS = {
 # Domain constants
 # ---------------------------------------------------------------------------
 CATEGORY_NAMES = [
-    "Ones", "Twos", "Threes", "Fours", "Fives", "Sixes",
-    "One Pair", "Two Pairs", "Three of a Kind", "Four of a Kind",
-    "Small Straight", "Large Straight", "Full House", "Chance", "Yatzy",
+    "Ones",
+    "Twos",
+    "Threes",
+    "Fours",
+    "Fives",
+    "Sixes",
+    "One Pair",
+    "Two Pairs",
+    "Three of a Kind",
+    "Four of a Kind",
+    "Small Straight",
+    "Large Straight",
+    "Full House",
+    "Chance",
+    "Yatzy",
 ]
 CATEGORY_SHORT = [
-    "1s", "2s", "3s", "4s", "5s", "6s",
-    "Pair", "2Pair", "3Kind", "4Kind",
-    "SmStr", "LgStr", "FHouse", "Chance", "Yatzy",
+    "1s",
+    "2s",
+    "3s",
+    "4s",
+    "5s",
+    "6s",
+    "Pair",
+    "2Pair",
+    "3Kind",
+    "4Kind",
+    "SmStr",
+    "LgStr",
+    "FHouse",
+    "Chance",
+    "Yatzy",
 ]
 
 PERCENTILES_CORE = ["p5", "p10", "p25", "p50", "p75", "p90", "p95", "p99"]
@@ -75,6 +100,7 @@ CMAP_R = CMAP.reversed()
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def save_fig(fig, out_dir: Path, name: str, *, dpi: int = 200, fmt: str = "png") -> Path:
     """Save + close with consistent bbox_inches='tight'."""
@@ -108,7 +134,10 @@ def theta_color(t: float, norm: mcolors.Normalize):
 
 
 def theta_colorbar(
-    ax, norm: mcolors.Normalize, *, label: str = "θ  (blue=risk-averse, red=risk-seeking)",
+    ax,
+    norm: mcolors.Normalize,
+    *,
+    label: str = "θ  (blue=risk-averse, red=risk-seeking)",
 ):
     sm = plt.cm.ScalarMappable(cmap=CMAP, norm=norm)
     sm.set_array([])

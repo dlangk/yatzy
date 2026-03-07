@@ -1,4 +1,5 @@
 """Percentile frontiers and risk tradeoff plots, parameterized by θ."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -109,11 +110,16 @@ def plot_percentile_frontiers(
 
     # Light annotation explaining the loops
     ax.text(
-        0.02, 0.97,
+        0.02,
+        0.97,
         "Curves loop because std is non-monotonic in θ:\n"
         "risk-averse (left) → EV-optimal (center) → risk-seeking (right)",
-        transform=ax.transAxes, fontsize=8, va="top", ha="left",
-        color="0.4", style="italic",
+        transform=ax.transAxes,
+        fontsize=8,
+        va="top",
+        ha="left",
+        color="0.4",
+        style="italic",
     )
 
     fig.tight_layout()
@@ -161,6 +167,7 @@ def _place_right_labels(
 # Shared helper: θ-colored line with labeled scatter points
 # ---------------------------------------------------------------------------
 
+
 def _theta_colored_curve(
     ax: plt.Axes,
     x: np.ndarray,
@@ -189,13 +196,23 @@ def _theta_colored_curve(
     ax.add_collection(lc)
 
     # Scatter dots
-    ax.scatter(x, y, c=thetas, cmap=cmap, norm=norm, s=marker_size,
-               edgecolors="white", linewidths=0.4, zorder=3)
+    ax.scatter(
+        x,
+        y,
+        c=thetas,
+        cmap=cmap,
+        norm=norm,
+        s=marker_size,
+        edgecolors="white",
+        linewidths=0.4,
+        zorder=3,
+    )
 
     # Label selected thetas
     if label_thetas is None:
         label_thetas = [
-            t for t in [-3, -1, -0.5, -0.1, -0.03, 0, 0.03, 0.1, 0.5, 1, 3]
+            t
+            for t in [-3, -1, -0.5, -0.1, -0.03, 0, 0.03, 0.1, 0.5, 1, 3]
             if t >= thetas.min() - 0.01 and t <= thetas.max() + 0.01
         ]
 
@@ -225,6 +242,7 @@ def _add_theta_colorbar(ax: plt.Axes, norm: mcolors.Normalize) -> None:
 # 1. Mean vs CVaR_5  —  the classic risk-return frontier
 # ---------------------------------------------------------------------------
 
+
 def plot_mean_vs_cvar(
     stats_df: pl.DataFrame,
     out_dir: Path,
@@ -244,8 +262,9 @@ def plot_mean_vs_cvar(
     x = df["mean"].to_numpy()
     y = df["cvar_5"].to_numpy()
     thetas = df["theta"].to_numpy()
-    norm = mcolors.SymLogNorm(linthresh=0.05, linscale=1.0,
-                              vmin=-max(abs(thetas)), vmax=max(abs(thetas)))
+    norm = mcolors.SymLogNorm(
+        linthresh=0.05, linscale=1.0, vmin=-max(abs(thetas)), vmax=max(abs(thetas))
+    )
 
     fig, ax = plt.subplots(figsize=(10, 8))
     _theta_colored_curve(ax, x, y, thetas, norm)
@@ -253,15 +272,29 @@ def plot_mean_vs_cvar(
     # Mark θ=0 with a star
     idx0 = int(np.argmin(np.abs(thetas)))
     ax.plot(x[idx0], y[idx0], "*", color="black", markersize=14, zorder=6)
-    ax.annotate("θ=0\n(EV-optimal)", (x[idx0], y[idx0]),
-                xytext=(-12, -18), textcoords="offset points",
-                fontsize=9, ha="center", fontweight="bold", zorder=6)
+    ax.annotate(
+        "θ=0\n(EV-optimal)",
+        (x[idx0], y[idx0]),
+        xytext=(-12, -18),
+        textcoords="offset points",
+        fontsize=9,
+        ha="center",
+        fontweight="bold",
+        zorder=6,
+    )
 
     # Reference line: y = x (CVaR = mean means no tail risk)
     lim_lo = min(x.min(), y.min()) - 5
     lim_hi = max(x.max(), y.max()) + 5
-    ax.plot([lim_lo, lim_hi], [lim_lo, lim_hi], "--", color="0.7",
-            linewidth=1, zorder=1, label="CVaR5 = mean")
+    ax.plot(
+        [lim_lo, lim_hi],
+        [lim_lo, lim_hi],
+        "--",
+        color="0.7",
+        linewidth=1,
+        zorder=1,
+        label="CVaR5 = mean",
+    )
 
     ax.set_xlabel("Mean Score", fontsize=FONT_AXIS_LABEL)
     ax.set_ylabel("CVaR5 (average of worst 5%)", fontsize=FONT_AXIS_LABEL)
@@ -279,6 +312,7 @@ def plot_mean_vs_cvar(
 # ---------------------------------------------------------------------------
 # 2. P5 vs P95  —  pure tail-vs-tail tradeoff
 # ---------------------------------------------------------------------------
+
 
 def plot_p5_vs_p95(
     stats_df: pl.DataFrame,
@@ -299,8 +333,9 @@ def plot_p5_vs_p95(
     x = df["p5"].to_numpy().astype(float)
     y = df["p95"].to_numpy().astype(float)
     thetas = df["theta"].to_numpy()
-    norm = mcolors.SymLogNorm(linthresh=0.05, linscale=1.0,
-                              vmin=-max(abs(thetas)), vmax=max(abs(thetas)))
+    norm = mcolors.SymLogNorm(
+        linthresh=0.05, linscale=1.0, vmin=-max(abs(thetas)), vmax=max(abs(thetas))
+    )
 
     fig, ax = plt.subplots(figsize=(10, 8))
     _theta_colored_curve(ax, x, y, thetas, norm)
@@ -308,18 +343,37 @@ def plot_p5_vs_p95(
     # Mark θ=0
     idx0 = int(np.argmin(np.abs(thetas)))
     ax.plot(x[idx0], y[idx0], "*", color="black", markersize=14, zorder=6)
-    ax.annotate("θ=0", (x[idx0], y[idx0]),
-                xytext=(-10, -14), textcoords="offset points",
-                fontsize=9, ha="center", fontweight="bold", zorder=6)
+    ax.annotate(
+        "θ=0",
+        (x[idx0], y[idx0]),
+        xytext=(-10, -14),
+        textcoords="offset points",
+        fontsize=9,
+        ha="center",
+        fontweight="bold",
+        zorder=6,
+    )
 
     # Ideal direction arrow (upper-right = both improve)
     ax.annotate(
-        "", xy=(0.95, 0.95), xytext=(0.85, 0.85),
-        xycoords="axes fraction", textcoords="axes fraction",
+        "",
+        xy=(0.95, 0.95),
+        xytext=(0.85, 0.85),
+        xycoords="axes fraction",
+        textcoords="axes fraction",
         arrowprops=dict(arrowstyle="->", color="0.6", lw=1.5),
     )
-    ax.text(0.96, 0.92, "ideal\n(both improve)", transform=ax.transAxes,
-            fontsize=8, color="0.5", ha="right", va="top", style="italic")
+    ax.text(
+        0.96,
+        0.92,
+        "ideal\n(both improve)",
+        transform=ax.transAxes,
+        fontsize=8,
+        color="0.5",
+        ha="right",
+        va="top",
+        style="italic",
+    )
 
     ax.set_xlabel("P5 (5th percentile — floor)", fontsize=FONT_AXIS_LABEL)
     ax.set_ylabel("P95 (95th percentile — ceiling)", fontsize=FONT_AXIS_LABEL)
@@ -336,6 +390,7 @@ def plot_p5_vs_p95(
 # ---------------------------------------------------------------------------
 # 3. Skewness vs Kurtosis  —  distribution shape journey
 # ---------------------------------------------------------------------------
+
 
 def plot_skewness_vs_kurtosis(
     stats_df: pl.DataFrame,
@@ -359,8 +414,9 @@ def plot_skewness_vs_kurtosis(
     x = df["skewness"].to_numpy()
     y = df["kurtosis"].to_numpy()
     thetas = df["theta"].to_numpy()
-    norm = mcolors.SymLogNorm(linthresh=0.05, linscale=1.0,
-                              vmin=-max(abs(thetas)), vmax=max(abs(thetas)))
+    norm = mcolors.SymLogNorm(
+        linthresh=0.05, linscale=1.0, vmin=-max(abs(thetas)), vmax=max(abs(thetas))
+    )
 
     fig, ax = plt.subplots(figsize=(10, 8))
     _theta_colored_curve(ax, x, y, thetas, norm, marker_size=50)
@@ -368,15 +424,29 @@ def plot_skewness_vs_kurtosis(
     # Mark θ=0
     idx0 = int(np.argmin(np.abs(thetas)))
     ax.plot(x[idx0], y[idx0], "*", color="black", markersize=14, zorder=6)
-    ax.annotate("θ=0", (x[idx0], y[idx0]),
-                xytext=(8, -12), textcoords="offset points",
-                fontsize=9, ha="left", fontweight="bold", zorder=6)
+    ax.annotate(
+        "θ=0",
+        (x[idx0], y[idx0]),
+        xytext=(8, -12),
+        textcoords="offset points",
+        fontsize=9,
+        ha="left",
+        fontweight="bold",
+        zorder=6,
+    )
 
     # Normal reference point
     ax.plot(0, 0, "D", color="0.4", markersize=8, zorder=5, alpha=0.6)
-    ax.annotate("Normal\n(0, 0)", (0, 0), xytext=(8, 8),
-                textcoords="offset points", fontsize=8, color="0.4",
-                style="italic", zorder=5)
+    ax.annotate(
+        "Normal\n(0, 0)",
+        (0, 0),
+        xytext=(8, 8),
+        textcoords="offset points",
+        fontsize=8,
+        color="0.4",
+        style="italic",
+        zorder=5,
+    )
 
     # Axis lines through origin
     ax.axhline(0, color="0.8", linewidth=0.8, zorder=1)
@@ -384,18 +454,50 @@ def plot_skewness_vs_kurtosis(
 
     # Quadrant labels
     pad = 0.02
-    ax.text(pad, 1 - pad, "left-skewed\nheavy-tailed",
-            transform=ax.transAxes, fontsize=8, color="0.6",
-            ha="left", va="top", style="italic")
-    ax.text(1 - pad, 1 - pad, "right-skewed\nheavy-tailed",
-            transform=ax.transAxes, fontsize=8, color="0.6",
-            ha="right", va="top", style="italic")
-    ax.text(pad, pad, "left-skewed\nlight-tailed",
-            transform=ax.transAxes, fontsize=8, color="0.6",
-            ha="left", va="bottom", style="italic")
-    ax.text(1 - pad, pad, "right-skewed\nlight-tailed",
-            transform=ax.transAxes, fontsize=8, color="0.6",
-            ha="right", va="bottom", style="italic")
+    ax.text(
+        pad,
+        1 - pad,
+        "left-skewed\nheavy-tailed",
+        transform=ax.transAxes,
+        fontsize=8,
+        color="0.6",
+        ha="left",
+        va="top",
+        style="italic",
+    )
+    ax.text(
+        1 - pad,
+        1 - pad,
+        "right-skewed\nheavy-tailed",
+        transform=ax.transAxes,
+        fontsize=8,
+        color="0.6",
+        ha="right",
+        va="top",
+        style="italic",
+    )
+    ax.text(
+        pad,
+        pad,
+        "left-skewed\nlight-tailed",
+        transform=ax.transAxes,
+        fontsize=8,
+        color="0.6",
+        ha="left",
+        va="bottom",
+        style="italic",
+    )
+    ax.text(
+        1 - pad,
+        pad,
+        "right-skewed\nlight-tailed",
+        transform=ax.transAxes,
+        fontsize=8,
+        color="0.6",
+        ha="right",
+        va="bottom",
+        style="italic",
+    )
 
     ax.set_xlabel("Skewness", fontsize=FONT_AXIS_LABEL)
     ax.set_ylabel("Excess Kurtosis", fontsize=FONT_AXIS_LABEL)

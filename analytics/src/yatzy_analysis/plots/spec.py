@@ -1,4 +1,5 @@
 """Plot specifications: purpose, design, and theta-legend rendering mode."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

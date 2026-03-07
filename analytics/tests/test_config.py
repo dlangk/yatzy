@@ -1,4 +1,5 @@
 """Tests for analytics config module."""
+
 from __future__ import annotations
 
 from pathlib import Path

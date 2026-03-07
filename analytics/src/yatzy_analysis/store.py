@@ -1,4 +1,5 @@
 """Save/load Parquet intermediates."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -19,10 +20,14 @@ def save_scores(scores_dict: dict[float, NDArray[np.int32]], path: Path) -> None
     parts = []
     for t in sorted(scores_dict.keys()):
         s = scores_dict[t]
-        parts.append(pl.DataFrame({
-            "theta": np.full(len(s), t, dtype=np.float64),
-            "score": s,
-        }))
+        parts.append(
+            pl.DataFrame(
+                {
+                    "theta": np.full(len(s), t, dtype=np.float64),
+                    "score": s,
+                }
+            )
+        )
     df = pl.concat(parts)
     df.write_parquet(path)
 

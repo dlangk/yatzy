@@ -3,7 +3,7 @@ export interface DieElements {
   container: HTMLDivElement;
   update: (opts: {
     value: number;
-    held: boolean;
+    kept: boolean;
     isOptimalReroll: boolean;
     isOptimalKeep: boolean;
     disabled: boolean;
@@ -12,10 +12,10 @@ export interface DieElements {
 }
 
 /**
- * Creates a single die button with up/down increment arrows and hold toggle.
+ * Creates a single die button with up/down increment arrows and keep toggle.
  *
- * Callbacks: onToggle (hold/reroll), onIncrement (+1), onDecrement (-1).
- * Returned `update()` sets value, held state, optimal-keep/reroll borders,
+ * Callbacks: onToggle (keep/reroll), onIncrement (+1), onDecrement (-1).
+ * Returned `update()` sets value, kept state, optimal-keep/reroll borders,
  * and disabled/faded appearance.
  */
 export function createDie(
@@ -46,7 +46,7 @@ export function createDie(
 
   function update(opts: {
     value: number;
-    held: boolean;
+    kept: boolean;
     isOptimalReroll: boolean;
     isOptimalKeep: boolean;
     disabled: boolean;
@@ -54,10 +54,10 @@ export function createDie(
   }) {
     btn.textContent = opts.value === 0 ? '?' : String(opts.value);
     btn.disabled = opts.disabled;
-    btn.style.background = opts.held ? 'var(--bg)' : 'var(--bg-alt)';
+    btn.style.background = opts.kept ? 'var(--bg)' : 'var(--bg-alt)';
     btn.style.cursor = opts.disabled ? 'default' : 'pointer';
     btn.style.opacity = opts.faded ? '0.5' : '1';
-    btn.title = opts.held ? 'Held (click to reroll)' : 'Will reroll (click to hold)';
+    btn.title = opts.kept ? 'Kept (click to reroll)' : 'Will reroll (click to keep)';
 
     if (opts.isOptimalReroll) {
       btn.style.border = '3px solid var(--color-danger)';

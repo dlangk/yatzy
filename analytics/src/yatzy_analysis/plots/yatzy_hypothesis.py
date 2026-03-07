@@ -7,6 +7,7 @@ or only dumps it in poor games. Includes max-policy as a distinct strategy.
 2. Unconditional vs top-5% tail hit rate (line plot)
 3. Dump gap: mean score when Yatzy hit vs missed (paired bars)
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -69,6 +70,7 @@ def _ordered_strategies(thetas: list[float], has_max: bool) -> list[str]:
 
 # ── Plot 1: Conditional hit rate by score band ────────────────────────────
 
+
 def plot_conditional_hit_rate(
     df: pl.DataFrame,
     out_dir: Path,
@@ -102,9 +104,13 @@ def plot_conditional_hit_rate(
 
         offset = (j - n_strats / 2 + 0.5) * bar_width
         ax.bar(
-            x + offset, rates, bar_width,
-            label=_strategy_label(strat), color=colors[strat],
-            edgecolor="white", linewidth=0.5,
+            x + offset,
+            rates,
+            bar_width,
+            label=_strategy_label(strat),
+            color=colors[strat],
+            edgecolor="white",
+            linewidth=0.5,
         )
 
     ax.set_xticks(x)
@@ -113,7 +119,8 @@ def plot_conditional_hit_rate(
     ax.set_ylabel("Yatzy Hit Rate (%)", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "Conditional Yatzy Hit Rate by Score Band",
-        fontsize=FONT_TITLE, fontweight="bold",
+        fontsize=FONT_TITLE,
+        fontweight="bold",
     )
     ax.legend(title="", loc="upper left", fontsize=FONT_LEGEND, ncol=2)
     ax.yaxis.set_major_formatter(mticker.PercentFormatter(decimals=0))
@@ -121,8 +128,13 @@ def plot_conditional_hit_rate(
     # Vertical separator before top5pct
     ax.axvline(x=n_bands - 1.5, color="black", linewidth=1, linestyle="--", alpha=0.4)
     ax.text(
-        n_bands - 1, ax.get_ylim()[1] * 0.95, "dynamic\nthreshold",
-        ha="center", fontsize=9, alpha=0.5, style="italic",
+        n_bands - 1,
+        ax.get_ylim()[1] * 0.95,
+        "dynamic\nthreshold",
+        ha="center",
+        fontsize=9,
+        alpha=0.5,
+        style="italic",
     )
 
     ax.grid(axis="y", alpha=GRID_ALPHA)
@@ -134,6 +146,7 @@ def plot_conditional_hit_rate(
 
 
 # ── Plot 2: Unconditional vs tail hit rate ────────────────────────────────
+
 
 def plot_unconditional_vs_tail(
     df: pl.DataFrame,
@@ -164,13 +177,21 @@ def plot_unconditional_vs_tail(
     fig, ax = plt.subplots(figsize=(10, 7))
 
     ax.plot(
-        all_df["theta_f"].to_numpy(), all_df["yatzy_hit_rate"].to_numpy() * 100,
-        "o-", color="#2166AC", linewidth=2.5, markersize=8,
+        all_df["theta_f"].to_numpy(),
+        all_df["yatzy_hit_rate"].to_numpy() * 100,
+        "o-",
+        color="#2166AC",
+        linewidth=2.5,
+        markersize=8,
         label="Unconditional (all games)",
     )
     ax.plot(
-        top5_df["theta_f"].to_numpy(), top5_df["yatzy_hit_rate"].to_numpy() * 100,
-        "s--", color="#B2182B", linewidth=2.5, markersize=8,
+        top5_df["theta_f"].to_numpy(),
+        top5_df["yatzy_hit_rate"].to_numpy() * 100,
+        "s--",
+        color="#B2182B",
+        linewidth=2.5,
+        markersize=8,
         label="Top 5% tail only",
     )
 
@@ -184,24 +205,33 @@ def plot_unconditional_vs_tail(
             rate = mp_all["yatzy_hit_rate"].to_numpy()[0] * 100
             ax.plot(x_max, rate, "D", color=MAX_POLICY_COLOR, markersize=12, zorder=5)
             ax.annotate(
-                f"max-policy\n{rate:.1f}%", (x_max, rate),
-                textcoords="offset points", xytext=(12, 0), fontsize=9,
-                color=MAX_POLICY_COLOR, fontweight="bold",
+                f"max-policy\n{rate:.1f}%",
+                (x_max, rate),
+                textcoords="offset points",
+                xytext=(12, 0),
+                fontsize=9,
+                color=MAX_POLICY_COLOR,
+                fontweight="bold",
             )
         if len(mp_top5) > 0:
             rate = mp_top5["yatzy_hit_rate"].to_numpy()[0] * 100
             ax.plot(x_max, rate, "D", color=MAX_POLICY_COLOR, markersize=12, zorder=5)
             ax.annotate(
-                f"max-policy top5%\n{rate:.1f}%", (x_max, rate),
-                textcoords="offset points", xytext=(12, 0), fontsize=9,
-                color=MAX_POLICY_COLOR, fontweight="bold",
+                f"max-policy top5%\n{rate:.1f}%",
+                (x_max, rate),
+                textcoords="offset points",
+                xytext=(12, 0),
+                fontsize=9,
+                color=MAX_POLICY_COLOR,
+                fontweight="bold",
             )
 
     ax.set_xlabel("θ (risk parameter)", fontsize=FONT_AXIS_LABEL)
     ax.set_ylabel("Yatzy Hit Rate (%)", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "Unconditional vs Top-5% Tail Yatzy Hit Rate",
-        fontsize=FONT_TITLE, fontweight="bold",
+        fontsize=FONT_TITLE,
+        fontweight="bold",
     )
     ax.legend(fontsize=11, loc="best")
     ax.yaxis.set_major_formatter(mticker.PercentFormatter(decimals=0))
@@ -214,12 +244,20 @@ def plot_unconditional_vs_tail(
         t0_all = all_first["yatzy_hit_rate"] * 100
         tmax_all = all_last["yatzy_hit_rate"] * 100
         ax.annotate(
-            f"{t0_all:.1f}%", (all_first["theta_f"], t0_all),
-            textcoords="offset points", xytext=(10, 10), fontsize=9, color="#2166AC",
+            f"{t0_all:.1f}%",
+            (all_first["theta_f"], t0_all),
+            textcoords="offset points",
+            xytext=(10, 10),
+            fontsize=9,
+            color="#2166AC",
         )
         ax.annotate(
-            f"{tmax_all:.1f}%", (all_last["theta_f"], tmax_all),
-            textcoords="offset points", xytext=(10, -15), fontsize=9, color="#2166AC",
+            f"{tmax_all:.1f}%",
+            (all_last["theta_f"], tmax_all),
+            textcoords="offset points",
+            xytext=(10, -15),
+            fontsize=9,
+            color="#2166AC",
         )
 
     if len(top5_df) >= 2:
@@ -228,12 +266,20 @@ def plot_unconditional_vs_tail(
         t0_top5 = top5_first["yatzy_hit_rate"] * 100
         tmax_top5 = top5_last["yatzy_hit_rate"] * 100
         ax.annotate(
-            f"{t0_top5:.1f}%", (top5_first["theta_f"], t0_top5),
-            textcoords="offset points", xytext=(10, -15), fontsize=9, color="#B2182B",
+            f"{t0_top5:.1f}%",
+            (top5_first["theta_f"], t0_top5),
+            textcoords="offset points",
+            xytext=(10, -15),
+            fontsize=9,
+            color="#B2182B",
         )
         ax.annotate(
-            f"{tmax_top5:.1f}%", (top5_last["theta_f"], tmax_top5),
-            textcoords="offset points", xytext=(10, 10), fontsize=9, color="#B2182B",
+            f"{tmax_top5:.1f}%",
+            (top5_last["theta_f"], tmax_top5),
+            textcoords="offset points",
+            xytext=(10, 10),
+            fontsize=9,
+            color="#B2182B",
         )
 
     plt.tight_layout()
@@ -244,6 +290,7 @@ def plot_unconditional_vs_tail(
 
 
 # ── Plot 3: The dump gap ─────────────────────────────────────────────────
+
 
 def plot_dump_gap(
     df: pl.DataFrame,
@@ -277,20 +324,33 @@ def plot_dump_gap(
     miss_scores = all_df["mean_score_miss"].to_numpy()
 
     ax.bar(
-        x - width / 2, hit_scores, width,
-        label="Yatzy HIT", color="#2166AC", edgecolor="white", linewidth=0.5,
+        x - width / 2,
+        hit_scores,
+        width,
+        label="Yatzy HIT",
+        color="#2166AC",
+        edgecolor="white",
+        linewidth=0.5,
     )
     ax.bar(
-        x + width / 2, miss_scores, width,
-        label="Yatzy MISSED", color="#B2182B", edgecolor="white", linewidth=0.5,
+        x + width / 2,
+        miss_scores,
+        width,
+        label="Yatzy MISSED",
+        color="#B2182B",
+        edgecolor="white",
+        linewidth=0.5,
     )
 
     # Annotate gaps
     for i, (h, m) in enumerate(zip(hit_scores, miss_scores)):
         gap = h - m
         ax.annotate(
-            f"+{gap:.0f}", (x[i], max(h, m) + 1),
-            ha="center", fontsize=9, fontweight="bold",
+            f"+{gap:.0f}",
+            (x[i], max(h, m) + 1),
+            ha="center",
+            fontsize=9,
+            fontweight="bold",
             color="#333333",
         )
 
@@ -300,7 +360,8 @@ def plot_dump_gap(
     ax.set_ylabel("Mean Total Score", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "The Dump Gap: Mean Score When Yatzy Hit vs Missed",
-        fontsize=FONT_TITLE, fontweight="bold",
+        fontsize=FONT_TITLE,
+        fontweight="bold",
     )
     ax.legend(fontsize=11, loc="lower left")
     ax.grid(axis="y", alpha=GRID_ALPHA)
@@ -318,6 +379,7 @@ def plot_dump_gap(
 
 
 # ── Orchestrator ─────────────────────────────────────────────────────────
+
 
 def plot_all_yatzy_hypothesis(
     csv_path: Path,

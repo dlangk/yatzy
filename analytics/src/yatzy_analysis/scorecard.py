@@ -15,9 +15,21 @@ from dataclasses import dataclass
 
 
 CATEGORY_NAMES = [
-    "Ones", "Twos", "Threes", "Fours", "Fives", "Sixes",
-    "One Pair", "Two Pairs", "Three of a Kind", "Four of a Kind",
-    "Small Straight", "Large Straight", "Full House", "Chance", "Yatzy",
+    "Ones",
+    "Twos",
+    "Threes",
+    "Fours",
+    "Fives",
+    "Sixes",
+    "One Pair",
+    "Two Pairs",
+    "Three of a Kind",
+    "Four of a Kind",
+    "Small Straight",
+    "Large Straight",
+    "Full House",
+    "Chance",
+    "Yatzy",
 ]
 
 # Upper section category IDs
@@ -67,10 +79,10 @@ def render_scorecard(
         lines.append("")
 
     # Column widths
-    sel_w = 5   # [10] + padding
+    sel_w = 5  # [10] + padding
     cat_w = 18  # category name
     score_w = 7  # score
-    info_w = 5   # bonus tracker
+    info_w = 5  # bonus tracker
 
     def sep(left: str, mid: str, right: str, fill: str = "\u2500") -> str:
         return (
@@ -79,7 +91,10 @@ def render_scorecard(
         )
 
     def row(
-        sel_str: str, name: str, score_str: str, info_str: str = "",
+        sel_str: str,
+        name: str,
+        score_str: str,
+        info_str: str = "",
     ) -> str:
         return (
             f"  \u2502 {sel_str:>{sel_w - 2}} "
@@ -186,11 +201,13 @@ def scorecard_from_scenario(
 
     # Scored categories
     for detail in scenario.get("scored_details", []):
-        entries.append(ScoreEntry(
-            category_id=detail["id"],
-            name=detail["name"],
-            score=detail["score"],
-        ))
+        entries.append(
+            ScoreEntry(
+                category_id=detail["id"],
+                name=detail["name"],
+                score=detail["score"],
+            )
+        )
 
     # Available categories (unscored)
     available = scenario.get("available", [])
@@ -201,13 +218,15 @@ def scorecard_from_scenario(
     for cat in available:
         cat_id = cat["id"]
         selectable = cat_id in available_ids
-        entries.append(ScoreEntry(
-            category_id=cat_id,
-            name=cat["name"],
-            score=None,
-            selectable=selectable,
-            selection_num=sel_num if selectable else None,
-        ))
+        entries.append(
+            ScoreEntry(
+                category_id=cat_id,
+                name=cat["name"],
+                score=None,
+                selectable=selectable,
+                selection_num=sel_num if selectable else None,
+            )
+        )
         if selectable:
             sel_num += 1
 

@@ -131,12 +131,21 @@ def run_convergence_trial(
         # Synthetic human responds
         if adaptive is not None:
             action = _sample_action_adaptive(
-                estimator, si, scenario,
-                adaptive[0], adaptive[1], beta_true, rng,
+                estimator,
+                si,
+                scenario,
+                adaptive[0],
+                adaptive[1],
+                beta_true,
+                rng,
             )
         else:
             action = _sample_action_vectorized(
-                estimator, si, theta_true, beta_true, rng,
+                estimator,
+                si,
+                theta_true,
+                beta_true,
+                rng,
             )
 
         estimator.update_by_idx(si, action, scenario_id)
@@ -190,7 +199,11 @@ def run_validation(
                 seed = trial * 1000 + int(theta_true * 100) + int(beta_true * 10)
                 rng = np.random.default_rng(seed)
                 result = run_convergence_trial(
-                    template, scenarios, theta_true, beta_true, max_questions,
+                    template,
+                    scenarios,
+                    theta_true,
+                    beta_true,
+                    max_questions,
                     rng=rng,
                 )
                 trial_results.append(result)
@@ -207,9 +220,7 @@ def run_validation(
             for n_q in [5, 8, 10, 15, 20, 25, 30]:
                 if n_q <= max_questions:
                     ws = [
-                        r["ci_widths"][n_q - 1]
-                        for r in trial_results
-                        if len(r["ci_widths"]) >= n_q
+                        r["ci_widths"][n_q - 1] for r in trial_results if len(r["ci_widths"]) >= n_q
                     ]
                     widths_at[n_q] = float(np.mean(ws)) if ws else None
 
@@ -238,7 +249,11 @@ def run_validation(
         for trial in range(n_trials):
             rng = np.random.default_rng(trial * 2000 + int(theta_early * 100))
             result = run_convergence_trial(
-                template, scenarios, 0.0, beta_true, max_questions,
+                template,
+                scenarios,
+                0.0,
+                beta_true,
+                max_questions,
                 adaptive=(theta_early, theta_late),
                 rng=rng,
             )
@@ -318,7 +333,8 @@ def print_validation_results(results: dict[str, Any]) -> None:
         avg_recovery = np.mean([v["recovery_rate"] for v in good_beta.values()])
         print(f"  Average recovery rate (β >= 2): {avg_recovery:.0%}")
         widths_15 = [
-            v["widths_at"].get(15, 0.2) for v in good_beta.values()
+            v["widths_at"].get(15, 0.2)
+            for v in good_beta.values()
             if v["widths_at"].get(15) is not None
         ]
         if widths_15:

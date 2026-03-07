@@ -42,7 +42,7 @@ npm run lint      # ESLint
 | `components/ActionBar.ts` | Roll/reroll buttons and reroll counter |
 | `components/DebugPanel.ts` | Collapsible raw state inspector |
 | `components/DecisionLog.ts` | Per-turn reroll/score decision table with delta bars |
-| `components/DiceBar.ts` | Five-die display with hold toggles |
+| `components/DiceBar.ts` | Five-die display with keep toggles |
 | `components/DiceLegend.ts` | Optimal keep/reroll color legend |
 | `components/Die.ts` | Single die SVG with pip layout |
 | `components/EvalPanel.ts` | State value and optimal action summary |

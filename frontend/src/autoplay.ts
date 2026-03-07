@@ -45,10 +45,10 @@ function executeStep(): void {
     ev.optimal_mask_ev > ev.optimal_category_ev;
 
   if (shouldReroll && ev.optimal_mask !== undefined) {
-    // Set holds: bit=1 in rerollMask means reroll, so held = !(bit set)
+    // Set keeps: bit=1 in rerollMask means reroll, so kept = !(bit set)
     for (let i = 0; i < s.dice.length; i++) {
-      const shouldHold = !(ev.optimal_mask & (1 << i));
-      if (s.dice[i].held !== shouldHold) {
+      const shouldKeep = !(ev.optimal_mask & (1 << i));
+      if (s.dice[i].kept !== shouldKeep) {
         dispatch({ type: 'TOGGLE_DIE', index: i });
       }
     }

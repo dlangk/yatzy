@@ -1,4 +1,5 @@
 """Frontier test plots: adaptive θ(s) vs constant-θ Pareto frontier."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,7 +8,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 
-from .style import ADAPTIVE_COLORS as _STYLE_ADAPTIVE_COLORS, FONT_AXIS_LABEL, FONT_LEGEND, FONT_TITLE, GRID_ALPHA, setup_theme
+from .style import (
+    ADAPTIVE_COLORS as _STYLE_ADAPTIVE_COLORS,
+    FONT_AXIS_LABEL,
+    FONT_LEGEND,
+    FONT_TITLE,
+    GRID_ALPHA,
+    setup_theme,
+)
 
 
 # Consistent colors for adaptive policies

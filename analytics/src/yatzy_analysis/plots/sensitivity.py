@@ -1,4 +1,5 @@
 """Decision sensitivity plots: flip rates, θ distributions, gap analysis."""
+
 from __future__ import annotations
 
 import json
@@ -9,7 +10,16 @@ import numpy as np
 import polars as pl
 import seaborn as sns
 
-from .style import COLOR_BLUE, COLOR_GREEN, COLOR_ORANGE, FONT_AXIS_LABEL, FONT_LEGEND, FONT_TITLE, GRID_ALPHA, setup_theme
+from .style import (
+    COLOR_BLUE,
+    COLOR_GREEN,
+    COLOR_ORANGE,
+    FONT_AXIS_LABEL,
+    FONT_LEGEND,
+    FONT_TITLE,
+    GRID_ALPHA,
+    setup_theme,
+)
 
 
 def load_sensitivity_data(
@@ -23,9 +33,7 @@ def load_sensitivity_data(
     summary_path = scenario_dir / "decision_sensitivity_summary.json"
 
     if not csv_path.exists():
-        raise FileNotFoundError(
-            f"{csv_path} not found. Run yatzy-decision-sensitivity first."
-        )
+        raise FileNotFoundError(f"{csv_path} not found. Run yatzy-decision-sensitivity first.")
 
     df = pl.read_csv(csv_path)
 
@@ -47,16 +55,11 @@ def plot_flip_rates(df: pl.DataFrame, out_dir: Path, dpi: int = 200, fmt: str = 
     setup_theme()
 
     # Compute flip rates
-    grouped = (
-        df.group_by(["decision_type", "game_phase"])
-        .agg(
-            pl.col("has_flip").count().alias("total"),
-            pl.col("has_flip").sum().alias("flips"),
-        )
+    grouped = df.group_by(["decision_type", "game_phase"]).agg(
+        pl.col("has_flip").count().alias("total"),
+        pl.col("has_flip").sum().alias("flips"),
     )
-    grouped = grouped.with_columns(
-        (pl.col("flips") / pl.col("total")).alias("flip_rate")
-    )
+    grouped = grouped.with_columns((pl.col("flips") / pl.col("total")).alias("flip_rate"))
 
     fig, ax = plt.subplots(figsize=(10, 5))
 
@@ -69,9 +72,7 @@ def plot_flip_rates(df: pl.DataFrame, out_dir: Path, dpi: int = 200, fmt: str = 
     for i, dt in enumerate(dtypes):
         rates = []
         for phase in phases:
-            row = grouped.filter(
-                (pl.col("decision_type") == dt) & (pl.col("game_phase") == phase)
-            )
+            row = grouped.filter((pl.col("decision_type") == dt) & (pl.col("game_phase") == phase))
             if len(row) > 0:
                 rates.append(row["flip_rate"][0] * 100)
             else:
@@ -82,8 +83,7 @@ def plot_flip_rates(df: pl.DataFrame, out_dir: Path, dpi: int = 200, fmt: str = 
     ax.set_ylabel("Flip Rate (%)")
     ax.set_title("Decision Flip Rates by Type and Game Phase")
     ax.set_xticks(x + width)
-    ax.set_xticklabels([f"{p}\n(turns {r})" for p, r in
-                        zip(phases, ["1-5", "6-10", "11-15"])])
+    ax.set_xticklabels([f"{p}\n(turns {r})" for p, r in zip(phases, ["1-5", "6-10", "11-15"])])
     ax.legend(title="Decision Type")
     ax.set_ylim(bottom=0)
 
@@ -128,8 +128,15 @@ def plot_flip_theta_distribution(
         for t in thetas:
             counts.append(len(subset.filter(pl.col("flip_theta") == t)))
         counts_arr = np.array(counts, dtype=float)
-        ax.bar(thetas, counts_arr, width=np.diff(edges).min() * 0.8,
-               bottom=bottom, label=dt, color=color, alpha=0.85)
+        ax.bar(
+            thetas,
+            counts_arr,
+            width=np.diff(edges).min() * 0.8,
+            bottom=bottom,
+            label=dt,
+            color=color,
+            alpha=0.85,
+        )
         bottom += counts_arr
 
     ax.set_xlabel("θ at First Flip")
@@ -200,9 +207,7 @@ def plot_gap_distributions(
     plt.close(fig)
 
 
-def plot_turn_heatmap(
-    df: pl.DataFrame, out_dir: Path, dpi: int = 200, fmt: str = "png"
-) -> None:
+def plot_turn_heatmap(df: pl.DataFrame, out_dir: Path, dpi: int = 200, fmt: str = "png") -> None:
     """Plot 4: Turn × decision type heatmap of flip rates."""
     setup_theme()
 
@@ -210,13 +215,12 @@ def plot_turn_heatmap(
 
     # Build pivot: 15 turns × 3 decision types as numpy array
     import numpy as np
+
     pivot = np.zeros((15, len(dtypes)))
 
     for turn in range(15):
         for j, dt in enumerate(dtypes):
-            subset = df.filter(
-                (pl.col("turn") == turn) & (pl.col("decision_type") == dt)
-            )
+            subset = df.filter((pl.col("turn") == turn) & (pl.col("decision_type") == dt))
             if len(subset) > 0:
                 pivot[turn, j] = float(subset["has_flip"].mean()) * 100
 
@@ -231,11 +235,13 @@ def plot_turn_heatmap(
         ax=ax,
         linewidths=0.5,
         xticklabels=dtypes,
-        yticklabels=[f"Turn {i+1}" for i in range(15)],
+        yticklabels=[f"Turn {i + 1}" for i in range(15)],
     )
     ax.set_xlabel("Decision Type")
     ax.set_ylabel("")
-    ax.set_title("Decision Sensitivity by Turn and Type\n(% of decisions that flip for theta in [0, 0.2])")
+    ax.set_title(
+        "Decision Sensitivity by Turn and Type\n(% of decisions that flip for theta in [0, 0.2])"
+    )
 
     fig.tight_layout()
     fig.savefig(out_dir / f"sensitivity_heatmap.{fmt}", dpi=dpi)
@@ -249,14 +255,12 @@ def print_top_sensitive(df: pl.DataFrame, n: int = 20) -> None:
         print("No flips found.")
         return
 
-    flips = flips.with_columns(
-        pl.col("gap_at_theta0").abs().alias("abs_gap")
-    )
+    flips = flips.with_columns(pl.col("gap_at_theta0").abs().alias("abs_gap"))
     top = flips.sort("abs_gap").head(n)
 
-    print(f"\n{'='*95}")
+    print(f"\n{'=' * 95}")
     print(f"  Top {n} Most Sensitive Decisions (smallest θ=0 gap among flips)")
-    print(f"{'='*95}")
+    print(f"{'=' * 95}")
     print(
         f"{'Turn':>5} {'Dice':<16} {'Type':>10} {'θ=0 Action':>20} "
         f"{'Flip Action':>20} {'Flip θ':>8} {'θ=0 Gap':>10}"
@@ -264,7 +268,7 @@ def print_top_sensitive(df: pl.DataFrame, n: int = 20) -> None:
     print("-" * 100)
     for row in top.iter_rows(named=True):
         print(
-            f"{int(row['turn'])+1:>5} {str(row['dice']):<16} {row['decision_type']:>10} "
+            f"{int(row['turn']) + 1:>5} {str(row['dice']):<16} {row['decision_type']:>10} "
             f"{row['theta_0_action']:>20} {row['flip_action']:>20} "
             f"{row['flip_theta']:>8.3f} {row['gap_at_theta0']:>10.3f}"
         )
@@ -290,17 +294,17 @@ def plot_all_sensitivity(
         rate = summary_data.get("flip_rate", 0)
         print(f"\nDecision sensitivity analysis:")
         print(f"  Analyzed: {total:,d} unique decision points")
-        print(f"  Flips:    {flips:,d} ({rate*100:.1f}%)")
+        print(f"  Flips:    {flips:,d} ({rate * 100:.1f}%)")
         print()
 
         by_type = summary_data.get("by_decision_type", [])
         if by_type:
             print(f"  {'Type':>10} {'Total':>8} {'Flips':>8} {'Rate':>8}")
-            print(f"  {'-'*38}")
+            print(f"  {'-' * 38}")
             for t in by_type:
                 print(
                     f"  {t['decision_type']:>10} {t['total']:>8,d} "
-                    f"{t['flips']:>8,d} {t['flip_rate']*100:>7.1f}%"
+                    f"{t['flips']:>8,d} {t['flip_rate'] * 100:>7.1f}%"
                 )
             print()
 

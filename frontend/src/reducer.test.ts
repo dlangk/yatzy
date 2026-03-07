@@ -16,7 +16,7 @@ function buildCategories(): CategoryState[] {
 
 function freshState(): GameState {
   return {
-    dice: Array.from({ length: TOTAL_DICE }, () => ({ value: 0, held: false })),
+    dice: Array.from({ length: TOTAL_DICE }, () => ({ value: 0, kept: false })),
     upperScore: 0,
     scoredCategories: 0,
     rerollsRemaining: 0,
@@ -38,11 +38,11 @@ function rolledState(): GameState {
   return {
     ...freshState(),
     dice: [
-      { value: 3, held: true },
-      { value: 1, held: true },
-      { value: 4, held: true },
-      { value: 1, held: true },
-      { value: 5, held: true },
+      { value: 3, kept: true },
+      { value: 1, kept: true },
+      { value: 4, kept: true },
+      { value: 1, kept: true },
+      { value: 5, kept: true },
     ],
     rerollsRemaining: 2,
     turnPhase: 'rolled',
@@ -63,7 +63,7 @@ describe('gameReducer', () => {
       for (const d of next.dice) {
         expect(d.value).toBeGreaterThanOrEqual(1);
         expect(d.value).toBeLessThanOrEqual(6);
-        expect(d.held).toBe(true);
+        expect(d.kept).toBe(true);
       }
       expect(next.rerollsRemaining).toBe(2);
       expect(next.turnPhase).toBe('rolled');
@@ -79,25 +79,25 @@ describe('gameReducer', () => {
 
   // --- REROLL ---
   describe('REROLL', () => {
-    it('rerolls unheld dice and decrements rerollsRemaining', () => {
+    it('rerolls unkept dice and decrements rerollsRemaining', () => {
       const state: GameState = {
         ...rolledState(),
         dice: [
-          { value: 3, held: true },
-          { value: 1, held: false },  // should change
-          { value: 4, held: true },
-          { value: 1, held: false },  // should change
-          { value: 5, held: true },
+          { value: 3, kept: true },
+          { value: 1, kept: false },  // should change
+          { value: 4, kept: true },
+          { value: 1, kept: false },  // should change
+          { value: 5, kept: true },
         ],
       };
       const next = gameReducer(state, { type: 'REROLL' });
-      // Held dice keep their values
+      // Kept dice keep their values
       expect(next.dice[0].value).toBe(3);
       expect(next.dice[2].value).toBe(4);
       expect(next.dice[4].value).toBe(5);
-      // All dice are held after reroll
+      // All dice are kept after reroll
       for (const d of next.dice) {
-        expect(d.held).toBe(true);
+        expect(d.kept).toBe(true);
       }
       expect(next.rerollsRemaining).toBe(1);
       expect(next.lastEvalResponse).toBeNull();
@@ -253,13 +253,13 @@ describe('gameReducer', () => {
 
   // --- TOGGLE_DIE ---
   describe('TOGGLE_DIE', () => {
-    it('toggles held state of targeted die', () => {
+    it('toggles kept state of targeted die', () => {
       const state = rolledState();
-      expect(state.dice[2].held).toBe(true);
+      expect(state.dice[2].kept).toBe(true);
       const next = gameReducer(state, { type: 'TOGGLE_DIE', index: 2 });
-      expect(next.dice[2].held).toBe(false);
+      expect(next.dice[2].kept).toBe(false);
       // Other dice unchanged
-      expect(next.dice[0].held).toBe(true);
+      expect(next.dice[0].kept).toBe(true);
     });
   });
 

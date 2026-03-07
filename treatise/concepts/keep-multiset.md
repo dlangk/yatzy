@@ -6,7 +6,7 @@ A **keep multiset** is the set of dice a player chooses to retain after a roll. 
 
 When you roll 5 dice, there are 2^5 = 32 subsets you could keep (including the empty set, where you reroll everything). But many of these subsets produce identical results because dice of the same face value are interchangeable.
 
-For example, if you rolled [2, 3, 2, 5, 2], keeping "positions 1 and 3" versus "positions 1 and 5" both result in keeping two 2s. The probability distributions over subsequent rolls are identical in both cases. What matters is the *multiset* of kept face values, not which physical dice are held.
+For example, if you rolled [2, 3, 2, 5, 2], keeping "positions 1 and 3" versus "positions 1 and 5" both result in keeping two 2s. The probability distributions over subsequent rolls are identical in both cases. What matters is the *multiset* of kept face values, not which physical dice are kept.
 
 The distinction is between **positional masks** (which slots to keep) and **value multisets** (which face-value combination to retain). Two different masks that produce the same multiset lead to identical future expected values.
 

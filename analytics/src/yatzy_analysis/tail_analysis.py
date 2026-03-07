@@ -3,6 +3,7 @@
 Provides empirical tail statistics, log-linear extrapolation, and analytical
 probability estimates for the theoretical maximum score (374).
 """
+
 from __future__ import annotations
 
 import math
@@ -55,12 +56,14 @@ def tail_distribution(scores: NDArray[np.int32]) -> dict:
         above = int(np.sum(scores >= t))
         frac = above / n if n > 0 else 0.0
         inv = 1.0 / frac if frac > 0 else float("inf")
-        thresholds.append({
-            "threshold": t,
-            "count": above,
-            "fraction": frac,
-            "inv_fraction": inv,
-        })
+        thresholds.append(
+            {
+                "threshold": t,
+                "count": above,
+                "fraction": frac,
+                "inv_fraction": inv,
+            }
+        )
 
     return {
         "n": n,
@@ -99,8 +102,12 @@ def fit_log_linear(scores: NDArray[np.int32]) -> dict:
     n_pts = len(ts)
     if n_pts < 2:
         return {
-            "a": 0.0, "b": 0.0, "decay_per_point": 1.0,
-            "log10_p374": 0.0, "p374": 0.0, "games_needed": float("inf"),
+            "a": 0.0,
+            "b": 0.0,
+            "decay_per_point": 1.0,
+            "log10_p374": 0.0,
+            "p374": 0.0,
+            "games_needed": float("inf"),
             "n_points": n_pts,
         }
 
@@ -172,9 +179,7 @@ def p_at_least_n_of_face(need: int, n_dice: int = 5) -> float:
     return total
 
 
-def _p_specific_combo_mc(
-    dice_needed: tuple[int, ...], n_trials: int = 5_000_000
-) -> float:
+def _p_specific_combo_mc(dice_needed: tuple[int, ...], n_trials: int = 5_000_000) -> float:
     """Monte Carlo estimate: P(getting exact sorted dice combo) in 3 rolls."""
     rng = random.Random(42)
     hits = 0

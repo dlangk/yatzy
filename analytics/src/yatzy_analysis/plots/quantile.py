@@ -1,4 +1,5 @@
 """Quantile (inverse CDF) plot."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -9,7 +10,15 @@ import polars as pl
 
 from ..config import MAX_SCORE
 from .spec import PLOT_SPECS
-from .style import FONT_AXIS_LABEL, FONT_TITLE, GRID_ALPHA, apply_theta_legend, make_norm, setup_theme, theta_color
+from .style import (
+    FONT_AXIS_LABEL,
+    FONT_TITLE,
+    GRID_ALPHA,
+    apply_theta_legend,
+    make_norm,
+    setup_theme,
+    theta_color,
+)
 
 
 def plot_quantile(
@@ -34,8 +43,11 @@ def plot_quantile(
         color = theta_color(t, norm)
         lw = 2.5 if t == 0 else 1.4
         ax.plot(
-            subset["cdf"], subset["score"],
-            color=color, linewidth=lw, alpha=0.85,
+            subset["cdf"],
+            subset["score"],
+            color=color,
+            linewidth=lw,
+            alpha=0.85,
         )
 
     ax.set_xlabel("Cumulative Probability", fontsize=FONT_AXIS_LABEL)

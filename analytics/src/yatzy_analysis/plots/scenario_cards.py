@@ -5,6 +5,7 @@ Generates a single-page PNG per scenario combining:
 - Right top: signed-advantage chart showing decision crossover across theta
 - Right bottom: per-theta decision table
 """
+
 from __future__ import annotations
 
 import json
@@ -55,6 +56,7 @@ def decode_scenario_id(sid: str) -> dict:
         "dice": list(SORTED_DICE[dice_idx]),
         "decision_type": _DTYPE_INT_TO_STR[dtype],
     }
+
 
 # Unicode die faces: index 1-6
 DIE_FACES = {1: "\u2680", 2: "\u2681", 3: "\u2682", 4: "\u2683", 5: "\u2684", 6: "\u2685"}
@@ -162,20 +164,21 @@ def _append_category_table(
     show_markers = dtype == "category"
 
     # Box-drawing table: Category(18) | Scored(7) | Avail(7) | marker(6)
-    lines.append("  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2510")
-    lines.append("  \u2502 Category         "
-                 "\u2502Scored "
-                 "\u2502 Avail "
-                 "\u2502      \u2502")
-    lines.append("  \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2524")
+    lines.append(
+        "  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2510"
+    )
+    lines.append("  \u2502 Category         \u2502Scored \u2502 Avail \u2502      \u2502")
+    lines.append(
+        "  \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2524"
+    )
 
     for c in range(15):
         name = CATEGORY_NAMES[c]
@@ -184,10 +187,7 @@ def _append_category_table(
                 scored_str = f" {category_scores[c]:>5} "
             else:
                 scored_str = "   \u2713   "
-            lines.append(
-                f"  \u2502 {name:<16} \u2502{scored_str}"
-                f"\u2502       \u2502      \u2502"
-            )
+            lines.append(f"  \u2502 {name:<16} \u2502{scored_str}\u2502       \u2502      \u2502")
         else:
             scr = compute_score(dice, c)
             marker = ""
@@ -197,24 +197,26 @@ def _append_category_table(
                 elif c == flip_id:
                     marker = "\u25c0 \u03b8+"
             lines.append(
-                f"  \u2502 {name:<16} \u2502       "
-                f"\u2502 {scr:>5} "
-                f"\u2502 {marker:<5}\u2502"
+                f"  \u2502 {name:<16} \u2502       \u2502 {scr:>5} \u2502 {marker:<5}\u2502"
             )
 
         # Separator after upper section
         if c == 5:
-            lines.append("  \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
-                         "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
-                         "\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
-                         "\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
-                         "\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2524")
+            lines.append(
+                "  \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+                "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+                "\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+                "\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+                "\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2524"
+            )
 
-    lines.append("  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534"
-                 "\u2500\u2500\u2500\u2500\u2500\u2500\u2518")
+    lines.append(
+        "  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534"
+        "\u2500\u2500\u2500\u2500\u2500\u2500\u2518"
+    )
 
 
 def _plot_advantage_chart(scenario: dict, ax: plt.Axes) -> None:
@@ -251,14 +253,24 @@ def _plot_advantage_chart(scenario: dict, ax: plt.Axes) -> None:
 
     # Filled regions
     ax.fill_between(
-        thetas_arr, gaps_arr, 0,
-        where=gaps_arr >= 0, interpolate=True,
-        color="#2ca02c", alpha=0.15, label=None,
+        thetas_arr,
+        gaps_arr,
+        0,
+        where=gaps_arr >= 0,
+        interpolate=True,
+        color="#2ca02c",
+        alpha=0.15,
+        label=None,
     )
     ax.fill_between(
-        thetas_arr, gaps_arr, 0,
-        where=gaps_arr < 0, interpolate=True,
-        color="#d62728", alpha=0.15, label=None,
+        thetas_arr,
+        gaps_arr,
+        0,
+        where=gaps_arr < 0,
+        interpolate=True,
+        color="#d62728",
+        alpha=0.15,
+        label=None,
     )
 
     # Line (no per-point markers — 201 points is too dense)
@@ -273,8 +285,9 @@ def _plot_advantage_chart(scenario: dict, ax: plt.Axes) -> None:
     # Flip vertical line
     if scenario.get("has_flip"):
         flip_theta = scenario["flip_theta"]
-        ax.axvline(x=flip_theta, color="#d62728", linewidth=1.5,
-                   linestyle="--", alpha=0.6, zorder=3)
+        ax.axvline(
+            x=flip_theta, color="#d62728", linewidth=1.5, linestyle="--", alpha=0.6, zorder=3
+        )
 
     # Fixed axes for cross-card comparability
     ax.set_xscale("symlog", linthresh=0.05)
@@ -292,17 +305,20 @@ def _plot_advantage_chart(scenario: dict, ax: plt.Axes) -> None:
 
     green_patch = mpatches.Patch(color="#2ca02c", alpha=0.5, label=f"{theta0_action} (EV-optimal)")
     red_patch = mpatches.Patch(color="#d62728", alpha=0.5, label=f"{flip_action} (alternative)")
-    ax.legend(handles=[green_patch, red_patch], loc="upper right", fontsize=9,
-              framealpha=0.9)
+    ax.legend(handles=[green_patch, red_patch], loc="upper right", fontsize=9, framealpha=0.9)
 
     # theta=0 note (centered, since theta=0 is now mid-chart)
     r0 = next((r for r in results if r["theta"] == 0.0), None)
     if r0:
         ax.text(
-            0.5, 0.04,
+            0.5,
+            0.04,
             f"At \u03b8=0: {r0['action']} wins by {r0['gap']:.2f} EV pts",
-            transform=ax.transAxes, fontsize=8.5, color="#555555",
-            style="italic", ha="center",
+            transform=ax.transAxes,
+            fontsize=8.5,
+            color="#555555",
+            style="italic",
+            ha="center",
         )
 
     ax.grid(True, alpha=0.3)
@@ -324,12 +340,14 @@ def _plot_theta_table(scenario: dict, ax: plt.Axes) -> None:
         bg = "#e8f5e9" if is_theta0 else "#ffebee"
 
         theta_str = f"{r['theta']:.3f}" if r["theta"] != 0.0 else "0 (EV)"
-        cell_text.append([
-            theta_str,
-            r["action"],
-            r["runner_up"],
-            f"{r['gap']:.4f}",
-        ])
+        cell_text.append(
+            [
+                theta_str,
+                r["action"],
+                r["runner_up"],
+                f"{r['gap']:.4f}",
+            ]
+        )
         cell_colors.append([bg] * 4)
 
     table = ax.table(
@@ -366,11 +384,16 @@ def plot_scenario_card(
 
     # Fixed grid: 2 rows x 2 cols
     gs = fig.add_gridspec(
-        2, 2,
+        2,
+        2,
         width_ratios=[0.8, 1.4],
         height_ratios=[1.3, 1],
-        hspace=0.25, wspace=0.01,
-        left=0.01, right=0.98, top=0.88, bottom=0.04,
+        hspace=0.25,
+        wspace=0.01,
+        left=0.01,
+        right=0.98,
+        top=0.88,
+        bottom=0.04,
     )
 
     # Title
@@ -384,9 +407,11 @@ def plot_scenario_card(
 
     id_prefix = f"[{scenario_id}]  " if scenario_id else ""
     fig.suptitle(
-        f"{id_prefix}Decision Sensitivity: {dtype_label} at Turn {turn}    "
-        f"Dice [{dice_str}]",
-        fontsize=15, fontweight="bold", x=0.5, y=0.96,
+        f"{id_prefix}Decision Sensitivity: {dtype_label} at Turn {turn}    Dice [{dice_str}]",
+        fontsize=15,
+        fontweight="bold",
+        x=0.5,
+        y=0.96,
     )
 
     # Subtitle
@@ -395,8 +420,7 @@ def plot_scenario_card(
     flip_theta = scenario.get("flip_theta", 0)
     if scenario.get("has_flip"):
         subtitle = (
-            f"EV-optimal: {theta0_action}   \u2192   "
-            f"Flips at \u03b8={flip_theta}: {flip_action}"
+            f"EV-optimal: {theta0_action}   \u2192   Flips at \u03b8={flip_theta}: {flip_action}"
         )
     else:
         subtitle = f"EV-optimal: {theta0_action}   (no flip across \u03b8 range)"
@@ -412,20 +436,25 @@ def plot_scenario_card(
     dice = scenario["dice"]
     faces = "  ".join(DIE_FACES.get(d, str(d)) for d in dice)
     ax_text.text(
-        0.06, 0.97, faces,
+        0.06,
+        0.97,
+        faces,
         transform=ax_text.transAxes,
-        fontsize=28, verticalalignment="top",
+        fontsize=28,
+        verticalalignment="top",
     )
 
     # Compact state text below dice
     text = _build_state_text(scenario)
     ax_text.text(
-        0.03, 0.88, text,
+        0.03,
+        0.88,
+        text,
         transform=ax_text.transAxes,
-        fontfamily="monospace", fontsize=9.5,
+        fontfamily="monospace",
+        fontsize=9.5,
         verticalalignment="top",
-        bbox=dict(boxstyle="square,pad=0.6", facecolor="#f8f9fa",
-                  edgecolor="#dee2e6", linewidth=1),
+        bbox=dict(boxstyle="square,pad=0.6", facecolor="#f8f9fa", edgecolor="#dee2e6", linewidth=1),
     )
 
     # Right top: advantage chart (fixed axes)
@@ -465,6 +494,7 @@ def generate_example_cards(
 
     # Phase-diverse selection: pick top candidates from each game phase
     import math
+
     per_phase = math.ceil(n / 3)
     phase_groups: dict[str, list[dict]] = {"early": [], "mid": [], "late": []}
     for s in ranked:
@@ -502,7 +532,7 @@ def generate_example_cards(
         paths.append(out_path)
         dice_str = ",".join(str(d) for d in scenario["dice"])
         print(
-            f"  {out_path.name} ({scenario_id}): Turn {scenario['turn']+1} "
+            f"  {out_path.name} ({scenario_id}): Turn {scenario['turn'] + 1} "
             f"[{dice_str}] {scenario['decision_type']} "
             f"{scenario['theta_0_action']} -> {scenario['flip_action']}"
         )

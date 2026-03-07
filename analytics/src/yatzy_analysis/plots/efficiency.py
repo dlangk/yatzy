@@ -1,4 +1,5 @@
 """Efficiency analysis: MER, frontier, CDF difference, CVaR deficit."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,7 +8,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 
-from .style import FONT_AXIS_LABEL, FONT_LEGEND, FONT_SUPTITLE, FONT_TITLE, GRID_ALPHA, make_norm, setup_theme, theta_color, theta_colorbar
+from .style import (
+    FONT_AXIS_LABEL,
+    FONT_LEGEND,
+    FONT_SUPTITLE,
+    FONT_TITLE,
+    GRID_ALPHA,
+    make_norm,
+    setup_theme,
+    theta_color,
+    theta_colorbar,
+)
 
 # Shared axis ranges for all adaptive frontier plots (individual + combined).
 # Data ranges: Mean 186–248, p95 266–314, p99 300–329, p999 328–341.
@@ -33,7 +44,9 @@ def plot_efficiency(
     fig, axes = plt.subplots(2, 2, figsize=(18, 14))
     fig.suptitle(
         "The Cost of Risk-Seeking in Yatzy",
-        fontsize=FONT_SUPTITLE, fontweight="bold", y=0.98,
+        fontsize=FONT_SUPTITLE,
+        fontweight="bold",
+        y=0.98,
     )
 
     # Filter to available thetas and positive-theta only for MER
@@ -53,8 +66,15 @@ def plot_efficiency(
         valid = mer.filter(pl.col(col).is_between(-50, 50))  # filter out inf/dominated
         if not valid.is_empty():
             pdf_valid = valid.to_pandas()
-            ax.plot(pdf_valid["theta"], pdf_valid[col], marker="o", markersize=4,
-                    linewidth=1.8, color=color, label=label)
+            ax.plot(
+                pdf_valid["theta"],
+                pdf_valid[col],
+                marker="o",
+                markersize=4,
+                linewidth=1.8,
+                color=color,
+                label=label,
+            )
 
     ax.set_xlabel("θ", fontsize=FONT_AXIS_LABEL)
     ax.set_ylabel("Mean points lost per point gained", fontsize=FONT_AXIS_LABEL)
@@ -71,21 +91,36 @@ def plot_efficiency(
     for _, row in pdf_stats.iterrows():
         t = row["theta"]
         color = theta_color(t, norm)
-        ax.scatter(row["mean"], row["p95"], color=color, s=60, zorder=5,
-                   edgecolors="white", linewidths=0.5)
+        ax.scatter(
+            row["mean"], row["p95"], color=color, s=60, zorder=5, edgecolors="white", linewidths=0.5
+        )
     # Connect with line
     ax.plot(pdf_stats["mean"], pdf_stats["p95"], color="gray", linewidth=0.8, alpha=0.5, zorder=1)
     # Mark baseline
     base = stats.filter(pl.col("theta") == 0.0)
     if not base.is_empty():
         pdf_base = base.to_pandas()
-        ax.scatter(pdf_base["mean"], pdf_base["p95"], color="black", s=120, marker="*",
-                   zorder=10, label="θ=0 (EV-optimal)")
+        ax.scatter(
+            pdf_base["mean"],
+            pdf_base["p95"],
+            color="black",
+            s=120,
+            marker="*",
+            zorder=10,
+            label="θ=0 (EV-optimal)",
+        )
     # Mark peak p95
     peak_idx = stats["p95"].arg_max()
     peak = stats.row(peak_idx, named=True)
-    ax.scatter(peak["mean"], peak["p95"], color="red", s=120, marker="D",
-               zorder=10, label=f"peak p95 (θ={peak['theta']:.2f})")
+    ax.scatter(
+        peak["mean"],
+        peak["p95"],
+        color="red",
+        s=120,
+        marker="D",
+        zorder=10,
+        label=f"peak p95 (θ={peak['theta']:.2f})",
+    )
     # Shade dominated region
     if not base.is_empty():
         b = base.row(0, named=True)
@@ -128,21 +163,50 @@ def plot_efficiency(
         row = sdva_df.filter(pl.col("theta") == t)
         if not row.is_empty():
             xc = row.row(0, named=True)["x_cross"]
-            ax.axvline(xc, color=theta_color(t, norm), linewidth=0.8,
-                       linestyle=":", alpha=0.7)
+            ax.axvline(xc, color=theta_color(t, norm), linewidth=0.8, linestyle=":", alpha=0.7)
 
     # Panel 4: CVaR deficit overlaid with mean
     ax = axes[1, 1]
     pos = stats.filter(pl.col("theta") >= 0)
     pdf_pos = pos.to_pandas()
-    ax.plot(pdf_pos["theta"], pdf_pos["mean"], color="black", linewidth=2, label="Mean", marker="o",
-            markersize=4)
-    ax.plot(pdf_pos["theta"], pdf_pos["cvar_5"], color="tab:red", linewidth=2, label="CVaR 5%",
-            marker="s", markersize=4)
-    ax.plot(pdf_pos["theta"], pdf_pos["cvar_10"], color="tab:orange", linewidth=1.5, label="CVaR 10%",
-            marker="^", markersize=4, alpha=0.8)
-    ax.plot(pdf_pos["theta"], pdf_pos["cvar_1"], color="darkred", linewidth=1.5, label="CVaR 1%",
-            marker="v", markersize=4, alpha=0.8)
+    ax.plot(
+        pdf_pos["theta"],
+        pdf_pos["mean"],
+        color="black",
+        linewidth=2,
+        label="Mean",
+        marker="o",
+        markersize=4,
+    )
+    ax.plot(
+        pdf_pos["theta"],
+        pdf_pos["cvar_5"],
+        color="tab:red",
+        linewidth=2,
+        label="CVaR 5%",
+        marker="s",
+        markersize=4,
+    )
+    ax.plot(
+        pdf_pos["theta"],
+        pdf_pos["cvar_10"],
+        color="tab:orange",
+        linewidth=1.5,
+        label="CVaR 10%",
+        marker="^",
+        markersize=4,
+        alpha=0.8,
+    )
+    ax.plot(
+        pdf_pos["theta"],
+        pdf_pos["cvar_1"],
+        color="darkred",
+        linewidth=1.5,
+        label="CVaR 1%",
+        marker="v",
+        markersize=4,
+        alpha=0.8,
+    )
 
     ax.set_xlabel("θ", fontsize=FONT_AXIS_LABEL)
     ax.set_ylabel("Score", fontsize=FONT_AXIS_LABEL)
@@ -186,7 +250,9 @@ def _plot_adaptive_frontier(
         fig, ax = plt.subplots(figsize=(12, 8))
         fig.suptitle(
             f"Adaptive θ Policies vs Fixed-θ Frontier (Mean vs {percentile_label})",
-            fontsize=FONT_SUPTITLE, fontweight="bold", y=0.98,
+            fontsize=FONT_SUPTITLE,
+            fontweight="bold",
+            y=0.98,
         )
 
     norm = make_norm(thetas)
@@ -197,11 +263,26 @@ def _plot_adaptive_frontier(
     for _, row in pdf_stats.iterrows():
         t = row["theta"]
         color = theta_color(t, norm)
-        ax.scatter(row["mean"], row[percentile_col], color=color, s=50, zorder=5,
-                   edgecolors="white", linewidths=0.5, alpha=0.7)
+        ax.scatter(
+            row["mean"],
+            row[percentile_col],
+            color=color,
+            s=50,
+            zorder=5,
+            edgecolors="white",
+            linewidths=0.5,
+            alpha=0.7,
+        )
 
     # Connect fixed-θ points
-    ax.plot(pdf_stats["mean"], pdf_stats[percentile_col], color="gray", linewidth=0.8, alpha=0.4, zorder=1)
+    ax.plot(
+        pdf_stats["mean"],
+        pdf_stats[percentile_col],
+        color="gray",
+        linewidth=0.8,
+        alpha=0.4,
+        zorder=1,
+    )
 
     # Compute and shade convex hull of fixed-θ points
     points = stats.select("mean", percentile_col).to_numpy()
@@ -210,10 +291,21 @@ def _plot_adaptive_frontier(
             hull = ConvexHull(points)
             hull_pts = points[hull.vertices]
             hull_pts = np.vstack([hull_pts, hull_pts[0]])  # close the polygon
-            ax.fill(hull_pts[:, 0], hull_pts[:, 1], alpha=0.08, color="blue",
-                    label="Fixed-θ convex hull")
-            ax.plot(hull_pts[:, 0], hull_pts[:, 1], color="blue", linewidth=1.0,
-                    alpha=0.4, linestyle="--")
+            ax.fill(
+                hull_pts[:, 0],
+                hull_pts[:, 1],
+                alpha=0.08,
+                color="blue",
+                label="Fixed-θ convex hull",
+            )
+            ax.plot(
+                hull_pts[:, 0],
+                hull_pts[:, 1],
+                color="blue",
+                linewidth=1.0,
+                alpha=0.4,
+                linestyle="--",
+            )
         except Exception:
             pass  # degenerate hull
 
@@ -221,28 +313,54 @@ def _plot_adaptive_frontier(
     base = stats.filter(pl.col("theta") == 0.0)
     if not base.is_empty():
         pdf_base = base.to_pandas()
-        ax.scatter(pdf_base["mean"], pdf_base[percentile_col], color="black", s=150, marker="*",
-                   zorder=10, label="θ=0 (EV-optimal)")
+        ax.scatter(
+            pdf_base["mean"],
+            pdf_base[percentile_col],
+            color="black",
+            s=150,
+            marker="*",
+            zorder=10,
+            label="θ=0 (EV-optimal)",
+        )
 
     # Mark best fixed-θ for this percentile
     peak_idx = stats[percentile_col].arg_max()
     peak = stats.row(peak_idx, named=True)
-    ax.scatter(peak["mean"], peak[percentile_col], color="red", s=120, marker="D",
-               zorder=10, label=f"Best fixed {percentile_label} (θ={peak['theta']:.2f})")
+    ax.scatter(
+        peak["mean"],
+        peak[percentile_col],
+        color="red",
+        s=120,
+        marker="D",
+        zorder=10,
+        label=f"Best fixed {percentile_label} (θ={peak['theta']:.2f})",
+    )
 
     # Plot adaptive policy points
     markers = {"bonus-adaptive": "^", "phase-based": "s", "combined": "P", "always-ev": "o"}
-    colors = {"bonus-adaptive": "tab:green", "phase-based": "tab:orange",
-              "combined": "tab:purple", "always-ev": "gray"}
+    colors = {
+        "bonus-adaptive": "tab:green",
+        "phase-based": "tab:orange",
+        "combined": "tab:purple",
+        "always-ev": "gray",
+    }
 
     pdf_adaptive = adaptive_df.to_pandas()
     for _, row in pdf_adaptive.iterrows():
         name = row["policy"]
         m = markers.get(name, "X")
         c = colors.get(name, "tab:brown")
-        ax.scatter(row["mean"], row[percentile_col], color=c, s=200, marker=m,
-                   zorder=15, edgecolors="black", linewidths=1.0,
-                   label=f"{name}")
+        ax.scatter(
+            row["mean"],
+            row[percentile_col],
+            color=c,
+            s=200,
+            marker=m,
+            zorder=15,
+            edgecolors="black",
+            linewidths=1.0,
+            label=f"{name}",
+        )
 
     ax.set_xlabel("Mean Score", fontsize=FONT_AXIS_LABEL)
     ax.set_ylabel(f"{percentile_label} Score", fontsize=FONT_AXIS_LABEL)
@@ -273,11 +391,17 @@ def plot_efficiency_with_adaptive(
 ) -> None:
     """Efficient frontier with adaptive overlay for p95 (default view)."""
     _plot_adaptive_frontier(
-        thetas, summary_df, adaptive_df, out_dir,
-        percentile_col="p95", percentile_label="p95",
+        thetas,
+        summary_df,
+        adaptive_df,
+        out_dir,
+        percentile_col="p95",
+        percentile_label="p95",
         filename="efficiency_adaptive",
-        xlim=_ADAPTIVE_XLIM, ylim=_ADAPTIVE_YLIM,
-        dpi=dpi, fmt=fmt,
+        xlim=_ADAPTIVE_XLIM,
+        ylim=_ADAPTIVE_YLIM,
+        dpi=dpi,
+        fmt=fmt,
     )
 
 
@@ -292,11 +416,17 @@ def plot_efficiency_adaptive_p99(
 ) -> None:
     """Efficient frontier with adaptive overlay for p99."""
     _plot_adaptive_frontier(
-        thetas, summary_df, adaptive_df, out_dir,
-        percentile_col="p99", percentile_label="p99",
+        thetas,
+        summary_df,
+        adaptive_df,
+        out_dir,
+        percentile_col="p99",
+        percentile_label="p99",
         filename="efficiency_adaptive_p99",
-        xlim=_ADAPTIVE_XLIM, ylim=_ADAPTIVE_YLIM,
-        dpi=dpi, fmt=fmt,
+        xlim=_ADAPTIVE_XLIM,
+        ylim=_ADAPTIVE_YLIM,
+        dpi=dpi,
+        fmt=fmt,
     )
 
 
@@ -311,11 +441,17 @@ def plot_efficiency_adaptive_p999(
 ) -> None:
     """Efficient frontier with adaptive overlay for p99.9."""
     _plot_adaptive_frontier(
-        thetas, summary_df, adaptive_df, out_dir,
-        percentile_col="p999", percentile_label="p99.9",
+        thetas,
+        summary_df,
+        adaptive_df,
+        out_dir,
+        percentile_col="p999",
+        percentile_label="p99.9",
         filename="efficiency_adaptive_p999",
-        xlim=_ADAPTIVE_XLIM, ylim=_ADAPTIVE_YLIM,
-        dpi=dpi, fmt=fmt,
+        xlim=_ADAPTIVE_XLIM,
+        ylim=_ADAPTIVE_YLIM,
+        dpi=dpi,
+        fmt=fmt,
     )
 
 
@@ -331,18 +467,31 @@ def plot_efficiency_adaptive_combined(
     """Three-panel combined adaptive frontier: p95, p99, p99.9 side-by-side."""
     setup_theme()
     fig, axes = plt.subplots(1, 3, figsize=(36, 10))
-    for ax_i, (pcol, plabel) in zip(axes, [
-        ("p95", "p95"), ("p99", "p99"), ("p999", "p99.9"),
-    ]):
+    for ax_i, (pcol, plabel) in zip(
+        axes,
+        [
+            ("p95", "p95"),
+            ("p99", "p99"),
+            ("p999", "p99.9"),
+        ],
+    ):
         _plot_adaptive_frontier(
-            thetas, summary_df, adaptive_df, out_dir,
-            percentile_col=pcol, percentile_label=plabel,
+            thetas,
+            summary_df,
+            adaptive_df,
+            out_dir,
+            percentile_col=pcol,
+            percentile_label=plabel,
             filename="",
-            ax=ax_i, xlim=_ADAPTIVE_XLIM, ylim=_ADAPTIVE_YLIM,
+            ax=ax_i,
+            xlim=_ADAPTIVE_XLIM,
+            ylim=_ADAPTIVE_YLIM,
         )
     fig.suptitle(
         "Adaptive θ Policies vs Fixed-θ Frontier",
-        fontsize=FONT_SUPTITLE, fontweight="bold", y=0.98,
+        fontsize=FONT_SUPTITLE,
+        fontweight="bold",
+        y=0.98,
     )
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     fig.savefig(out_dir / f"efficiency_adaptive_combined.{fmt}", dpi=dpi, bbox_inches="tight")

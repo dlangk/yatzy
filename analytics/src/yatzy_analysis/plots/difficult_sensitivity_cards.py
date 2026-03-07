@@ -6,6 +6,7 @@ and generates one PNG per scenario using the existing plot_scenario_card() funct
 With ~200 θ values, the theta table would have too many rows. We subsample to ~20
 values for the table while keeping all points for the advantage chart.
 """
+
 from __future__ import annotations
 
 import json
@@ -81,7 +82,9 @@ def generate_difficult_sensitivity_cards(
         # Subsample for the table display
         flip_theta = scenario.get("flip_theta") if scenario.get("has_flip") else None
         subsampled = _subsample_theta_results(
-            full_results, max_rows=max_theta_rows, flip_theta=flip_theta,
+            full_results,
+            max_rows=max_theta_rows,
+            flip_theta=flip_theta,
         )
 
         # Replace theta_results with subsampled version for the card

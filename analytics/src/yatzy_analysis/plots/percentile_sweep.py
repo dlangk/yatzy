@@ -1,4 +1,5 @@
 """Percentile sweep plots: curves, heatmap, frontier, and peak annotations."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -9,7 +10,18 @@ import numpy as np
 import polars as pl
 import seaborn as sns
 
-from .style import CMAP, FONT_AXIS_LABEL, FONT_LEGEND, FONT_SUPTITLE, FONT_TICK, FONT_TITLE, GRID_ALPHA, PERCENTILES_CORE, PERCENTILES_EXTRA, setup_theme
+from .style import (
+    CMAP,
+    FONT_AXIS_LABEL,
+    FONT_LEGEND,
+    FONT_SUPTITLE,
+    FONT_TICK,
+    FONT_TITLE,
+    GRID_ALPHA,
+    PERCENTILES_CORE,
+    PERCENTILES_EXTRA,
+    setup_theme,
+)
 
 _CORE = PERCENTILES_CORE
 _EXTRA = PERCENTILES_EXTRA
@@ -32,9 +44,14 @@ def _plot_curves(
     for i, p in enumerate(_CORE):
         if p in pdf.columns and p not in skip:
             ax.plot(
-                pdf["theta"], pdf[p],
-                marker="o", markersize=4, linewidth=1.8, color=pct_colors[i],
-                label=p, zorder=3,
+                pdf["theta"],
+                pdf[p],
+                marker="o",
+                markersize=4,
+                linewidth=1.8,
+                color=pct_colors[i],
+                label=p,
+                zorder=3,
             )
 
     extra_styles = {
@@ -45,9 +62,16 @@ def _plot_curves(
     for p, (ls, color) in extra_styles.items():
         if p in pdf.columns and p not in skip:
             ax.plot(
-                pdf["theta"], pdf[p],
-                linestyle=ls, marker="s", markersize=3, linewidth=1.4,
-                color=color, alpha=0.8, label=p, zorder=3,
+                pdf["theta"],
+                pdf[p],
+                linestyle=ls,
+                marker="s",
+                markersize=3,
+                linewidth=1.4,
+                color=color,
+                alpha=0.8,
+                label=p,
+                zorder=3,
             )
 
 
@@ -67,9 +91,14 @@ def _add_peak_stars(ax, df: pl.DataFrame, peaks: pl.DataFrame, theta_range=None,
         if theta_range and not (theta_range[0] <= t <= theta_range[1]):
             continue
         ax.plot(
-            t, row["value"],
-            marker="*", markersize=14, color=color_map[pct],
-            markeredgecolor="black", markeredgewidth=0.5, zorder=5,
+            t,
+            row["value"],
+            marker="*",
+            markersize=14,
+            color=color_map[pct],
+            markeredgecolor="black",
+            markeredgewidth=0.5,
+            zorder=5,
         )
 
 
@@ -83,9 +112,7 @@ def _merge_with_coarse(sweep_df: pl.DataFrame, coarse_path: Path | None) -> pl.D
     # Only keep coarse rows outside the sweep range
     lo = sweep_df["theta"].min()
     hi = sweep_df["theta"].max()
-    outside = coarse.filter(
-        (pl.col("theta") < lo - 0.001) | (pl.col("theta") > hi + 0.001)
-    )
+    outside = coarse.filter((pl.col("theta") < lo - 0.001) | (pl.col("theta") > hi + 0.001))
 
     if outside.is_empty():
         return sweep_df
@@ -182,9 +209,7 @@ def _plot_wide(
     fmt: str = "png",
 ) -> Path:
     """Wide range: θ ∈ [-1.0, +1.0], merging dense sweep + coarse grid."""
-    wdf = df.filter(
-        (pl.col("theta") >= -1.0) & (pl.col("theta") <= 1.0)
-    )
+    wdf = df.filter((pl.col("theta") >= -1.0) & (pl.col("theta") <= 1.0))
     if wdf.is_empty():
         wdf = df
 
@@ -198,7 +223,8 @@ def _plot_wide(
     ax.set_ylabel("Score", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "Score Percentiles vs θ  (|θ| ≤ 1)",
-        fontsize=FONT_TITLE, fontweight="bold",
+        fontsize=FONT_TITLE,
+        fontweight="bold",
     )
     ax.legend(loc="lower left", fontsize=FONT_LEGEND, ncol=3, framealpha=0.9)
     ax.grid(True, alpha=GRID_ALPHA)
@@ -229,17 +255,22 @@ def _plot_mean_std(
         theta_arr,
         mean_arr - std_arr,
         mean_arr + std_arr,
-        alpha=0.2, color="#3182ce",
+        alpha=0.2,
+        color="#3182ce",
     )
     ax.plot(theta_arr, mean_arr, linewidth=2.5, color="#2b6cb0", label="Mean ± 1σ")
 
     ev_idx = int(np.abs(theta_arr).argmin())
-    ax.plot(theta_arr[ev_idx], mean_arr[ev_idx], marker="*", markersize=14, color="#e53e3e", zorder=5)
+    ax.plot(
+        theta_arr[ev_idx], mean_arr[ev_idx], marker="*", markersize=14, color="#e53e3e", zorder=5
+    )
 
     ax.axvline(0, color="black", linewidth=0.8, linestyle="-", alpha=0.4)
     ax.set_xlabel("θ  (risk parameter)", fontsize=FONT_AXIS_LABEL)
     ax.set_ylabel("Mean Score", fontsize=FONT_AXIS_LABEL)
-    ax.set_title("Mean Score vs θ  (risk-averse ← 0 → risk-seeking)", fontsize=FONT_TITLE, fontweight="bold")
+    ax.set_title(
+        "Mean Score vs θ  (risk-averse ← 0 → risk-seeking)", fontsize=FONT_TITLE, fontweight="bold"
+    )
     ax.legend(fontsize=11)
     ax.grid(True, alpha=GRID_ALPHA)
 
@@ -324,16 +355,21 @@ def _plot_mean_cost(
     ax.scatter(xs, ys, c=colors, s=120, zorder=5, edgecolors="black", linewidth=0.5)
     for x, y, lab in zip(xs, ys, labels):
         ax.annotate(
-            lab, (x, y),
-            xytext=(8, 5), textcoords="offset points",
-            fontsize=10, fontweight="bold",
+            lab,
+            (x, y),
+            xytext=(8, 5),
+            textcoords="offset points",
+            fontsize=10,
+            fontweight="bold",
         )
 
     ax.axhline(0, color="gray", linewidth=0.8, linestyle="--", alpha=0.5)
     ax.axvline(0, color="gray", linewidth=0.8, linestyle="--", alpha=0.5)
     ax.set_xlabel("Mean Score Cost  (EV-optimal mean − mean@θ*)", fontsize=FONT_AXIS_LABEL)
     ax.set_ylabel("Percentile Gain  (value@θ* − value@θ=0)", fontsize=FONT_AXIS_LABEL)
-    ax.set_title("Cost-Benefit: Tail Optimization vs Mean Score", fontsize=FONT_TITLE, fontweight="bold")
+    ax.set_title(
+        "Cost-Benefit: Tail Optimization vs Mean Score", fontsize=FONT_TITLE, fontweight="bold"
+    )
     ax.grid(True, alpha=GRID_ALPHA)
 
     fig.tight_layout()
@@ -371,14 +407,19 @@ def _plot_frontier(
     )
     if len(coarse_only) > 0:
         norm_wide = mcolors.Normalize(
-            vmin=df_wide["theta"].min(), vmax=df_wide["theta"].max(),
+            vmin=df_wide["theta"].min(),
+            vmax=df_wide["theta"].max(),
         )
         for row in coarse_only.iter_rows(named=True):
             ax.scatter(
-                row["std"], row["mean"],
+                row["std"],
+                row["mean"],
                 color=CMAP(norm_wide(row["theta"])),
-                s=40, alpha=0.35, zorder=2,
-                edgecolors="gray", linewidths=0.3,
+                s=40,
+                alpha=0.35,
+                zorder=2,
+                edgecolors="gray",
+                linewidths=0.3,
             )
 
     # --- Dense sweep: colored line segments by θ ---
@@ -393,23 +434,35 @@ def _plot_frontier(
     for i in range(len(ds) - 1):
         t_mid = (thetas[i] + thetas[i + 1]) / 2
         ax.plot(
-            [stds[i], stds[i + 1]], [means[i], means[i + 1]],
-            color=CMAP(norm(t_mid)), linewidth=2.8, solid_capstyle="round", zorder=3,
+            [stds[i], stds[i + 1]],
+            [means[i], means[i + 1]],
+            color=CMAP(norm(t_mid)),
+            linewidth=2.8,
+            solid_capstyle="round",
+            zorder=3,
         )
 
     # Scatter on top for visibility
     colors = [CMAP(norm(t)) for t in thetas]
     ax.scatter(
-        stds, means,
-        c=colors, s=30, zorder=4,
-        edgecolors="white", linewidths=0.3,
+        stds,
+        means,
+        c=colors,
+        s=30,
+        zorder=4,
+        edgecolors="white",
+        linewidths=0.3,
     )
 
     # --- θ=0 marker ---
     ev_idx = int(np.abs(thetas).argmin())
     ax.scatter(
-        stds[ev_idx], means[ev_idx],
-        color="black", s=200, marker="*", zorder=10,
+        stds[ev_idx],
+        means[ev_idx],
+        color="black",
+        s=200,
+        marker="*",
+        zorder=10,
         label="θ=0 (EV-optimal)",
     )
 
@@ -421,9 +474,14 @@ def _plot_frontier(
         r_std = stds[idx]
         r_mean = means[idx]
         ax.scatter(
-            r_std, r_mean,
-            color="#e53e3e", s=180, marker="D", zorder=10,
-            edgecolors="black", linewidths=0.8,
+            r_std,
+            r_mean,
+            color="#e53e3e",
+            s=180,
+            marker="D",
+            zorder=10,
+            edgecolors="black",
+            linewidths=0.8,
             label=f"θ*_p95 = {t_star:+.2f}",
         )
 
@@ -454,8 +512,11 @@ def _plot_frontier(
         ax.annotate(
             label,
             (stds[idx], means[idx]),
-            textcoords="offset points", xytext=offset,
-            fontsize=8.5, alpha=0.85, ha=ha,
+            textcoords="offset points",
+            xytext=offset,
+            fontsize=8.5,
+            alpha=0.85,
+            ha=ha,
             arrowprops=dict(arrowstyle="-", alpha=0.3, linewidth=0.5),
         )
 
@@ -467,8 +528,12 @@ def _plot_frontier(
         ax.annotate(
             "risk-averse\n(lower variance, lower mean)",
             (stds[mid_a], means[mid_a]),
-            textcoords="offset points", xytext=(30, -35),
-            fontsize=9.5, color="#3b4cc0", fontstyle="italic", ha="center",
+            textcoords="offset points",
+            xytext=(30, -35),
+            fontsize=9.5,
+            color="#3b4cc0",
+            fontstyle="italic",
+            ha="center",
             arrowprops=dict(arrowstyle="->", color="#3b4cc0", linewidth=1.2),
         )
     if seeking_mask.sum() > 2:
@@ -476,8 +541,12 @@ def _plot_frontier(
         ax.annotate(
             "risk-seeking\n(higher variance, lower mean)",
             (stds[mid_s], means[mid_s]),
-            textcoords="offset points", xytext=(-60, 30),
-            fontsize=9.5, color="#b40426", fontstyle="italic", ha="center",
+            textcoords="offset points",
+            xytext=(-60, 30),
+            fontsize=9.5,
+            color="#b40426",
+            fontstyle="italic",
+            ha="center",
             arrowprops=dict(arrowstyle="->", color="#b40426", linewidth=1.2),
         )
 
@@ -491,7 +560,8 @@ def _plot_frontier(
     ax.set_ylabel("Mean Score", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "Mean–Variance Frontier across Risk Parameter θ",
-        fontsize=FONT_SUPTITLE, fontweight="bold",
+        fontsize=FONT_SUPTITLE,
+        fontweight="bold",
     )
     ax.legend(loc="lower left", fontsize=11, framealpha=0.9)
     ax.grid(True, alpha=GRID_ALPHA)
@@ -539,8 +609,12 @@ def _plot_percentile_frontiers(
         a = (alpha_arr[i] + alpha_arr[i + 1]) / 2
         c = CMAP(norm_theta(t_mid))
         ax.plot(
-            [stds[i], stds[i + 1]], [means[i], means[i + 1]],
-            color=(*c[:3], a), linewidth=2.0, solid_capstyle="round", zorder=2,
+            [stds[i], stds[i + 1]],
+            [means[i], means[i + 1]],
+            color=(*c[:3], a),
+            linewidth=2.0,
+            solid_capstyle="round",
+            zorder=2,
         )
 
     # --- Percentile peak markers along the curve ---
@@ -565,15 +639,26 @@ def _plot_percentile_frontiers(
     # Connect peaks with a line to show the trajectory
     if len(peak_stds) > 1:
         ax.plot(
-            peak_stds, peak_means,
-            color="black", linewidth=1.5, linestyle="--", alpha=0.4, zorder=4,
+            peak_stds,
+            peak_means,
+            color="black",
+            linewidth=1.5,
+            linestyle="--",
+            alpha=0.4,
+            zorder=4,
         )
 
     # Plot markers
     for i, (s, m, lab, c) in enumerate(zip(peak_stds, peak_means, peak_labels, peak_colors)):
         ax.scatter(
-            s, m, color=c, s=160, zorder=6,
-            edgecolors="black", linewidths=0.8, marker="o",
+            s,
+            m,
+            color=c,
+            s=160,
+            zorder=6,
+            edgecolors="black",
+            linewidths=0.8,
+            marker="o",
         )
         # Alternate label offsets to avoid overlap
         offset_x = 10 if i % 2 == 0 else -10
@@ -581,18 +666,25 @@ def _plot_percentile_frontiers(
         ax.annotate(
             lab,
             (s, m),
-            fontsize=9.5, fontweight="bold",
+            fontsize=9.5,
+            fontweight="bold",
             color=c,
-            xytext=(offset_x, 6), textcoords="offset points",
-            ha=ha, va="bottom",
+            xytext=(offset_x, 6),
+            textcoords="offset points",
+            ha=ha,
+            va="bottom",
             arrowprops=dict(arrowstyle="-", alpha=0.3, linewidth=0.5),
         )
 
     # --- θ=0 reference marker ---
     ev_idx = int(np.abs(thetas).argmin())
     ax.scatter(
-        stds[ev_idx], means[ev_idx],
-        color="black", s=250, marker="*", zorder=10,
+        stds[ev_idx],
+        means[ev_idx],
+        color="black",
+        s=250,
+        marker="*",
+        zorder=10,
         label="θ=0 (EV-optimal)",
     )
 
@@ -612,7 +704,8 @@ def _plot_percentile_frontiers(
     ax.set_ylabel("Mean Score", fontsize=FONT_AXIS_LABEL)
     ax.set_title(
         "Mean–Std Frontier: Where Each Percentile's Optimal θ* Lands",
-        fontsize=FONT_SUPTITLE, fontweight="bold",
+        fontsize=FONT_SUPTITLE,
+        fontweight="bold",
     )
     ax.grid(True, alpha=GRID_ALPHA)
 

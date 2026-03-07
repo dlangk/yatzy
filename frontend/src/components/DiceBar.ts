@@ -1,7 +1,7 @@
 import { getState, dispatch, subscribe } from '../store.ts';
 import { createDie, type DieElements } from './Die.ts';
 
-/** Render 5 interactive dice with hold/toggle and optimal-keep hints. */
+/** Render 5 interactive dice with keep/toggle and optimal-keep hints. */
 export function initDiceBar(container: HTMLElement): void {
   container.className = 'dice-bar';
 
@@ -40,7 +40,7 @@ export function initDiceBar(container: HTMLElement): void {
       const v = active ? s.dice[i].value : 0;
       dice[i].update({
         value: v,
-        held: active ? s.dice[i].held : true,
+        kept: active ? s.dice[i].kept : true,
         isOptimalReroll: showMaskHints && !!(optimalMask! & (1 << i)),
         isOptimalKeep: showMaskHints && !(optimalMask! & (1 << i)),
         disabled: !canToggle,

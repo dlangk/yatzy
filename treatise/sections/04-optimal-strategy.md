@@ -68,7 +68,7 @@ What if you always played for the highest possible outcome? The theoretical ceil
 </div>
 :::
 
-The ceiling-chasing strategy fails because it overvalues unlikely outcomes. It will hold a single Six hoping for Yatzy when the odds are terrible, instead of taking a safe Full House. The 130-point gap between optimal play and ceiling-chasing is a vivid reminder: in a game with dice, playing the odds beats wishful thinking every time.
+The ceiling-chasing strategy fails because it overvalues unlikely outcomes. It will keep a single Six hoping for Yatzy when the odds are terrible, instead of taking a safe Full House. The 130-point gap between optimal play and ceiling-chasing is a vivid reminder: in a game with dice, playing the odds beats wishful thinking every time.
 
 ### What Does a Typical Game Look Like?
 

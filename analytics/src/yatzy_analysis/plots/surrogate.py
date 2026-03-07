@@ -1,4 +1,5 @@
 """Surrogate model Pareto frontier and accuracy plots."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -63,9 +64,7 @@ def plot_all_surrogate(
     for dtype in all_results:
         fi_path = results_dir / f"feature_importance_{dtype}.npz"
         if fi_path.exists():
-            paths.append(
-                _plot_feature_importance(fi_path, dtype, output_dir, dpi=dpi, fmt=fmt)
-            )
+            paths.append(_plot_feature_importance(fi_path, dtype, output_dir, dpi=dpi, fmt=fmt))
             break  # One importance plot is sufficient (category is most interesting)
 
     # 4. Accuracy by turn heatmap
@@ -238,8 +237,7 @@ def _plot_accuracy_heatmap(
         models_pd = models.to_pandas()
         y_pos = np.arange(len(models_pd))
         colors = [
-            "#1f77b4" if row["model_type"] == "dt" else "#ff7f0e"
-            for _, row in models_pd.iterrows()
+            "#1f77b4" if row["model_type"] == "dt" else "#ff7f0e" for _, row in models_pd.iterrows()
         ]
 
         ax.barh(y_pos, models_pd["accuracy"], color=colors, alpha=0.8)
@@ -295,38 +293,63 @@ def _plot_params_vs_mean(
     # Plot DTs
     if not dt_df.is_empty():
         ax.scatter(
-            dt_df["total_params"].to_numpy(), dt_df["mean"].to_numpy(),
-            marker="o", s=100, c="#1f77b4", zorder=4, label="Decision Tree",
+            dt_df["total_params"].to_numpy(),
+            dt_df["mean"].to_numpy(),
+            marker="o",
+            s=100,
+            c="#1f77b4",
+            zorder=4,
+            label="Decision Tree",
         )
         ax.plot(
-            dt_df["total_params"].to_numpy(), dt_df["mean"].to_numpy(),
-            color="#1f77b4", alpha=0.4, linewidth=1.5, zorder=3,
+            dt_df["total_params"].to_numpy(),
+            dt_df["mean"].to_numpy(),
+            color="#1f77b4",
+            alpha=0.4,
+            linewidth=1.5,
+            zorder=3,
         )
         # Label each point
         for row in dt_df.iter_rows(named=True):
             ax.annotate(
-                row["name"], (row["total_params"], row["mean"]),
-                textcoords="offset points", xytext=(8, -4),
-                fontsize=7, alpha=0.7,
+                row["name"],
+                (row["total_params"], row["mean"]),
+                textcoords="offset points",
+                xytext=(8, -4),
+                fontsize=7,
+                alpha=0.7,
             )
 
     # Plot MLPs
     if not mlp_df.is_empty():
         ax.scatter(
-            mlp_df["total_params"].to_numpy(), mlp_df["mean"].to_numpy(),
-            marker="s", s=100, c="#ff7f0e", zorder=4, label="MLP",
+            mlp_df["total_params"].to_numpy(),
+            mlp_df["mean"].to_numpy(),
+            marker="s",
+            s=100,
+            c="#ff7f0e",
+            zorder=4,
+            label="MLP",
         )
         ax.plot(
-            mlp_df["total_params"].to_numpy(), mlp_df["mean"].to_numpy(),
-            color="#ff7f0e", alpha=0.4, linewidth=1.5, zorder=3,
+            mlp_df["total_params"].to_numpy(),
+            mlp_df["mean"].to_numpy(),
+            color="#ff7f0e",
+            alpha=0.4,
+            linewidth=1.5,
+            zorder=3,
         )
 
     # Plot heuristic
     if not heur_df.is_empty():
         heur_mean = heur_df.row(0, named=True)["mean"]
         ax.axhline(
-            y=heur_mean, color="#2ca02c", linestyle=":", alpha=0.7,
-            label=f"Heuristic ({heur_mean:.0f})", zorder=2,
+            y=heur_mean,
+            color="#2ca02c",
+            linestyle=":",
+            alpha=0.7,
+            label=f"Heuristic ({heur_mean:.0f})",
+            zorder=2,
         )
 
     # Reference lines
@@ -361,25 +384,37 @@ def _plot_score_summary(
 
     # Draw whisker-style range bars
     for i, row in enumerate(df_sorted.iter_rows(named=True)):
-        color = "#1f77b4" if row["name"].startswith("dt_") else (
-            "#ff7f0e" if row["name"].startswith("mlp_") else "#2ca02c"
+        color = (
+            "#1f77b4"
+            if row["name"].startswith("dt_")
+            else ("#ff7f0e" if row["name"].startswith("mlp_") else "#2ca02c")
         )
         # p5-p95 range
-        ax.barh(i, row["p95"] - row["p5"], left=row["p5"], height=0.5,
-                color=color, alpha=0.3, zorder=2)
+        ax.barh(
+            i, row["p95"] - row["p5"], left=row["p5"], height=0.5, color=color, alpha=0.3, zorder=2
+        )
         # p25-p75 range
-        ax.barh(i, row["p75"] - row["p25"], left=row["p25"], height=0.5,
-                color=color, alpha=0.6, zorder=3)
+        ax.barh(
+            i,
+            row["p75"] - row["p25"],
+            left=row["p25"],
+            height=0.5,
+            color=color,
+            alpha=0.6,
+            zorder=3,
+        )
         # Median line
-        ax.plot([row["p50"], row["p50"]], [i - 0.25, i + 0.25],
-                color=color, linewidth=2, zorder=4)
+        ax.plot([row["p50"], row["p50"]], [i - 0.25, i + 0.25], color=color, linewidth=2, zorder=4)
         # Mean marker
         ax.scatter([row["mean"]], [i], color=color, marker="D", s=40, zorder=5)
         # Params annotation
         params = int(row["total_params"])
         ax.annotate(
-            f"{params:,d}", (row["p95"] + 2, i),
-            fontsize=7, alpha=0.6, va="center",
+            f"{params:,d}",
+            (row["p95"] + 2, i),
+            fontsize=7,
+            alpha=0.6,
+            va="center",
         )
 
     ax.set_yticks(y_pos)
@@ -480,9 +515,13 @@ def plot_forward_selection_elbow(
         # Annotate first few features
         for r in results[:5]:
             ax.annotate(
-                r["feature_name"], (r["n_features"], r["ev_loss"]),
-                textcoords="offset points", xytext=(8, 4),
-                fontsize=7, alpha=0.7, color=color,
+                r["feature_name"],
+                (r["n_features"], r["ev_loss"]),
+                textcoords="offset points",
+                xytext=(8, 4),
+                fontsize=7,
+                alpha=0.7,
+                color=color,
             )
 
     ax.set_xlabel("Number of features", fontsize=FONT_AXIS_LABEL)
@@ -542,8 +581,15 @@ def plot_error_analysis(
             f"  Near-zero (<0.1): {gap_stats['near_zero_frac']:.1%}\n\n"
             f"Near bonus threshold: {data['near_bonus_fraction']:.1%}"
         )
-        ax_gap.text(0.1, 0.9, stats_text, transform=ax_gap.transAxes,
-                    fontsize=10, verticalalignment="top", fontfamily="monospace")
+        ax_gap.text(
+            0.1,
+            0.9,
+            stats_text,
+            transform=ax_gap.transAxes,
+            fontsize=10,
+            verticalalignment="top",
+            fontfamily="monospace",
+        )
         ax_gap.set_title(f"{dtype}: Error Statistics", fontsize=FONT_TITLE)
         ax_gap.axis("off")
 

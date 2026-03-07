@@ -4,6 +4,7 @@ Simulates full Yatzy games using trained sklearn classifiers (DTs/MLPs)
 for all 3 decision types, measuring actual mean scores rather than
 per-decision EV loss.
 """
+
 from __future__ import annotations
 
 import csv
@@ -149,11 +150,11 @@ def build_features(
     bonus_deficit = 0 if bonus_secured else 63 - upper_score
 
     features = [
-        turn / 14.0,                          # 0: turn normalized
-        upper_score / 63.0,                   # 1: upper_score normalized
-        upper_cats_left / 6.0,                # 2: upper categories left
-        1.0 if bonus_secured else 0.0,        # 3: bonus secured
-        bonus_deficit / 63.0,                 # 4: bonus deficit
+        turn / 14.0,  # 0: turn normalized
+        upper_score / 63.0,  # 1: upper_score normalized
+        upper_cats_left / 6.0,  # 2: upper categories left
+        1.0 if bonus_secured else 0.0,  # 3: bonus secured
+        bonus_deficit / 63.0,  # 4: bonus deficit
     ]
     # 5-10: face counts
     for f in range(1, 7):
@@ -215,6 +216,7 @@ def pick_best_available_category(dice: np.ndarray, scored: int) -> int:
 @dataclass
 class ModelTriple:
     """Three models (one per decision type) forming a complete player."""
+
     category: object  # sklearn classifier
     reroll1: object
     reroll2: object
@@ -274,6 +276,7 @@ def simulate_game(
 @dataclass
 class BatchCategoryStats:
     """Per-category aggregate stats from a batch simulation."""
+
     cat_mean_scores: dict[int, float]
     cat_hit_rates: dict[int, float]
     mean_upper_total: float
@@ -453,10 +456,21 @@ class HeuristicPlayer:
 
         # 14. Dump order
         dump_order = [
-            CAT_ONES, CAT_TWOS, CAT_THREES, CAT_YATZY,
-            CAT_SMALL_STRAIGHT, CAT_LARGE_STRAIGHT, CAT_FULL_HOUSE,
-            CAT_TWO_PAIRS, CAT_THREE_OF_A_KIND, CAT_FOUR_OF_A_KIND,
-            CAT_ONE_PAIR, CAT_FOURS, CAT_FIVES, CAT_SIXES, CAT_CHANCE,
+            CAT_ONES,
+            CAT_TWOS,
+            CAT_THREES,
+            CAT_YATZY,
+            CAT_SMALL_STRAIGHT,
+            CAT_LARGE_STRAIGHT,
+            CAT_FULL_HOUSE,
+            CAT_TWO_PAIRS,
+            CAT_THREE_OF_A_KIND,
+            CAT_FOUR_OF_A_KIND,
+            CAT_ONE_PAIR,
+            CAT_FOURS,
+            CAT_FIVES,
+            CAT_SIXES,
+            CAT_CHANCE,
         ]
         for c in dump_order:
             if open_cat(c):
@@ -588,6 +602,7 @@ def simulate_heuristic_batch(
 @dataclass
 class EvalResult:
     """Results from evaluating one model combo."""
+
     name: str
     total_params: int
     n_games: int
@@ -678,14 +693,18 @@ def load_model_triple(
             csv_path = results_dir / f"results_{dtype}.csv"
             if csv_path.exists():
                 import polars as pl
+
                 df = pl.read_csv(csv_path)
                 row = df.filter(pl.col("name") == model_stem)
                 if not row.is_empty():
                     total_params += int(row.row(0, named=True)["n_params"])
 
     return ModelTriple(
-        category=cat, reroll1=r1, reroll2=r2,
-        name=model_stem, total_params=total_params,
+        category=cat,
+        reroll1=r1,
+        reroll2=r2,
+        name=model_stem,
+        total_params=total_params,
     )
 
 
@@ -711,7 +730,7 @@ def run_evaluation(
     print(
         f"  heuristic: mean={r.mean:.1f}, std={r.std:.1f}, "
         f"p5={r.p5}, p50={r.p50}, p95={r.p95}, bonus={r.bonus_rate:.1%} "
-        f"({time.time()-t0:.1f}s)"
+        f"({time.time() - t0:.1f}s)"
     )
 
     # 2. Surrogate model combos
@@ -735,7 +754,7 @@ def run_evaluation(
         print(
             f"  {combo_name}: mean={r.mean:.1f}, std={r.std:.1f}, "
             f"p5={r.p5}, p50={r.p50}, p95={r.p95}, bonus={r.bonus_rate:.1%}, "
-            f"params={r.total_params:,d} ({time.time()-t0:.1f}s)"
+            f"params={r.total_params:,d} ({time.time() - t0:.1f}s)"
         )
 
     # Save results
@@ -759,22 +778,59 @@ def _apply_category_stats(r: EvalResult, stats: BatchCategoryStats) -> None:
 def _save_eval_csv(results: list[EvalResult], path: Path) -> None:
     with open(path, "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow([
-            "name", "total_params", "n_games", "mean", "std",
-            "min", "p5", "p10", "p25", "p50", "p75", "p90", "p95", "p99", "max",
-            "bonus_rate", "yatzy_rate", "small_straight_rate", "large_straight_rate",
-            "full_house_rate", "mean_upper_total", "mean_chance",
-        ])
+        w.writerow(
+            [
+                "name",
+                "total_params",
+                "n_games",
+                "mean",
+                "std",
+                "min",
+                "p5",
+                "p10",
+                "p25",
+                "p50",
+                "p75",
+                "p90",
+                "p95",
+                "p99",
+                "max",
+                "bonus_rate",
+                "yatzy_rate",
+                "small_straight_rate",
+                "large_straight_rate",
+                "full_house_rate",
+                "mean_upper_total",
+                "mean_chance",
+            ]
+        )
         for r in results:
-            w.writerow([
-                r.name, r.total_params, r.n_games,
-                f"{r.mean:.2f}", f"{r.std:.2f}",
-                r.min, r.p5, r.p10, r.p25, r.p50, r.p75, r.p90, r.p95, r.p99, r.max,
-                f"{r.bonus_rate:.4f}", f"{r.yatzy_rate:.4f}",
-                f"{r.small_straight_rate:.4f}", f"{r.large_straight_rate:.4f}",
-                f"{r.full_house_rate:.4f}", f"{r.mean_upper_total:.2f}",
-                f"{r.mean_chance:.2f}",
-            ])
+            w.writerow(
+                [
+                    r.name,
+                    r.total_params,
+                    r.n_games,
+                    f"{r.mean:.2f}",
+                    f"{r.std:.2f}",
+                    r.min,
+                    r.p5,
+                    r.p10,
+                    r.p25,
+                    r.p50,
+                    r.p75,
+                    r.p90,
+                    r.p95,
+                    r.p99,
+                    r.max,
+                    f"{r.bonus_rate:.4f}",
+                    f"{r.yatzy_rate:.4f}",
+                    f"{r.small_straight_rate:.4f}",
+                    f"{r.large_straight_rate:.4f}",
+                    f"{r.full_house_rate:.4f}",
+                    f"{r.mean_upper_total:.2f}",
+                    f"{r.mean_chance:.2f}",
+                ]
+            )
 
 
 def _save_eval_json(results: list[EvalResult], path: Path) -> None:

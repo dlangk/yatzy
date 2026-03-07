@@ -1,4 +1,5 @@
 """Win rate analysis plots: θ vs win rate, conditional breakdown, PMF overlay."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -71,7 +72,7 @@ def plot_winrate_curve(
     best_idx = challengers["win_rate"].arg_max()
     best = challengers.row(best_idx, named=True)
     ax.annotate(
-        f"θ={best['theta']:+.3f}\n{best['win_rate']*100:.2f}%",
+        f"θ={best['theta']:+.3f}\n{best['win_rate'] * 100:.2f}%",
         (best["theta"], best["win_rate"] * 100),
         textcoords="offset points",
         xytext=(12, 12),
@@ -83,7 +84,9 @@ def plot_winrate_curve(
 
     # Reference lines
     ax.axhline(y=50, color="gray", linewidth=1.5, linestyle="--", alpha=0.7, label="50% (parity)")
-    ax.axhline(y=51, color="#e74c3c", linewidth=1.2, linestyle=":", alpha=0.7, label="51% (H₁ threshold)")
+    ax.axhline(
+        y=51, color="#e74c3c", linewidth=1.2, linestyle=":", alpha=0.7, label="51% (H₁ threshold)"
+    )
     ax.axvline(x=0, color="gray", linewidth=0.8, alpha=0.5)
 
     ax.set_xlabel("θ (risk parameter)", fontsize=FONT_AXIS_LABEL)
@@ -209,17 +212,31 @@ def plot_pmf_comparison(
     y_bl = gauss(x, bl["mean"], bl["std"])
     y_best = gauss(x, best["mean"], best["std"])
 
-    ax.fill_between(x, y_bl, alpha=0.25, color="#3498db", label=f"θ=0 (μ={bl['mean']:.1f}, σ={bl['std']:.1f})")
+    ax.fill_between(
+        x, y_bl, alpha=0.25, color="#3498db", label=f"θ=0 (μ={bl['mean']:.1f}, σ={bl['std']:.1f})"
+    )
     ax.plot(x, y_bl, color="#3498db", linewidth=2.0)
 
-    ax.fill_between(x, y_best, alpha=0.25, color="#e74c3c",
-                     label=f"θ={best['theta']:+.3f} (μ={best['mean']:.1f}, σ={best['std']:.1f})")
+    ax.fill_between(
+        x,
+        y_best,
+        alpha=0.25,
+        color="#e74c3c",
+        label=f"θ={best['theta']:+.3f} (μ={best['mean']:.1f}, σ={best['std']:.1f})",
+    )
     ax.plot(x, y_best, color="#e74c3c", linewidth=2.0)
 
     # Shade region where challenger density exceeds baseline
     higher = y_best > y_bl
-    ax.fill_between(x, y_bl, y_best, where=higher, alpha=0.3, color="#27ae60",
-                     label="Challenger > Baseline density")
+    ax.fill_between(
+        x,
+        y_bl,
+        y_best,
+        where=higher,
+        alpha=0.3,
+        color="#27ae60",
+        label="Challenger > Baseline density",
+    )
 
     ax.set_xlabel("Total Score", fontsize=FONT_AXIS_LABEL)
     ax.set_ylabel("Probability Density", fontsize=FONT_AXIS_LABEL)

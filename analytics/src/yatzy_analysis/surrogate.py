@@ -3,6 +3,7 @@
 Trains classifiers on per-decision training data exported by yatzy-export-training-data,
 evaluates via gap-weighted EV loss, and produces a Pareto frontier of model size vs accuracy.
 """
+
 from __future__ import annotations
 
 import json
@@ -36,18 +37,18 @@ def load_training_data(
     with open(path, "rb") as f:
         header = f.read(HEADER_SIZE)
 
-    magic, version, num_records, num_features, num_actions = struct.unpack_from(
-        "<IIqII", header, 0
-    )
+    magic, version, num_records, num_features, num_actions = struct.unpack_from("<IIqII", header, 0)
     assert magic == MAGIC, f"Bad magic: {magic:#x}"
     assert version == VERSION, f"Bad version: {version}"
 
     # Build a structured dtype matching the record layout (packed, no padding)
-    dt = np.dtype([
-        ("features", np.float32, (num_features,)),
-        ("label", np.uint16),
-        ("gap", np.float32),
-    ])
+    dt = np.dtype(
+        [
+            ("features", np.float32, (num_features,)),
+            ("label", np.uint16),
+            ("gap", np.float32),
+        ]
+    )
 
     # Memory-map the body for zero-copy read
     raw = np.memmap(path, dtype=np.uint8, mode="r", offset=HEADER_SIZE)
@@ -163,9 +164,7 @@ def train_decision_trees(
 # ── Random Forest for feature importance ─────────────────────────────────
 
 
-def compute_feature_importance(
-    X_train: np.ndarray, y_train: np.ndarray
-) -> np.ndarray:
+def compute_feature_importance(X_train: np.ndarray, y_train: np.ndarray) -> np.ndarray:
     """Fit a Random Forest on a subsample and return feature importances."""
     from sklearn.ensemble import RandomForestClassifier
 
@@ -178,9 +177,7 @@ def compute_feature_importance(
     else:
         X_sub, y_sub = X_train, y_train
 
-    rf = RandomForestClassifier(
-        n_estimators=30, max_depth=15, random_state=42, n_jobs=-1
-    )
+    rf = RandomForestClassifier(n_estimators=30, max_depth=15, random_state=42, n_jobs=-1)
     rf.fit(X_sub, y_sub)
     return rf.feature_importances_
 
@@ -277,7 +274,10 @@ def train_mlps(
             ev_loss=ev_loss_per_game(y_test, pred_test, gaps_test, n_test_games),
             train_accuracy=accuracy(y_tr_sub, pred_train),
             train_ev_loss=ev_loss_per_game(
-                y_tr_sub, pred_train, gaps_tr_sub, n_train_games_sub,
+                y_tr_sub,
+                pred_train,
+                gaps_tr_sub,
+                n_train_games_sub,
             ),
             accuracy_per_turn=accuracy_by_turn(y_test, pred_test),
             extra={"layers": list(layers), "epochs": clf.n_iter_},
@@ -310,12 +310,35 @@ def compute_pareto_frontier(results: list[ModelResult]) -> list[ModelResult]:
 # ── Full training pipeline ───────────────────────────────────────────────
 
 FEATURE_NAMES_CATEGORY = [
-    "turn", "upper_score", "upper_cats_left", "bonus_secured", "bonus_deficit",
-    "face1", "face2", "face3", "face4", "face5", "face6",
-    "dice_sum", "max_face_count", "num_distinct",
-    "cat0_avail", "cat1_avail", "cat2_avail", "cat3_avail", "cat4_avail",
-    "cat5_avail", "cat6_avail", "cat7_avail", "cat8_avail", "cat9_avail",
-    "cat10_avail", "cat11_avail", "cat12_avail", "cat13_avail", "cat14_avail",
+    "turn",
+    "upper_score",
+    "upper_cats_left",
+    "bonus_secured",
+    "bonus_deficit",
+    "face1",
+    "face2",
+    "face3",
+    "face4",
+    "face5",
+    "face6",
+    "dice_sum",
+    "max_face_count",
+    "num_distinct",
+    "cat0_avail",
+    "cat1_avail",
+    "cat2_avail",
+    "cat3_avail",
+    "cat4_avail",
+    "cat5_avail",
+    "cat6_avail",
+    "cat7_avail",
+    "cat8_avail",
+    "cat9_avail",
+    "cat10_avail",
+    "cat11_avail",
+    "cat12_avail",
+    "cat13_avail",
+    "cat14_avail",
 ]
 
 FEATURE_NAMES_REROLL = FEATURE_NAMES_CATEGORY + ["rerolls_remaining"]
@@ -345,13 +368,13 @@ def run_training_pipeline(
             print(f"  [skip] {path} not found")
             continue
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"  Training {dtype} models ({n_features} features, {n_classes} classes)")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         t0 = time.time()
         features, labels, gaps = load_training_data(path)
-        print(f"  Loaded {len(features):,d} records in {time.time()-t0:.1f}s")
+        print(f"  Loaded {len(features):,d} records in {time.time() - t0:.1f}s")
         print(f"  Mean gap: {gaps.mean():.3f}, zero-gap: {(gaps < 0.01).mean():.1%}")
 
         # Train/test split by game (80/20)
@@ -373,9 +396,15 @@ def run_training_pipeline(
         # Decision trees
         print("\n  --- Decision Trees ---")
         dt_results = train_decision_trees(
-            X_train, y_train, gaps_train,
-            X_test, y_test, gaps_test,
-            n_train_games, n_test_games, dtype,
+            X_train,
+            y_train,
+            gaps_train,
+            X_test,
+            y_test,
+            gaps_test,
+            n_train_games,
+            n_test_games,
+            dtype,
             models_dir=models_dir,
         )
         for r in dt_results:
@@ -403,18 +432,27 @@ def run_training_pipeline(
         # MLPs
         print("\n  --- MLPs ---")
         mlp_results = train_mlps(
-            X_train, y_train, gaps_train,
-            X_test, y_test, gaps_test,
-            n_train_games, n_test_games, dtype,
-            n_features, n_classes,
+            X_train,
+            y_train,
+            gaps_train,
+            X_test,
+            y_test,
+            gaps_test,
+            n_train_games,
+            n_test_games,
+            dtype,
+            n_features,
+            n_classes,
             models_dir=models_dir,
         )
         results.extend(mlp_results)
 
         # Baselines
         random_ev_loss = ev_loss_per_game(
-            y_test, np.random.RandomState(42).randint(0, n_classes, len(y_test)),
-            gaps_test, n_test_games,
+            y_test,
+            np.random.RandomState(42).randint(0, n_classes, len(y_test)),
+            gaps_test,
+            n_test_games,
         )
         results.append(
             ModelResult(
@@ -437,9 +475,7 @@ def run_training_pipeline(
     for results in all_results.values():
         all_combined.extend(results)
 
-    pareto = compute_pareto_frontier(
-        [r for r in all_combined if r.model_type != "baseline"]
-    )
+    pareto = compute_pareto_frontier([r for r in all_combined if r.model_type != "baseline"])
     _save_pareto_csv(pareto, output_dir / "pareto_frontier.csv")
     _save_pareto_json(pareto, all_results, output_dir / "pareto_frontier.json")
 
@@ -451,16 +487,31 @@ def _save_results_csv(results: list[ModelResult], path: Path) -> None:
 
     with open(path, "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow([
-            "name", "model_type", "decision_type", "n_params",
-            "accuracy", "ev_loss", "train_accuracy", "train_ev_loss",
-        ])
+        w.writerow(
+            [
+                "name",
+                "model_type",
+                "decision_type",
+                "n_params",
+                "accuracy",
+                "ev_loss",
+                "train_accuracy",
+                "train_ev_loss",
+            ]
+        )
         for r in results:
-            w.writerow([
-                r.name, r.model_type, r.decision_type, r.n_params,
-                f"{r.accuracy:.6f}", f"{r.ev_loss:.6f}",
-                f"{r.train_accuracy:.6f}", f"{r.train_ev_loss:.6f}",
-            ])
+            w.writerow(
+                [
+                    r.name,
+                    r.model_type,
+                    r.decision_type,
+                    r.n_params,
+                    f"{r.accuracy:.6f}",
+                    f"{r.ev_loss:.6f}",
+                    f"{r.train_accuracy:.6f}",
+                    f"{r.train_ev_loss:.6f}",
+                ]
+            )
 
 
 def _save_pareto_csv(pareto: list[ModelResult], path: Path) -> None:
@@ -470,10 +521,16 @@ def _save_pareto_csv(pareto: list[ModelResult], path: Path) -> None:
         w = csv.writer(f)
         w.writerow(["name", "model_type", "decision_type", "n_params", "accuracy", "ev_loss"])
         for r in pareto:
-            w.writerow([
-                r.name, r.model_type, r.decision_type, r.n_params,
-                f"{r.accuracy:.6f}", f"{r.ev_loss:.6f}",
-            ])
+            w.writerow(
+                [
+                    r.name,
+                    r.model_type,
+                    r.decision_type,
+                    r.n_params,
+                    f"{r.accuracy:.6f}",
+                    f"{r.ev_loss:.6f}",
+                ]
+            )
 
 
 def _save_pareto_json(
@@ -510,9 +567,7 @@ def _save_pareto_json(
 # ── Diagnostic experiments ──────────────────────────────────────────────
 
 
-def quantify_label_noise(
-    features: np.ndarray, labels: np.ndarray, gaps: np.ndarray
-) -> dict:
+def quantify_label_noise(features: np.ndarray, labels: np.ndarray, gaps: np.ndarray) -> dict:
     """Group records by feature vector, check for conflicting labels.
 
     If zero conflicts, the feature set is lossless (no two identical feature
@@ -665,13 +720,15 @@ def run_data_scaling_experiment(
         el = float((gaps_test * wrong).sum() / n_test_games)
         acc = float((~wrong).mean())
 
-        results.append({
-            "n_games": n_games,
-            "n_records": n_train,
-            "ev_loss": el,
-            "accuracy": acc,
-            "n_params": count_dt_params(clf),
-        })
+        results.append(
+            {
+                "n_games": n_games,
+                "n_records": n_train,
+                "ev_loss": el,
+                "accuracy": acc,
+                "n_params": count_dt_params(clf),
+            }
+        )
         print(
             f"    {decision_type} @ {n_games:>7,d} games: "
             f"ev_loss={el:.4f}, acc={acc:.4f}, params={count_dt_params(clf):,d}"
@@ -738,18 +795,19 @@ def run_feature_ablation(
         el = ev_loss_per_game(y_test, pred, gaps_test, n_test_games)
         acc = accuracy(y_test, pred)
 
-        results.append({
-            "group": group_name,
-            "removed_indices": valid_indices,
-            "ev_loss": el,
-            "accuracy": acc,
-            "delta_ev_loss": el - baseline_loss,
-            "delta_accuracy": acc - baseline_acc,
-            "n_params": count_dt_params(clf),
-        })
+        results.append(
+            {
+                "group": group_name,
+                "removed_indices": valid_indices,
+                "ev_loss": el,
+                "accuracy": acc,
+                "delta_ev_loss": el - baseline_loss,
+                "delta_accuracy": acc - baseline_acc,
+                "n_params": count_dt_params(clf),
+            }
+        )
         print(
-            f"    -{group_name:>16s}: ev_loss={el:.4f} "
-            f"(Δ={el - baseline_loss:+.4f}), acc={acc:.4f}"
+            f"    -{group_name:>16s}: ev_loss={el:.4f} (Δ={el - baseline_loss:+.4f}), acc={acc:.4f}"
         )
 
     return results
@@ -822,14 +880,18 @@ def run_forward_selection(
         pred = clf.predict(X_test[:, selected])
         acc = accuracy(y_test, pred)
 
-        results.append({
-            "step": step + 1,
-            "feature_idx": best_feat,
-            "feature_name": feat_names[best_feat] if best_feat < len(feat_names) else f"feat_{best_feat}",
-            "ev_loss": best_loss,
-            "accuracy": acc,
-            "n_features": len(selected),
-        })
+        results.append(
+            {
+                "step": step + 1,
+                "feature_idx": best_feat,
+                "feature_name": feat_names[best_feat]
+                if best_feat < len(feat_names)
+                else f"feat_{best_feat}",
+                "ev_loss": best_loss,
+                "accuracy": acc,
+                "n_features": len(selected),
+            }
+        )
         print(
             f"    step {step + 1:>2d}: +{feat_names[best_feat]:>20s} "
             f"→ ev_loss={best_loss:.4f}, acc={acc:.4f}"
@@ -889,14 +951,16 @@ def train_with_augmented_features(
         pred_base = clf_base.predict(X_test)
         base_loss = ev_loss_per_game(y_test, pred_base, gaps_test, n_test_games)
         base_acc = accuracy(y_test, pred_base)
-        results.append(ModelResult(
-            name=f"dt_d{depth}_base",
-            model_type="dt",
-            decision_type=dtype,
-            n_params=count_dt_params(clf_base),
-            accuracy=base_acc,
-            ev_loss=base_loss,
-        ))
+        results.append(
+            ModelResult(
+                name=f"dt_d{depth}_base",
+                model_type="dt",
+                decision_type=dtype,
+                n_params=count_dt_params(clf_base),
+                accuracy=base_acc,
+                ev_loss=base_loss,
+            )
+        )
         print(f"    baseline:  ev_loss={base_loss:.4f}, acc={base_acc:.4f}")
 
         # Augmented features
@@ -909,14 +973,16 @@ def train_with_augmented_features(
         pred_aug = clf_aug.predict(X_test_aug)
         aug_loss = ev_loss_per_game(y_test, pred_aug, gaps_test, n_test_games)
         aug_acc = accuracy(y_test, pred_aug)
-        results.append(ModelResult(
-            name=f"dt_d{depth}_augmented",
-            model_type="dt",
-            decision_type=dtype,
-            n_params=count_dt_params(clf_aug),
-            accuracy=aug_acc,
-            ev_loss=aug_loss,
-        ))
+        results.append(
+            ModelResult(
+                name=f"dt_d{depth}_augmented",
+                model_type="dt",
+                decision_type=dtype,
+                n_params=count_dt_params(clf_aug),
+                accuracy=aug_acc,
+                ev_loss=aug_loss,
+            )
+        )
         print(
             f"    augmented: ev_loss={aug_loss:.4f}, acc={aug_acc:.4f} "
             f"(Δ={aug_loss - base_loss:+.4f})"

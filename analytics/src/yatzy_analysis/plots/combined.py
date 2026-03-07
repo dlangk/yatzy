@@ -1,4 +1,5 @@
 """Combined 3x2 dashboard figure."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -29,12 +30,21 @@ def plot_combined(
     fig = plt.figure(figsize=(28, 24))
 
     gs = fig.add_gridspec(
-        3, 2, hspace=0.35, wspace=0.3, left=0.05, right=0.95, top=0.93, bottom=0.05,
+        3,
+        2,
+        hspace=0.35,
+        wspace=0.3,
+        left=0.05,
+        right=0.95,
+        top=0.93,
+        bottom=0.05,
     )
 
     fig.suptitle(
         "Risk-Sensitive Yatzy: Score Distributions by θ",
-        fontsize=22, fontweight="bold", y=0.97,
+        fontsize=22,
+        fontweight="bold",
+        y=0.97,
     )
 
     # Suppress per-panel colorbars; figure gets one shared colorbar below.

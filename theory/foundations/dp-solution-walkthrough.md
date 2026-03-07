@@ -222,7 +222,7 @@ The mathematical optimum operates roughly 20 to 30 points higher than the averag
 
 1. **Upper Bonus Awareness (The largest gain):** Humans chronically undervalue the 50-point injection. The solver will aggressively take a zero in *Four-of-a-Kind* to force the 63-point upper threshold.
 2. **Flexibility Preservation (The medium gain):** Humans use *Chance* or *Ones* when they get a bad roll early. The solver guards these categories with its life, saving them to absorb catastrophic variance in Turns 13 and 14.
-3. **Combinatorial Micro-Hedging (The final 5%):** The realm of the DP solver. Knowing exactly when to hold a generic Pair versus a 3-to-a-Straight based on the exact fractional EV of the remaining scorecard.
+3. **Combinatorial Micro-Hedging (The final 5%):** The realm of the DP solver. Knowing exactly when to keep a generic Pair versus a 3-to-a-Straight based on the exact fractional EV of the remaining scorecard.
 
 > **Visual Prompt 7: The Skill Ladder**
 > * **Chart Type:** Waterfall chart / Stepped Bar chart.

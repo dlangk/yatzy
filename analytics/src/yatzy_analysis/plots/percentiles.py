@@ -1,4 +1,5 @@
 """Percentile curves vs theta."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -34,25 +35,77 @@ def _plot_percentile_curves(
     for i, p in enumerate(_CORE):
         if p in pdf.columns:
             ax.plot(
-                pdf["theta"], pdf[p],
-                marker="o", markersize=4, linewidth=1.8, color=pct_colors[i],
-                label=p, zorder=3,
+                pdf["theta"],
+                pdf[p],
+                marker="o",
+                markersize=4,
+                linewidth=1.8,
+                color=pct_colors[i],
+                label=p,
+                zorder=3,
             )
 
     if include_extra:
-        extra_styles = {"p1": ("--", "tab:blue"), "p999": ("--", "tab:orange"), "p9999": ("--", "tab:red")}
+        extra_styles = {
+            "p1": ("--", "tab:blue"),
+            "p999": ("--", "tab:orange"),
+            "p9999": ("--", "tab:red"),
+        }
         for p, (ls, color) in extra_styles.items():
             if p in pdf.columns:
                 ax.plot(
-                    pdf["theta"], pdf[p],
-                    linestyle=ls, marker="s", markersize=3, linewidth=1.4,
-                    color=color, alpha=0.8, label=p, zorder=3,
+                    pdf["theta"],
+                    pdf[p],
+                    linestyle=ls,
+                    marker="s",
+                    markersize=3,
+                    linewidth=1.4,
+                    color=color,
+                    alpha=0.8,
+                    label=p,
+                    zorder=3,
                 )
 
-    ax.plot(pdf["theta"], pdf["min"], linestyle="--", linewidth=1.2, color="gray", alpha=0.7, label="min", zorder=2)
-    ax.plot(pdf["theta"], pdf["max"], linestyle="--", linewidth=1.2, color="black", alpha=0.7, label="max", zorder=2)
-    ax.plot(pdf["theta"], pdf["bot5_avg"], linestyle=":", linewidth=1.4, color="gray", alpha=0.7, label="bot5 avg", zorder=2)
-    ax.plot(pdf["theta"], pdf["top5_avg"], linestyle=":", linewidth=1.4, color="black", alpha=0.7, label="top5 avg", zorder=2)
+    ax.plot(
+        pdf["theta"],
+        pdf["min"],
+        linestyle="--",
+        linewidth=1.2,
+        color="gray",
+        alpha=0.7,
+        label="min",
+        zorder=2,
+    )
+    ax.plot(
+        pdf["theta"],
+        pdf["max"],
+        linestyle="--",
+        linewidth=1.2,
+        color="black",
+        alpha=0.7,
+        label="max",
+        zorder=2,
+    )
+    ax.plot(
+        pdf["theta"],
+        pdf["bot5_avg"],
+        linestyle=":",
+        linewidth=1.4,
+        color="gray",
+        alpha=0.7,
+        label="bot5 avg",
+        zorder=2,
+    )
+    ax.plot(
+        pdf["theta"],
+        pdf["top5_avg"],
+        linestyle=":",
+        linewidth=1.4,
+        color="black",
+        alpha=0.7,
+        label="top5 avg",
+        zorder=2,
+    )
 
 
 def plot_percentiles(
@@ -91,7 +144,8 @@ def plot_percentiles(
             ax_z.set_ylabel("Score", fontsize=FONT_AXIS_LABEL)
             ax_z.set_title(
                 "Score Percentiles vs θ (zoomed: peaks region)",
-                fontsize=FONT_TITLE, fontweight="bold",
+                fontsize=FONT_TITLE,
+                fontweight="bold",
             )
             ax_z.legend(loc="lower left", fontsize=FONT_LEGEND, ncol=3, framealpha=0.9)
             ax_z.grid(True, alpha=GRID_ALPHA)

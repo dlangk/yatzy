@@ -2,6 +2,7 @@
 
 Mirror of the JS estimator for validation purposes.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -64,7 +65,9 @@ def _lookup_q(scenario: dict, theta: float, gamma: float, d: int) -> np.ndarray 
             kt, kg, kd = float(parts[0]), float(parts[1]), int(float(parts[2]))
         except ValueError:
             continue
-        dist = abs(kt - nearest_theta) + abs(kg - nearest_gamma) + (0 if kd == int(nearest_d) else 1e6)
+        dist = (
+            abs(kt - nearest_theta) + abs(kg - nearest_gamma) + (0 if kd == int(nearest_d) else 1e6)
+        )
         if dist < best_dist:
             best_dist = dist
             best_key = key
@@ -95,9 +98,7 @@ def neg_log_likelihood(
             continue
 
         actions = scenario["actions"]
-        action_idx = next(
-            (i for i, a in enumerate(actions) if a["id"] == ans["actionId"]), None
-        )
+        action_idx = next((i for i, a in enumerate(actions) if a["id"] == ans["actionId"]), None)
         if action_idx is None or action_idx >= len(q):
             continue
 
@@ -125,14 +126,14 @@ def estimate_profile(
 
     # Diverse starting points for multi-start optimization
     start_points = [
-        np.array([0.0, np.log(2.0), 0.9]),       # default center
-        np.array([0.0, np.log(5.0), 0.95]),       # high β, high γ
-        np.array([0.0, np.log(1.0), 0.5]),        # low β, low γ
-        np.array([-0.05, np.log(3.0), 0.85]),     # risk-averse
-        np.array([0.05, np.log(1.5), 0.7]),       # risk-seeking
-        np.array([0.0, np.log(8.0), 0.95]),       # very precise
-        np.array([0.0, np.log(0.5), 0.6]),        # very noisy
-        np.array([0.03, np.log(4.0), 0.8]),       # moderate risk-seek
+        np.array([0.0, np.log(2.0), 0.9]),  # default center
+        np.array([0.0, np.log(5.0), 0.95]),  # high β, high γ
+        np.array([0.0, np.log(1.0), 0.5]),  # low β, low γ
+        np.array([-0.05, np.log(3.0), 0.85]),  # risk-averse
+        np.array([0.05, np.log(1.5), 0.7]),  # risk-seeking
+        np.array([0.0, np.log(8.0), 0.95]),  # very precise
+        np.array([0.0, np.log(0.5), 0.6]),  # very noisy
+        np.array([0.03, np.log(4.0), 0.8]),  # moderate risk-seek
     ]
 
     best_result = None
@@ -140,6 +141,7 @@ def estimate_profile(
     best_d = D_GRID[-1]
 
     for d in D_GRID:
+
         def objective(x: np.ndarray, _d=d) -> float:
             theta = np.clip(x[0], -0.1, 0.1)
             beta = np.clip(np.exp(x[1]), 0.1, beta_max)
@@ -157,9 +159,7 @@ def estimate_profile(
                 best_d = d
 
     if best_result is None:
-        return ProfileEstimate(
-            theta=0.0, beta=2.0, gamma=0.9, d=999, nll=0.0, bic=0.0
-        )
+        return ProfileEstimate(theta=0.0, beta=2.0, gamma=0.9, d=999, nll=0.0, bic=0.0)
 
     theta = np.clip(best_result.x[0], -0.1, 0.1)
     beta = np.clip(np.exp(best_result.x[1]), 0.1, beta_max)

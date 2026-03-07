@@ -95,16 +95,16 @@ export function initEvalPanel(container: HTMLElement): void {
     const showKeep = hasData && hints && rerolls > 0;
     const showScore = hasData && hints;
 
-    // Best keep (dice values held by optimal mask — masks are in original dice order)
+    // Best keep (dice values kept by optimal mask — masks are in original dice order)
     if (showKeep && s.lastEvalResponse?.optimal_mask != null) {
       const mask = s.lastEvalResponse.optimal_mask;
-      const kept: number[] = [];
+      const keptDice: number[] = [];
       for (let i = 0; i < 5; i++) {
         if (!(mask & (1 << i))) {
-          kept.push(s.dice[i].value);
+          keptDice.push(s.dice[i].value);
         }
       }
-      turnVals[0].textContent = kept.length === 5 ? 'All' : kept.length === 0 ? 'None' : kept.join(', ');
+      turnVals[0].textContent = keptDice.length === 5 ? 'All' : keptDice.length === 0 ? 'None' : keptDice.join(', ');
     } else {
       turnVals[0].textContent = DASH;
     }
@@ -118,7 +118,7 @@ export function initEvalPanel(container: HTMLElement): void {
     if (s.lastEvalResponse?.mask_evs) {
       let rerollMask = 0;
       for (let i = 0; i < s.dice.length; i++) {
-        if (!s.dice[i].held) rerollMask |= 1 << i;
+        if (!s.dice[i].kept) rerollMask |= 1 << i;
       }
       currentMaskEv = s.lastEvalResponse.mask_evs[rerollMask] ?? null;
     }

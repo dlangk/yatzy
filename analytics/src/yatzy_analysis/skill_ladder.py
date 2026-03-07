@@ -25,49 +25,120 @@ HEADER_SIZE = 32
 NUM_SEMANTIC_FEATURES = 56
 
 FEATURE_NAMES = [
-    "turn", "categories_left", "rerolls_remaining", "upper_score",
-    "bonus_secured", "bonus_pace", "upper_cats_left",
-    "face_count_1", "face_count_2", "face_count_3",
-    "face_count_4", "face_count_5", "face_count_6",
-    "max_count", "num_distinct", "dice_sum",
-    "has_pair", "has_two_pair", "has_three_of_kind", "has_four_of_kind",
-    "has_full_house", "has_small_straight", "has_large_straight", "has_yatzy",
-    "cat_avail_ones", "cat_avail_twos", "cat_avail_threes",
-    "cat_avail_fours", "cat_avail_fives", "cat_avail_sixes",
-    "cat_avail_one_pair", "cat_avail_two_pairs", "cat_avail_three_of_kind",
-    "cat_avail_four_of_kind", "cat_avail_small_straight",
-    "cat_avail_large_straight", "cat_avail_full_house",
-    "cat_avail_chance", "cat_avail_yatzy",
-    "cat_score_ones", "cat_score_twos", "cat_score_threes",
-    "cat_score_fours", "cat_score_fives", "cat_score_sixes",
-    "cat_score_one_pair", "cat_score_two_pairs", "cat_score_three_of_kind",
-    "cat_score_four_of_kind", "cat_score_small_straight",
-    "cat_score_large_straight", "cat_score_full_house",
-    "cat_score_chance", "cat_score_yatzy",
-    "zeros_available", "best_available_score",
+    "turn",
+    "categories_left",
+    "rerolls_remaining",
+    "upper_score",
+    "bonus_secured",
+    "bonus_pace",
+    "upper_cats_left",
+    "face_count_1",
+    "face_count_2",
+    "face_count_3",
+    "face_count_4",
+    "face_count_5",
+    "face_count_6",
+    "max_count",
+    "num_distinct",
+    "dice_sum",
+    "has_pair",
+    "has_two_pair",
+    "has_three_of_kind",
+    "has_four_of_kind",
+    "has_full_house",
+    "has_small_straight",
+    "has_large_straight",
+    "has_yatzy",
+    "cat_avail_ones",
+    "cat_avail_twos",
+    "cat_avail_threes",
+    "cat_avail_fours",
+    "cat_avail_fives",
+    "cat_avail_sixes",
+    "cat_avail_one_pair",
+    "cat_avail_two_pairs",
+    "cat_avail_three_of_kind",
+    "cat_avail_four_of_kind",
+    "cat_avail_small_straight",
+    "cat_avail_large_straight",
+    "cat_avail_full_house",
+    "cat_avail_chance",
+    "cat_avail_yatzy",
+    "cat_score_ones",
+    "cat_score_twos",
+    "cat_score_threes",
+    "cat_score_fours",
+    "cat_score_fives",
+    "cat_score_sixes",
+    "cat_score_one_pair",
+    "cat_score_two_pairs",
+    "cat_score_three_of_kind",
+    "cat_score_four_of_kind",
+    "cat_score_small_straight",
+    "cat_score_large_straight",
+    "cat_score_full_house",
+    "cat_score_chance",
+    "cat_score_yatzy",
+    "zeros_available",
+    "best_available_score",
 ]
 
 CATEGORY_NAMES = [
-    "Ones", "Twos", "Threes", "Fours", "Fives", "Sixes",
-    "One Pair", "Two Pairs", "Three of a Kind", "Four of a Kind",
-    "Small Straight", "Large Straight", "Full House", "Chance", "Yatzy",
+    "Ones",
+    "Twos",
+    "Threes",
+    "Fours",
+    "Fives",
+    "Sixes",
+    "One Pair",
+    "Two Pairs",
+    "Three of a Kind",
+    "Four of a Kind",
+    "Small Straight",
+    "Large Straight",
+    "Full House",
+    "Chance",
+    "Yatzy",
 ]
 
 BOOL_FEATURES = {
-    "bonus_secured", "has_pair", "has_two_pair", "has_three_of_kind",
-    "has_four_of_kind", "has_full_house", "has_small_straight",
-    "has_large_straight", "has_yatzy",
-} | {f"cat_avail_{n}" for n in [
-    "ones", "twos", "threes", "fours", "fives", "sixes",
-    "one_pair", "two_pairs", "three_of_kind", "four_of_kind",
-    "small_straight", "large_straight", "full_house", "chance", "yatzy",
-]}
+    "bonus_secured",
+    "has_pair",
+    "has_two_pair",
+    "has_three_of_kind",
+    "has_four_of_kind",
+    "has_full_house",
+    "has_small_straight",
+    "has_large_straight",
+    "has_yatzy",
+} | {
+    f"cat_avail_{n}"
+    for n in [
+        "ones",
+        "twos",
+        "threes",
+        "fours",
+        "fives",
+        "sixes",
+        "one_pair",
+        "two_pairs",
+        "three_of_kind",
+        "four_of_kind",
+        "small_straight",
+        "large_straight",
+        "full_house",
+        "chance",
+        "yatzy",
+    ]
+}
+
 
 @dataclass
 class CfgAction:
     """Composable Filter Grammar action."""
-    name: str           # e.g. "Union(MaxGroup,High(1))"
-    complexity: int     # AST node count: 1 for primitive, 3 for union
+
+    name: str  # e.g. "Union(MaxGroup,High(1))"
+    complexity: int  # AST node count: 1 for primitive, 3 for union
 
 
 def enumerate_cfg_actions() -> list[CfgAction]:
@@ -93,9 +164,12 @@ def enumerate_cfg_actions() -> list[CfgAction]:
     unions = []
     for i in range(len(combinable)):
         for j in range(i + 1, len(combinable)):
-            unions.append(CfgAction(
-                f"Union({combinable[i].name},{combinable[j].name})", 3,
-            ))
+            unions.append(
+                CfgAction(
+                    f"Union({combinable[i].name},{combinable[j].name})",
+                    3,
+                )
+            )
     return primitives + unions
 
 
@@ -105,13 +179,15 @@ NUM_CFG_ACTIONS = len(CFG_ACTIONS)  # 80
 
 # ── Data loading ─────────────────────────────────────────────────────────
 
+
 @dataclass
 class RegretDataset:
     """Loaded regret export data for one decision type."""
-    features: np.ndarray     # (N, NUM_SEMANTIC_FEATURES) float32
-    q_values: np.ndarray     # (N, num_actions) float32
+
+    features: np.ndarray  # (N, NUM_SEMANTIC_FEATURES) float32
+    q_values: np.ndarray  # (N, num_actions) float32
     best_action: np.ndarray  # (N,) int32
-    regret: np.ndarray       # (N, num_actions) float32
+    regret: np.ndarray  # (N, num_actions) float32
     num_actions: int
     decision_type: str
 
@@ -129,12 +205,12 @@ def load_regret_file(path: Path, decision_type: str) -> RegretDataset:
     assert len(data) >= expected, f"File too small: {len(data)} < {expected}"
 
     raw = np.frombuffer(data, dtype=np.float32, offset=HEADER_SIZE)
-    raw = raw[:count * record_floats].reshape(count, record_floats)
+    raw = raw[: count * record_floats].reshape(count, record_floats)
 
     features = raw[:, :n_features].copy()
-    q_values = raw[:, n_features:n_features + n_actions].copy()
+    q_values = raw[:, n_features : n_features + n_actions].copy()
     best_action = raw[:, n_features + n_actions].astype(np.int32)
-    regret = raw[:, n_features + n_actions + 1:].copy()
+    regret = raw[:, n_features + n_actions + 1 :].copy()
 
     return RegretDataset(
         features=features,
@@ -166,7 +242,7 @@ def reconstruct_sorted_dice(face_counts: np.ndarray) -> np.ndarray:
 
 def reconstruct_all_dice(features: np.ndarray) -> np.ndarray:
     """Vectorized: reconstruct (N, 5) sorted dice from feature matrix."""
-    counts = features[:, _FACE_COUNT_START:_FACE_COUNT_START + 6].astype(np.int32)
+    counts = features[:, _FACE_COUNT_START : _FACE_COUNT_START + 6].astype(np.int32)
     n = len(counts)
     result = np.empty((n, 5), dtype=np.int32)
     for i in range(n):
@@ -174,7 +250,7 @@ def reconstruct_all_dice(features: np.ndarray) -> np.ndarray:
         for face_val in range(1, 7):
             cnt = counts[i, face_val - 1]
             if cnt > 0:
-                result[i, pos:pos + cnt] = face_val
+                result[i, pos : pos + cnt] = face_val
                 pos += cnt
     return result
 
@@ -196,6 +272,7 @@ def _cfg_primitive_positions(dice: np.ndarray, name: str) -> set[int] | None:
         return positions if positions else None
 
     from collections import Counter
+
     counts = Counter(int(d) for d in dice)
 
     if name == "MaxGroup":
@@ -285,7 +362,7 @@ def cfg_to_bitmask(sorted_dice: np.ndarray, action: CfgAction) -> int:
         if split < 0:
             return -1
         a_name = inner[:split]
-        b_name = inner[split + 1:]
+        b_name = inner[split + 1 :]
         pos_a = _cfg_primitive_positions(sorted_dice, a_name)
         pos_b = _cfg_primitive_positions(sorted_dice, b_name)
         # Union: merge valid positions
@@ -315,7 +392,8 @@ def cfg_to_bitmask(sorted_dice: np.ndarray, action: CfgAction) -> int:
 
 
 def build_cfg_regret_matrix(
-    features: np.ndarray, bitmask_regret: np.ndarray,
+    features: np.ndarray,
+    bitmask_regret: np.ndarray,
     actions: list[CfgAction] | None = None,
 ) -> np.ndarray:
     """Project (N, 32) bitmask regret to (N, num_actions) CFG regret.
@@ -347,6 +425,7 @@ def build_cfg_regret_matrix(
 
 
 # ── Rule induction (vectorized) ──────────────────────────────────────────
+
 
 @dataclass
 class Condition:
@@ -531,8 +610,10 @@ def induce_rules(
     rules: list[Rule] = []
 
     lam_str = f", λ={lam}" if lam > 0 else ""
-    print(f"  Inducing rules for {ds.decision_type} "
-          f"({n_full:,d} records, subsampled to {n:,d}, {ds.num_actions} actions{lam_str})...")
+    print(
+        f"  Inducing rules for {ds.decision_type} "
+        f"({n_full:,d} records, subsampled to {n:,d}, {ds.num_actions} actions{lam_str})..."
+    )
 
     t0 = time.time()
     cond_masks, conditions = _build_condition_masks(features)
@@ -565,8 +646,13 @@ def induce_rules(
                 continue
 
             action_idx, mean_reg = _best_action_for_masked(
-                best_action, regret, mask, ds.num_actions,
-                semantic=semantic, lam=lam, actions=actions,
+                best_action,
+                regret,
+                mask,
+                ds.num_actions,
+                semantic=semantic,
+                lam=lam,
+                actions=actions,
             )
             score = mean_reg
             if semantic and lam > 0:
@@ -607,8 +693,13 @@ def induce_rules(
                     continue
 
                 action_idx, mean_reg = _best_action_for_masked(
-                    best_action, regret, mask2, ds.num_actions,
-                    semantic=semantic, lam=lam, actions=actions,
+                    best_action,
+                    regret,
+                    mask2,
+                    ds.num_actions,
+                    semantic=semantic,
+                    lam=lam,
+                    actions=actions,
                 )
                 score = mean_reg
                 if semantic and lam > 0:
@@ -645,8 +736,7 @@ def induce_rules(
         remaining = int(alive.sum())
         elapsed = time.time() - t1
         act_str = (
-            best_rule.action if isinstance(best_rule.action, str)
-            else f"{best_rule.action:2d}"
+            best_rule.action if isinstance(best_rule.action, str) else f"{best_rule.action:2d}"
         )
         print(
             f"    Rule {rule_idx + 1:3d}: "
@@ -661,21 +751,25 @@ def induce_rules(
     uncovered_mask = alive.astype(bool)
     if uncovered_mask.sum() > 0:
         default_idx, _ = _best_action_for_masked(
-            best_action, regret, uncovered_mask, ds.num_actions,
-            semantic=semantic, lam=lam, actions=actions,
+            best_action,
+            regret,
+            uncovered_mask,
+            ds.num_actions,
+            semantic=semantic,
+            lam=lam,
+            actions=actions,
         )
     else:
         default_idx = 0
 
-    default_action: int | str = (
-        actions[default_idx].name if semantic else default_idx
-    )
+    default_action: int | str = actions[default_idx].name if semantic else default_idx
 
     print(f"    -> {len(rules)} rules, default={default_action}, uncovered={int(alive.sum()):,d}")
     return rules, default_action
 
 
 # ── Output generation ────────────────────────────────────────────────────
+
 
 def _action_label(action: int | str, decision_type: str) -> str:
     if isinstance(action, str):
@@ -728,7 +822,9 @@ def generate_skill_ladder(
             continue
         t0 = time.time()
         datasets[dtype] = load_regret_file(path, dtype)
-        print(f"  Loaded {dtype}: {len(datasets[dtype].features):,d} records ({time.time() - t0:.1f}s)")
+        print(
+            f"  Loaded {dtype}: {len(datasets[dtype].features):,d} records ({time.time() - t0:.1f}s)"
+        )
 
     if not datasets:
         raise FileNotFoundError("No regret data files found")
@@ -745,19 +841,27 @@ def generate_skill_ladder(
             print(f"    Done in {time.time() - t_proj:.1f}s")
             cfg_ds = RegretDataset(
                 features=ds.features,
-                q_values=ds.q_values[:, :num_actions] if ds.q_values.shape[1] >= num_actions else ds.q_values,
+                q_values=ds.q_values[:, :num_actions]
+                if ds.q_values.shape[1] >= num_actions
+                else ds.q_values,
                 best_action=np.zeros(len(ds.features), dtype=np.int32),
                 regret=cfg_regret,
                 num_actions=num_actions,
                 decision_type=ds.decision_type,
             )
             rules, default = induce_rules(
-                cfg_ds, max_rules=max_rules, min_coverage=min_coverage,
-                semantic=True, lam=lam, actions=actions,
+                cfg_ds,
+                max_rules=max_rules,
+                min_coverage=min_coverage,
+                semantic=True,
+                lam=lam,
+                actions=actions,
             )
         else:
             rules, default = induce_rules(
-                ds, max_rules=max_rules, min_coverage=min_coverage,
+                ds,
+                max_rules=max_rules,
+                min_coverage=min_coverage,
             )
         all_rules[dtype] = rules
         defaults[dtype] = default
@@ -811,9 +915,7 @@ def generate_skill_ladder(
                 f"(covers {rule.coverage:,d} states, regret {rule.mean_regret:.4f})"
             )
         default = defaults.get(dtype, 0)
-        md_lines.append(
-            f"{len(rules) + 1}. **ELSE** {_action_label(default, dtype)}"
-        )
+        md_lines.append(f"{len(rules) + 1}. **ELSE** {_action_label(default, dtype)}")
         md_lines.append("")
 
     md_path.write_text("\n".join(md_lines))

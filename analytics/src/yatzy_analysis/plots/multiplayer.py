@@ -1,4 +1,5 @@
 """Multiplayer simulation plots (2-player 1v1)."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,7 +8,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 
-from .style import COLOR_BLUE, COLOR_ORANGE, COLOR_RED, FONT_AXIS_LABEL, FONT_TITLE, GRID_ALPHA, setup_theme
+from .style import (
+    COLOR_BLUE,
+    COLOR_ORANGE,
+    COLOR_RED,
+    FONT_AXIS_LABEL,
+    FONT_TITLE,
+    GRID_ALPHA,
+    setup_theme,
+)
 
 
 def plot_score_difference_per_turn(
@@ -98,7 +107,9 @@ def plot_score_difference_histogram(
 
     ax.hist(diff, bins=120, color=COLOR_BLUE, alpha=0.7, edgecolor="white", linewidth=0.3)
     ax.axvline(0, color="gray", linewidth=1.2, linestyle="--", label="Zero")
-    ax.axvline(mean_diff, color=COLOR_RED, linewidth=1.5, linestyle="-", label=f"Mean = {mean_diff:+.1f}")
+    ax.axvline(
+        mean_diff, color=COLOR_RED, linewidth=1.5, linestyle="-", label=f"Mean = {mean_diff:+.1f}"
+    )
 
     ax.set_xlabel("Score Difference (P1 − P2)")
     ax.set_ylabel("Count")
@@ -129,7 +140,9 @@ def plot_win_margin_distribution(
 
     ax.hist(margins, bins=100, color=COLOR_ORANGE, alpha=0.7, edgecolor="white", linewidth=0.3)
     ax.axvline(mean_m, color=COLOR_RED, linewidth=1.5, linestyle="-", label=f"Mean = {mean_m:.1f}")
-    ax.axvline(median_m, color=COLOR_BLUE, linewidth=1.5, linestyle="--", label=f"Median = {median_m:.1f}")
+    ax.axvline(
+        median_m, color=COLOR_BLUE, linewidth=1.5, linestyle="--", label=f"Median = {median_m:.1f}"
+    )
 
     ax.set_xlabel("Win Margin (|P1 − P2|)")
     ax.set_ylabel("Count")
@@ -166,7 +179,7 @@ def plot_winner_loser_trajectories(
     # For each game, pick winner/loser trajectory
     p1_wins = s1_d > s2_d
     winner_traj = np.where(p1_wins[:, None], tt_d[:, 0, :], tt_d[:, 1, :])  # (M, 15)
-    loser_traj = np.where(p1_wins[:, None], tt_d[:, 1, :], tt_d[:, 0, :])   # (M, 15)
+    loser_traj = np.where(p1_wins[:, None], tt_d[:, 1, :], tt_d[:, 0, :])  # (M, 15)
 
     turns = np.arange(1, 16)
 

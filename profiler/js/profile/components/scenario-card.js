@@ -21,7 +21,7 @@ export function initScenarioCard(container) {
   const diceLegend = document.createElement('div');
   diceLegend.className = 'game-dice-legend';
   const legendItems = [
-    { bg: 'var(--bg)', border: '1px solid var(--border)', label: 'Held' },
+    { bg: 'var(--bg)', border: '1px solid var(--border)', label: 'Kept' },
     { bg: 'var(--bg-alt)', border: '1px solid var(--border)', label: 'Reroll' },
   ];
   for (const item of legendItems) {
@@ -75,7 +75,7 @@ export function initScenarioCard(container) {
   let currentScenarioId = null;
 
   // Reroll dice state
-  let held = [true, true, true, true, true];
+  let kept = [true, true, true, true, true];
   let dieButtons = [];
   let isRerollDecision = false;
   let answered = false;
@@ -83,7 +83,7 @@ export function initScenarioCard(container) {
   function buildRerollMask() {
     let mask = 0;
     for (let i = 0; i < 5; i++) {
-      if (!held[i]) mask |= (1 << i);
+      if (!kept[i]) mask |= (1 << i);
     }
     return mask;
   }
@@ -91,12 +91,12 @@ export function initScenarioCard(container) {
   function updateDieVisuals() {
     dieButtons.forEach((btn, i) => {
       btn.className = 'die--interactive';
-      if (held[i]) {
-        btn.classList.add('die--held');
-        btn.title = 'Held (click to reroll)';
+      if (kept[i]) {
+        btn.classList.add('die--kept');
+        btn.title = 'Kept (click to reroll)';
       } else {
         btn.classList.add('die--will-reroll');
-        btn.title = 'Will reroll (click to hold)';
+        btn.title = 'Will reroll (click to keep)';
       }
     });
   }
@@ -114,7 +114,7 @@ export function initScenarioCard(container) {
 
   function applyRerollMask(mask) {
     for (let i = 0; i < 5; i++) {
-      held[i] = !(mask & (1 << i));
+      kept[i] = !(mask & (1 << i));
     }
     updateDieVisuals();
   }
@@ -154,7 +154,7 @@ export function initScenarioCard(container) {
     diceLegend.style.opacity = isRerollDecision ? '1' : '0';
 
     // Dice
-    held = [true, true, true, true, true];
+    kept = [true, true, true, true, true];
     dieButtons = [];
     diceRow.innerHTML = '';
 
@@ -162,14 +162,14 @@ export function initScenarioCard(container) {
 
     scenario.dice.forEach((v, i) => {
       const btn = document.createElement('button');
-      btn.className = 'die--interactive die--held';
+      btn.className = 'die--interactive die--kept';
       btn.textContent = v;
-      btn.title = 'Held (click to reroll)';
+      btn.title = 'Kept (click to reroll)';
 
       if (isRerollDecision && !answered) {
         btn.addEventListener('click', () => {
           if (answered) return;
-          held[i] = !held[i];
+          kept[i] = !kept[i];
           updateDieVisuals();
         });
       } else if (!isRerollDecision) {

@@ -1,4 +1,5 @@
 """Read simulation binary files (numpy vectorized)."""
+
 from __future__ import annotations
 
 import struct
@@ -126,17 +127,19 @@ def read_multiplayer_recording(path: Path) -> dict | None:
         seed = struct.unpack_from("<Q", header_data, 16)[0]
 
         # Read packed records: each is [scores i16[2], turn_totals i16[2][15]] = 64 bytes
-        record_dt = np.dtype([
-            ("scores", np.int16, (2,)),
-            ("turn_totals", np.int16, (2, 15)),
-        ])
+        record_dt = np.dtype(
+            [
+                ("scores", np.int16, (2,)),
+                ("turn_totals", np.int16, (2, 15)),
+            ]
+        )
         data = np.frombuffer(f.read(num_games * 64), dtype=record_dt)
 
     return {
         "num_games": int(num_games),
         "num_players": int(num_players),
         "seed": int(seed),
-        "scores": data["scores"],          # (N, 2)
+        "scores": data["scores"],  # (N, 2)
         "turn_totals": data["turn_totals"],  # (N, 2, 15)
     }
 
@@ -190,7 +193,7 @@ def read_full_recording(path: Path) -> dict | None:
     for t in range(15):
         cat_off = game_offsets + t * 19 + 17
         score_off = game_offsets + t * 19 + 18
-        cats = data[cat_off]      # (N,) category ids 0-14
+        cats = data[cat_off]  # (N,) category ids 0-14
         scores = data[score_off]  # (N,) scores
         # Scatter: category_scores[game_i, cats[game_i]] = scores[game_i]
         category_scores[np.arange(n), cats] = scores
