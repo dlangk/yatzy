@@ -142,7 +142,11 @@ fn compute_all_state_values_nocache_inner(
 }
 
 fn compute_all_state_values_inner(ctx: &mut YatzyContext, oracle: &mut Option<PolicyOracle>) {
-    compute_all_state_values_impl(ctx, oracle, false);
+    // When building the oracle, we must run the full backward induction even if
+    // cached state values exist on disk, because the oracle arrays need to be
+    // populated from the argmax decisions computed during the sweep.
+    let skip_cache = oracle.is_some();
+    compute_all_state_values_impl(ctx, oracle, skip_cache);
 }
 
 fn compute_all_state_values_impl(
