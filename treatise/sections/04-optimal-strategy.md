@@ -2,49 +2,33 @@
 
 ## The Optimal Strategy
 
-Now we have a solver that knows the best move in every possible situation. What does perfect play actually look like? The answer is surprising: even when you play perfectly, Yatzy is still wildly unpredictable.
+The solver has computed the optimal action for every reachable position: 1.43 million numbers. To make sense of that, we look at what happens to each of the 15 categories across a million simulated games.
 
-### Anatomy of a Hard Decision
+### The Category Landscape
 
-Not all decisions are obvious. Consider this endgame position. Most players take the safe guaranteed score, but the solver sees further.
+Not all 15 boxes on the scorecard are equal. The chart below maps each category by when it gets scored (x-axis), how close to its ceiling it scores (y-axis), and how much it contributes to final score variance (bubble size).
 
 :::html
-<div class="chart-container" id="chart-decision-anatomy">
-  <div id="chart-decision-anatomy-content"></div>
-  <p class="chart-caption">A hard endgame decision: the safe play vs. the solver's deeper calculation.</p>
+<div class="chart-container" id="chart-category-landscape">
+  <p class="chart-caption">Each bubble is a category. Position shows when and how well it scores; size shows variance contribution. Upper section in blue, lower in red.</p>
 </div>
 :::
 
-### The Score Distribution
+Three clusters stand out. Top-left: Sixes, Fives, and Fours, scored early and close to ceiling. These are the earners. Bottom-right: Ones and Twos, scored late and far below ceiling. These are the dump slots, sacrificed to preserve options elsewhere. In between: the lower-section categories, each with a distinct strategic role. And one enormous outlier: Yatzy, whose bubble dwarfs everything else because it swings between 50 and 0.
 
-Playing perfectly does not mean scoring the same every time. The optimal strategy averages 248.4 points per game, but the spread is enormous: a standard deviation of 38.5 means that two perfectly played games can easily differ by 100 points or more.
+### The Upper Section and the Bonus
 
-Simulating one million games shows that the scores do not follow the familiar bell curve. You might expect fifteen rounds to average out, but they don't. The distribution is lopsided, with a long tail stretching to the left. The reason? The rounds are not independent. What happens early in the game changes what is possible later.
+The 50-point upper bonus at 63 points is the gravitational center of the entire strategy. The solver pursues upper categories in a clear hierarchy: Sixes first, then Fives, then Fours, then Threes. Each contributes more toward the 63 threshold and scores more raw points. Ones and Twos sit at the bottom: their ceilings (5 and 10) are so low that dumping a zero there barely hurts.
 
-### Four Groups, One Game
-
-The lopsided shape has a clean explanation. Two things dominate your final score more than anything else: whether you hit the
-::concept[upper-section bonus]{upper-section-bonus}
-(about 90% of the time under perfect play), and whether you scored Yatzy (about 39%). These two yes-or-no outcomes split all games into four groups, each with its own score range:
-
-- Missed bonus, no Yatzy: average around 164
-- Missed bonus, scored Yatzy: average around 213
-- Hit bonus, no Yatzy: average around 237
-- Hit bonus, scored Yatzy: average around 288
-
-The overall score distribution is these four groups stacked on top of each other. Because the bonus matters so much (it separates 90% of games from the unlucky 10%), you can see a clear dip where the two populations meet.
+The chart below tracks upper-section score evolution across 15 turns. Most games converge toward the bonus by turns 10 to 12. A thin stream of unlucky games stays low throughout.
 
 :::html
-<div class="chart-container" id="chart-mixture">
-  <div id="chart-mixture-svg"></div>
-  <p class="chart-caption">The score distribution is a blend of four groups: bonus hit/miss × Yatzy hit/miss.</p>
+<div class="chart-container" id="chart-race-to-63">
+  <p class="chart-caption">How upper-section scores build turn by turn, with most games converging toward the 63-point bonus.</p>
 </div>
 :::
 
-### The Bonus Is Worth More Than You Think
-
-The ::concept[upper-section bonus]{upper-section-bonus}
-says 50 points in the rules. But its true impact is 72 points. Where do the extra 22 come from? Players who reach the bonus threshold tend to have been rolling well throughout the game. Good upper-section rolls also mean more options in the lower section: more straights, more full houses, more of-a-kind combinations. So hitting the bonus is not just a 50-point reward; it is a sign that the whole game went well.
+**The bonus is worth 72, not 50.** The rules say 50 points, but the true impact is 72. Where do the extra 22 come from? Players who reach the bonus tend to have been rolling well throughout, which lifts their lower-section scores too. About 12 points come from the upper-section scores themselves being higher when the threshold is reached, and about 10 from genuine positive correlation between upper and lower sections.
 
 :::html
 <div class="chart-container" id="chart-bonus-covariance">
@@ -57,32 +41,27 @@ says 50 points in the rules. But its true impact is 72 points. Where do the extr
 **Key insight:** This is why good Yatzy players obsess over the upper section early in the game. The 50-point bonus is visible in the rules, but the 22-point hidden advantage is not. You can only discover it by running the numbers.
 :::
 
-### Why "Best Case" Thinking Fails
+### The Lower Section: Roles and Wildcards
 
-What if you always played for the highest possible outcome? The theoretical ceiling is 374 points (every roll comes up perfect). But a strategy that always chases the ceiling, picking whatever move has the best possible upside, averages just 118.7 in actual play. That is less than half the optimal score.
+The nine lower-section categories play very different roles. They fall into four groups.
+
+**Reliable scorers.** One Pair, Three of a Kind, and Chance are easy to fill. Their zero rates are tiny, and Chance accepts any five dice. These categories provide the scoring floor: steady points that are rarely wasted.
+
+**Pattern specialists.** Two Pairs, Full House, and Four of a Kind need specific dice patterns. They have moderate zero rates (7% to 13%). The solver pursues them when dice align and takes zeros when they don't.
+
+**Binary outcomes.** Small Straight (15 points) and Large Straight (20 points) are fixed-value patterns. Either you hit the sequence or you score zero. No partial credit.
+
+**The lottery ticket.** Yatzy is worth 50 points but only hit about 39% of the time. It accounts for the single largest chunk of score variance in the entire game.
 
 :::html
-<div class="chart-container" id="chart-max-policy-failure">
-  <div id="chart-max-policy-failure-svg"></div>
-  <p class="chart-caption">Always chasing the best case averages just 118.7, less than half the optimal 248.4.</p>
+<div class="chart-container" id="chart-category-pmf-grid">
+  <p class="chart-caption">Score distributions for each category. Some are smooth (upper categories), some are binary spikes (straights, Yatzy), and some fall in between.</p>
 </div>
 :::
 
-The ceiling-chasing strategy fails because it overvalues unlikely outcomes. It will keep a single Six hoping for Yatzy when the odds are terrible, instead of taking a safe Full House. The 130-point gap between optimal play and ceiling-chasing is a vivid reminder: in a game with dice, playing the odds beats wishful thinking every time.
+### How a Game Unfolds
 
-### What Does a Typical Game Look Like?
-
-The solver tells us the *value* of every position, but not how often each position actually comes up. To see that, we trace a million games forward from the starting position and record what happens along the way. Three patterns emerge.
-
-**The race to 63.** The upper-section bonus at 63 points is the single most important target in the game. The chart below tracks how upper-section scores evolve turn by turn. Most games converge toward the bonus by turns 10 to 12, but a thin stream of unlucky games stays low throughout.
-
-:::html
-<div class="chart-container" id="chart-race-to-63">
-  <p class="chart-caption">How upper-section scores build turn by turn, with most games converging toward the 63-point bonus.</p>
-</div>
-:::
-
-**When is each category scored?** The chart below shows, for each turn, which category the solver picks most often. High-value upper categories (Sixes, Fives, Fours) tend to get scored early, while low-value ones (Ones, Twos) and Chance get used as dump slots late in the game when the dice don't cooperate.
+We have seen the roles. Now let's watch them play out. The chart below shows which category gets scored at each turn, aggregated across a million games.
 
 :::html
 <div class="chart-container" id="chart-category-stream">
@@ -90,11 +69,49 @@ The solver tells us the *value* of every position, but not how often each positi
 </div>
 :::
 
-**How uncertainty narrows.** Before any dice are rolled, every game has the same expected score of 248. As turns pass, some games get lucky and some don't, and the range of likely outcomes fans out. By the final turn, the spread covers everything from about 120 to 370.
+The strategy has phases. Early game: invest in the bonus by accumulating Sixes, Fives, and Fours while keeping lower-section options open. Mid-game: fill pattern categories (straights, full house, pairs) as dice allow. Late game: damage control. Ones, Twos, and Chance absorb whatever is left.
+
+The chart below shows how uncertainty evolves. Before any dice are rolled, every game has the same expected score of 248. As turns pass, outcomes fan out based on dice luck and category choices. By the final turn, the spread covers everything from about 120 to 370.
 
 :::html
 <div class="chart-container" id="chart-ev-ridgeline">
   <p class="chart-caption">Expected score by turn: starts as a single point at 248, fans out to the full range of final scores.</p>
+</div>
+:::
+
+Even under perfect play, Yatzy is fundamentally a game of managed uncertainty. The solver does not eliminate luck; it manages it.
+
+### The Shape of the Outcome
+
+All of the above produces one final number each game. The distribution is not a bell curve. Two binary events dominate: whether you hit the
+::concept[upper-section bonus]{upper-section-bonus}
+(about 90% of the time under perfect play) and whether you scored Yatzy (about 39%). These two yes-or-no outcomes split all games into four sub-populations:
+
+- Missed bonus, no Yatzy: average around 164
+- Missed bonus, scored Yatzy: average around 213
+- Hit bonus, no Yatzy: average around 237
+- Hit bonus, scored Yatzy: average around 288
+
+The overall distribution is these four groups stacked together. The bonus creates a visible dip where the two populations (90% vs 10%) meet.
+
+:::html
+<div class="chart-container" id="chart-mixture">
+  <div id="chart-mixture-svg"></div>
+  <p class="chart-caption">The score distribution is a blend of four groups: bonus hit/miss x Yatzy hit/miss. Toggle to highlight each component.</p>
+</div>
+:::
+
+The non-normal shape now makes sense. It is not a failure of averaging; it is a fundamental property of a game where the two highest-value events are all-or-nothing.
+
+Headline stats: mean 248.4, standard deviation 38.5, median 249, 5th percentile 179, 95th percentile 309.
+
+### Explore a Position
+
+The interactive tool below connects to the live solver API. Set the dice and scorecard state, then see the solver's evaluation: which dice to keep, which category to score, and the expected total for every option.
+
+:::html
+<div class="chart-container" id="chart-position-explorer">
+  <p class="chart-caption">Set any position and see the solver's optimal play. Requires the backend (<code>just dev-backend</code>).</p>
 </div>
 :::
 
@@ -124,44 +141,41 @@ upper-section luck and lower-section scoring opportunities.
 
 :::code
 
-The mixture decomposition is computed from simulation data by conditioning
-on the bonus and Yatzy indicators. The Monte Carlo engine records both
-the final score and the bonus/Yatzy status for each simulated game:
-
-```python
-# analytics: mixture decomposition
-import polars as pl
-
-df = pl.read_parquet("outputs/aggregates/parquet/summary.parquet")
-groups = df.group_by(["bonus_hit", "yatzy_hit"]).agg([
-    pl.col("score").mean().alias("mean"),
-    pl.col("score").std().alias("std"),
-    pl.col("score").count().alias("n"),
-])
-# Mixing weights: n_i / N
-groups = groups.with_columns(
-    (pl.col("n") / pl.col("n").sum()).alias("weight")
-)
-```
-
-The max-policy simulation uses the same solver infrastructure but replaces
-the expectation operator with a pure maximum at every decision point. The
-resulting policy table is then evaluated via standard Monte Carlo:
+The category landscape data is derived from Monte Carlo simulation.
+The solver records per-category scores and fill turns for each game,
+then computes means, zero rates, and variance contributions:
 
 ```rust
-// batched_solver.rs — max-policy variant
-fn solve_widget_max(ctx: &YatzyContext, ...) -> f32 {
-    // Phase 2: replace weighted sum with max
-    for ds in 0..252 {
-        let mut best = f32::NEG_INFINITY;
-        for keep in 0..n_keeps[ds] {
-            let future_max = lookup_max(keep, state_values);
-            best = best.max(future_max);
-        }
-        widget_values[ds] = best;
+// category_sweep.rs — per-category statistics
+
+for game in 0..n_games {
+    let record = simulate_game(&ctx, &mut rng);
+    for cat in 0..15 {
+        stats[cat].add(record.category_scores[cat],
+                       record.fill_turns[cat]);
     }
-    // Phase 3: max over dice outcomes (not weighted sum)
-    widget_values.iter().copied().fold(f32::NEG_INFINITY, f32::max)
+}
+// Output: mean_score, zero_rate, mean_fill_turn,
+//         score_pct_ceiling, variance_contribution
+```
+
+The position explorer uses the same `/evaluate` endpoint as the
+game UI. Given dice, upper score, scored categories, and rerolls
+remaining, the solver returns all 252 keep-mask EVs and 15
+category EVs:
+
+```rust
+// server.rs — evaluate endpoint
+
+async fn handle_evaluate(
+    State(state): State<AppState>,
+    Json(req): Json<EvaluateRequest>,
+) -> Result<Json<EvaluateResponse>, StatusCode> {
+    let resp = compute_roll_response(
+        &state.ctx, req.dice, req.upper_score,
+        req.scored_categories, req.rerolls_remaining,
+    );
+    Ok(Json(resp))
 }
 ```
 

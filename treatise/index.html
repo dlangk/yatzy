@@ -40,15 +40,15 @@
   import { initWidgetInteractive } from './js/charts/widget-interactive.js';
   import { initBackwardWave } from './js/charts/backward-wave.js';
   // Chart modules — Optimal Strategy
-  import { initDecisionAnatomy } from './js/charts/decision-anatomy.js';
+  import { initCategoryLandscape } from './js/charts/category-landscape.js';
   import { initScoreDistribution } from './js/charts/score-distribution.js';
   import { initMixtureDecomposition } from './js/charts/mixture-decomposition.js';
   import { initBonusCovariance } from './js/charts/bonus-covariance.js';
-  import { initMaxPolicyFailure } from './js/charts/max-policy-failure.js';
-  // Chart modules — Forward Pass
   import { initRaceTo63 } from './js/charts/race-to-63.js';
   import { initCategoryStream } from './js/charts/category-stream.js';
   import { initEvRidgeline } from './js/charts/ev-ridgeline.js';
+  import { initCategoryPmfGrid } from './js/charts/category-pmf-grid.js';
+  import { initPositionExplorer } from './js/charts/position-explorer.js';
   // Chart modules — Risk Parameter
   import { initExponentialUtility } from './js/charts/exponential-utility.js';
   import { initMeanVarianceFrontier } from './js/charts/mean-variance-frontier.js';
@@ -118,14 +118,15 @@
     'chart-path-probability': { init: initPathProbability, loaded: false },
     'chart-widget-interactive': { init: initWidgetInteractive, loaded: false },
     'chart-backward-wave': { init: initBackwardWave, loaded: false },
-    'chart-decision-anatomy': { init: initDecisionAnatomy, loaded: false },
+    'chart-category-landscape': { init: initCategoryLandscape, loaded: false },
     'chart-score-distribution': { init: initScoreDistribution, loaded: false },
     'chart-mixture': { init: initMixtureDecomposition, loaded: false },
     'chart-bonus-covariance': { init: initBonusCovariance, loaded: false },
-    'chart-max-policy-failure': { init: initMaxPolicyFailure, loaded: false },
     'chart-race-to-63': { init: initRaceTo63, loaded: false },
     'chart-category-stream': { init: initCategoryStream, loaded: false },
     'chart-ev-ridgeline': { init: initEvRidgeline, loaded: false },
+    'chart-category-pmf-grid': { init: initCategoryPmfGrid, loaded: false },
+    'chart-position-explorer': { init: initPositionExplorer, loaded: false },
     'chart-exponential-utility': { init: initExponentialUtility, loaded: false },
     'chart-mean-variance-frontier': { init: initMeanVarianceFrontier, loaded: false },
     'chart-risk-reward': { init: initRiskReward, loaded: false },

@@ -49,4 +49,8 @@ export const DataLoader = {
   raceTo63: () => load('graph_race_to_63.json'),
   categorySankey: () => load('graph_category_sankey.json'),
   evFunnel: () => load('graph_ev_funnel.json'),
+
+  // Category analysis (Section 4)
+  categoryLandscape: () => load('category_landscape.json'),
+  categoryPmfs: () => load('category_pmfs.json'),
 };
