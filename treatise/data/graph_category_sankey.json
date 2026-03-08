@@ -1,0 +1,1346 @@
+[
+  {
+    "turn": 0,
+    "category": "Ones",
+    "category_index": 0,
+    "mass": 0.05098292575897574
+  },
+  {
+    "turn": 0,
+    "category": "Twos",
+    "category_index": 1,
+    "mass": 0.05423295229139494
+  },
+  {
+    "turn": 0,
+    "category": "Threes",
+    "category_index": 2,
+    "mass": 0.08896311337537163
+  },
+  {
+    "turn": 0,
+    "category": "Fours",
+    "category_index": 3,
+    "mass": 0.10598899603212328
+  },
+  {
+    "turn": 0,
+    "category": "Fives",
+    "category_index": 4,
+    "mass": 0.12096745302953976
+  },
+  {
+    "turn": 0,
+    "category": "Sixes",
+    "category_index": 5,
+    "mass": 0.048779862304194975
+  },
+  {
+    "turn": 0,
+    "category": "One Pair",
+    "category_index": 6,
+    "mass": 0.06570739755857281
+  },
+  {
+    "turn": 0,
+    "category": "Two Pairs",
+    "category_index": 7,
+    "mass": 0.10679326192675674
+  },
+  {
+    "turn": 0,
+    "category": "Three of a Kind",
+    "category_index": 8,
+    "mass": 0.076496983518935
+  },
+  {
+    "turn": 0,
+    "category": "Small Straight",
+    "category_index": 10,
+    "mass": 0.05676363686813006
+  },
+  {
+    "turn": 0,
+    "category": "Large Straight",
+    "category_index": 11,
+    "mass": 0.027810259059042174
+  },
+  {
+    "turn": 0,
+    "category": "Full House",
+    "category_index": 12,
+    "mass": 0.09944251244197741
+  },
+  {
+    "turn": 0,
+    "category": "Chance",
+    "category_index": 13,
+    "mass": 0.05635936137596159
+  },
+  {
+    "turn": 0,
+    "category": "Yatzy",
+    "category_index": 14,
+    "mass": 0.040711304395169956
+  },
+  {
+    "turn": 1,
+    "category": "Ones",
+    "category_index": 0,
+    "mass": 0.05390490088314091
+  },
+  {
+    "turn": 1,
+    "category": "Twos",
+    "category_index": 1,
+    "mass": 0.060248187558840545
+  },
+  {
+    "turn": 1,
+    "category": "Threes",
+    "category_index": 2,
+    "mass": 0.08099667921216892
+  },
+  {
+    "turn": 1,
+    "category": "Fours",
+    "category_index": 3,
+    "mass": 0.09683254583567497
+  },
+  {
+    "turn": 1,
+    "category": "Fives",
+    "category_index": 4,
+    "mass": 0.10939853922521867
+  },
+  {
+    "turn": 1,
+    "category": "Sixes",
+    "category_index": 5,
+    "mass": 0.11046091032367897
+  },
+  {
+    "turn": 1,
+    "category": "One Pair",
+    "category_index": 6,
+    "mass": 0.07944805163164004
+  },
+  {
+    "turn": 1,
+    "category": "Two Pairs",
+    "category_index": 7,
+    "mass": 0.09756596258891685
+  },
+  {
+    "turn": 1,
+    "category": "Three of a Kind",
+    "category_index": 8,
+    "mass": 0.03295216763108945
+  },
+  {
+    "turn": 1,
+    "category": "Four of a Kind",
+    "category_index": 9,
+    "mass": 0.008372750711999572
+  },
+  {
+    "turn": 1,
+    "category": "Small Straight",
+    "category_index": 10,
+    "mass": 0.05887361289632816
+  },
+  {
+    "turn": 1,
+    "category": "Large Straight",
+    "category_index": 11,
+    "mass": 0.027898631754314805
+  },
+  {
+    "turn": 1,
+    "category": "Full House",
+    "category_index": 12,
+    "mass": 0.09100276353792154
+  },
+  {
+    "turn": 1,
+    "category": "Chance",
+    "category_index": 13,
+    "mass": 0.053656194402989195
+  },
+  {
+    "turn": 1,
+    "category": "Yatzy",
+    "category_index": 14,
+    "mass": 0.03838814139872388
+  },
+  {
+    "turn": 2,
+    "category": "Ones",
+    "category_index": 0,
+    "mass": 0.057479189031926586
+  },
+  {
+    "turn": 2,
+    "category": "Twos",
+    "category_index": 1,
+    "mass": 0.06691569773498245
+  },
+  {
+    "turn": 2,
+    "category": "Threes",
+    "category_index": 2,
+    "mass": 0.08039065771520923
+  },
+  {
+    "turn": 2,
+    "category": "Fours",
+    "category_index": 3,
+    "mass": 0.09013216779021398
+  },
+  {
+    "turn": 2,
+    "category": "Fives",
+    "category_index": 4,
+    "mass": 0.09996931476352831
+  },
+  {
+    "turn": 2,
+    "category": "Sixes",
+    "category_index": 5,
+    "mass": 0.11016293768440363
+  },
+  {
+    "turn": 2,
+    "category": "One Pair",
+    "category_index": 6,
+    "mass": 0.082921488798737
+  },
+  {
+    "turn": 2,
+    "category": "Two Pairs",
+    "category_index": 7,
+    "mass": 0.09117078110268355
+  },
+  {
+    "turn": 2,
+    "category": "Three of a Kind",
+    "category_index": 8,
+    "mass": 0.040247815135750896
+  },
+  {
+    "turn": 2,
+    "category": "Four of a Kind",
+    "category_index": 9,
+    "mass": 0.019350270188241574
+  },
+  {
+    "turn": 2,
+    "category": "Small Straight",
+    "category_index": 10,
+    "mass": 0.05909987507670058
+  },
+  {
+    "turn": 2,
+    "category": "Large Straight",
+    "category_index": 11,
+    "mass": 0.028037997656672087
+  },
+  {
+    "turn": 2,
+    "category": "Full House",
+    "category_index": 12,
+    "mass": 0.08563082272532273
+  },
+  {
+    "turn": 2,
+    "category": "Chance",
+    "category_index": 13,
+    "mass": 0.05218226675805687
+  },
+  {
+    "turn": 2,
+    "category": "Yatzy",
+    "category_index": 14,
+    "mass": 0.03630877692463418
+  },
+  {
+    "turn": 3,
+    "category": "Ones",
+    "category_index": 0,
+    "mass": 0.06037478736519821
+  },
+  {
+    "turn": 3,
+    "category": "Twos",
+    "category_index": 1,
+    "mass": 0.07394602978813279
+  },
+  {
+    "turn": 3,
+    "category": "Threes",
+    "category_index": 2,
+    "mass": 0.07960629010990027
+  },
+  {
+    "turn": 3,
+    "category": "Fours",
+    "category_index": 3,
+    "mass": 0.08445438547356107
+  },
+  {
+    "turn": 3,
+    "category": "Fives",
+    "category_index": 4,
+    "mass": 0.09247351129180112
+  },
+  {
+    "turn": 3,
+    "category": "Sixes",
+    "category_index": 5,
+    "mass": 0.10678758818470431
+  },
+  {
+    "turn": 3,
+    "category": "One Pair",
+    "category_index": 6,
+    "mass": 0.08269751848803703
+  },
+  {
+    "turn": 3,
+    "category": "Two Pairs",
+    "category_index": 7,
+    "mass": 0.08536906952764119
+  },
+  {
+    "turn": 3,
+    "category": "Three of a Kind",
+    "category_index": 8,
+    "mass": 0.04473799370021443
+  },
+  {
+    "turn": 3,
+    "category": "Four of a Kind",
+    "category_index": 9,
+    "mass": 0.02992222620098504
+  },
+  {
+    "turn": 3,
+    "category": "Small Straight",
+    "category_index": 10,
+    "mass": 0.06052781786100385
+  },
+  {
+    "turn": 3,
+    "category": "Large Straight",
+    "category_index": 11,
+    "mass": 0.030727236464495298
+  },
+  {
+    "turn": 3,
+    "category": "Full House",
+    "category_index": 12,
+    "mass": 0.07927203835330714
+  },
+  {
+    "turn": 3,
+    "category": "Chance",
+    "category_index": 13,
+    "mass": 0.054733386281436584
+  },
+  {
+    "turn": 3,
+    "category": "Yatzy",
+    "category_index": 14,
+    "mass": 0.034370199483116336
+  },
+  {
+    "turn": 4,
+    "category": "Ones",
+    "category_index": 0,
+    "mass": 0.06477703406160248
+  },
+  {
+    "turn": 4,
+    "category": "Twos",
+    "category_index": 1,
+    "mass": 0.07798886002907189
+  },
+  {
+    "turn": 4,
+    "category": "Threes",
+    "category_index": 2,
+    "mass": 0.07920164165825172
+  },
+  {
+    "turn": 4,
+    "category": "Fours",
+    "category_index": 3,
+    "mass": 0.0795511305288268
+  },
+  {
+    "turn": 4,
+    "category": "Fives",
+    "category_index": 4,
+    "mass": 0.0851029987954111
+  },
+  {
+    "turn": 4,
+    "category": "Sixes",
+    "category_index": 5,
+    "mass": 0.09776875578161567
+  },
+  {
+    "turn": 4,
+    "category": "One Pair",
+    "category_index": 6,
+    "mass": 0.08133308727060554
+  },
+  {
+    "turn": 4,
+    "category": "Two Pairs",
+    "category_index": 7,
+    "mass": 0.07991733435949055
+  },
+  {
+    "turn": 4,
+    "category": "Three of a Kind",
+    "category_index": 8,
+    "mass": 0.05292640015493986
+  },
+  {
+    "turn": 4,
+    "category": "Four of a Kind",
+    "category_index": 9,
+    "mass": 0.03984374866658629
+  },
+  {
+    "turn": 4,
+    "category": "Small Straight",
+    "category_index": 10,
+    "mass": 0.061537886053033744
+  },
+  {
+    "turn": 4,
+    "category": "Large Straight",
+    "category_index": 11,
+    "mass": 0.03507730113583702
+  },
+  {
+    "turn": 4,
+    "category": "Full House",
+    "category_index": 12,
+    "mass": 0.0736160669689325
+  },
+  {
+    "turn": 4,
+    "category": "Chance",
+    "category_index": 13,
+    "mass": 0.0589090452188201
+  },
+  {
+    "turn": 4,
+    "category": "Yatzy",
+    "category_index": 14,
+    "mass": 0.03244880746002272
+  },
+  {
+    "turn": 5,
+    "category": "Ones",
+    "category_index": 0,
+    "mass": 0.06930335800285316
+  },
+  {
+    "turn": 5,
+    "category": "Twos",
+    "category_index": 1,
+    "mass": 0.08076393776322814
+  },
+  {
+    "turn": 5,
+    "category": "Threes",
+    "category_index": 2,
+    "mass": 0.07791746046573701
+  },
+  {
+    "turn": 5,
+    "category": "Fours",
+    "category_index": 3,
+    "mass": 0.07569328020488643
+  },
+  {
+    "turn": 5,
+    "category": "Fives",
+    "category_index": 4,
+    "mass": 0.07735026654728222
+  },
+  {
+    "turn": 5,
+    "category": "Sixes",
+    "category_index": 5,
+    "mass": 0.0886144560940065
+  },
+  {
+    "turn": 5,
+    "category": "One Pair",
+    "category_index": 6,
+    "mass": 0.07913763968261554
+  },
+  {
+    "turn": 5,
+    "category": "Two Pairs",
+    "category_index": 7,
+    "mass": 0.07496696703536104
+  },
+  {
+    "turn": 5,
+    "category": "Three of a Kind",
+    "category_index": 8,
+    "mass": 0.060142126690396015
+  },
+  {
+    "turn": 5,
+    "category": "Four of a Kind",
+    "category_index": 9,
+    "mass": 0.04870715388736561
+  },
+  {
+    "turn": 5,
+    "category": "Small Straight",
+    "category_index": 10,
+    "mass": 0.06360087326734326
+  },
+  {
+    "turn": 5,
+    "category": "Large Straight",
+    "category_index": 11,
+    "mass": 0.041159896139279964
+  },
+  {
+    "turn": 5,
+    "category": "Full House",
+    "category_index": 12,
+    "mass": 0.06790866410661177
+  },
+  {
+    "turn": 5,
+    "category": "Chance",
+    "category_index": 13,
+    "mass": 0.06416874374904762
+  },
+  {
+    "turn": 5,
+    "category": "Yatzy",
+    "category_index": 14,
+    "mass": 0.030565294250137452
+  },
+  {
+    "turn": 6,
+    "category": "Ones",
+    "category_index": 0,
+    "mass": 0.07504521140787727
+  },
+  {
+    "turn": 6,
+    "category": "Twos",
+    "category_index": 1,
+    "mass": 0.0817399460416758
+  },
+  {
+    "turn": 6,
+    "category": "Threes",
+    "category_index": 2,
+    "mass": 0.07596785278642024
+  },
+  {
+    "turn": 6,
+    "category": "Fours",
+    "category_index": 3,
+    "mass": 0.0718769965721949
+  },
+  {
+    "turn": 6,
+    "category": "Fives",
+    "category_index": 4,
+    "mass": 0.06997198073537174
+  },
+  {
+    "turn": 6,
+    "category": "Sixes",
+    "category_index": 5,
+    "mass": 0.0788472683706226
+  },
+  {
+    "turn": 6,
+    "category": "One Pair",
+    "category_index": 6,
+    "mass": 0.07696392757077902
+  },
+  {
+    "turn": 6,
+    "category": "Two Pairs",
+    "category_index": 7,
+    "mass": 0.07031815327200555
+  },
+  {
+    "turn": 6,
+    "category": "Three of a Kind",
+    "category_index": 8,
+    "mass": 0.06697828282775217
+  },
+  {
+    "turn": 6,
+    "category": "Four of a Kind",
+    "category_index": 9,
+    "mass": 0.05654876324999828
+  },
+  {
+    "turn": 6,
+    "category": "Small Straight",
+    "category_index": 10,
+    "mass": 0.06591246618694298
+  },
+  {
+    "turn": 6,
+    "category": "Large Straight",
+    "category_index": 11,
+    "mass": 0.048623341139461915
+  },
+  {
+    "turn": 6,
+    "category": "Full House",
+    "category_index": 12,
+    "mass": 0.0627402624007444
+  },
+  {
+    "turn": 6,
+    "category": "Chance",
+    "category_index": 13,
+    "mass": 0.06922341032637194
+  },
+  {
+    "turn": 6,
+    "category": "Yatzy",
+    "category_index": 14,
+    "mass": 0.029242275000378785
+  },
+  {
+    "turn": 7,
+    "category": "Ones",
+    "category_index": 0,
+    "mass": 0.08094857182737827
+  },
+  {
+    "turn": 7,
+    "category": "Twos",
+    "category_index": 1,
+    "mass": 0.08161901753925856
+  },
+  {
+    "turn": 7,
+    "category": "Threes",
+    "category_index": 2,
+    "mass": 0.07341506513914829
+  },
+  {
+    "turn": 7,
+    "category": "Fours",
+    "category_index": 3,
+    "mass": 0.06798088921642935
+  },
+  {
+    "turn": 7,
+    "category": "Fives",
+    "category_index": 4,
+    "mass": 0.06317098277977565
+  },
+  {
+    "turn": 7,
+    "category": "Sixes",
+    "category_index": 5,
+    "mass": 0.06959432064910386
+  },
+  {
+    "turn": 7,
+    "category": "One Pair",
+    "category_index": 6,
+    "mass": 0.07467384015480166
+  },
+  {
+    "turn": 7,
+    "category": "Two Pairs",
+    "category_index": 7,
+    "mass": 0.06567001708738275
+  },
+  {
+    "turn": 7,
+    "category": "Three of a Kind",
+    "category_index": 8,
+    "mass": 0.07284477447407625
+  },
+  {
+    "turn": 7,
+    "category": "Four of a Kind",
+    "category_index": 9,
+    "mass": 0.06266414622527881
+  },
+  {
+    "turn": 7,
+    "category": "Small Straight",
+    "category_index": 10,
+    "mass": 0.06899079779991807
+  },
+  {
+    "turn": 7,
+    "category": "Large Straight",
+    "category_index": 11,
+    "mass": 0.056978138511086
+  },
+  {
+    "turn": 7,
+    "category": "Full House",
+    "category_index": 12,
+    "mass": 0.05783714355968992
+  },
+  {
+    "turn": 7,
+    "category": "Chance",
+    "category_index": 13,
+    "mass": 0.07375409353727445
+  },
+  {
+    "turn": 7,
+    "category": "Yatzy",
+    "category_index": 14,
+    "mass": 0.029858359743868208
+  },
+  {
+    "turn": 8,
+    "category": "Ones",
+    "category_index": 0,
+    "mass": 0.08617416183026397
+  },
+  {
+    "turn": 8,
+    "category": "Twos",
+    "category_index": 1,
+    "mass": 0.08049964472512863
+  },
+  {
+    "turn": 8,
+    "category": "Threes",
+    "category_index": 2,
+    "mass": 0.06995519533289359
+  },
+  {
+    "turn": 8,
+    "category": "Fours",
+    "category_index": 3,
+    "mass": 0.06352582081031945
+  },
+  {
+    "turn": 8,
+    "category": "Fives",
+    "category_index": 4,
+    "mass": 0.05704285748595233
+  },
+  {
+    "turn": 8,
+    "category": "Sixes",
+    "category_index": 5,
+    "mass": 0.060910695283120896
+  },
+  {
+    "turn": 8,
+    "category": "One Pair",
+    "category_index": 6,
+    "mass": 0.07147575146074268
+  },
+  {
+    "turn": 8,
+    "category": "Two Pairs",
+    "category_index": 7,
+    "mass": 0.06095818385235055
+  },
+  {
+    "turn": 8,
+    "category": "Three of a Kind",
+    "category_index": 8,
+    "mass": 0.07768492838286195
+  },
+  {
+    "turn": 8,
+    "category": "Four of a Kind",
+    "category_index": 9,
+    "mass": 0.06701006292293589
+  },
+  {
+    "turn": 8,
+    "category": "Small Straight",
+    "category_index": 10,
+    "mass": 0.07338639217124573
+  },
+  {
+    "turn": 8,
+    "category": "Large Straight",
+    "category_index": 11,
+    "mass": 0.06615082370109665
+  },
+  {
+    "turn": 8,
+    "category": "Full House",
+    "category_index": 12,
+    "mass": 0.0534957125776303
+  },
+  {
+    "turn": 8,
+    "category": "Chance",
+    "category_index": 13,
+    "mass": 0.0773417239146092
+  },
+  {
+    "turn": 8,
+    "category": "Yatzy",
+    "category_index": 14,
+    "mass": 0.034388224644496236
+  },
+  {
+    "turn": 9,
+    "category": "Ones",
+    "category_index": 0,
+    "mass": 0.08932131015013704
+  },
+  {
+    "turn": 9,
+    "category": "Twos",
+    "category_index": 1,
+    "mass": 0.07832393808929053
+  },
+  {
+    "turn": 9,
+    "category": "Threes",
+    "category_index": 2,
+    "mass": 0.06589916507440317
+  },
+  {
+    "turn": 9,
+    "category": "Fours",
+    "category_index": 3,
+    "mass": 0.05854853603227833
+  },
+  {
+    "turn": 9,
+    "category": "Fives",
+    "category_index": 4,
+    "mass": 0.051218982805044326
+  },
+  {
+    "turn": 9,
+    "category": "Sixes",
+    "category_index": 5,
+    "mass": 0.05287806658493354
+  },
+  {
+    "turn": 9,
+    "category": "One Pair",
+    "category_index": 6,
+    "mass": 0.06784908603397162
+  },
+  {
+    "turn": 9,
+    "category": "Two Pairs",
+    "category_index": 7,
+    "mass": 0.05624481561166525
+  },
+  {
+    "turn": 9,
+    "category": "Three of a Kind",
+    "category_index": 8,
+    "mass": 0.08065753794888604
+  },
+  {
+    "turn": 9,
+    "category": "Four of a Kind",
+    "category_index": 9,
+    "mass": 0.07138224739418131
+  },
+  {
+    "turn": 9,
+    "category": "Small Straight",
+    "category_index": 10,
+    "mass": 0.07948191791954728
+  },
+  {
+    "turn": 9,
+    "category": "Large Straight",
+    "category_index": 11,
+    "mass": 0.07556697443095961
+  },
+  {
+    "turn": 9,
+    "category": "Full House",
+    "category_index": 12,
+    "mass": 0.04979676611561383
+  },
+  {
+    "turn": 9,
+    "category": "Chance",
+    "category_index": 13,
+    "mass": 0.07965071357814467
+  },
+  {
+    "turn": 9,
+    "category": "Yatzy",
+    "category_index": 14,
+    "mass": 0.043180142794438325
+  },
+  {
+    "turn": 10,
+    "category": "Ones",
+    "category_index": 0,
+    "mass": 0.08886300383835465
+  },
+  {
+    "turn": 10,
+    "category": "Twos",
+    "category_index": 1,
+    "mass": 0.07368602426478937
+  },
+  {
+    "turn": 10,
+    "category": "Threes",
+    "category_index": 2,
+    "mass": 0.0608668976344481
+  },
+  {
+    "turn": 10,
+    "category": "Fours",
+    "category_index": 3,
+    "mass": 0.05310356458616915
+  },
+  {
+    "turn": 10,
+    "category": "Fives",
+    "category_index": 4,
+    "mass": 0.045325791844260534
+  },
+  {
+    "turn": 10,
+    "category": "Sixes",
+    "category_index": 5,
+    "mass": 0.045157488796420626
+  },
+  {
+    "turn": 10,
+    "category": "One Pair",
+    "category_index": 6,
+    "mass": 0.06367425421084195
+  },
+  {
+    "turn": 10,
+    "category": "Two Pairs",
+    "category_index": 7,
+    "mass": 0.05163593859966442
+  },
+  {
+    "turn": 10,
+    "category": "Three of a Kind",
+    "category_index": 8,
+    "mass": 0.08158986381420051
+  },
+  {
+    "turn": 10,
+    "category": "Four of a Kind",
+    "category_index": 9,
+    "mass": 0.07717482640603092
+  },
+  {
+    "turn": 10,
+    "category": "Small Straight",
+    "category_index": 10,
+    "mass": 0.08547786326665217
+  },
+  {
+    "turn": 10,
+    "category": "Large Straight",
+    "category_index": 11,
+    "mass": 0.08546188189181604
+  },
+  {
+    "turn": 10,
+    "category": "Full House",
+    "category_index": 12,
+    "mass": 0.04709246459982373
+  },
+  {
+    "turn": 10,
+    "category": "Chance",
+    "category_index": 13,
+    "mass": 0.08164117619035101
+  },
+  {
+    "turn": 10,
+    "category": "Yatzy",
+    "category_index": 14,
+    "mass": 0.05924918263226166
+  },
+  {
+    "turn": 11,
+    "category": "Ones",
+    "category_index": 0,
+    "mass": 0.08293817220685024
+  },
+  {
+    "turn": 11,
+    "category": "Twos",
+    "category_index": 1,
+    "mass": 0.06590951582911246
+  },
+  {
+    "turn": 11,
+    "category": "Threes",
+    "category_index": 2,
+    "mass": 0.05452626711064249
+  },
+  {
+    "turn": 11,
+    "category": "Fours",
+    "category_index": 3,
+    "mass": 0.04754926834582003
+  },
+  {
+    "turn": 11,
+    "category": "Fives",
+    "category_index": 4,
+    "mass": 0.03921799314835382
+  },
+  {
+    "turn": 11,
+    "category": "Sixes",
+    "category_index": 5,
+    "mass": 0.03813031172060782
+  },
+  {
+    "turn": 11,
+    "category": "One Pair",
+    "category_index": 6,
+    "mass": 0.0576995072940481
+  },
+  {
+    "turn": 11,
+    "category": "Two Pairs",
+    "category_index": 7,
+    "mass": 0.04663033273881876
+  },
+  {
+    "turn": 11,
+    "category": "Three of a Kind",
+    "category_index": 8,
+    "mass": 0.08020014486125625
+  },
+  {
+    "turn": 11,
+    "category": "Four of a Kind",
+    "category_index": 9,
+    "mass": 0.08612781334216854
+  },
+  {
+    "turn": 11,
+    "category": "Small Straight",
+    "category_index": 10,
+    "mass": 0.0864809341148569
+  },
+  {
+    "turn": 11,
+    "category": "Large Straight",
+    "category_index": 11,
+    "mass": 0.09278952993699814
+  },
+  {
+    "turn": 11,
+    "category": "Full House",
+    "category_index": 12,
+    "mass": 0.04600095468629504
+  },
+  {
+    "turn": 11,
+    "category": "Chance",
+    "category_index": 13,
+    "mass": 0.08120749143701714
+  },
+  {
+    "turn": 11,
+    "category": "Yatzy",
+    "category_index": 14,
+    "mass": 0.09459200823528496
+  },
+  {
+    "turn": 12,
+    "category": "Ones",
+    "category_index": 0,
+    "mass": 0.06766577484685198
+  },
+  {
+    "turn": 12,
+    "category": "Twos",
+    "category_index": 1,
+    "mass": 0.054963454166400826
+  },
+  {
+    "turn": 12,
+    "category": "Threes",
+    "category_index": 2,
+    "mass": 0.04665850746265385
+  },
+  {
+    "turn": 12,
+    "category": "Fours",
+    "category_index": 3,
+    "mass": 0.041206048518020684
+  },
+  {
+    "turn": 12,
+    "category": "Fives",
+    "category_index": 4,
+    "mass": 0.033308928161300766
+  },
+  {
+    "turn": 12,
+    "category": "Sixes",
+    "category_index": 5,
+    "mass": 0.03135458831233598
+  },
+  {
+    "turn": 12,
+    "category": "One Pair",
+    "category_index": 6,
+    "mass": 0.05081108969893197
+  },
+  {
+    "turn": 12,
+    "category": "Two Pairs",
+    "category_index": 7,
+    "mass": 0.041685286493527186
+  },
+  {
+    "turn": 12,
+    "category": "Three of a Kind",
+    "category_index": 8,
+    "mass": 0.07782005795624687
+  },
+  {
+    "turn": 12,
+    "category": "Four of a Kind",
+    "category_index": 9,
+    "mass": 0.0977284349877536
+  },
+  {
+    "turn": 12,
+    "category": "Small Straight",
+    "category_index": 10,
+    "mass": 0.06234009066604038
+  },
+  {
+    "turn": 12,
+    "category": "Large Straight",
+    "category_index": 11,
+    "mass": 0.07609876781311636
+  },
+  {
+    "turn": 12,
+    "category": "Full House",
+    "category_index": 12,
+    "mass": 0.04749471414523469
+  },
+  {
+    "turn": 12,
+    "category": "Chance",
+    "category_index": 13,
+    "mass": 0.07671830774273874
+  },
+  {
+    "turn": 12,
+    "category": "Yatzy",
+    "category_index": 14,
+    "mass": 0.19414621670705243
+  },
+  {
+    "turn": 13,
+    "category": "Ones",
+    "category_index": 0,
+    "mass": 0.04699477672128811
+  },
+  {
+    "turn": 13,
+    "category": "Twos",
+    "category_index": 1,
+    "mass": 0.041153973523385304
+  },
+  {
+    "turn": 13,
+    "category": "Threes",
+    "category_index": 2,
+    "mass": 0.03513881914815444
+  },
+  {
+    "turn": 13,
+    "category": "Fours",
+    "category_index": 3,
+    "mass": 0.03134130043453497
+  },
+  {
+    "turn": 13,
+    "category": "Fives",
+    "category_index": 4,
+    "mass": 0.0252044208650871
+  },
+  {
+    "turn": 13,
+    "category": "Sixes",
+    "category_index": 5,
+    "mass": 0.024729109246056587
+  },
+  {
+    "turn": 13,
+    "category": "One Pair",
+    "category_index": 6,
+    "mass": 0.03992617110538645
+  },
+  {
+    "turn": 13,
+    "category": "Two Pairs",
+    "category_index": 7,
+    "mass": 0.037564386285620525
+  },
+  {
+    "turn": 13,
+    "category": "Three of a Kind",
+    "category_index": 8,
+    "mass": 0.07863447343435609
+  },
+  {
+    "turn": 13,
+    "category": "Four of a Kind",
+    "category_index": 9,
+    "mass": 0.12472798731531522
+  },
+  {
+    "turn": 13,
+    "category": "Small Straight",
+    "category_index": 10,
+    "mass": 0.06121170426149671
+  },
+  {
+    "turn": 13,
+    "category": "Large Straight",
+    "category_index": 11,
+    "mass": 0.13818033561220297
+  },
+  {
+    "turn": 13,
+    "category": "Full House",
+    "category_index": 12,
+    "mass": 0.05490937298022586
+  },
+  {
+    "turn": 13,
+    "category": "Chance",
+    "category_index": 13,
+    "mass": 0.06976636660925446
+  },
+  {
+    "turn": 13,
+    "category": "Yatzy",
+    "category_index": 14,
+    "mass": 0.19051709295742222
+  },
+  {
+    "turn": 14,
+    "category": "Ones",
+    "category_index": 0,
+    "mass": 0.02522698483577592
+  },
+  {
+    "turn": 14,
+    "category": "Twos",
+    "category_index": 1,
+    "mass": 0.028008972725954755
+  },
+  {
+    "turn": 14,
+    "category": "Threes",
+    "category_index": 2,
+    "mass": 0.030496525320412516
+  },
+  {
+    "turn": 14,
+    "category": "Fours",
+    "category_index": 3,
+    "mass": 0.032215198253520094
+  },
+  {
+    "turn": 14,
+    "category": "Fives",
+    "category_index": 4,
+    "mass": 0.030276097041033106
+  },
+  {
+    "turn": 14,
+    "category": "Sixes",
+    "category_index": 5,
+    "mass": 0.035823764958997084
+  },
+  {
+    "turn": 14,
+    "category": "One Pair",
+    "category_index": 6,
+    "mass": 0.025681334002938778
+  },
+  {
+    "turn": 14,
+    "category": "Two Pairs",
+    "category_index": 7,
+    "mass": 0.03350964241537945
+  },
+  {
+    "turn": 14,
+    "category": "Three of a Kind",
+    "category_index": 8,
+    "mass": 0.07608662355453782
+  },
+  {
+    "turn": 14,
+    "category": "Four of a Kind",
+    "category_index": 9,
+    "mass": 0.21043978669197913
+  },
+  {
+    "turn": 14,
+    "category": "Small Straight",
+    "category_index": 10,
+    "mass": 0.05631430488860409
+  },
+  {
+    "turn": 14,
+    "category": "Large Straight",
+    "category_index": 11,
+    "mass": 0.16943910564896658
+  },
+  {
+    "turn": 14,
+    "category": "Full House",
+    "category_index": 12,
+    "mass": 0.08375989130480425
+  },
+  {
+    "turn": 14,
+    "category": "Chance",
+    "category_index": 13,
+    "mass": 0.05068789065053253
+  },
+  {
+    "turn": 14,
+    "category": "Yatzy",
+    "category_index": 14,
+    "mass": 0.1120341910694663
+  }
+]

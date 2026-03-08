@@ -1,0 +1,596 @@
+{
+  "categories": [
+    {
+      "id": 0,
+      "name": "Ones",
+      "ceiling": 5,
+      "type": "continuous",
+      "pmf": [
+        {
+          "score": 0,
+          "prob": 0.093655
+        },
+        {
+          "score": 1,
+          "prob": 0.247804
+        },
+        {
+          "score": 2,
+          "prob": 0.222679
+        },
+        {
+          "score": 3,
+          "prob": 0.263346
+        },
+        {
+          "score": 4,
+          "prob": 0.166823
+        },
+        {
+          "score": 5,
+          "prob": 0.005693
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "Twos",
+      "ceiling": 10,
+      "type": "continuous",
+      "pmf": [
+        {
+          "score": 0,
+          "prob": 0.005273
+        },
+        {
+          "score": 2,
+          "prob": 0.076027
+        },
+        {
+          "score": 4,
+          "prob": 0.257781
+        },
+        {
+          "score": 6,
+          "prob": 0.411869
+        },
+        {
+          "score": 8,
+          "prob": 0.239616
+        },
+        {
+          "score": 10,
+          "prob": 0.009434
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Threes",
+      "ceiling": 15,
+      "type": "continuous",
+      "pmf": [
+        {
+          "score": 0,
+          "prob": 0.002252
+        },
+        {
+          "score": 3,
+          "prob": 0.021884
+        },
+        {
+          "score": 6,
+          "prob": 0.161257
+        },
+        {
+          "score": 9,
+          "prob": 0.515755
+        },
+        {
+          "score": 12,
+          "prob": 0.288178
+        },
+        {
+          "score": 15,
+          "prob": 0.010674
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Fours",
+      "ceiling": 20,
+      "type": "continuous",
+      "pmf": [
+        {
+          "score": 0,
+          "prob": 0.002244
+        },
+        {
+          "score": 4,
+          "prob": 0.011846
+        },
+        {
+          "score": 8,
+          "prob": 0.095975
+        },
+        {
+          "score": 12,
+          "prob": 0.575847
+        },
+        {
+          "score": 16,
+          "prob": 0.303478
+        },
+        {
+          "score": 20,
+          "prob": 0.01061
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Fives",
+      "ceiling": 25,
+      "type": "continuous",
+      "pmf": [
+        {
+          "score": 0,
+          "prob": 0.001934
+        },
+        {
+          "score": 5,
+          "prob": 0.008277
+        },
+        {
+          "score": 10,
+          "prob": 0.058811
+        },
+        {
+          "score": 15,
+          "prob": 0.611738
+        },
+        {
+          "score": 20,
+          "prob": 0.308565
+        },
+        {
+          "score": 25,
+          "prob": 0.010675
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Sixes",
+      "ceiling": 30,
+      "type": "continuous",
+      "pmf": [
+        {
+          "score": 0,
+          "prob": 0.002297
+        },
+        {
+          "score": 6,
+          "prob": 0.008896
+        },
+        {
+          "score": 12,
+          "prob": 0.038781
+        },
+        {
+          "score": 18,
+          "prob": 0.571431
+        },
+        {
+          "score": 24,
+          "prob": 0.364719
+        },
+        {
+          "score": 30,
+          "prob": 0.013876
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "One Pair",
+      "ceiling": 12,
+      "type": "discrete",
+      "pmf": [
+        {
+          "score": 0,
+          "prob": 0.000809
+        },
+        {
+          "score": 2,
+          "prob": 0.00068
+        },
+        {
+          "score": 4,
+          "prob": 0.00094
+        },
+        {
+          "score": 6,
+          "prob": 0.002381
+        },
+        {
+          "score": 8,
+          "prob": 0.034046
+        },
+        {
+          "score": 10,
+          "prob": 0.3203
+        },
+        {
+          "score": 12,
+          "prob": 0.640844
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Two Pairs",
+      "ceiling": 22,
+      "type": "discrete",
+      "pmf": [
+        {
+          "score": 0,
+          "prob": 0.012843
+        },
+        {
+          "score": 6,
+          "prob": 0.000187
+        },
+        {
+          "score": 8,
+          "prob": 0.000662
+        },
+        {
+          "score": 10,
+          "prob": 0.003893
+        },
+        {
+          "score": 12,
+          "prob": 0.011026
+        },
+        {
+          "score": 14,
+          "prob": 0.058528
+        },
+        {
+          "score": 16,
+          "prob": 0.07939
+        },
+        {
+          "score": 18,
+          "prob": 0.21147
+        },
+        {
+          "score": 20,
+          "prob": 0.187043
+        },
+        {
+          "score": 22,
+          "prob": 0.434958
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Three of a Kind",
+      "ceiling": 18,
+      "type": "discrete",
+      "pmf": [
+        {
+          "score": 0,
+          "prob": 0.041724
+        },
+        {
+          "score": 3,
+          "prob": 0.000889
+        },
+        {
+          "score": 6,
+          "prob": 0.004016
+        },
+        {
+          "score": 9,
+          "prob": 0.028627
+        },
+        {
+          "score": 12,
+          "prob": 0.102568
+        },
+        {
+          "score": 15,
+          "prob": 0.267646
+        },
+        {
+          "score": 18,
+          "prob": 0.55453
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "Four of a Kind",
+      "ceiling": 24,
+      "type": "discrete",
+      "pmf": [
+        {
+          "score": 0,
+          "prob": 0.287529
+        },
+        {
+          "score": 4,
+          "prob": 0.011821
+        },
+        {
+          "score": 8,
+          "prob": 0.033252
+        },
+        {
+          "score": 12,
+          "prob": 0.071532
+        },
+        {
+          "score": 16,
+          "prob": 0.121696
+        },
+        {
+          "score": 20,
+          "prob": 0.208815
+        },
+        {
+          "score": 24,
+          "prob": 0.265355
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Small Straight",
+      "ceiling": 15,
+      "type": "binary",
+      "pmf": [
+        {
+          "score": 0,
+          "prob": 0.736615
+        },
+        {
+          "score": 15,
+          "prob": 0.263385
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "name": "Large Straight",
+      "ceiling": 20,
+      "type": "binary",
+      "pmf": [
+        {
+          "score": 0,
+          "prob": 0.51403
+        },
+        {
+          "score": 20,
+          "prob": 0.48597
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "name": "Full House",
+      "ceiling": 28,
+      "type": "discrete",
+      "pmf": [
+        {
+          "score": 0,
+          "prob": 0.084449
+        },
+        {
+          "score": 7,
+          "prob": 0.000644
+        },
+        {
+          "score": 8,
+          "prob": 0.000856
+        },
+        {
+          "score": 9,
+          "prob": 0.001395
+        },
+        {
+          "score": 11,
+          "prob": 0.004517
+        },
+        {
+          "score": 12,
+          "prob": 0.002965
+        },
+        {
+          "score": 13,
+          "prob": 0.008342
+        },
+        {
+          "score": 14,
+          "prob": 0.010026
+        },
+        {
+          "score": 15,
+          "prob": 0.008293
+        },
+        {
+          "score": 16,
+          "prob": 0.017986
+        },
+        {
+          "score": 17,
+          "prob": 0.022012
+        },
+        {
+          "score": 18,
+          "prob": 0.037291
+        },
+        {
+          "score": 19,
+          "prob": 0.049293
+        },
+        {
+          "score": 20,
+          "prob": 0.026151
+        },
+        {
+          "score": 21,
+          "prob": 0.07238
+        },
+        {
+          "score": 22,
+          "prob": 0.089454
+        },
+        {
+          "score": 23,
+          "prob": 0.054732
+        },
+        {
+          "score": 24,
+          "prob": 0.123978
+        },
+        {
+          "score": 26,
+          "prob": 0.085625
+        },
+        {
+          "score": 27,
+          "prob": 0.151416
+        },
+        {
+          "score": 28,
+          "prob": 0.148195
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "name": "Chance",
+      "ceiling": 30,
+      "type": "continuous",
+      "pmf": [
+        {
+          "score": 7,
+          "prob": 3e-06
+        },
+        {
+          "score": 8,
+          "prob": 2e-06
+        },
+        {
+          "score": 9,
+          "prob": 3e-05
+        },
+        {
+          "score": 10,
+          "prob": 5.4e-05
+        },
+        {
+          "score": 11,
+          "prob": 0.000106
+        },
+        {
+          "score": 12,
+          "prob": 0.00021
+        },
+        {
+          "score": 13,
+          "prob": 0.000356
+        },
+        {
+          "score": 14,
+          "prob": 0.000652
+        },
+        {
+          "score": 15,
+          "prob": 0.000988
+        },
+        {
+          "score": 16,
+          "prob": 0.001646
+        },
+        {
+          "score": 17,
+          "prob": 0.003256
+        },
+        {
+          "score": 18,
+          "prob": 0.007289
+        },
+        {
+          "score": 19,
+          "prob": 0.022752
+        },
+        {
+          "score": 20,
+          "prob": 0.055503
+        },
+        {
+          "score": 21,
+          "prob": 0.158675
+        },
+        {
+          "score": 22,
+          "prob": 0.16883
+        },
+        {
+          "score": 23,
+          "prob": 0.167644
+        },
+        {
+          "score": 24,
+          "prob": 0.16264
+        },
+        {
+          "score": 25,
+          "prob": 0.103501
+        },
+        {
+          "score": 26,
+          "prob": 0.071921
+        },
+        {
+          "score": 27,
+          "prob": 0.042699
+        },
+        {
+          "score": 28,
+          "prob": 0.019038
+        },
+        {
+          "score": 29,
+          "prob": 0.010992
+        },
+        {
+          "score": 30,
+          "prob": 0.001212
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "name": "Yatzy",
+      "ceiling": 50,
+      "type": "binary",
+      "pmf": [
+        {
+          "score": 0,
+          "prob": 0.612043
+        },
+        {
+          "score": 50,
+          "prob": 0.387957
+        }
+      ]
+    }
+  ]
+}

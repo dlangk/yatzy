@@ -28,7 +28,7 @@ export async function initCategoryLandscape() {
     .domain([0, 1])
     .range([height, 0]);
 
-  const maxVar = d3.max(data, d => d.variance_contribution);
+  const maxVar = d3.max(data, d => Math.abs(d.variance_contribution));
   const r = d3.scaleSqrt()
     .domain([0, maxVar])
     .range([4, 32]);
@@ -62,7 +62,7 @@ export async function initCategoryLandscape() {
     .attr('class', 'bubble')
     .attr('cx', d => x(d.mean_fill_turn))
     .attr('cy', d => y(d.score_pct_ceiling))
-    .attr('r', d => r(d.variance_contribution))
+    .attr('r', d => r(Math.abs(d.variance_contribution)))
     .attr('fill', d => d.section === 'upper' ? upperColor : lowerColor)
     .attr('opacity', 0.6)
     .attr('stroke', d => d.section === 'upper' ? upperColor : lowerColor)
@@ -74,7 +74,7 @@ export async function initCategoryLandscape() {
     .join('text')
     .attr('class', 'cat-label')
     .attr('x', d => x(d.mean_fill_turn))
-    .attr('y', d => y(d.score_pct_ceiling) - r(d.variance_contribution) - 4)
+    .attr('y', d => y(d.score_pct_ceiling) - r(Math.abs(d.variance_contribution)) - 4)
     .attr('text-anchor', 'middle')
     .attr('fill', getMutedColor())
     .style('font-size', d => d.name === 'Yatzy' ? '10px' : '9px')

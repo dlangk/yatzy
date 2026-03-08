@@ -1,0 +1,28 @@
+{
+  "populations": [
+    {
+      "label": "No bonus, no Yatzy",
+      "fraction": 0.0608,
+      "mean": 164.2,
+      "std": 19.7
+    },
+    {
+      "label": "No bonus, scored Yatzy",
+      "fraction": 0.0413,
+      "mean": 212.7,
+      "std": 19.8
+    },
+    {
+      "label": "Hit bonus, no Yatzy",
+      "fraction": 0.5512,
+      "mean": 236.5,
+      "std": 20.3
+    },
+    {
+      "label": "Hit bonus, scored Yatzy",
+      "fraction": 0.3466,
+      "mean": 286.3,
+      "std": 21.1
+    }
+  ]
+}

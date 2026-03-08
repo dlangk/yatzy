@@ -1,0 +1,17 @@
+{
+  "total_gap": 72.0,
+  "components": [
+    {
+      "label": "Bonus itself",
+      "value": 50
+    },
+    {
+      "label": "Better upper scores",
+      "value": 10.3
+    },
+    {
+      "label": "Better lower scores",
+      "value": 11.7
+    }
+  ]
+}
