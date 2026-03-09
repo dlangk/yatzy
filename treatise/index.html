@@ -90,11 +90,20 @@
   const htmls = await Promise.all(responses.map(r => r.text()));
   document.getElementById('treatise-root').innerHTML = htmls.join('\n');
 
-  // Restore scroll position after dynamic content injection
-  if (location.hash) {
-    const target = document.querySelector(location.hash);
-    if (target) target.scrollIntoView();
+  // Restore scroll position after dynamic content injection.
+  // Use instant scroll on load; re-scroll as charts expand.
+  const savedHash = location.hash;
+  if (savedHash) {
+    const scrollToHash = () => {
+      const target = document.querySelector(savedHash);
+      if (target) target.scrollIntoView({ behavior: 'instant' });
+    };
+    scrollToHash();
+    setTimeout(scrollToHash, 300);
+    setTimeout(scrollToHash, 800);
   }
+  // Enable smooth scrolling after the page has settled
+  setTimeout(() => { document.documentElement.style.scrollBehavior = 'smooth'; }, 1500);
 
   // Initialize systems
   initConceptDrawer();
@@ -165,12 +174,15 @@
     if (el) observer.observe(el);
   });
 
-  // Scroll-driven URL hash: update #hash to current section
+  // Scroll-driven URL hash: update #hash to current section.
+  // Delayed start so it doesn't overwrite the hash during scroll restoration.
   {
     const sections = [...document.querySelectorAll('section[id]')];
     let ticking = false;
+    let enabled = false;
+    setTimeout(() => { enabled = true; }, 1200);
     window.addEventListener('scroll', () => {
-      if (ticking) return;
+      if (!enabled || ticking) return;
       ticking = true;
       requestAnimationFrame(() => {
         let current = null;

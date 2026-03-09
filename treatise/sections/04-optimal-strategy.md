@@ -4,9 +4,34 @@
 
 The optimal strategy exists in the form of ~1.43M numbers calculated by the solver. That means to play perfectly, we need ~1.43M parameters. In this section, we will explore what this strategy looks like, and see if there is anything we can learn in order to get better at playing Yatzy!
 
-### Searching for Patterns
+Since we cannot comprehend ~1.43M parameters, we need to find other ways to see how the optimal strategy behaves. We will start by searching for patterns. To do that, we simulate 1 million games played based on the optimal strategy. Why 1 million? Statistical precision scales with the square root of sample size. At 1 million games, averages are accurate to within a fraction of a point, and even rare events (like scoring zero on One Pair, which happens less than 0.1% of the time) show up hundreds of times. Going to 10 million would barely improve the precision while taking 10x longer to run. Going down to 100,000 would leave some of the rarer statistics too noisy to trust.
 
-Since we cannot easily understand ~1.43M parameters, we need to find other ways to understand how the optimal strategy behaves. We will start by searching for patterns. To do that, we simulate 1 million games played based on the optimal strategy. Why 1 million? Statistical precision scales with the square root of sample size. At 1 million games, averages are accurate to within a fraction of a point, and even rare events (like scoring zero on One Pair, which happens less than 0.1% of the time) show up hundreds of times. Going to 10 million would barely improve the precision while taking 10x longer to run. Going down to 100,000 would leave some of the rarer statistics too noisy to trust.
+### The Shape of the Outcome
+
+Let's start by looking at the big picture: The score distribution.
+
+:::html
+<div class="chart-container" id="chart-mixture">
+  <div id="chart-mixture-svg"></div>
+  <p class="chart-caption">Score distribution under optimal play (1M games). The 16 colored components are the sub-populations from four binary events: Bonus, Yatzy, Small Straight, Large Straight. Use the toggles to filter by hit/miss for each event. Dashed line: true (exact) distribution.</p>
+</div>
+:::
+
+:::html
+<div class="headline-stats">
+  <div class="headline-stat"><div class="headline-stat-value">248.4</div><div class="headline-stat-label">Mean</div></div>
+  <div class="headline-stat"><div class="headline-stat-value">249</div><div class="headline-stat-label">Median</div></div>
+  <div class="headline-stat"><div class="headline-stat-value">38.5</div><div class="headline-stat-label">Std Dev</div></div>
+  <div class="headline-stat"><div class="headline-stat-value">179</div><div class="headline-stat-label">P5</div></div>
+  <div class="headline-stat"><div class="headline-stat-value">309</div><div class="headline-stat-label">P95</div></div>
+</div>
+:::
+
+It's clearly not a normal distribution. The shape has bumps and shoulders that a single bell curve cannot explain. The reason: four categories in Yatzy are binary. You either score them or you don't, and each one shifts your total by a fixed amount. The upper-section bonus adds 50 points (hit ~90% of the time). Yatzy adds 50 points (~39%). Large Straight adds 20 points (~49%). Small Straight adds 15 points (~26%).
+
+These four yes/no events create 16 sub-populations. Each sub-population is roughly Gaussian in its "residual" score (the non-binary categories), centered around 155 to 177 points, then shifted upward by whichever binary events fired. The peaks in the overall distribution appear where multiple sub-populations pile up at similar total scores. For example, the shoulder near 254 is where "Bonus + Large Straight + no Yatzy" (mean 244) overlaps with "Bonus + Small Straight + Large Straight" (mean 262) and "Bonus + Yatzy only" (mean 270). Use the toggles above to isolate each event and see how it splits the distribution.
+
+### Understanding the Patterns
 
 :::html
 <div class="chart-container" id="chart-category-landscape">
@@ -14,126 +39,35 @@ Since we cannot easily understand ~1.43M parameters, we need to find other ways 
 </div>
 :::
 
-Three clusters stand out. Top-left: Sixes, Fives, and Fours, scored early and close to ceiling. These are the earners. Bottom-right: Ones and Twos, scored late and far below ceiling. These are the dump slots, sacrificed to preserve options elsewhere. In between: the lower-section categories, each with a distinct strategic role. And one enormous outlier: Yatzy, whose bubble dwarfs everything else because it swings between 50 and 0.
-
-The bubble chart compresses many dimensions into position and size. The next three charts look at relationships the bubbles cannot show: how category scores correlate with each other, when each category gets filled, and how the upper-section bonus shifts category scores.
+The next chart shows how category scores correlate.
 
 :::html
 <div class="chart-container" id="chart-category-correlations">
-  <p class="chart-caption">Pairwise correlation between category scores. Blue = negative (one tends to be high when the other is low), red = positive (they rise and fall together).</p>
+  <p class="chart-caption">Pairwise correlation between category scores (including bonus). Blue = negative, red = positive. Color scale clamped to the off-diagonal range.</p>
 </div>
 :::
+
+Three patterns are visible:
+
+**Firstd** of all, the bonus row dominates. Bonus correlates with Sixes (+0.33), then Fives (+0.26), Fours (+0.22), and so on in value order. The bonus also correlates with lower-section categories. We know that the zero rate for Four of a Kind (+0.14) drops from 48% to 27% in games that secure the bonus. This is explained by the solver scoring zero in this category more often when still chasing the upper section bonus. In no-bonus games the solver fills Chance earlier (mean turn 7.3 vs 8.5) as a dump for mediocre rolls while still chasing upper categories. In bonus games, Chance can wait for a better roll.
+
+**Second**, every upper-upper category pair shows negative correlation. The explanation for this is that upper categories compete for turns. If the solver spends an early turn scoring Sixes, that is one fewer turn available to retry Ones. Since the solver prioritizes high-value categories, the low-value ones get whatever is left. The further apart two categories are in value, the stronger the tradeoff.
+
+**Third**, Yatzy is uncorrelated with almost everything. Hitting or missing Yatzy tells you essentially nothing about the rest of your game. It is a pure lottery ticket.
+
+The next chart shows when each category gets filled.
 
 :::html
 <div class="chart-container" id="chart-fill-turn-heatmap">
-  <p class="chart-caption">Probability of filling each category on each turn. Categories sorted by mean fill turn.</p>
+  <p class="chart-caption">Probability of filling each category on each turn. Categories in scorecard order, with the bonus row showing when the last upper category is filled.</p>
 </div>
 :::
 
-:::html
-<div class="chart-container" id="chart-bonus-dependency">
-  <p class="chart-caption">Mean category score in games that hit the bonus (orange) vs games that missed (blue). Sorted by the size of the gap.</p>
-</div>
-:::
+High-value upper categories, like Sixes, Fives and Fours, tend to be filled early, while Ones and Twos are deferred. Lower-section categories are bimodal: Two Pairs and Full House peak at turn 1 (grab them if you get them), while Four of a Kind and Large Straight peak at turn 15 (last resort).
 
-### The Upper Section and the Bonus
+The toggle reveals that what looks like one strategy is actually two different games superimposed. Since ~90% of games hit the bonus, the "Bonus scored" view is nearly identical to "All games." The real information is in "Bonus missed."
 
-The 50-point upper bonus at 63 points is the gravitational center of the entire strategy. The solver pursues upper categories in a clear hierarchy: Sixes first, then Fives, then Fours, then Threes. Each contributes more toward the 63 threshold and scores more raw points. Ones and Twos sit at the bottom: their ceilings (5 and 10) are so low that dumping a zero there barely hurts.
-
-The chart below tracks upper-section score evolution across 15 turns. Most games converge toward the bonus by turns 10 to 12. A thin stream of unlucky games stays low throughout.
-
-:::html
-<div class="chart-container" id="chart-race-to-63">
-  <p class="chart-caption">How upper-section scores build turn by turn, with most games converging toward the 63-point bonus.</p>
-</div>
-:::
-
-**The bonus is worth 72, not 50.** The rules say 50 points, but the true impact is 72. Where do the extra 22 come from? Players who reach the bonus tend to have been rolling well throughout, which lifts their lower-section scores too. About 12 points come from the upper-section scores themselves being higher when the threshold is reached, and about 10 from genuine positive correlation between upper and lower sections.
-
-:::html
-<div class="chart-container" id="chart-bonus-covariance">
-  <div id="chart-bonus-covariance-svg"></div>
-  <p class="chart-caption">The 50-point bonus is actually worth 72 points when you account for the 22 extra points from generally better rolls.</p>
-</div>
-:::
-
-:::insight
-**Key insight:** This is why good Yatzy players obsess over the upper section early in the game. The 50-point bonus is visible in the rules, but the 22-point hidden advantage is not. You can only discover it by running the numbers.
-:::
-
-### The Lower Section: Roles and Wildcards
-
-The nine lower-section categories play very different roles. They fall into four groups.
-
-**Reliable scorers.** One Pair, Three of a Kind, and Chance are easy to fill. Their zero rates are tiny, and Chance accepts any five dice. These categories provide the scoring floor: steady points that are rarely wasted.
-
-**Pattern specialists.** Two Pairs, Full House, and Four of a Kind need specific dice patterns. They have moderate zero rates (7% to 13%). The solver pursues them when dice align and takes zeros when they don't.
-
-**Binary outcomes.** Small Straight (15 points) and Large Straight (20 points) are fixed-value patterns. Either you hit the sequence or you score zero. No partial credit.
-
-**The lottery ticket.** Yatzy is worth 50 points but only hit about 39% of the time. It accounts for the single largest chunk of score variance in the entire game.
-
-:::html
-<div class="chart-container" id="chart-category-pmf-grid">
-  <p class="chart-caption">Score distributions for each category. Some are smooth (upper categories), some are binary spikes (straights, Yatzy), and some fall in between.</p>
-</div>
-:::
-
-### How a Game Unfolds
-
-We have seen the roles. Now let's watch them play out. The chart below shows which category gets scored at each turn, aggregated across a million games.
-
-:::html
-<div class="chart-container" id="chart-category-stream">
-  <p class="chart-caption">Category timing: high-value categories early, dump slots like Ones and Chance late.</p>
-</div>
-:::
-
-The strategy has phases. Early game: invest in the bonus by accumulating Sixes, Fives, and Fours while keeping lower-section options open. Mid-game: fill pattern categories (straights, full house, pairs) as dice allow. Late game: damage control. Ones, Twos, and Chance absorb whatever is left.
-
-The chart below shows how uncertainty evolves. Before any dice are rolled, every game has the same expected score of 248. As turns pass, outcomes fan out based on dice luck and category choices. By the final turn, the spread covers everything from about 120 to 370.
-
-:::html
-<div class="chart-container" id="chart-ev-ridgeline">
-  <p class="chart-caption">Expected score by turn: starts as a single point at 248, fans out to the full range of final scores.</p>
-</div>
-:::
-
-Even under perfect play, Yatzy is fundamentally a game of managed uncertainty. The solver does not eliminate luck; it manages it.
-
-### The Shape of the Outcome
-
-All of the above produces one final number each game. The distribution is not a bell curve. Two binary events dominate: whether you hit the
-::concept[upper-section bonus]{upper-section-bonus}
-(about 90% of the time under perfect play) and whether you scored Yatzy (about 39%). These two yes-or-no outcomes split all games into four sub-populations:
-
-- Missed bonus, no Yatzy: average around 164
-- Missed bonus, scored Yatzy: average around 213
-- Hit bonus, no Yatzy: average around 237
-- Hit bonus, scored Yatzy: average around 288
-
-The overall distribution is these four groups stacked together. The bonus creates a visible dip where the two populations (90% vs 10%) meet.
-
-:::html
-<div class="chart-container" id="chart-mixture">
-  <div id="chart-mixture-svg"></div>
-  <p class="chart-caption">The score distribution is a blend of four groups: bonus hit/miss x Yatzy hit/miss. Toggle to highlight each component.</p>
-</div>
-:::
-
-The non-normal shape now makes sense. It is not a failure of averaging; it is a fundamental property of a game where the two highest-value events are all-or-nothing.
-
-Headline stats: mean 248.4, standard deviation 38.5, median 249, 5th percentile 179, 95th percentile 309.
-
-### Explore a Position
-
-The interactive tool below connects to the live solver API. Set the dice and scorecard state, then see the solver's evaluation: which dice to keep, which category to score, and the expected total for every option.
-
-:::html
-<div class="chart-container" id="chart-position-explorer">
-  <p class="chart-caption">Set any position and see the solver's optimal play. Requires the backend (<code>just dev-backend</code>).</p>
-</div>
-:::
+In no-bonus games, the solver fills lower-section categories earlier (Small Straight shifts from mean turn 8.4 to 6.5, One Pair from 7.3 to 6.1) to free up late turns for upper-section retries. The result: turn 15 belongs exclusively to upper categories (Sixes 24%, Fives 19%, Fours 19%), and the bonus row spikes to 93% at turn 15. These are not zero dumps. Sixes scored on turn 15 in no-bonus games average 9.5 points with only a 9% zero rate. The solver was genuinely trying to score well on these categories the whole game; the dice just never cooperated, so the upper categories kept getting pushed later until one landed on the final turn.
 
 :::math
 

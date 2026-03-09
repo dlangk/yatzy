@@ -12,15 +12,12 @@ export async function initFillTurnHeatmap() {
 
   const categories = data.categories;
   const turns = data.turns;
-  const matrix = data.matrix;
-  const nRows = categories.length;  // 16 (15 cats + bonus)
-  const nCols = turns.length;       // 15
-
-  // Find max probability for color scale
-  const maxProb = d3.max(matrix.flat());
+  const matrices = data.matrices;
+  const nRows = categories.length;
+  const nCols = turns.length;
 
   // Compute aspect ratio so cells are square
-  const mLeft = 120, mRight = 40, mTop = 20, mBottom = 45;
+  const mLeft = 120, mRight = 40, mTop = 40, mBottom = 55;
   const containerWidth = container.clientWidth || 635;
   const innerW = containerWidth - mLeft - mRight;
   const cellSize = innerW / nCols;
@@ -38,27 +35,80 @@ export async function initFillTurnHeatmap() {
   if (!chart) return;
   const { g, width, height } = chart;
 
-  // Move caption below SVG (must be after createChart which appends the SVG)
+  // Move caption below SVG
   const caption = container.querySelector('.chart-caption');
   if (caption) container.appendChild(caption);
 
+  // Two independent toggle groups
+  const controls = document.createElement('div');
+  controls.className = 'chart-controls';
+  container.insertBefore(controls, container.querySelector('svg'));
+
+  let bonusKey = 'no_bonus';
+  let scoreKey = 'zeroed';
+
+  function matrixKey() { return `${bonusKey}__${scoreKey}`; }
+
+  // Bonus group
+  const bonusBtns = [
+    { key: 'no_bonus', label: 'No Bonus' },
+    { key: 'bonus', label: 'Bonus' },
+    { key: 'all', label: 'Both' },
+  ].map(({ key, label }) => {
+    const btn = document.createElement('button');
+    btn.className = 'chart-btn' + (key === bonusKey ? ' active' : '');
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      bonusKey = key;
+      bonusBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      updateCells();
+    });
+    controls.appendChild(btn);
+    return btn;
+  });
+
+  // Separator
+  const sep = document.createElement('span');
+  sep.style.cssText = 'width:1px;height:20px;background:var(--border);margin:0 0.25rem;';
+  controls.appendChild(sep);
+
+  // Score group
+  const scoreBtns = [
+    { key: 'zeroed', label: 'Zeroed' },
+    { key: 'scored', label: 'Scored' },
+    { key: 'all', label: 'Both' },
+  ].map(({ key, label }) => {
+    const btn = document.createElement('button');
+    btn.className = 'chart-btn' + (key === scoreKey ? ' active' : '');
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      scoreKey = key;
+      scoreBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      updateCells();
+    });
+    controls.appendChild(btn);
+    return btn;
+  });
+
   const x = d3.scaleBand().domain(turns).range([0, width]).padding(0.05);
   const y = d3.scaleBand().domain(categories).range([0, height]).padding(0.05);
-  const color = d3.scaleLinear().domain([0, maxProb]).range(['#f5f5f5', COLORS.accent]);
+  // Sqrt scale: spreads out low values so they aren't all washed out
+  const color = d3.scalePow().exponent(0.5).domain([0, 1]).range(['#f5f5f5', COLORS.accent]);
 
-  // Flatten to cell objects
+  // Build cell data (values will be updated)
+  const initMatrix = matrices[matrixKey()];
   const cells = [];
   for (let i = 0; i < categories.length; i++) {
     for (let j = 0; j < turns.length; j++) {
-      cells.push({ cat: categories[i], turn: turns[j], val: matrix[i][j] });
+      cells.push({ cat: categories[i], turn: turns[j], i, j, val: initMatrix[i][j] });
     }
   }
 
-  // Tooltip
   const tt = tooltip(container);
 
-  // Draw cells
-  g.selectAll('rect.fill-cell')
+  const rects = g.selectAll('rect.fill-cell')
     .data(cells)
     .join('rect')
     .attr('class', 'fill-cell')
@@ -77,6 +127,13 @@ export async function initFillTurnHeatmap() {
     })
     .on('mouseleave', () => tt.hide());
 
+  function updateCells() {
+    const m = matrices[matrixKey()];
+    cells.forEach(c => { c.val = m[c.i][c.j]; });
+    rects.transition().duration(300)
+      .attr('fill', d => color(d.val));
+  }
+
   // Y axis: category names
   g.selectAll('text.row-label')
     .data(categories)
@@ -93,8 +150,8 @@ export async function initFillTurnHeatmap() {
   // X axis: turn numbers
   const xAxisG = g.append('g')
     .attr('transform', `translate(0,${height})`);
-  const xAxis = d3.axisBottom(x).tickSize(0);
-  xAxisG.call(xAxis);
+  const xAxisFn = d3.axisBottom(x).tickSize(0);
+  xAxisG.call(xAxisFn);
   xAxisG.select('.domain').remove();
   xAxisG.selectAll('text')
     .attr('fill', getMutedColor())
@@ -109,17 +166,20 @@ export async function initFillTurnHeatmap() {
     .style('font-size', '12px')
     .text('Turn');
 
-  // Color legend: horizontal gradient bar
-  const legendW = Math.min(width * 0.4, 150);
-  const legendH = 10;
+  // Color legend (in bottom margin, right of axis label)
+  const legendW = Math.min(width * 0.3, 120);
+  const legendH = 8;
   const legendX = width - legendW;
-  const legendY = -12;
+  const legendY = height + 28;
 
   const defs = g.append('defs');
   const gradId = 'fill-turn-gradient';
   const grad = defs.append('linearGradient').attr('id', gradId);
-  grad.append('stop').attr('offset', '0%').attr('stop-color', '#f5f5f5');
-  grad.append('stop').attr('offset', '100%').attr('stop-color', COLORS.accent);
+  // Approximate sqrt curve with gradient stops
+  [0, 0.01, 0.04, 0.09, 0.16, 0.25, 0.5, 1.0].forEach(v => {
+    const pct = Math.sqrt(v) * 100;
+    grad.append('stop').attr('offset', `${pct}%`).attr('stop-color', color(v));
+  });
 
   g.append('rect')
     .attr('x', legendX).attr('y', legendY)
@@ -127,9 +187,9 @@ export async function initFillTurnHeatmap() {
     .attr('fill', `url(#${gradId})`)
     .attr('rx', 2);
 
-  g.append('text').attr('x', legendX).attr('y', legendY + legendH + 12)
+  g.append('text').attr('x', legendX).attr('y', legendY + legendH + 10)
     .attr('text-anchor', 'middle').attr('fill', getMutedColor()).style('font-size', '9px').text('0%');
-  g.append('text').attr('x', legendX + legendW).attr('y', legendY + legendH + 12)
+  g.append('text').attr('x', legendX + legendW).attr('y', legendY + legendH + 10)
     .attr('text-anchor', 'middle').attr('fill', getMutedColor()).style('font-size', '9px')
-    .text(`${(maxProb * 100).toFixed(0)}%`);
+    .text('100%');
 }

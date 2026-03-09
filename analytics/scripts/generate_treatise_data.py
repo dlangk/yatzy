@@ -181,49 +181,64 @@ def generate_category_pmfs(rec: dict, out_path: Path):
 
 
 def generate_mixture(rec: dict, out_path: Path):
-    """Generate mixture.json: four sub-populations (bonus x yatzy)."""
+    """Generate mixture.json: 16 sub-populations (bonus x yatzy x SS x LS)."""
     total_scores = rec["total_scores"].astype(np.float64)
     got_bonus = rec["got_bonus"]
     cat_scores = rec["category_scores"]
     n = rec["num_games"]
 
-    # Yatzy is category 14; scored > 0 means hit
     got_yatzy = cat_scores[:, 14] > 0
+    got_ss = cat_scores[:, 10] > 0  # Small Straight (cat 10)
+    got_ls = cat_scores[:, 11] > 0  # Large Straight (cat 11)
+
+    flags = {
+        "bonus": got_bonus,
+        "yatzy": got_yatzy,
+        "ss": got_ss,
+        "ls": got_ls,
+    }
 
     populations = []
-    labels = [
-        ("No bonus, no Yatzy", False, False),
-        ("No bonus, scored Yatzy", False, True),
-        ("Hit bonus, no Yatzy", True, False),
-        ("Hit bonus, scored Yatzy", True, True),
-    ]
+    for bonus_hit in [False, True]:
+        for yatzy_hit in [False, True]:
+            for ss_hit in [False, True]:
+                for ls_hit in [False, True]:
+                    mask = (
+                        (got_bonus == bonus_hit)
+                        & (got_yatzy == yatzy_hit)
+                        & (got_ss == ss_hit)
+                        & (got_ls == ls_hit)
+                    )
+                    count = int(mask.sum())
+                    if count == 0:
+                        populations.append({
+                            "bonus": bonus_hit, "yatzy": yatzy_hit,
+                            "ss": ss_hit, "ls": ls_hit,
+                            "fraction": 0.0, "mean": 0.0, "std": 1.0,
+                        })
+                        continue
 
-    for label, bonus_flag, yatzy_flag in labels:
-        mask = (got_bonus == bonus_flag) & (got_yatzy == yatzy_flag)
-        count = int(mask.sum())
-        if count == 0:
-            populations.append({
-                "label": label,
-                "fraction": 0.0,
-                "mean": 0.0,
-                "std": 1.0,
-            })
-            continue
-
-        subset = total_scores[mask]
-        populations.append({
-            "label": label,
-            "fraction": round(count / n, 4),
-            "mean": round(float(subset.mean()), 1),
-            "std": round(float(subset.std()), 1),
-        })
+                    subset = total_scores[mask]
+                    populations.append({
+                        "bonus": bonus_hit, "yatzy": yatzy_hit,
+                        "ss": ss_hit, "ls": ls_hit,
+                        "fraction": round(count / n, 4),
+                        "mean": round(float(subset.mean()), 1),
+                        "std": round(float(subset.std()), 1),
+                    })
 
     with open(out_path, "w") as f:
         json.dump({"populations": populations}, f, indent=2)
 
     print(f"  mixture.json: {len(populations)} populations")
     for p in populations:
-        print(f"    {p['label']}: {p['fraction']*100:.1f}%, mean={p['mean']}, std={p['std']}")
+        parts = []
+        parts.append("Bonus" if p["bonus"] else "No bonus")
+        parts.append("Yatzy" if p["yatzy"] else "No Yatzy")
+        parts.append("SS" if p["ss"] else "No SS")
+        parts.append("LS" if p["ls"] else "No LS")
+        label = ", ".join(parts)
+        print(f"    {label}: {p['fraction']*100:.1f}%, mean={p['mean']}, std={p['std']}")
 
 
 def generate_bonus_covariance(rec: dict, out_path: Path):
@@ -313,40 +328,113 @@ def generate_correlation_matrix(rec: dict, out_path: Path):
     print(f"  category_correlations.json: {len(sorted_names)}x{len(sorted_names)} matrix")
 
 
-def generate_fill_turn_heatmap(rec: dict, out_path: Path):
-    """Generate fill_turn_heatmap.json: per-category probability of being filled at each turn."""
-    fill_turns = rec["fill_turns"]  # (N, 15) uint8
-    n = rec["num_games"]
+def _build_fill_turn_matrix(
+    fill_turns: np.ndarray, sorted_ids: list[int], n: int
+) -> tuple[list[str], list[list[float]]]:
+    """Build fill-turn probability matrix with bonus row after Sixes."""
+    matrix = []
+    names = []
+    for cat_id in sorted_ids:
+        turn_counts = np.bincount(fill_turns[:, cat_id], minlength=16)[1:]
+        matrix.append([round(float(p), 6) for p in turn_counts / n])
+        names.append(CATEGORY_NAMES[cat_id])
 
-    # Sort categories by section then mean_fill_turn
-    sorted_ids = _landscape_sort_order(out_path)
-    sorted_names = [CATEGORY_NAMES[i] for i in sorted_ids]
+        if cat_id == 5:
+            bonus_turn = fill_turns[:, :6].max(axis=1)
+            bonus_counts = np.bincount(bonus_turn, minlength=16)[1:]
+            matrix.append([round(float(p), 6) for p in bonus_counts / n])
+            names.append("Bonus (decided)")
+    return names, matrix
+
+
+def _build_fill_turn_matrix_filtered(
+    fill_turns: np.ndarray,
+    category_scores: np.ndarray,
+    got_bonus: np.ndarray,
+    sorted_ids: list[int],
+    score_filter: str,
+    bonus_filter: str,
+) -> list[list[float]]:
+    """Build fill-turn probability matrix with combined bonus + score filters.
+
+    score_filter: 'all', 'scored' (>0), or 'zeroed' (==0). Applied per-category.
+    bonus_filter: 'all', 'bonus', or 'no_bonus'. Applied globally.
+    """
+    # Global bonus mask
+    if bonus_filter == "bonus":
+        global_mask = got_bonus
+    elif bonus_filter == "no_bonus":
+        global_mask = ~got_bonus
+    else:
+        global_mask = np.ones(len(got_bonus), dtype=bool)
 
     matrix = []
-    names_with_bonus = []
     for cat_id in sorted_ids:
-        turn_counts = np.bincount(fill_turns[:, cat_id], minlength=16)[1:]  # turns 1-15
-        turn_probs = turn_counts / n
-        matrix.append([round(float(p), 6) for p in turn_probs])
-        names_with_bonus.append(CATEGORY_NAMES[cat_id])
+        # Per-category score mask
+        if score_filter == "scored":
+            score_mask = category_scores[:, cat_id] > 0
+        elif score_filter == "zeroed":
+            score_mask = category_scores[:, cat_id] == 0
+        else:
+            score_mask = np.ones(len(got_bonus), dtype=bool)
 
-        # Insert bonus row after Sixes (last upper category)
+        mask = global_mask & score_mask
+        count = int(mask.sum())
+        if count == 0:
+            matrix.append([0.0] * 15)
+        else:
+            turn_counts = np.bincount(fill_turns[mask, cat_id], minlength=16)[1:]
+            matrix.append([round(float(p), 6) for p in turn_counts / count])
+
         if cat_id == 5:
-            bonus_turn = fill_turns[:, :6].max(axis=1)  # turn last upper cat filled
-            bonus_counts = np.bincount(bonus_turn, minlength=16)[1:]
-            bonus_probs = bonus_counts / n
-            matrix.append([round(float(p), 6) for p in bonus_probs])
-            names_with_bonus.append("Bonus (decided)")
+            # Bonus row: for score_filter, use bonus hit/miss as the "score"
+            if score_filter == "scored":
+                bonus_score_mask = got_bonus
+            elif score_filter == "zeroed":
+                bonus_score_mask = ~got_bonus
+            else:
+                bonus_score_mask = np.ones(len(got_bonus), dtype=bool)
+            bmask = global_mask & bonus_score_mask
+            bcount = int(bmask.sum())
+            bonus_turn = fill_turns[:, :6].max(axis=1)
+            if bcount == 0:
+                matrix.append([0.0] * 15)
+            else:
+                bonus_counts = np.bincount(bonus_turn[bmask], minlength=16)[1:]
+                matrix.append([round(float(p), 6) for p in bonus_counts / bcount])
+    return matrix
+
+
+def generate_fill_turn_heatmap(rec: dict, out_path: Path):
+    """Generate fill_turn_heatmap.json: 3x3 grid of bonus x score filters."""
+    fill_turns = rec["fill_turns"]  # (N, 15) uint8
+    category_scores = rec["category_scores"]  # (N, 15) uint8
+    got_bonus = rec["got_bonus"]
+
+    sorted_ids = _landscape_sort_order(out_path)
+    names, matrix_all = _build_fill_turn_matrix(fill_turns, sorted_ids, rec["num_games"])
+
+    # Generate all 9 combinations (3 bonus x 3 score)
+    bonus_keys = ["all", "bonus", "no_bonus"]
+    score_keys = ["all", "scored", "zeroed"]
+    matrices = {}
+    for bk in bonus_keys:
+        for sk in score_keys:
+            key = f"{bk}__{sk}"
+            matrices[key] = _build_fill_turn_matrix_filtered(
+                fill_turns, category_scores, got_bonus, sorted_ids, sk, bk
+            )
 
     result = {
-        "categories": names_with_bonus,
+        "categories": names,
         "turns": list(range(1, 16)),
-        "matrix": matrix,
+        "matrices": matrices,
     }
 
     with open(out_path, "w") as f:
         json.dump(result, f, indent=2)
-    print(f"  fill_turn_heatmap.json: {len(names_with_bonus)} rows x 15 turns")
+    combos = len(matrices)
+    print(f"  fill_turn_heatmap.json: {len(names)} rows x 15 turns ({combos} filter combos)")
 
 
 def main():

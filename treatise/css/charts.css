@@ -28,6 +28,7 @@
   font-size: 0.8rem;
   color: var(--text-muted);
   margin-top: 0.5rem;
+  margin-bottom: 0;
   line-height: 1.4;
 }
 
@@ -169,6 +170,33 @@
   height: 12px;
   border-radius: 2px;
   flex-shrink: 0;
+}
+
+/* Headline stats (inline summary boxes) */
+.headline-stats {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.headline-stat {
+  flex: 1;
+  background: var(--bg-alt);
+  border-radius: 6px;
+  padding: 0.5rem 0.25rem;
+  text-align: center;
+}
+
+.headline-stat-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.headline-stat-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
 }
 
 /* Stats panel (for risk-reward) */

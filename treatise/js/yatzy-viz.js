@@ -79,6 +79,8 @@ export function createChart(containerId, opts = {}) {
   const svg = d3.select(container)
     .append('svg')
     .attr('viewBox', `0 0 ${totalWidth} ${totalHeight}`)
+    .attr('width', totalWidth)
+    .attr('height', totalHeight)
     .attr('preserveAspectRatio', 'xMidYMid meet');
 
   const g = svg.append('g')

@@ -1,28 +1,148 @@
 {
   "populations": [
     {
-      "label": "No bonus, no Yatzy",
-      "fraction": 0.0608,
-      "mean": 164.2,
-      "std": 19.7
+      "bonus": false,
+      "yatzy": false,
+      "ss": false,
+      "ls": false,
+      "fraction": 0.0316,
+      "mean": 154.2,
+      "std": 15.9
     },
     {
-      "label": "No bonus, scored Yatzy",
-      "fraction": 0.0413,
-      "mean": 212.7,
-      "std": 19.8
+      "bonus": false,
+      "yatzy": false,
+      "ss": false,
+      "ls": true,
+      "fraction": 0.0173,
+      "mean": 174.7,
+      "std": 16.4
     },
     {
-      "label": "Hit bonus, no Yatzy",
-      "fraction": 0.5512,
-      "mean": 236.5,
-      "std": 20.3
+      "bonus": false,
+      "yatzy": false,
+      "ss": true,
+      "ls": false,
+      "fraction": 0.0081,
+      "mean": 169.0,
+      "std": 16.1
     },
     {
-      "label": "Hit bonus, scored Yatzy",
-      "fraction": 0.3466,
-      "mean": 286.3,
-      "std": 21.1
+      "bonus": false,
+      "yatzy": false,
+      "ss": true,
+      "ls": true,
+      "fraction": 0.0038,
+      "mean": 190.0,
+      "std": 16.7
+    },
+    {
+      "bonus": false,
+      "yatzy": true,
+      "ss": false,
+      "ls": false,
+      "fraction": 0.0212,
+      "mean": 202.6,
+      "std": 16.1
+    },
+    {
+      "bonus": false,
+      "yatzy": true,
+      "ss": false,
+      "ls": true,
+      "fraction": 0.0117,
+      "mean": 222.8,
+      "std": 16.4
+    },
+    {
+      "bonus": false,
+      "yatzy": true,
+      "ss": true,
+      "ls": false,
+      "fraction": 0.0057,
+      "mean": 217.2,
+      "std": 16.4
+    },
+    {
+      "bonus": false,
+      "yatzy": true,
+      "ss": true,
+      "ls": true,
+      "fraction": 0.0028,
+      "mean": 237.6,
+      "std": 16.8
+    },
+    {
+      "bonus": true,
+      "yatzy": false,
+      "ss": false,
+      "ls": false,
+      "fraction": 0.2062,
+      "mean": 220.2,
+      "std": 14.6
+    },
+    {
+      "bonus": true,
+      "yatzy": false,
+      "ss": false,
+      "ls": true,
+      "fraction": 0.1993,
+      "mean": 243.5,
+      "std": 14.2
+    },
+    {
+      "bonus": true,
+      "yatzy": false,
+      "ss": true,
+      "ls": false,
+      "fraction": 0.0671,
+      "mean": 236.7,
+      "std": 14.7
+    },
+    {
+      "bonus": true,
+      "yatzy": false,
+      "ss": true,
+      "ls": true,
+      "fraction": 0.0787,
+      "mean": 261.6,
+      "std": 13.5
+    },
+    {
+      "bonus": true,
+      "yatzy": true,
+      "ss": false,
+      "ls": false,
+      "fraction": 0.129,
+      "mean": 269.8,
+      "std": 15.4
+    },
+    {
+      "bonus": true,
+      "yatzy": true,
+      "ss": false,
+      "ls": true,
+      "fraction": 0.1203,
+      "mean": 293.1,
+      "std": 15.2
+    },
+    {
+      "bonus": true,
+      "yatzy": true,
+      "ss": true,
+      "ls": false,
+      "fraction": 0.0452,
+      "mean": 286.4,
+      "std": 15.5
+    },
+    {
+      "bonus": true,
+      "yatzy": true,
+      "ss": true,
+      "ls": true,
+      "fraction": 0.0521,
+      "mean": 311.5,
+      "std": 14.8
     }
   ]
 }

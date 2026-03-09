@@ -14,8 +14,7 @@ export async function initCategoryCorrelations() {
   const matrix = data.matrix;
   const n = categories.length;
 
-  // Compute aspect ratio so cells are square
-  const mLeft = 120, mRight = 20, mTop = 100, mBottom = 40;
+  const mLeft = 110, mRight = 10, mTop = 90, mBottom = 30;
   const containerWidth = container.clientWidth || 635;
   const innerW = containerWidth - mLeft - mRight;
   const totalH = innerW + mTop + mBottom;  // square inner area (n x n)
