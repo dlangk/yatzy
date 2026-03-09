@@ -2,7 +2,7 @@
 
 ## The Solver
 
-We have established that there are ~1.43M reachable states, organized into 16 layers, connected by widgets. Every transition goes strictly forward (from layer *l* to layer *l*+1), and layer 16 is trivial: just check whether the upper bonus was earned. This one-directional structure is the key to solving the entire game. We can work backward: solve layer 16 first (trivial), then use those answers to solve layer 15, then layer 14, and so on until we reach layer 1.
+We have established that there are ~1.43M reachable states, organized into 16 layers, connected by widgets. Every transition goes strictly forward (from layer *L* to layer *L*+1), and layer 16 is trivial: just check whether the upper bonus was earned. This one-directional structure is necessary for us to be able to solve the game bacause it allows us to work backward: solve layer 16 first (trivial), then use those answers to solve layer 15, then layer 14, and so on until we reach layer 1.
 
 :::html
 <div id="chart-backward-cascade"></div>
@@ -10,9 +10,9 @@ We have established that there are ~1.43M reachable states, organized into 16 la
 
 ### Solving a Widget
 
-To compute the value of a state, the solver [evaluates its widget](https://github.com/dlangk/yatzy/blob/main/solver/src/widget_solver.rs#L430): the complete decision tree of one turn. The trick is to work backward through the turn: start from the last decision (which category to score) and reason back toward the first roll. Since the solver already knows the value of every end state (from the next layer) and the probability of every dice outcome, it can compute the expected score of every possible choice.
+To compute the value of a state, the solver [evaluates its widget](https://github.com/dlangk/yatzy/blob/main/solver/src/widget_solver.rs#L430): the complete decision tree of one turn. The trick is to work backward through the turn: start from the last decision (which category to score) and reason back toward the first roll. Since the solver already knows the value of every end state (since we already solved the next layer) and the probability of every dice outcome, it can compute the expected score of every possible choice.
 
-The visualization below demonstrates this live, using the actual solver. It first highlights the backward reasoning, sweeping from the scoring decision up to the initial roll, then lets you play a turn yourself.
+Below you can try this yourself using the actual solver. It first highlights the backward reasoning, sweeping from the scoring decision up to the initial roll, then lets you play a turn yourself.
 
 :::html
 <div class="chart-container" id="chart-widget-interactive">
@@ -20,9 +20,9 @@ The visualization below demonstrates this live, using the actual solver. It firs
 </div>
 :::
 
-### Scoring the Final Roll
+### Scoring A Category
 
-The solver starts at the end of the turn. After the last reroll, there is a final roll of five dice and the player must choose which category to score. Each unscored category gives an immediate score plus a future value (the expected score from the resulting state, already computed in a later layer). The solver tries every option and picks the best:
+The solver starts at the end of the turn. After the last reroll the player must choose which category to score. Each unscored category gives an immediate score plus a future value (the expected score from the resulting state, already computed in a later layer). The solver evaluates every option and picks the best:
 
 ```
 for each final roll (252 possibilities):
@@ -37,7 +37,7 @@ This is the innermost decision. Everything else in the turn feeds into it.
 
 ### Choosing What to Keep
 
-One step further back: the player sees a roll and decides which dice to keep. Each possible keep leads to a probability distribution over rerolls. The expected score of a keep is the weighted sum over those outcomes, using the scoring expected scores just computed:
+One step back, the player has five dices and needs to decide which to keep. Each possible keep leads to a probability distribution over possible outcomes. The expected score of a keep is the weighted sum of the value of all possible outcomes. That in turn uses the expected scores we calculated in the previous step:
 
 ```
 for each roll (252):
@@ -48,23 +48,11 @@ for each roll (252):
     keep_exp[roll] = best
 ```
 
-The solver runs this logic twice, in two identical passes: once for the second reroll (using scoring expected scores as input) and once for the first reroll (using second-reroll expected scores as input). It reads from one buffer and writes to the other, then swaps.
+The solver runs this logic twice: once for the second reroll (using scoring expected scores as input) and once for the first reroll (using second-reroll expected scores as input).
 
 ### Transition Probabilities
 
-Every time you decide which dice to keep, you are not just holding onto numbers you like. You are choosing which possible futures to allow, and quietly closing off all the others.
-
-A transition probability is simply the answer to the question: given the dice I am holding, how likely is each outcome when I reroll? It is the bridge between where you are now and where you could end up.
-
-#### How the probability is calculated
-
-When you keep some dice and reroll the rest, each free die lands on 1 through 6 independently. The probability of any specific outcome depends on how many ways the rerolled dice can produce the values you need.
-
-This compounds across a full turn. Each roll depends on what you kept from the previous one, so the probability of any specific three-roll sequence is the product of three individual probabilities, one per roll. That multiplication is where things get surprising.
-
-#### Try it: construct a path
-
-Use the tool below to set your dice at each roll, decide what to keep, and watch the joint probability of your path update in real time.
+A transition probability is the answer to the question: given the dice I have decided to keep, what is the probability distribution over possible outcomes of rerolling? Each reroll depends on what you kept from the previous one, so the probability of any specific three-roll sequence is the product of three individual probabilities, one per roll. Use the tool below to set your dice at each roll, decide what to keep, and see the joint probability of your path:
 
 :::html
 <div class="chart-container" id="chart-path-probability">
@@ -72,13 +60,9 @@ Use the tool below to set your dice at each roll, decide what to keep, and watch
 </div>
 :::
 
-The chain at the bottom shows what is happening: three probabilities being multiplied together. Each one is already a small fraction. Their product is almost always tiny, sometimes astronomically so.
+The chain at the bottom shows what is happening: three probabilities being multiplied together. I think most people are surprised of how rare specific events are in Yatzy. Most possible sequences of events never happen, even if every individual step feels completely reasonable.
 
-This is one of the most counterintuitive things in probability. Each individual step can feel completely reasonable. Getting two fives on a reroll: sure, that happens. But the specific sequence of all three rolls, each turning out exactly as it did? That combination is almost always far rarer than it feels. If a million people made the exact same keep decisions as you, only a handful would trace the exact same path.
-
-This does not mean your decisions were wrong. A rare path and a bad decision are completely different things. The best possible strategy still produces rare specific outcomes most of the time, because every specific path is rare. What good decisions do is aim your probability toward outcomes you want, not guarantee you arrive there.
-
-#### The full map of possibilities
+It's important to note, however, that a rare path and a bad decision are completely different things. The best possible strategy still produces rare specific outcomes most of the time, because every specific path is rare.
 
 The interactive tool above shows one path at a time. The image below shows all of them at once.
 
@@ -92,17 +76,11 @@ Each row is one of the 462 keeping decisions. Each column is one of the 252 poss
 
 At the top (keep nothing), every outcome is possible: the row is fully filled. At the bottom (keep all five), only one outcome remains: the dice you already hold. In between, each die you lock narrows the future. The filled region drifts diagonally because both axes are sorted the same way: keeping low dice only reaches low outcomes, keeping sixes only reaches outcomes containing sixes. Your keeping decision does not just narrow the future; it aims it.
 
-The solver [precomputes](https://github.com/dlangk/yatzy/blob/main/solver/src/phase0_tables.rs#L82) all 462 &times; 252 transition probabilities into a [sparse table](https://github.com/dlangk/yatzy/blob/main/solver/src/types.rs#L25-L40) with only 4,368 non-zero entries (roughly 4% of the full grid). Every widget on this page reads from that table rather than recomputing probabilities on demand.
+The solver [precomputes](https://github.com/dlangk/yatzy/blob/main/solver/src/phase0_tables.rs#L82) all 462 &times; 252 transition probabilities into a [sparse table](https://github.com/dlangk/yatzy/blob/main/solver/src/types.rs#L25-L40) with only 4,368 non-zero entries (roughly 4% of the full grid). Every widget reads from that table rather than recomputing probabilities on demand.
 
 ### The Keep Shortcut
 
-Here's a small insight that makes the whole solver fast.
-
-Many different rolls lead to the same keeping decision. "Keep my two threes" from (1,3,3,5,6) and from (2,3,3,4,4) are the same situation in disguise: two threes in hand, three free dice to reroll. The reroll distribution is identical. So the expected score for that keep only needs to be calculated once.
-
-The solver exploits this by splitting the work in two. First, it computes the expected score for each of the 462 unique keeps. This is the expensive step, done once. Then, for each actual roll, it simply looks up the best available keep from that precomputed table. This is a cheap step, done quickly.
-
-The result is that the hard probability work happens 462 times instead of once per roll per game state. That's what makes real-time evaluation possible.
+There's a nice trick here that makes the solver a lot faster. Many different rolls lead to the same keeping decision. "Keep my two threes" from (1,3,3,5,6) and from (2,3,3,4,4) are the same situation in disguise: two threes in hand, three free dice to reroll. The reroll distribution is identical. So the expected score for that keep only needs to be calculated once. The solver exploits this by splitting the work in two:
 
 ```
 Step 1: Compute expected score for each unique keep (462)
@@ -114,19 +92,21 @@ Step 2: For each roll, pick the best keep (252 lookups)
         keep_exp[r] = max over valid keeps h of r: keep_ev[h]
 ```
 
+First, it computes the expected score for each of the 462 unique keeps. This is the expensive step, done once. Then, for each actual roll, it simply looks up the best available keep from that precomputed table. This is a cheap step, done quickly. The result is that the hard probability work happens 462 times instead of once per roll per game state. That's what makes real-time evaluation possible.
+
 ### The First Roll
 
-At the start of a turn, before any dice are thrown, the expected score is just the weighted average over all 252 possible initial rolls:
+We are now finally at the beginning of a turn. Before any dice are thrown, we don't know which of the 252 possible rolls will appear. Each roll r has a probability P(r) (its multinomial coefficient divided by 6^5 = 7,776), and from step 2 above we already know keep_exp[r], the best expected score achievable from that roll. The state's expected value is simply the weighted average:
 
 ```
-E(state) = Σ P(initial roll = r) × keep_exp[r]   /   7776
+E(state) = Σ P(r) × keep_exp[r]
 ```
 
 One number comes out: the expected score from this state under optimal play.
 
 ### The Backward Sweep
 
-That is how a single widget is solved. Now we zoom out. All 1.43 million widgets are [solved layer by layer](https://github.com/dlangk/yatzy/blob/main/solver/src/state_computation.rs#L251), starting from layer 16 and working backward to layer 1. Each layer depends only on the next, and states within a layer are independent of each other, so every state in a layer can be solved in parallel across all CPU cores. The full sweep completes in about one second.
+We have now explained how a single widget is solved. All ~1.43M widgets are [solved](https://github.com/dlangk/yatzy/blob/main/solver/src/state_computation.rs#L251) in the same way, starting from layer 16 and working backward to layer 1. Each layer depends only on the next, and states within a layer are independent of each other, which allows for complete parallelization.
 
 :::insight
 **462 shared keeps make the inner loop tractable.** Without the keep shortcut, each of the 252 rolls would need its own set of sparse dot products against the reroll distribution. Sharing the computation across the 462 unique keep-multisets reduces the work by an order of magnitude, turning a minutes-long solve into a one-second sweep.
@@ -147,7 +127,7 @@ The solver evaluates the Bellman equation in four stages. Terminal states have a
 :::equation
 <var>Q</var><sub>cat</sub>(<var>u</var>, <var>S</var>, <var>d</var>) =
 max<sub><var>c</var> &notin; <var>S</var></sub>
-&big;( score(<var>d</var>, <var>c</var>) + <var>V</var>(<var>u</var>&prime;, <var>S</var> &cup; {<var>c</var>}) &big;)
+( score(<var>d</var>, <var>c</var>) + <var>V</var>(<var>u</var>&prime;, <var>S</var> &cup; {<var>c</var>}) )
 :::
 
 **Best keep at reroll stage <var>t</var> (ping-pong):**

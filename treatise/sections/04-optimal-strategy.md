@@ -2,19 +2,39 @@
 
 ## The Optimal Strategy
 
-The solver has computed the optimal action for every reachable position: 1.43 million numbers. To make sense of that, we look at what happens to each of the 15 categories across a million simulated games.
+The optimal strategy exists in the form of ~1.43M numbers calculated by the solver. That means to play perfectly, we need ~1.43M parameters. In this section, we will explore what this strategy looks like, and see if there is anything we can learn in order to get better at playing Yatzy!
 
-### The Category Landscape
+### Searching for Patterns
 
-Not all 15 boxes on the scorecard are equal. The chart below maps each category by when it gets scored (x-axis), how close to its ceiling it scores (y-axis), and how much it contributes to final score variance (bubble size).
+Since we cannot easily understand ~1.43M parameters, we need to find other ways to understand how the optimal strategy behaves. We will start by searching for patterns. To do that, we simulate 1 million games played based on the optimal strategy. Why 1 million? Statistical precision scales with the square root of sample size. At 1 million games, averages are accurate to within a fraction of a point, and even rare events (like scoring zero on One Pair, which happens less than 0.1% of the time) show up hundreds of times. Going to 10 million would barely improve the precision while taking 10x longer to run. Going down to 100,000 would leave some of the rarer statistics too noisy to trust.
 
 :::html
 <div class="chart-container" id="chart-category-landscape">
-  <p class="chart-caption">Each bubble is a category. Position shows when and how well it scores; size shows variance contribution. Upper section in blue, lower in red.</p>
+  <p class="chart-caption">Each bubble is one of the 15 categories. Click an insight to see a guided view, or use the dropdowns to explore freely. Upper section in blue, lower in red.</p>
 </div>
 :::
 
 Three clusters stand out. Top-left: Sixes, Fives, and Fours, scored early and close to ceiling. These are the earners. Bottom-right: Ones and Twos, scored late and far below ceiling. These are the dump slots, sacrificed to preserve options elsewhere. In between: the lower-section categories, each with a distinct strategic role. And one enormous outlier: Yatzy, whose bubble dwarfs everything else because it swings between 50 and 0.
+
+The bubble chart compresses many dimensions into position and size. The next three charts look at relationships the bubbles cannot show: how category scores correlate with each other, when each category gets filled, and how the upper-section bonus shifts category scores.
+
+:::html
+<div class="chart-container" id="chart-category-correlations">
+  <p class="chart-caption">Pairwise correlation between category scores. Blue = negative (one tends to be high when the other is low), red = positive (they rise and fall together).</p>
+</div>
+:::
+
+:::html
+<div class="chart-container" id="chart-fill-turn-heatmap">
+  <p class="chart-caption">Probability of filling each category on each turn. Categories sorted by mean fill turn.</p>
+</div>
+:::
+
+:::html
+<div class="chart-container" id="chart-bonus-dependency">
+  <p class="chart-caption">Mean category score in games that hit the bonus (orange) vs games that missed (blue). Sorted by the size of the gap.</p>
+</div>
+:::
 
 ### The Upper Section and the Bonus
 

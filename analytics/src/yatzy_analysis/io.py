@@ -190,6 +190,7 @@ def read_full_recording(path: Path) -> dict | None:
     # Per-category scores: scatter from temporal turns into category slots
     # Turn t: category at offset t*19+17, score at offset t*19+18
     category_scores = np.zeros((n, 15), dtype=np.uint8)
+    fill_turns = np.zeros((n, 15), dtype=np.uint8)
     for t in range(15):
         cat_off = game_offsets + t * 19 + 17
         score_off = game_offsets + t * 19 + 18
@@ -197,6 +198,7 @@ def read_full_recording(path: Path) -> dict | None:
         scores = data[score_off]  # (N,) scores
         # Scatter: category_scores[game_i, cats[game_i]] = scores[game_i]
         category_scores[np.arange(n), cats] = scores
+        fill_turns[np.arange(n), cats] = t + 1  # 1-indexed
 
     return {
         "num_games": n,
@@ -204,6 +206,7 @@ def read_full_recording(path: Path) -> dict | None:
         "got_bonus": got_bonus,
         "upper_totals": upper_totals,
         "category_scores": category_scores,
+        "fill_turns": fill_turns,
     }
 
 

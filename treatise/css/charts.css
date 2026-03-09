@@ -121,6 +121,28 @@
   font-weight: 600;
 }
 
+/* Dropdowns */
+.chart-select {
+  font-family: var(--font-serif);
+  font-size: 0.8rem;
+  padding: 0.3rem 0.5rem;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+}
+
+.chart-select:hover {
+  border-color: var(--accent);
+}
+
+.chart-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light, rgba(243, 112, 33, 0.15));
+}
+
 /* Legend */
 .chart-legend {
   display: flex;
@@ -478,6 +500,26 @@
 .dark .race-links { mix-blend-mode: lighten; }
 
 /* Transition matrix (hover styles are inline in the chart module) */
+
+/* Insight text (category landscape guided tour) */
+.insight-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--accent);
+  background: var(--bg-alt);
+  border-radius: 0 4px 4px 0;
+  box-sizing: border-box;
+}
+
+/* Heatmap cell hover */
+.corr-cell:hover,
+.fill-cell:hover {
+  stroke: var(--text) !important;
+  stroke-width: 1.5 !important;
+}
 
 /* Responsive chart adjustments */
 @media (max-width: 720px) {

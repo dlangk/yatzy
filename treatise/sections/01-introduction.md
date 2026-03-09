@@ -4,7 +4,7 @@
 
 :::section{#introduction}
 
-## Yatzy: The Family Game Balancing Skill and Luck 🎲
+## The Family Game
 
 I loved playing Yatzy as a kid. In fact, I still do 😊 Yatzy, for me, is closely associated with having fun as a family. In particular, I associate it with my wonderful dad - he is the best person I know to play Yatzy with! ❤️
 

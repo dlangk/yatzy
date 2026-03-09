@@ -9,7 +9,15 @@
     "mean_fill_turn": 8.04,
     "score_pct_ceiling": 0.4358,
     "variance_contribution": -3.8,
-    "hit_rate": 0.9063
+    "hit_rate": 0.9063,
+    "score_std": 1.25,
+    "score_skewness": -0.05,
+    "fill_turn_std": 3.87,
+    "fill_turn_entropy": 3.85,
+    "mean_score_bonus": 2.17,
+    "mean_score_no_bonus": 2.26,
+    "bonus_dependency": -0.09,
+    "opportunity_cost": 0.23
   },
   {
     "id": 1,
@@ -21,7 +29,15 @@
     "mean_fill_turn": 7.6,
     "score_pct_ceiling": 0.5666,
     "variance_contribution": 1.9,
-    "hit_rate": 0.9947
+    "hit_rate": 0.9947,
+    "score_std": 1.85,
+    "score_skewness": -0.32,
+    "fill_turn_std": 3.86,
+    "fill_turn_entropy": 3.86,
+    "mean_score_bonus": 5.71,
+    "mean_score_no_bonus": 5.29,
+    "bonus_dependency": 0.41,
+    "opportunity_cost": 0.03
   },
   {
     "id": 2,
@@ -33,7 +49,15 @@
     "mean_fill_turn": 6.96,
     "score_pct_ceiling": 0.6195,
     "variance_contribution": 9.3,
-    "hit_rate": 0.9977
+    "hit_rate": 0.9977,
+    "score_std": 2.31,
+    "score_skewness": -0.44,
+    "fill_turn_std": 4.03,
+    "fill_turn_entropy": 3.85,
+    "mean_score_bonus": 9.41,
+    "mean_score_no_bonus": 8.28,
+    "bonus_dependency": 1.13,
+    "opportunity_cost": 0.02
   },
   {
     "id": 3,
@@ -45,7 +69,15 @@
     "mean_fill_turn": 6.58,
     "score_pct_ceiling": 0.6397,
     "variance_contribution": 18.0,
-    "hit_rate": 0.9978
+    "hit_rate": 0.9978,
+    "score_std": 2.74,
+    "score_skewness": -0.47,
+    "fill_turn_std": 4.08,
+    "fill_turn_entropy": 3.82,
+    "mean_score_bonus": 13.0,
+    "mean_score_no_bonus": 11.02,
+    "bonus_dependency": 1.98,
+    "opportunity_cost": 0.03
   },
   {
     "id": 4,
@@ -57,7 +89,15 @@
     "mean_fill_turn": 6.13,
     "score_pct_ceiling": 0.6497,
     "variance_contribution": 26.5,
-    "hit_rate": 0.9981
+    "hit_rate": 0.9981,
+    "score_std": 3.16,
+    "score_skewness": -0.38,
+    "fill_turn_std": 4.0,
+    "fill_turn_entropy": 3.77,
+    "mean_score_bonus": 16.52,
+    "mean_score_no_bonus": 13.85,
+    "bonus_dependency": 2.66,
+    "opportunity_cost": 0.03
   },
   {
     "id": 5,
@@ -69,7 +109,15 @@
     "mean_fill_turn": 6.48,
     "score_pct_ceiling": 0.6658,
     "variance_contribution": 44.3,
-    "hit_rate": 0.9977
+    "hit_rate": 0.9977,
+    "score_std": 3.83,
+    "score_skewness": -0.51,
+    "fill_turn_std": 3.81,
+    "fill_turn_entropy": 3.77,
+    "mean_score_bonus": 20.4,
+    "mean_score_no_bonus": 16.22,
+    "bonus_dependency": 4.18,
+    "opportunity_cost": 0.05
   },
   {
     "id": 6,
@@ -81,7 +129,15 @@
     "mean_fill_turn": 7.14,
     "score_pct_ceiling": 0.9321,
     "variance_contribution": 2.2,
-    "hit_rate": 0.9992
+    "hit_rate": 0.9992,
+    "score_std": 1.22,
+    "score_skewness": -1.99,
+    "fill_turn_std": 3.96,
+    "fill_turn_entropy": 3.86,
+    "mean_score_bonus": 11.2,
+    "mean_score_no_bonus": 11.04,
+    "bonus_dependency": 0.16,
+    "opportunity_cost": 0.01
   },
   {
     "id": 7,
@@ -93,7 +149,15 @@
     "mean_fill_turn": 6.6,
     "score_pct_ceiling": 0.8811,
     "variance_contribution": 17.4,
-    "hit_rate": 0.9872
+    "hit_rate": 0.9872,
+    "score_std": 3.46,
+    "score_skewness": -2.6,
+    "fill_turn_std": 4.12,
+    "fill_turn_entropy": 3.83,
+    "mean_score_bonus": 19.44,
+    "mean_score_no_bonus": 18.88,
+    "bonus_dependency": 0.56,
+    "opportunity_cost": 0.25
   },
   {
     "id": 8,
@@ -105,7 +169,15 @@
     "mean_fill_turn": 8.73,
     "score_pct_ceiling": 0.8617,
     "variance_contribution": 27.6,
-    "hit_rate": 0.9583
+    "hit_rate": 0.9583,
+    "score_std": 4.06,
+    "score_skewness": -2.45,
+    "fill_turn_std": 4.22,
+    "fill_turn_entropy": 3.86,
+    "mean_score_bonus": 15.62,
+    "mean_score_no_bonus": 14.57,
+    "bonus_dependency": 1.05,
+    "opportunity_cost": 0.68
   },
   {
     "id": 9,
@@ -117,7 +189,15 @@
     "mean_fill_turn": 10.96,
     "score_pct_ceiling": 0.5693,
     "variance_contribution": 131.2,
-    "hit_rate": 0.7125
+    "hit_rate": 0.7125,
+    "score_std": 9.67,
+    "score_skewness": -0.45,
+    "fill_turn_std": 3.58,
+    "fill_turn_entropy": 3.5,
+    "mean_score_bonus": 14.11,
+    "mean_score_no_bonus": 9.72,
+    "bonus_dependency": 4.39,
+    "opportunity_cost": 5.51
   },
   {
     "id": 10,
@@ -129,7 +209,15 @@
     "mean_fill_turn": 8.24,
     "score_pct_ceiling": 0.2634,
     "variance_contribution": 62.7,
-    "hit_rate": 0.2634
+    "hit_rate": 0.2634,
+    "score_std": 6.61,
+    "score_skewness": 1.07,
+    "fill_turn_std": 4.15,
+    "fill_turn_entropy": 3.89,
+    "mean_score_bonus": 4.06,
+    "mean_score_no_bonus": 2.99,
+    "bonus_dependency": 1.07,
+    "opportunity_cost": 11.05
   },
   {
     "id": 11,
@@ -141,7 +229,15 @@
     "mean_fill_turn": 10.38,
     "score_pct_ceiling": 0.486,
     "variance_contribution": 138.0,
-    "hit_rate": 0.486
+    "hit_rate": 0.486,
+    "score_std": 10.0,
+    "score_skewness": 0.06,
+    "fill_turn_std": 4.03,
+    "fill_turn_entropy": 3.67,
+    "mean_score_bonus": 10.03,
+    "mean_score_no_bonus": 6.97,
+    "bonus_dependency": 3.07,
+    "opportunity_cost": 10.28
   },
   {
     "id": 12,
@@ -153,7 +249,15 @@
     "mean_fill_turn": 7.23,
     "score_pct_ceiling": 0.7665,
     "variance_contribution": 76.8,
-    "hit_rate": 0.9156
+    "hit_rate": 0.9156,
+    "score_std": 7.56,
+    "score_skewness": -1.83,
+    "fill_turn_std": 4.54,
+    "fill_turn_entropy": 3.86,
+    "mean_score_bonus": 21.61,
+    "mean_score_no_bonus": 20.12,
+    "bonus_dependency": 1.5,
+    "opportunity_cost": 1.98
   },
   {
     "id": 13,
@@ -165,7 +269,15 @@
     "mean_fill_turn": 8.39,
     "score_pct_ceiling": 0.7697,
     "variance_contribution": 15.8,
-    "hit_rate": 1.0
+    "hit_rate": 1.0,
+    "score_std": 2.26,
+    "score_skewness": 0.07,
+    "fill_turn_std": 4.11,
+    "fill_turn_entropy": 3.89,
+    "mean_score_bonus": 23.17,
+    "mean_score_no_bonus": 22.38,
+    "bonus_dependency": 0.79,
+    "opportunity_cost": 0.0
   },
   {
     "id": 14,
@@ -177,6 +289,14 @@
     "mean_fill_turn": 10.56,
     "score_pct_ceiling": 0.388,
     "variance_contribution": 583.0,
-    "hit_rate": 0.388
+    "hit_rate": 0.388,
+    "score_std": 24.36,
+    "score_skewness": 0.46,
+    "fill_turn_std": 4.27,
+    "fill_turn_entropy": 3.52,
+    "mean_score_bonus": 19.3,
+    "mean_score_no_bonus": 20.23,
+    "bonus_dependency": -0.92,
+    "opportunity_cost": 30.6
   }
 ]

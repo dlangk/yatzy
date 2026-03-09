@@ -49,6 +49,9 @@
   import { initEvRidgeline } from './js/charts/ev-ridgeline.js';
   import { initCategoryPmfGrid } from './js/charts/category-pmf-grid.js';
   import { initPositionExplorer } from './js/charts/position-explorer.js';
+  import { initCategoryCorrelations } from './js/charts/category-correlations.js';
+  import { initFillTurnHeatmap } from './js/charts/fill-turn-heatmap.js';
+  import { initBonusDependency } from './js/charts/bonus-dependency.js';
   // Chart modules — Risk Parameter
   import { initExponentialUtility } from './js/charts/exponential-utility.js';
   import { initMeanVarianceFrontier } from './js/charts/mean-variance-frontier.js';
@@ -119,6 +122,9 @@
     'chart-widget-interactive': { init: initWidgetInteractive, loaded: false },
     'chart-backward-wave': { init: initBackwardWave, loaded: false },
     'chart-category-landscape': { init: initCategoryLandscape, loaded: false },
+    'chart-category-correlations': { init: initCategoryCorrelations, loaded: false },
+    'chart-fill-turn-heatmap': { init: initFillTurnHeatmap, loaded: false },
+    'chart-bonus-dependency': { init: initBonusDependency, loaded: false },
     'chart-score-distribution': { init: initScoreDistribution, loaded: false },
     'chart-mixture': { init: initMixtureDecomposition, loaded: false },
     'chart-bonus-covariance': { init: initBonusCovariance, loaded: false },

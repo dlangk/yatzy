@@ -10,6 +10,8 @@ Produces:
   - treatise/data/category_pmfs.json
   - treatise/data/mixture.json
   - treatise/data/bonus_covariance.json
+  - treatise/data/category_correlations.json
+  - treatise/data/fill_turn_heatmap.json
 """
 
 from __future__ import annotations
@@ -65,7 +67,9 @@ def generate_category_landscape(csv_path: Path, rec: dict, out_path: Path):
 
     # Compute variance contributions from the simulation data
     cat_scores = rec["category_scores"]  # (N, 15) uint8
+    fill_turns = rec["fill_turns"]  # (N, 15) uint8
     total_scores = rec["total_scores"].astype(np.float64)  # (N,)
+    got_bonus = rec["got_bonus"]
     n = rec["num_games"]
 
     # Variance contribution: Cov(cat_score, total_score) for each category
@@ -78,10 +82,42 @@ def generate_category_landscape(csv_path: Path, rec: dict, out_path: Path):
         cat_id = int(row["category_id"])
         cat_vals = cat_scores[:, cat_id].astype(np.float64)
         cat_mean = cat_vals.mean()
+        cat_std = cat_vals.std()
 
         # Covariance contribution: Cov(X_i, Total) = sum of all covariances involving X_i
         # This is the proper decomposition: Var(Total) = sum_i Cov(X_i, Total)
         cov_with_total = np.mean((cat_vals - cat_mean) * (total_scores - total_mean))
+
+        # Score skewness: mean(((x - mean) / std)^3), guarded for std=0
+        if cat_std > 0:
+            score_skewness = float(np.mean(((cat_vals - cat_mean) / cat_std) ** 3))
+        else:
+            score_skewness = 0.0
+
+        # Fill turn statistics
+        ft = fill_turns[:, cat_id].astype(np.float64)
+        fill_turn_std = float(np.std(ft))
+
+        # Fill turn entropy: -sum(p * log2(p)) over turn distribution
+        turn_counts = np.bincount(fill_turns[:, cat_id], minlength=16)[1:]  # turns 1-15
+        turn_probs = turn_counts / n
+        nonzero = turn_probs > 0
+        fill_turn_entropy = float(-np.sum(turn_probs[nonzero] * np.log2(turn_probs[nonzero])))
+
+        # Bonus dependency: mean(score | bonus) - mean(score | no bonus)
+        bonus_mask = got_bonus
+        no_bonus_mask = ~got_bonus
+        if bonus_mask.sum() > 0 and no_bonus_mask.sum() > 0:
+            bonus_dependency = float(cat_vals[bonus_mask].mean() - cat_vals[no_bonus_mask].mean())
+        else:
+            bonus_dependency = 0.0
+
+        # Opportunity cost: mean(score | score > 0) - mean(score)
+        nonzero_mask = cat_vals > 0
+        if nonzero_mask.sum() > 0:
+            opportunity_cost = float(cat_vals[nonzero_mask].mean() - cat_mean)
+        else:
+            opportunity_cost = 0.0
 
         result.append({
             "id": cat_id,
@@ -94,6 +130,14 @@ def generate_category_landscape(csv_path: Path, rec: dict, out_path: Path):
             "score_pct_ceiling": round(float(row["score_pct_ceiling"]) / 100.0, 4),
             "variance_contribution": round(float(cov_with_total), 1),
             "hit_rate": round(float(row["hit_rate"]), 4),
+            "score_std": round(cat_std, 2),
+            "score_skewness": round(score_skewness, 2),
+            "fill_turn_std": round(fill_turn_std, 2),
+            "fill_turn_entropy": round(fill_turn_entropy, 2),
+            "mean_score_bonus": round(float(cat_vals[bonus_mask].mean()), 2) if bonus_mask.sum() > 0 else round(float(cat_mean), 2),
+            "mean_score_no_bonus": round(float(cat_vals[no_bonus_mask].mean()), 2) if no_bonus_mask.sum() > 0 else round(float(cat_mean), 2),
+            "bonus_dependency": round(bonus_dependency, 2),
+            "opportunity_cost": round(opportunity_cost, 2),
         })
 
     with open(out_path, "w") as f:
@@ -235,8 +279,84 @@ def generate_bonus_covariance(rec: dict, out_path: Path):
     print(f"  bonus_covariance.json: 50 + {upper_lift} + {lower_lift} = {total_gap}")
 
 
+def _landscape_sort_order(out_path: Path) -> list[int]:
+    """Return category IDs in scorecard order (0-14)."""
+    return list(range(15))
+
+
+def generate_correlation_matrix(rec: dict, out_path: Path):
+    """Generate category_correlations.json: 16x16 Pearson correlation matrix (15 cats + bonus)."""
+    cat_scores = rec["category_scores"].astype(np.float64)  # (N, 15)
+    got_bonus = rec["got_bonus"].astype(np.float64)  # (N,)
+
+    # Stack bonus as column 15, then compute 16x16 correlation
+    all_cols = np.column_stack([cat_scores, got_bonus])
+    corr = np.corrcoef(all_cols.T)
+
+    # Scorecard order: 0-5 (upper), bonus (col 15), 6-14 (lower)
+    sorted_ids = list(range(6)) + [15] + list(range(6, 15))
+    all_names = CATEGORY_NAMES + ["Bonus"]
+    sorted_names = [all_names[i] for i in sorted_ids]
+
+    # Reorder matrix rows and columns
+    sorted_corr = corr[np.ix_(sorted_ids, sorted_ids)]
+
+    matrix = [[round(float(v), 4) for v in row] for row in sorted_corr]
+
+    result = {
+        "categories": sorted_names,
+        "matrix": matrix,
+    }
+
+    with open(out_path, "w") as f:
+        json.dump(result, f, indent=2)
+    print(f"  category_correlations.json: {len(sorted_names)}x{len(sorted_names)} matrix")
+
+
+def generate_fill_turn_heatmap(rec: dict, out_path: Path):
+    """Generate fill_turn_heatmap.json: per-category probability of being filled at each turn."""
+    fill_turns = rec["fill_turns"]  # (N, 15) uint8
+    n = rec["num_games"]
+
+    # Sort categories by section then mean_fill_turn
+    sorted_ids = _landscape_sort_order(out_path)
+    sorted_names = [CATEGORY_NAMES[i] for i in sorted_ids]
+
+    matrix = []
+    names_with_bonus = []
+    for cat_id in sorted_ids:
+        turn_counts = np.bincount(fill_turns[:, cat_id], minlength=16)[1:]  # turns 1-15
+        turn_probs = turn_counts / n
+        matrix.append([round(float(p), 6) for p in turn_probs])
+        names_with_bonus.append(CATEGORY_NAMES[cat_id])
+
+        # Insert bonus row after Sixes (last upper category)
+        if cat_id == 5:
+            bonus_turn = fill_turns[:, :6].max(axis=1)  # turn last upper cat filled
+            bonus_counts = np.bincount(bonus_turn, minlength=16)[1:]
+            bonus_probs = bonus_counts / n
+            matrix.append([round(float(p), 6) for p in bonus_probs])
+            names_with_bonus.append("Bonus (decided)")
+
+    result = {
+        "categories": names_with_bonus,
+        "turns": list(range(1, 16)),
+        "matrix": matrix,
+    }
+
+    with open(out_path, "w") as f:
+        json.dump(result, f, indent=2)
+    print(f"  fill_turn_heatmap.json: {len(names_with_bonus)} rows x 15 turns")
+
+
 def main():
-    raw_path = repo_root / "data" / "simulations" / "theta" / "theta_0.000" / "simulation_raw.bin"
+    # Try multiple known locations for simulation_raw.bin
+    candidates = [
+        repo_root / "data" / "simulations" / "theta" / "theta_0.000" / "simulation_raw.bin",
+        repo_root / "data" / "simulations" / "theta" / "theta_0" / "simulation_raw.bin",
+        repo_root / "data" / "simulations" / "simulation_raw.bin",
+    ]
+    raw_path = next((p for p in candidates if p.exists()), candidates[0])
     csv_path = repo_root / "outputs" / "aggregates" / "csv" / "category_stats.csv"
     out_dir = repo_root / "treatise" / "data"
 
@@ -257,6 +377,8 @@ def main():
     generate_category_pmfs(rec, out_dir / "category_pmfs.json")
     generate_mixture(rec, out_dir / "mixture.json")
     generate_bonus_covariance(rec, out_dir / "bonus_covariance.json")
+    generate_correlation_matrix(rec, out_dir / "category_correlations.json")
+    generate_fill_turn_heatmap(rec, out_dir / "fill_turn_heatmap.json")
 
     print("\nDone.")
 

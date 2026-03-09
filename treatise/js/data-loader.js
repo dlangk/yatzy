@@ -53,4 +53,6 @@ export const DataLoader = {
   // Category analysis (Section 4)
   categoryLandscape: () => load('category_landscape.json'),
   categoryPmfs: () => load('category_pmfs.json'),
+  categoryCorrelations: () => load('category_correlations.json'),
+  fillTurnHeatmap: () => load('fill_turn_heatmap.json'),
 };
