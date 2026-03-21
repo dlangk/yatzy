@@ -29,7 +29,7 @@ Let's start by looking at the big picture: The score distribution.
 
 It's clearly not a normal distribution. The shape has bumps and shoulders that a single bell curve cannot explain. The reason: four categories in Yatzy are binary. You either score them or you don't, and each one shifts your total by a fixed amount. The upper-section bonus adds 50 points (hit ~90% of the time). Yatzy adds 50 points (~39%). Large Straight adds 20 points (~49%). Small Straight adds 15 points (~26%).
 
-These four yes/no events create 16 sub-populations. Each sub-population is roughly Gaussian in its "residual" score (the non-binary categories), centered around 155 to 177 points, then shifted upward by whichever binary events fired. The peaks in the overall distribution appear where multiple sub-populations pile up at similar total scores. For example, the shoulder near 254 is where "Bonus + Large Straight + no Yatzy" (mean 244) overlaps with "Bonus + Small Straight + Large Straight" (mean 262) and "Bonus + Yatzy only" (mean 270). Use the toggles above to isolate each event and see how it splits the distribution.
+These four yes/no events create 16 sub-populations. Each sub-population is roughly Gaussian in its "residual" score (the non-binary categories), centered around 154 to 177 points, then shifted upward by whichever binary events fired. The peaks in the overall distribution appear where multiple sub-populations pile up at similar total scores. For example, the shoulder near 254 is where "Bonus + Large Straight + no Yatzy" (mean 244) overlaps with "Bonus + Small Straight + Large Straight" (mean 262) and "Bonus + Yatzy only" (mean 270). Use the toggles above to isolate each event and see how it splits the distribution.
 
 ### Understanding the Patterns
 
@@ -49,9 +49,9 @@ The next chart shows how category scores correlate.
 
 Three patterns are visible:
 
-**Firstd** of all, the bonus row dominates. Bonus correlates with Sixes (+0.33), then Fives (+0.26), Fours (+0.22), and so on in value order. The bonus also correlates with lower-section categories. We know that the zero rate for Four of a Kind (+0.14) drops from 48% to 27% in games that secure the bonus. This is explained by the solver scoring zero in this category more often when still chasing the upper section bonus. In no-bonus games the solver fills Chance earlier (mean turn 7.3 vs 8.5) as a dump for mediocre rolls while still chasing upper categories. In bonus games, Chance can wait for a better roll.
+**First** of all, the bonus row dominates. Bonus correlates with Sixes (+0.33), then Fives (+0.26), Fours (+0.22), and so on in value order. The bonus also correlates with lower-section categories. We know that the zero rate for Four of a Kind (+0.14) drops from 48% to 27% in games that secure the bonus. This is explained by the solver scoring zero in this category more often when still chasing the upper section bonus. In no-bonus games the solver fills Chance earlier (mean turn 7.3 vs 8.5) as a dump for mediocre rolls while still chasing upper categories. In bonus games, Chance can wait for a better roll.
 
-**Second**, every upper-upper category pair shows negative correlation. The explanation for this is that upper categories compete for turns. If the solver spends an early turn scoring Sixes, that is one fewer turn available to retry Ones. Since the solver prioritizes high-value categories, the low-value ones get whatever is left. The further apart two categories are in value, the stronger the tradeoff.
+**Second**, every upper-upper category pair shows negative correlation. The explanation for this is that upper categories compete for turns. If the solver spends an early turn scoring Sixes, that is one fewer turn available to retry Ones. Since the solver prioritizes high-value categories, the low-value ones get whatever is left. In general, the further apart two categories are in value, the stronger the tradeoff (for example, Ones-Sixes at -0.12 vs Ones-Twos at -0.04), though this is not perfectly monotonic across all pairs.
 
 **Third**, Yatzy is uncorrelated with almost everything. Hitting or missing Yatzy tells you essentially nothing about the rest of your game. It is a pure lottery ticket.
 
@@ -82,13 +82,13 @@ The four-component mixture model can be written as:
 where the mixing weights &pi;<sub><var>i</var></sub> are determined by the
 joint probability of bonus hit/miss and Yatzy hit/miss. Under optimal play,
 the bonus hit rate is approximately 90% and the Yatzy probability is approximately
-39%, giving mixing weights of roughly 0.055, 0.055, 0.555, and 0.335 for the
+39%, giving mixing weights of roughly 0.061, 0.041, 0.551, and 0.347 for the
 four components (miss/miss, miss/hit, hit/miss, hit/hit).
 
 The 22-point correlated advantage can be decomposed further. Approximately
-12 points come from the upper-section scores themselves being higher when
+10 points come from the upper-section scores themselves being higher when
 the bonus is reached (conditional expectation above threshold vs below),
-and approximately 10 points come from a genuine positive correlation between
+and approximately 12 points come from a genuine positive correlation between
 upper-section luck and lower-section scoring opportunities.
 
 :::

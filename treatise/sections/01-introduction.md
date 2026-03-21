@@ -36,8 +36,17 @@ Many years ago, I got it into my head to figure out: exactly how much skill is i
 
 - **The Significant Inherent Randomness.**  Five dices with six sides that are rolled over and over again means a whole lot of randomness.
 
-- **The Huge State Space.** There are about ~1.7 &times; 10<sup>170</sup> possible Yatzy games. That's significantly larger than chess. And the universe 🤯 There are about ~10<sup>80</sup> atoms in the universe.
+- **The Huge State Space.** There are about ~10<sup>197</sup> possible Yatzy games. That's significantly larger than chess. And the universe 🤯 There are about ~10<sup>80</sup> atoms in the universe.
 
 - **It Can Still Be Solved.** Clever mathematicians have figured out how to reduce the state space drastically, and as a result, Yatzy can be solved. I've implemented my own solver based on this math, and used AI to push that solver to extreme performance.
 
 This site is the outcome of many years of nerding out about Yatzy. I was finally able to publish everything with the help of Agentic Coding.
+
+:::html
+<div class="acknowledgment">
+  <strong>Standing on the shoulders of giants</strong>
+  This work would not have been possible without the research of Tom Verhoeff, who first demonstrated that Yahtzee could be solved optimally via backward induction [1], and James Glenn, who published both a <a href="http://gunpowder.cs.loyola.edu/~jglenn/research/optimal_yahtzee.pdf">technical report</a> [2] and a later <a href="http://www.cs.loyola.edu/~jglenn/Papers/yahtzee_cig2007_glenn.pdf">IEEE CIG paper</a> [3] on the topic. The technical report was the first one I found, and my implementation is completely built on its description of the state space reductions and MDP formulation. For the Scandinavian Yatzy variant specifically, Larsson and Sjöberg at KTH [4] were the first to compute its optimal strategy. All modifications required to adapt the algorithms to Scandinavian rules are my own.
+</div>
+:::
+
+

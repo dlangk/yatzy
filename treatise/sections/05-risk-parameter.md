@@ -2,46 +2,13 @@
 
 ## Adding a Risk Parameter
 
-The EV-optimal solver answers one question: what maximises expected score? But
-expected score is not always the right objective. A player trailing by 40 points
-in the final rounds needs upside, not consistency. A player protecting a lead
-needs the floor, not the ceiling. The question becomes: how do we parametrise the
-tradeoff between expected value and variance?
+We defined the optimal strategy as "maximize the expected score". But, what if we want to take a bit more risk? What if we want a truly legendary score, and not just a good average? We will now explore how we can adjust our risk preference, which we will call &theta;.
 
-The answer is ::concept[exponential utility]{exponential-utility}.
-Instead of maximising the raw expected score E[<var>x</var>], the solver maximises
-E[&minus;exp(&minus;&theta;<var>x</var>)], where &theta; is a single real-valued
-parameter that controls risk attitude. When &theta; = 0, the exponential flattens
-and the solver recovers exactly the EV-optimal policy. When &theta; &lt; 0, the
-solver becomes risk-averse: it overweights bad outcomes and prefers
-consistent scores. When &theta; &gt; 0, it becomes risk-seeking: it chases
-high-variance plays that lift the ceiling at the cost of the floor.
+Instead of maximising the expected score E[<var>x</var>], we built a solver that maximises E[&minus;exp(&minus;&theta;<var>x</var>)], where &theta; is a single real-valued parameter that controls risk attitude. When &theta; = 0, the exponential flattens and the solver recovers exactly the EV-optimal policy. When &theta; &lt; 0, the solver becomes risk-averse: it overweights bad outcomes and prefers consistent scores. When &theta; &gt; 0, it becomes risk-seeking: it chases high-variance plays that lift the ceiling at the cost of the floor.
 
-This is the ::concept[CARA]{cara-utility}
-(constant absolute risk aversion) model from decision theory. Its defining
-property is that the risk premium for any gamble is independent of current
-wealth. The solver's willingness to take a risky reroll depends only on
-&theta; and the gamble's shape, never on how many points have already been
-scored. This makes &theta; a clean, interpretable dial: turn it left for safety,
-turn it right for ambition.
+This is the ::concept[CARA]{cara-utility} (constant absolute risk aversion) model from decision theory. Its defining property is that the risk premium for any gamble is independent of current wealth. The solver's willingness to take a risky reroll depends only on &theta; and the gamble's shape, never on how many points have already been scored. This makes &theta; a clean, interpretable dial: turn it left for safety, turn it right for ambition.
 
-:::html
-<div class="chart-container" id="chart-exponential-utility">
-  <div id="chart-exponential-utility-svg"></div>
-  <p class="chart-caption">Exponential utility: θ &lt; 0 overweights bad outcomes (risk-averse), θ &gt; 0 overweights good outcomes (risk-seeking).</p>
-</div>
-:::
-
-The solver sweeps 37 values of &theta; from &minus;3.0 to +3.0, with dense
-spacing near zero (19 values with &Delta;&theta; as small as 0.005) and sparser
-coverage at the extremes. Each produces a complete strategy table via backward
-induction, and each is evaluated over one million simulated games.
-
-Use the slider below to see how the score distribution changes across the
-full &theta; range. At &theta; = 0 the familiar left-skewed EV-optimal
-distribution appears. As &theta; moves negative the distribution compresses
-(lower mean, tighter spread). As &theta; moves positive the distribution
-stretches toward both tails before collapsing at extreme values.
+Use the slider below to see how the score distribution changes across the full &theta; range. At &theta; = 0 the familiar left-skewed EV-optimal distribution appears. As &theta; moves negative the distribution compresses (lower mean, tighter spread). As &theta; moves positive the distribution stretches toward both tails before collapsing at extreme values.
 
 :::html
 <div class="chart-container" id="chart-score-distribution">
@@ -54,8 +21,7 @@ stretches toward both tails before collapsing at extreme values.
 </div>
 :::
 
-The results trace a ::concept[mean-variance frontier]{free-energy}
-that reveals the price of risk in exact quantitative terms.
+The results trace a ::concept[mean-variance frontier]{free-energy} that reveals the price of risk in exact quantitative terms.
 
 :::html
 <div class="chart-container" id="chart-mean-variance-frontier">

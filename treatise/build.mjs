@@ -178,6 +178,29 @@ for (const file of files) {
       return `<div class="code-card"><div class="code-card-header">${headerText}</div><pre><code>${numbered}</code></pre></div>`;
     }
   );
+  // Transform inline [N] markers into superscript ref-marker links.
+  // Matches [N] where N is 1-2 digits, but NOT inside <a> tags, code blocks,
+  // or Markdown link syntax like [text](url).
+  html = html.replace(
+    /(<(?:a|code|pre)[^>]*>[\s\S]*?<\/(?:a|code|pre)>)|(\[(\d{1,2})\])/gi,
+    (match, tag, bracket, num) => {
+      if (tag) return tag; // inside <a>, <code>, or <pre> — leave alone
+      return `<a href="#ref-${num}" class="ref-marker" data-ref="${num}">${num}</a>`;
+    }
+  );
+  // Add id="ref-N" anchors to ordered list items inside a .references-list div.
+  // The div is emitted by the :::html block in markdown.
+  html = html.replace(
+    /(<ol[^>]*class="references-list"[^>]*>)([\s\S]*?)(<\/ol>)/g,
+    (match, open, body, close) => {
+      let i = 0;
+      const anchored = body.replace(/<li>/g, () => {
+        i++;
+        return `<li><a id="ref-${i}"></a>`;
+      });
+      return open + anchored + close;
+    }
+  );
   // Inject TOC where placeholder exists
   html = html.replace("<!-- TOC -->", tocHtml);
   const outName = file.replace(/\.md$/, ".html");

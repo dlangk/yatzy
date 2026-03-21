@@ -393,7 +393,7 @@ export async function initWidgetInteractive() {
       const rerolls = playPhase === 'rolled' ? 2 : 1;
       actionBarEl.style.display = '';
       const rb = mk('button', 'primary');
-      rb.textContent = `Reroll (${rerolls - 1} left)`;
+      rb.textContent = `Reroll (${rerolls} left)`;
       rb.addEventListener('click', () => {
         playPhase = playPhase === 'rolled' ? 'keep1' : 'keep2';
         doRoll();

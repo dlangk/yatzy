@@ -80,7 +80,7 @@ The solver [precomputes](https://github.com/dlangk/yatzy/blob/main/solver/src/ph
 
 ### The Keep Shortcut
 
-There's a nice trick here that makes the solver a lot faster. Many different rolls lead to the same keeping decision. "Keep my two threes" from (1,3,3,5,6) and from (2,3,3,4,4) are the same situation in disguise: two threes in hand, three free dice to reroll. The reroll distribution is identical. So the expected score for that keep only needs to be calculated once. The solver exploits this by splitting the work in two:
+We can use a trick when it comes to which dice are kept to make the solver a lot faster. It turns out, many different rolls lead to the same keeping decision. "Keep my two threes" from (1,3,3,5,6) and from (2,3,3,4,4) are the same situation: two Threes in hand, three free dice to reroll. Their reroll distributions are identical. So the expected score for that keep only needs to be calculated once. We exploit this in the solver by splitting the work in two:
 
 ```
 Step 1: Compute expected score for each unique keep (462)
@@ -92,17 +92,17 @@ Step 2: For each roll, pick the best keep (252 lookups)
         keep_exp[r] = max over valid keeps h of r: keep_ev[h]
 ```
 
-First, it computes the expected score for each of the 462 unique keeps. This is the expensive step, done once. Then, for each actual roll, it simply looks up the best available keep from that precomputed table. This is a cheap step, done quickly. The result is that the hard probability work happens 462 times instead of once per roll per game state. That's what makes real-time evaluation possible.
+First, it computes the expected score for each of the 462 unique keeps. This is expensive step but only done once. Then, for each actual roll, it just looks up the best available keep from the precomputed table. The result is that the expensive probability work happens 462 times instead of once per roll per game state.
 
 ### The First Roll
 
-We are now finally at the beginning of a turn. Before any dice are thrown, we don't know which of the 252 possible rolls will appear. Each roll r has a probability P(r) (its multinomial coefficient divided by 6^5 = 7,776), and from step 2 above we already know keep_exp[r], the best expected score achievable from that roll. The state's expected value is simply the weighted average:
+We are now finally at the beginning of a turn, i.e. the end of the computation. Before any dice are thrown, we don't know which of the 252 possible rolls will appear. Each roll r has a probability P(r) (its multinomial coefficient divided by 6<sup>5</sup> = 7,776), and from step 2 above we already know keep_exp[r], the best expected score achievable from that roll. The state's expected value is simply the weighted average:
 
 ```
 E(state) = Σ P(r) × keep_exp[r]
 ```
 
-One number comes out: the expected score from this state under optimal play.
+One number comes out: the expected score from this state under optimal play. For the first turn, this is the expected score of an optimal Yatzy player.
 
 ### The Backward Sweep
 
@@ -279,9 +279,9 @@ At the global level, the solver keeps one `f32` per state slot: `4,194,304 &time
 
 | Structure | Size | Purpose |
 |-----------|------|---------|
-| State values | 16 MB | One f32 per state slot (4,194,304 &times; 4 bytes) |
+| State values | 16 MB | One f32 per state slot (4,194,304 &times; 4 bytes; stride-128 padding for branchless access) |
 | Precomputed scores | 15 KB | 252 dice sets &times; 15 categories &times; 4 bytes |
-| Sparse keep table | 17 KB | 4,368 non-zero (f32, i32) pairs + row pointers |
+| Sparse keep table | 35 KB | 4,368 non-zero (f32, i32) pairs + row pointers |
 | Reverse dice lookup | 32 KB | 5D index_lookup for O(1) dice &rarr; index |
 | Keep frequency lookup | 182 KB | Horner hash table (46,656 entries) |
 | Reachability mask | 4 KB | 64 &times; 64 booleans |

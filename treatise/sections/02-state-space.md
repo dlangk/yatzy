@@ -2,7 +2,7 @@
 
 ## The State Space
 
-A Yatzy game is a sequence of rolls, keeps, and scoring decisions across fifteen rounds. The total number of possible games is 1.7 &times; 10<sup>170</sup>. That vastly exceeds the number of atoms in the observable universe, estimated at "only" about 10^80! 🤯
+A Yatzy game is a sequence of rolls, keeps, and scoring decisions across fifteen rounds. The total number of possible games is roughly 10<sup>197</sup>. That vastly exceeds the number of atoms in the observable universe, estimated at "only" about 10<sup>80</sup>! 🤯
 
 **How do you solve something that big? You don't.** You find ways to make it smaller. This section walks through five simplifications that shrink the problem from impossibly large to something a laptop can handle in about a second.
 
@@ -18,9 +18,11 @@ When you roll five dice, their "order" don't change anything. A roll of ⚂⚄�
 
 ### Step 2: Forget the Past
 
-The second big insight is: that (most of) the past doesn't matter. Suppose two games took completely different paths; you scored different categories in different orders, but ended up with the same upper-section total and the same categories remaining. As long as those two things are the same, the best strategy for the rest of the game is identical. All history except scored categories and total upper score is irrelevant. It doesn't matter if you scored a good One Pair or a bad one. It doesn't even matter what your total score is.
+The second big insight is: that (most of) the past doesn't matter. Suppose two games took completely different paths; you scored different categories in different orders, but ended up with the same upper-section total and the same categories remaining. As long as upper-section total and scored categories are the same, the best strategy for the rest of the game is **identical**. All history beyond that is irrelevant. It doesn't matter if you scored a good One Pair or a bad one.
 
-A game state is fully described by just two things: the upper-section score so far (actually, all you need to know is the number between 0 to 63, since anything above the ::concept[bonus]{upper-section-bonus} threshold is equivalent) and which of the 15 categories have been used. That gives 64 &times; 2<sup>15</sup> = 2,097,152 possible states. Between turns, you are in one of these ~2.1M states.
+**It doesn't even matter what your total score is.**
+
+This means the game state is fully described by just two things: the upper-section score so far (actually, all you need to know is the number between 0 to 63, since anything above the ::concept[bonus]{upper-section-bonus} threshold is equivalent) and which of the 15 categories have been used. That gives 64 &times; 2<sup>15</sup> = 2,097,152 possible states. Between turns, you are always in one of these ~2.1M states.
 
 ### Step 3: Prune the Impossible
 
@@ -34,7 +36,11 @@ Not all of those ~2.1M states can actually occur in a real game. For example, an
 
 ### Step 4: One Turn at a Time
 
-Alright, now know there are ~1.43M possible states we can visit while playing. Next, we need to understand how we can *transition* between these states. Every transition works the same: roll all dices, keep some and roll the rest, then keep some and roll the rest again, then finally score a category. If you roll a Yatzy on the first roll, we can just represent that as "keep all dices twice and then score Yatyz". Every turn starts in one of the ~1.43M states and transitions to another through these intermediate steps. We will refer this transition mechanism as a ::concept[widget]{solve-widget}.
+Alright, now know there are ~1.43M possible states we can visit while playing. Next, we need to understand how we can *transition* between these states.
+
+**Every turn starts in one of these states**, and it always transitions to another state using the same mechanism: roll all dices, keep some and roll the rest, then keep some and roll the rest again, then finally score a category.
+
+If you roll a Yatzy on the first roll, we can just represent that as "keep all dices twice and then score Yatyz". We will refer this transition mechanism as a **widget** and we can visualize it like this:
 
 :::html
 <div class="chart-container" id="chart-widget-structure">
@@ -42,7 +48,9 @@ Alright, now know there are ~1.43M possible states we can visit while playing. N
 </div>
 :::
 
-Let's look more closely at each widget. The 252 unique rolls were explained in Step 1. But where does 462 come from? After each roll, you choose which dice to keep. With five dice there are 2<sup>5</sup>&nbsp;=&nbsp;32 ways to select which dice to keep. But for most sets of dices, many of those 32 choices lead to the same outcome. Say you rolled 3, 3, 3, 5, 5. Keeping dice #1 and #2, or #1 and #3, are different reroll choices but the result is the same: you will be keeping two Threes either way. What matters is *how many of each face* you keep, not *which physical dice* you picked.
+**Let's look more closely at each widget.** The 252 unique rolls were explained in Step 1. But where does 462 come from?
+
+**After each roll, you choose which dice to keep.** With five dice there are 2<sup>5</sup>&nbsp;=&nbsp;32 ways to select which dice to keep. But for most sets of dices, many of those 32 choices lead to the same outcome. Say you rolled 3, 3, 3, 5, 5. Keeping dice #1 and #2, or #1 and #3, are different reroll choices but the result is the same: you will be keeping two Threes either way. What matters is *how many of each face* you keep, not *which physical dice* you picked.
 
 :::html
 <div id="chart-keep-equivalence"></div>
@@ -56,7 +64,7 @@ The chart below starts with exactly that roll. Each colored cell is one of the 3
 </div>
 :::
 
-For a Full House, 32 possible keep choices reduce to just 12 unique keeps. But how many unique keeps exist in total? Since dice showing the same face are interchangeable, it becomes a multiset combination problem. The table below enumerates every case:
+For a Full House, 32 possible keep choices reduce to just 12 unique keeps. But how many unique keeps exist in total? Since dice showing the same face are interchangeable, it becomes a ::concept[multiset combination problem]{multiset-combination}. The table below enumerates every case:
 
 | Dice kept | Unique keeps | Example |
 |-----------|-------------:|---------|
@@ -76,7 +84,7 @@ There is one final structural property that simplifies Yatzy: it is "one-directi
 
 :::insight
 
-**From 10<sup>170</sup> to 1.43 million.** Ignoring dice order cuts 7,776 rolls to 252 unique combinations. Ignoring history further reduces the space down to ~2.1M states. Pruning unreachable states removes another ~32%. Breaking each turn into a widget makes every state independently solvable. And because the graph is directed and acyclic, each layer depends only on the next.
+**From 10<sup>197</sup> to 1.43 million.** Ignoring dice order cuts 7,776 rolls to 252 unique combinations. Ignoring history further reduces the space down to ~2.1M states. Pruning unreachable states removes another ~32%. Breaking each turn into a widget makes every state independently solvable. And because the graph is directed and acyclic, each layer depends only on the next. [1] [2] [3] [4]
 
 :::
 

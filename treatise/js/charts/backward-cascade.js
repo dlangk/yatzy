@@ -64,7 +64,7 @@ export async function initBackwardCascade() {
       <div class="cascade-arrow-line"></div>
     </div>
     ${card(1, 'Game start', 0,
-      'All 15 open. 1 widget. <strong>E[start] = 248.4</strong>',
+      'All 15 categories open. 1 widget.',
       'The answer to the entire game.')}
   </div>`;
 }

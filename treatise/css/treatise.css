@@ -147,16 +147,30 @@ h2 .section-link:hover {
   line-height: 1;
 }
 
-/* Key insight callout */
-.insight {
-  background: var(--accent-light);
+/* Key insight / info callout */
+.insight,
+.acknowledgment {
+  background: var(--bg-alt);
   border-radius: 8px;
-  padding: 1rem 1.25rem;
+  padding: 1.25rem 1.5rem;
   margin: 1.5rem 0;
-  border-left: 3px solid var(--accent);
+  border-left: 4px solid var(--accent);
+  font-size: 0.92rem;
+  line-height: 1.6;
 }
 
-.insight strong:first-child {
+.insight strong:first-child,
+.acknowledgment strong:first-child {
+  color: var(--accent);
+}
+
+.acknowledgment strong {
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.acknowledgment a,
+.insight a {
   color: var(--accent);
 }
 
@@ -1549,3 +1563,69 @@ h2 .section-link:hover {
     font-size: 0.7rem;
   }
 }
+
+/* ===== Reference Markers ===== */
+
+.ref-marker {
+  font-size: 0.75em;
+  vertical-align: super;
+  line-height: 0;
+  text-decoration: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.ref-marker:hover {
+  text-decoration: underline;
+}
+
+/* References section */
+.references-section {
+  padding-bottom: 3rem;
+}
+
+.references-list {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  padding-left: 1.5rem;
+}
+
+.references-list li {
+  margin-bottom: 0.5rem;
+  line-height: 1.55;
+}
+
+.references-list a {
+  color: var(--accent);
+}
+
+/* Tooltip */
+.annotation-tooltip {
+  position: absolute;
+  z-index: 10000;
+  max-width: 380px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  pointer-events: auto;
+  font-family: var(--font-serif);
+}
+
+.dark .annotation-tooltip {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.annotation-tooltip a {
+  color: var(--accent);
+}
+
+.annotation-tooltip p {
+  margin: 0;
+}
+

@@ -68,6 +68,7 @@
   // Chart modules — Profiling
   import { initUmapManifold } from './js/charts/umap-manifold.js';
 
+  import { initReferences } from './js/references.js';
   import { initConceptDrawer } from './js/concept-drawer.js';
   import { initTheme } from './js/theme.js';
   import { initDepthToggle } from './js/depth-toggle.js';
@@ -83,6 +84,7 @@
     'sections/06-compression.html',
     'sections/07-profiling.html',
     'sections/08-conclusion.html',
+    'sections/09-references.html',
   ];
 
   // Load all sections in parallel, insert in order
@@ -106,6 +108,7 @@
   setTimeout(() => { document.documentElement.style.scrollBehavior = 'smooth'; }, 1500);
 
   // Initialize systems
+  initReferences();
   initConceptDrawer();
   initTheme();
   initDepthToggle();
