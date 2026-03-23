@@ -10,7 +10,7 @@ We have established that there are ~1.43M reachable states, organized into 16 la
 
 ### Solving a Widget
 
-To compute the value of a state, the solver [evaluates its widget](https://github.com/dlangk/yatzy/blob/main/solver/src/widget_solver.rs#L430): the complete decision tree of one turn. The trick is to work backward through the turn: start from the last decision (which category to score) and reason back toward the first roll. Since the solver already knows the value of every end state (since we already solved the next layer) and the probability of every dice outcome, it can compute the expected score of every possible choice.
+To compute the value of a state, the solver [evaluates the widget](https://github.com/dlangk/yatzy/blob/main/solver/src/widget_solver.rs#L430) for the origin state. The trick is to work backward through the turn: start from the last decision (which category to score) and reason back toward the first roll. Since the solver already knows the value of every end state (since we already solved the next layer) and the probability of every dice outcome, it can compute the expected score of every possible choice.
 
 Below you can try this yourself using the actual solver. It first highlights the backward reasoning, sweeping from the scoring decision up to the initial roll, then lets you play a turn yourself.
 

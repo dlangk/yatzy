@@ -8,6 +8,7 @@
 import { DataLoader } from '../data-loader.js';
 import { tooltip, getTextColor, getMutedColor, getGridColor, COLORS } from '../yatzy-viz.js';
 import { renderDiceSelectable } from '../utils/dice-interactive.js';
+import { createDieSVG } from '/yatzy/shared/dice.js';
 
 export async function initDiceSymmetry() {
   const container = document.getElementById('chart-dice-symmetry');
@@ -76,33 +77,11 @@ export async function initDiceSymmetry() {
 
   const tt = tooltip(container);
 
-  // ------- Pip layout for mini dice (scaled from 48px base) -------
-  const PIPS = [
-    [],
-    [{ cx: 24, cy: 24 }],
-    [{ cx: 14, cy: 14 }, { cx: 34, cy: 34 }],
-    [{ cx: 14, cy: 14 }, { cx: 24, cy: 24 }, { cx: 34, cy: 34 }],
-    [{ cx: 14, cy: 14 }, { cx: 34, cy: 14 }, { cx: 14, cy: 34 }, { cx: 34, cy: 34 }],
-    [{ cx: 14, cy: 14 }, { cx: 34, cy: 14 }, { cx: 24, cy: 24 }, { cx: 14, cy: 34 }, { cx: 34, cy: 34 }],
-    [{ cx: 14, cy: 12 }, { cx: 34, cy: 12 }, { cx: 14, cy: 24 }, { cx: 34, cy: 24 }, { cx: 14, cy: 36 }, { cx: 34, cy: 36 }],
-  ];
-
   function makeMinDie(face, kept) {
-    // Build SVG content as single string to avoid innerHTML+= re-parse issues
-    const pips = (PIPS[face] || []).map(p =>
-      kept
-        ? `<circle cx="${p.cx}" cy="${p.cy}" r="4.5" fill="var(--text)"/>`
-        : `<circle cx="${p.cx}" cy="${p.cy}" r="4.5" fill="var(--text)" opacity="0.2"/>`
-    ).join('');
-
-    const rect = kept
-      ? `<rect x="1" y="1" width="46" height="46" rx="8" fill="var(--bg)" stroke="var(--accent)" stroke-width="3"/>`
-      : `<rect x="1" y="1" width="46" height="46" rx="8" fill="none" stroke="var(--border)" stroke-width="2" stroke-dasharray="4 3"/>`;
-
-    // Wrap in a div for reliable CSS sizing (classList on SVG can be flaky)
+    const state = kept ? 'kept' : 'reroll';
     const wrap = document.createElement('div');
     wrap.className = kept ? 'keep-die keep-die-kept' : 'keep-die keep-die-reroll';
-    wrap.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">${rect}${pips}</svg>`;
+    wrap.appendChild(createDieSVG(face, { size: 20, state }));
     return wrap;
   }
 

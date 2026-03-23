@@ -1,0 +1,11 @@
+/* Shared die SVG styles */
+.die-svg {
+  flex-shrink: 0;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.die-inline {
+  display: inline;
+  vertical-align: -0.15em;
+}

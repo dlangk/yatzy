@@ -61,6 +61,11 @@ function serveDir(prefix: string, dir: string): Plugin {
 
 export default defineConfig({
   base: '/yatzy/play/',
+  resolve: {
+    alias: {
+      '/yatzy/shared/': path.join(root, 'shared') + '/',
+    },
+  },
   server: {
     port: 5173,
     proxy: {
@@ -71,6 +76,7 @@ export default defineConfig({
     },
   },
   plugins: [
+    serveDir('/yatzy/shared/', path.join(root, 'shared')),
     serveDir('/yatzy/profile/', path.join(root, 'profiler')),
     serveDir('/yatzy/', path.join(root, 'treatise')),
   ],

@@ -1,5 +1,6 @@
 import { DataLoader } from '../data-loader.js';
 import { getTextColor, getMutedColor, COLORS } from '../yatzy-viz.js';
+import { createDieSVG } from '/yatzy/shared/dice.js';
 
 export async function initDecisionAnatomy() {
   const container = document.getElementById('chart-decision-anatomy');
@@ -28,10 +29,7 @@ export async function initDecisionAnatomy() {
     const diceRow = document.createElement('div');
     diceRow.className = 'dice-row';
     data.state.dice.forEach((v) => {
-      const die = document.createElement('span');
-      die.className = 'die';
-      die.textContent = v;
-      diceRow.appendChild(die);
+      diceRow.appendChild(createDieSVG(v, { size: 40 }));
     });
     diceSection.appendChild(diceRow);
 

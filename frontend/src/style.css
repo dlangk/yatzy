@@ -278,14 +278,9 @@ body {
   color: var(--text);
 }
 
-.die-btn {
+.die-wrap {
   width: 56px;
   height: 56px;
-  font-size: 28px;
-  font-weight: bold;
-  font-family: var(--font-mono);
-  border-radius: 8px;
-  color: var(--text);
 }
 
 /* Dice legend */

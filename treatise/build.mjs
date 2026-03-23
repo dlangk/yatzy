@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, readdirSync } from "fs";
 import { join, basename } from "path";
 import MarkdownIt from "markdown-it";
+import { inlineDieSVG } from "../shared/dice.js";
 
 const SECTIONS_DIR = join(import.meta.dirname, "sections");
 const md = new MarkdownIt({ html: true });
@@ -140,8 +141,8 @@ for (const file of files) {
     }
     html = parts.join("");
   }
-  // Wrap Unicode dice faces (⚀-⚅) in a span for larger rendering
-  html = html.replace(/[\u2680-\u2685]/g, ch => `<span class="die-char">${ch}</span>`);
+  // Replace Unicode dice faces (⚀-⚅) with inline SVG pip dice
+  html = html.replace(/[\u2680-\u2685]/g, ch => inlineDieSVG(ch.codePointAt(0) - 0x267F));
   // Inject section number + permalink into first h2
   const sec = fileSectionMap.get(file);
   if (sec) {

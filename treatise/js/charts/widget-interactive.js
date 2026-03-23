@@ -6,7 +6,7 @@
  *   Play:    user makes choices, rows accumulate top-to-bottom
  */
 
-import { PIPS } from '../utils/dice-interactive.js';
+import { createDieSVG } from '/yatzy/shared/dice.js';
 
 const SCENARIO = {
   upper_score: 18,
@@ -34,24 +34,8 @@ const EXPLAIN_TEXTS = [
 
 function createDie(value, options = {}) {
   const { selected = false, rerolling = false, clickable = false } = options;
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 48 48');
-  svg.setAttribute('width', String(DIE_SIZE));
-  svg.setAttribute('height', String(DIE_SIZE));
-  svg.classList.add('die-svg');
-  if (rerolling) svg.classList.add('rerolling');
-  if (clickable) svg.classList.add('clickable');
-
-  const stroke = selected ? 'var(--accent)' : 'var(--border)';
-  const sw = selected ? 3 : 2;
-  const opacity = rerolling ? 0.4 : 1;
-
-  let html = `<rect x="1" y="1" width="46" height="46" rx="8" fill="var(--bg-alt)" stroke="${stroke}" stroke-width="${sw}"/>`;
-  (PIPS[value] || []).forEach(p => {
-    html += `<circle cx="${p.cx}" cy="${p.cy}" r="4.5" fill="var(--text)" opacity="${opacity}"/>`;
-  });
-  svg.innerHTML = html;
-  return svg;
+  const state = rerolling ? 'faded' : (selected ? 'kept' : 'normal');
+  return createDieSVG(value, { size: DIE_SIZE, state, clickable });
 }
 
 // ── API helpers ────────────────────────────────────────────────

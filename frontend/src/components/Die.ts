@@ -1,3 +1,6 @@
+// @ts-ignore - shared module served at runtime
+import { createDieSVG } from '/yatzy/shared/dice.js';
+
 /** DOM handles and update function returned by {@link createDie}. */
 export interface DieElements {
   container: HTMLDivElement;
@@ -12,7 +15,7 @@ export interface DieElements {
 }
 
 /**
- * Creates a single die button with up/down increment arrows and keep toggle.
+ * Creates a single die SVG with up/down increment arrows and keep toggle.
  *
  * Callbacks: onToggle (keep/reroll), onIncrement (+1), onDecrement (-1).
  * Returned `update()` sets value, kept state, optimal-keep/reroll borders,
@@ -31,9 +34,12 @@ export function createDie(
   upBtn.innerHTML = '&#9650;';
   upBtn.addEventListener('click', onIncrement);
 
-  const btn = document.createElement('button');
-  btn.className = 'die-btn';
-  btn.addEventListener('click', onToggle);
+  // Placeholder SVG die (will be replaced on first update)
+  const dieWrap = document.createElement('div');
+  dieWrap.className = 'die-wrap';
+  dieWrap.style.width = '56px';
+  dieWrap.style.height = '56px';
+  dieWrap.addEventListener('click', onToggle);
 
   const downBtn = document.createElement('button');
   downBtn.className = 'die-arrow';
@@ -41,7 +47,7 @@ export function createDie(
   downBtn.addEventListener('click', onDecrement);
 
   container.appendChild(upBtn);
-  container.appendChild(btn);
+  container.appendChild(dieWrap);
   container.appendChild(downBtn);
 
   function update(opts: {
@@ -52,20 +58,40 @@ export function createDie(
     disabled: boolean;
     faded: boolean;
   }) {
-    btn.textContent = opts.value === 0 ? '?' : String(opts.value);
-    btn.disabled = opts.disabled;
-    btn.style.background = opts.kept ? 'var(--bg)' : 'var(--bg-alt)';
-    btn.style.cursor = opts.disabled ? 'default' : 'pointer';
-    btn.style.opacity = opts.faded ? '0.5' : '1';
-    btn.title = opts.kept ? 'Kept (click to reroll)' : 'Will reroll (click to keep)';
+    // Background: white if kept, gray if will-reroll
+    // Border: green if correct (matches optimal), red if wrong, neutral otherwise
+    // Pips: full if kept, dimmed if will-reroll
+    let fill: string, stroke: string, sw: number, pipOp: number;
 
-    if (opts.isOptimalReroll) {
-      btn.style.border = '3px solid var(--color-danger)';
-    } else if (opts.isOptimalKeep) {
-      btn.style.border = '3px solid var(--color-success)';
+    if (opts.faded) {
+      fill = 'var(--bg-alt)';
+      stroke = 'var(--border)';
+      sw = 2;
+      pipOp = 0.5;
+    } else if (opts.kept) {
+      fill = 'var(--bg)';
+      pipOp = 1;
+      if (opts.isOptimalKeep) { stroke = 'var(--color-success)'; sw = 3; }
+      else if (opts.isOptimalReroll) { stroke = 'var(--color-danger)'; sw = 3; }
+      else { stroke = 'var(--border)'; sw = 2; }
     } else {
-      btn.style.border = '2px solid var(--text)';
+      fill = 'var(--bg-alt)';
+      pipOp = 0.45;
+      if (opts.isOptimalReroll) { stroke = 'var(--color-success)'; sw = 3; }
+      else if (opts.isOptimalKeep) { stroke = 'var(--color-danger)'; sw = 3; }
+      else { stroke = 'var(--border)'; sw = 2; }
     }
+
+    const svg = createDieSVG(opts.value || 0, {
+      size: 56,
+      state: 'normal',
+      clickable: !opts.disabled,
+      fill, stroke, sw, pipOp,
+    });
+
+    dieWrap.innerHTML = '';
+    dieWrap.appendChild(svg);
+    dieWrap.style.cursor = opts.disabled ? 'default' : 'pointer';
   }
 
   return { container, update };

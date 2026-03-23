@@ -6,6 +6,7 @@
  */
 import { subscribe, getState, dispatch } from '../store.js';
 import { createProfileScorecard } from './profile-scorecard.js';
+import { createDieSVG } from '/yatzy/shared/dice.js';
 
 export function initScenarioCard(container) {
   const el = document.createElement('div');
@@ -88,28 +89,23 @@ export function initScenarioCard(container) {
     return mask;
   }
 
+  let diceValues = [];
+  let optimalMaskOverride = null;
+
   function updateDieVisuals() {
-    dieButtons.forEach((btn, i) => {
-      btn.className = 'die--interactive';
-      if (kept[i]) {
-        btn.classList.add('die--kept');
-        btn.title = 'Kept (click to reroll)';
-      } else {
-        btn.classList.add('die--will-reroll');
-        btn.title = 'Will reroll (click to keep)';
+    dieButtons.forEach((wrap, i) => {
+      let state = kept[i] ? 'kept' : 'normal';
+      if (optimalMaskOverride !== null) {
+        state = (optimalMaskOverride & (1 << i)) ? 'optimal-reroll' : 'optimal-keep';
       }
+      wrap.innerHTML = '';
+      wrap.appendChild(createDieSVG(diceValues[i], { size: 56, state, clickable: isRerollDecision && !answered }));
     });
   }
 
   function showOptimalMask(scenario) {
-    const optimalMask = scenario.optimal_action_id;
-    dieButtons.forEach((btn, i) => {
-      if (optimalMask & (1 << i)) {
-        btn.classList.add('die--optimal-reroll');
-      } else {
-        btn.classList.add('die--optimal-keep');
-      }
-    });
+    optimalMaskOverride = scenario.optimal_action_id;
+    updateDieVisuals();
   }
 
   function applyRerollMask(mask) {
@@ -156,30 +152,32 @@ export function initScenarioCard(container) {
     // Dice
     kept = [true, true, true, true, true];
     dieButtons = [];
+    diceValues = [];
+    optimalMaskOverride = null;
     diceRow.innerHTML = '';
 
     const startTime = performance.now();
 
     scenario.dice.forEach((v, i) => {
-      const btn = document.createElement('button');
-      btn.className = 'die--interactive die--kept';
-      btn.textContent = v;
-      btn.title = 'Kept (click to reroll)';
+      diceValues.push(v);
+      const wrap = document.createElement('div');
+      wrap.style.width = '56px';
+      wrap.style.height = '56px';
+      wrap.style.cursor = 'pointer';
+
+      const state = isRerollDecision ? 'kept' : 'faded';
+      wrap.appendChild(createDieSVG(v, { size: 56, state, clickable: isRerollDecision && !answered }));
 
       if (isRerollDecision && !answered) {
-        btn.addEventListener('click', () => {
+        wrap.addEventListener('click', () => {
           if (answered) return;
           kept[i] = !kept[i];
           updateDieVisuals();
         });
-      } else if (!isRerollDecision) {
-        btn.disabled = true;
-        btn.classList.add('die--faded');
-        btn.title = '';
       }
 
-      diceRow.appendChild(btn);
-      dieButtons.push(btn);
+      diceRow.appendChild(wrap);
+      dieButtons.push(wrap);
     });
 
     // Actions

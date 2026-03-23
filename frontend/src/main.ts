@@ -1,3 +1,9 @@
+// Load shared nav bar (absolute URL to bypass Vite base path rewriting)
+const s = document.createElement('script');
+s.type = 'module';
+s.src = '/yatzy/shared/nav.js';
+document.head.appendChild(s);
+
 import { TOTAL_DICE } from './constants.ts';
 import { getState, dispatch, subscribe } from './store.ts';
 import { initApp } from './App.ts';

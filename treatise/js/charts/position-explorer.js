@@ -5,7 +5,7 @@
  * evaluation: optimal keep mask, category EVs, and action ranking.
  */
 
-import { PIPS } from '../utils/dice-interactive.js';
+import { createDieSVG } from '/yatzy/shared/dice.js';
 import { getMutedColor, COLORS } from '../yatzy-viz.js';
 
 const API_BASE = '/yatzy/api';
@@ -46,19 +46,7 @@ async function callEvaluate(dice, upperScore, scoredCategories, rerolls) {
 
 function createDie(value, options = {}) {
   const { clickable = false } = options;
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 48 48');
-  svg.setAttribute('width', String(DIE_SIZE));
-  svg.setAttribute('height', String(DIE_SIZE));
-  svg.classList.add('die-svg');
-  if (clickable) svg.classList.add('clickable');
-
-  let html = `<rect x="1" y="1" width="46" height="46" rx="8" fill="var(--bg-alt)" stroke="var(--border)" stroke-width="2"/>`;
-  (PIPS[value] || []).forEach(p => {
-    html += `<circle cx="${p.cx}" cy="${p.cy}" r="4.5" fill="var(--text)"/>`;
-  });
-  svg.innerHTML = html;
-  return svg;
+  return createDieSVG(value, { size: DIE_SIZE, state: 'normal', clickable });
 }
 
 // ── Main ────────────────────────────────────────────────────────

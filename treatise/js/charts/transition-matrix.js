@@ -124,6 +124,8 @@ function buildOutcomeLookup(outcomes) {
   return map;
 }
 
+import { createDieSVG } from '/yatzy/shared/dice.js';
+
 // ── Die component (vertical, matches path-probability pattern) ──
 
 function makeDie(value, { kept = false, onToggle, onInc, onDec }) {
@@ -135,21 +137,9 @@ function makeDie(value, { kept = false, onToggle, onInc, onDec }) {
   upBtn.innerHTML = '&#9650;';
   upBtn.addEventListener('click', onInc);
 
-  const btn = document.createElement('button');
-  btn.className = 'tm-die-btn';
-  btn.textContent = String(value);
-
-  if (kept) {
-    btn.style.background = 'var(--bg)';
-    btn.style.border = '3px solid var(--accent)';
-    btn.title = 'Kept (click to reroll)';
-  } else {
-    btn.style.background = 'var(--bg-alt)';
-    btn.style.border = '2px solid var(--text)';
-    btn.title = 'Will reroll (click to keep)';
-  }
-  btn.style.cursor = 'pointer';
-  btn.addEventListener('click', onToggle);
+  const state = kept ? 'kept' : 'normal';
+  const die = createDieSVG(value, { size: 36, state, clickable: true });
+  die.addEventListener('click', onToggle);
 
   const downBtn = document.createElement('button');
   downBtn.className = 'tm-die-arrow';
@@ -157,7 +147,7 @@ function makeDie(value, { kept = false, onToggle, onInc, onDec }) {
   downBtn.addEventListener('click', onDec);
 
   container.appendChild(upBtn);
-  container.appendChild(btn);
+  container.appendChild(die);
   container.appendChild(downBtn);
   return container;
 }
@@ -171,12 +161,7 @@ function makeOutcomeDie(value, { onInc, onDec }) {
   upBtn.innerHTML = '&#9650;';
   upBtn.addEventListener('click', onInc);
 
-  const btn = document.createElement('button');
-  btn.className = 'tm-die-btn';
-  btn.textContent = String(value);
-  btn.style.background = 'var(--bg-alt)';
-  btn.style.border = '2px solid var(--text)';
-  btn.style.cursor = 'default';
+  const die = createDieSVG(value, { size: 36, state: 'normal' });
 
   const downBtn = document.createElement('button');
   downBtn.className = 'tm-die-arrow';
@@ -184,7 +169,7 @@ function makeOutcomeDie(value, { onInc, onDec }) {
   downBtn.addEventListener('click', onDec);
 
   container.appendChild(upBtn);
-  container.appendChild(btn);
+  container.appendChild(die);
   container.appendChild(downBtn);
   return container;
 }

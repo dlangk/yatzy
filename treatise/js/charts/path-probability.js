@@ -52,7 +52,9 @@ function formatOneInN(p) {
   return `1 in ${n.toLocaleString()}`;
 }
 
-// ── Die component (matches Play UI pattern: ▲ button ▼) ────────
+import { createDieSVG } from '/yatzy/shared/dice.js';
+
+// ── Die component (matches Play UI pattern: ▲ [die] ▼) ────────
 
 function makeDie(value, { kept = false, valueFixed = false, noKeep = false, onToggle, onInc, onDec }) {
   const container = document.createElement('div');
@@ -62,15 +64,13 @@ function makeDie(value, { kept = false, valueFixed = false, noKeep = false, onTo
   upBtn.className = 'pp-die-arrow';
   upBtn.innerHTML = '&#9650;';
 
-  const btn = document.createElement('button');
-  btn.className = 'pp-die-btn';
-  btn.textContent = String(value);
+  const state = kept ? 'kept' : 'normal';
+  const die = createDieSVG(value, { size: 40, state, clickable: !valueFixed || !noKeep });
 
   const downBtn = document.createElement('button');
   downBtn.className = 'pp-die-arrow';
   downBtn.innerHTML = '&#9660;';
 
-  // Value-fixed dice: no inc/dec arrows, but still clickable to toggle keep
   if (valueFixed) {
     upBtn.style.visibility = 'hidden';
     downBtn.style.visibility = 'hidden';
@@ -79,29 +79,12 @@ function makeDie(value, { kept = false, valueFixed = false, noKeep = false, onTo
     downBtn.addEventListener('click', onDec);
   }
 
-  // Keep styling and toggle
-  if (noKeep) {
-    // Final roll: no keep toggle, just show the value
-    btn.style.background = 'var(--bg-alt)';
-    btn.style.border = '2px solid var(--text)';
-    btn.style.cursor = valueFixed ? 'default' : 'pointer';
-    btn.title = 'Final roll';
-  } else if (kept) {
-    btn.style.background = 'var(--bg)';
-    btn.style.border = '3px solid var(--accent)';
-    btn.style.cursor = 'pointer';
-    btn.title = 'Kept (click to reroll)';
-    btn.addEventListener('click', onToggle);
-  } else {
-    btn.style.background = 'var(--bg-alt)';
-    btn.style.border = '2px solid var(--text)';
-    btn.style.cursor = 'pointer';
-    btn.title = 'Will reroll (click to keep)';
-    btn.addEventListener('click', onToggle);
+  if (!noKeep) {
+    die.addEventListener('click', onToggle);
   }
 
   container.appendChild(upBtn);
-  container.appendChild(btn);
+  container.appendChild(die);
   container.appendChild(downBtn);
   return container;
 }
@@ -423,15 +406,6 @@ export async function initPathProbability() {
       }
       .pp-die-arrow:hover {
         background: var(--accent-light);
-      }
-      .pp-die-btn {
-        width: 40px;
-        height: 40px;
-        font-size: 20px;
-        font-weight: bold;
-        font-family: var(--font-mono);
-        border-radius: 8px;
-        color: var(--text);
       }
       .pp-keep-info {
         font-size: 0.7rem;

@@ -1,22 +1,8 @@
-import { PIPS } from '../utils/dice-interactive.js';
+import { dieSVGString } from '/yatzy/shared/dice.js';
 
 function dieSVG(value, { kept = false, ghosted = false } = {}) {
-  const fill = ghosted ? 'none' : 'var(--bg)';
-  const stroke = kept ? 'var(--accent)' : 'var(--border)';
-  const strokeWidth = kept ? 3 : 2;
-  const dashArray = ghosted ? '4 3' : 'none';
-  const pipOpacity = ghosted ? 0.2 : 1;
-
-  let html = `<svg viewBox="0 0 48 48" class="keep-die-svg">` +
-    `<rect x="1" y="1" width="46" height="46" rx="8" fill="${fill}" ` +
-    `stroke="${stroke}" stroke-width="${strokeWidth}"` +
-    (dashArray !== 'none' ? ` stroke-dasharray="${dashArray}"` : '') +
-    `/>`;
-  (PIPS[value] || []).forEach(p => {
-    html += `<circle cx="${p.cx}" cy="${p.cy}" r="4.5" fill="var(--text)" opacity="${pipOpacity}"/>`;
-  });
-  html += '</svg>';
-  return html;
+  const state = ghosted ? 'reroll' : (kept ? 'kept' : 'normal');
+  return dieSVGString(value, { size: 26, state });
 }
 
 function diceRow(values, opts) {
