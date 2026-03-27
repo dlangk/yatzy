@@ -2,35 +2,38 @@
 
 ## Multiplayer and Adaptive Strategies
 
-Everything so far treats Yatzy as a solitaire optimisation problem: one player, one score, maximise it. But Yatzy is usually played against opponents, and in that setting the right question changes. It is no longer "what maximises my expected score?" but "what maximises my probability of winning?"
+Most people play Yatzy as if it was a single-player game, which makes sense. Two parallel Yatzy games are independent: the dice you roll do not affect the dice your opponent rolls. Nothing you do changes what is available to them.
 
-Against an EV-optimal opponent, the EV-optimal policy wins exactly half the time by symmetry. But a slightly risk-seeking policy (&theta; around +0.05 to +0.07) can gain an edge. The mechanism is straightforward: risk-seeking play increases variance, which pushes more probability mass into both tails. Since games are decided by the higher score, the increased upside (p95 rising from 309 to 313) matters more than the increased downside when trailing. The draw rate in head-to-head play is just 0.76%, with the typical winning margin at 43.5 points.
+But here is an interesting question: if you can see your opponent's running score, can you improve your probability of *winning*?
 
-The disagreement between &theta; = 0.07 and &theta; = 0 reveals where risk tolerance changes decisions. In 12.5% of reroll situations and 12.4% of category selections, the two policies diverge. These disagreements cluster around two patterns. First, ::concept[Yatzy preservation]{backward-induction}: at &theta; &asymp; 0.05–0.07, the solver keeps Yatzy-seeking dice combinations in 42.8% of relevant states versus 38.8% at &theta; = 0. The risk-seeking policy holds out for the 50-point jackpot more often. Second, straight chasing: the risk-seeking solver is more willing to break a safe pair to chase a Large Straight, accepting the lower hit rate for the higher payoff.
+No fixed &theta; beats EV-optimal in head-to-head play. Two EV-optimal players each win exactly 50% of games by symmetry, and any deviation from &theta; = 0 reduces expected score, which reduces win probability. The best fixed challenger (&theta; = &minus;0.03) wins only 48.6% of games against an EV-optimal opponent.
+
+Variance does matter, but only conditionally. When trailing, high variance is useful: you need a lucky swing, and a strategy that reliably adds points is nearly worthless if you cannot catch up. When leading, high variance is dangerous: it gives your opponent a chance to overtake. In a close game, EV-optimal play is correct.
+
+This gives rise to a ::concept[threshold policy]{threshold-policy}: select &theta; at each turn based on the current score gap. But what is the theoretical ceiling? How much can adaptive play actually gain?
+
+The chart below shows the answer. The bars compare two strategies for every possible range of opponent final scores: playing EV-optimal (&theta; = 0) the whole game versus playing the single best fixed &theta; for that score band. The colored bars are the oracle: it knows the opponent's final score *before the game begins*, and plays the optimal fixed &theta; for that band throughout.
 
 :::html
-<div class="chart-container" id="chart-adaptive-winrate">
-  <div id="chart-adaptive-winrate-svg"></div>
-  <p class="chart-caption">Slightly risk-seeking play (θ ≈ 0.05–0.07) gains an edge in head-to-head matchups.</p>
+<div class="chart-container" id="chart-oracle-winrate">
+  <div id="chart-oracle-winrate-svg"></div>
+  <p class="chart-caption">Oracle upper bound: conditional win rates for EV-optimal vs best fixed &theta; per opponent score band. The oracle knows the opponent's final score before the game starts and selects the best possible &theta; for that band.</p>
 </div>
 :::
 
-The real insight is that the optimal &theta; depends on game state. A player who is behind should increase &theta; to generate variance; a player who is ahead should decrease it to protect the lead. This leads naturally to a ::concept[threshold policy]{threshold-policy}: estimate the score differential at each decision point and select the strategy table (indexed by &theta;) that maximises win probability given the current gap. The adaptive policy does not require solving a new DP; it simply switches between pre-computed strategy tables based on a score-differential threshold.
+The directional logic is clear: against a weak opponent (scored below 200) you want to play conservatively (negative &theta;), protecting your lead by minimising variance. Against a strong opponent (scored above 280) you need to have taken risks (positive &theta;), because cautious play cannot produce the tail scores required to win.
 
-The cost of risk-seeking is visible in category hit rates. The EV-optimal solver achieves a 92% Full House hit rate across one million games. At &theta; = +3.0, this collapses to 54%. The solver sacrifices reliable mid-range categories to chase Yatzy and straights. The upper bonus achievement rate at &theta; = 0 is 83.6%, and it declines monotonically as &theta; increases. Both extremes converge to similarly poor mean scores: &theta; = &minus;1.0 yields 198.2, and &theta; = +1.0 yields 194.5. Excessive caution is as costly as excessive ambition.
+The overall oracle win rate is **50.15%**, a gain of just +0.146 percentage points over EV-optimal. This is the absolute theoretical ceiling for strategy-switching based on the opponent's *final* score, even with perfect advance knowledge. No adaptive policy, however sophisticated, can exceed this bound.
 
-:::html
-<div class="chart-container" id="chart-threshold-policy">
-  <div id="chart-threshold-policy-svg"></div>
-  <p class="chart-caption">Adaptive θ: increase risk when trailing, protect the lead when ahead.</p>
-</div>
-:::
+The reason the gain is so small is that the score distributions of the two players overlap heavily. A conservative adjustment that helps when the opponent scores low hurts roughly equally when the opponent scores high, and vice versa. The gain from knowing which regime you are in does not compound: each band offers only a fraction of a percentage point of room, and the weighted sum across bands is tiny.
+
+A practical ::concept[threshold policy]{threshold-policy} does not have oracle knowledge. It selects &theta; based on the *current* score gap during the game, not the opponent's eventual total. The 30-point threshold corresponds to roughly 0.8 standard deviations of the score distribution, the point where the probability of overtaking shifts meaningfully.
 
 :::math
 
 ### Adaptive Policy Implementation
 
-The adaptive policy loads multiple strategy tables into memory (one per &theta; value) and selects at runtime based on estimated score differential:
+The adaptive policy loads multiple strategy tables into memory (one per &theta; value) and selects at runtime based on the estimated score differential:
 
 ```rust
 // Adaptive θ selection based on score gap
