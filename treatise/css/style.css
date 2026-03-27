@@ -385,9 +385,9 @@ blockquote p:last-child {
 .concept-drawer {
   position: fixed;
   right: 0;
-  top: 0;
+  top: 36px;
   width: 380px;
-  height: 100vh;
+  height: calc(100vh - 36px);
   background: var(--bg);
   border-left: 1px solid var(--border);
   z-index: 200;

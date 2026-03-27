@@ -55,4 +55,7 @@ export const DataLoader = {
   categoryPmfs: () => load('category_pmfs.json'),
   categoryCorrelations: () => load('category_correlations.json'),
   fillTurnHeatmap: () => load('fill_turn_heatmap.json'),
+
+  // Tail probability (Section 5 — exact forward-DP)
+  tailExact: () => load('tail_exact.json'),
 };

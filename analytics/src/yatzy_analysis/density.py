@@ -161,11 +161,12 @@ def compute_summary_from_pmf(theta: float, data: dict) -> dict:
     p999 = _cdf_quantile(scores, cdf, 0.999)
     p9999 = _cdf_quantile(scores, cdf, 0.9999)
 
-    # Score range
-    nonzero = probs > 0
-    if nonzero.any():
-        score_min = int(scores[nonzero][0])
-        score_max = int(scores[nonzero][-1])
+    # Score range — use a threshold to exclude vanishingly unlikely scores
+    # (exact PMFs can have nonzero probability ~1e-15 at theoretical extremes)
+    meaningful = probs > 1e-9
+    if meaningful.any():
+        score_min = int(scores[meaningful][0])
+        score_max = int(scores[meaningful][-1])
     else:
         score_min = int(scores[0])
         score_max = int(scores[-1])

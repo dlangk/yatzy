@@ -4,14 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Mathematics of Optimal Yatzy</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="node_modules/@fontsource/newsreader/400.css">
+  <link rel="stylesheet" href="node_modules/@fontsource/newsreader/400-italic.css">
+  <link rel="stylesheet" href="node_modules/@fontsource/newsreader/600.css">
+  <link rel="stylesheet" href="node_modules/@fontsource/newsreader/700.css">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/charts.css">
   <link rel="stylesheet" href="css/treatise.css">
   <link rel="stylesheet" href="/yatzy/shared/dice.css">
-  <script src="https://d3js.org/d3.v7.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="vendor/d3.v7.min.js"></script>
+  <script src="vendor/marked.min.js"></script>
 </head>
 <body data-layer="1">
 <script type="module" src="/yatzy/shared/nav.js"></script>
@@ -42,7 +44,8 @@
   import { initBackwardWave } from './js/charts/backward-wave.js';
   // Chart modules — Optimal Strategy
   import { initCategoryLandscape } from './js/charts/category-landscape.js';
-  import { initScoreDistribution } from './js/charts/score-distribution.js';
+  import { initRiskTheta } from './js/charts/risk-theta.js';
+  import { initUtilityCurves } from './js/charts/utility-curves.js';
   import { initMixtureDecomposition } from './js/charts/mixture-decomposition.js';
   import { initBonusCovariance } from './js/charts/bonus-covariance.js';
   import { initRaceTo63 } from './js/charts/race-to-63.js';
@@ -55,8 +58,9 @@
   import { initBonusDependency } from './js/charts/bonus-dependency.js';
   // Chart modules — Risk Parameter
   import { initExponentialUtility } from './js/charts/exponential-utility.js';
-  import { initMeanVarianceFrontier } from './js/charts/mean-variance-frontier.js';
+  // mean-variance-frontier merged into risk-theta
   import { initRiskReward } from './js/charts/risk-reward.js';
+  import { initTailSurvival, initTailGamesNeeded, initTailBars, initTailHeatmap } from './js/charts/tail-probability.js';
   import { initFreeEnergyPhase } from './js/charts/free-energy-phase.js';
   import { initAdaptiveWinrate } from './js/charts/adaptive-winrate.js';
   import { initThresholdPolicy } from './js/charts/threshold-policy.js';
@@ -138,7 +142,8 @@
     'chart-category-correlations': { init: initCategoryCorrelations, loaded: false },
     'chart-fill-turn-heatmap': { init: initFillTurnHeatmap, loaded: false },
     'chart-bonus-dependency': { init: initBonusDependency, loaded: false },
-    'chart-score-distribution': { init: initScoreDistribution, loaded: false },
+    'chart-utility-curves': { init: initUtilityCurves, loaded: false },
+    'chart-risk-theta': { init: initRiskTheta, loaded: false },
     'chart-mixture': { init: initMixtureDecomposition, loaded: false },
     'chart-bonus-covariance': { init: initBonusCovariance, loaded: false },
     'chart-race-to-63': { init: initRaceTo63, loaded: false },
@@ -147,9 +152,13 @@
     'chart-category-pmf-grid': { init: initCategoryPmfGrid, loaded: false },
     'chart-position-explorer': { init: initPositionExplorer, loaded: false },
     'chart-exponential-utility': { init: initExponentialUtility, loaded: false },
-    'chart-mean-variance-frontier': { init: initMeanVarianceFrontier, loaded: false },
+    // mean-variance-frontier merged into chart-risk-theta
     'chart-risk-reward': { init: initRiskReward, loaded: false },
     'chart-free-energy-phase': { init: initFreeEnergyPhase, loaded: false },
+    'chart-tail-survival': { init: initTailSurvival, loaded: false },
+    'chart-tail-games-needed': { init: initTailGamesNeeded, loaded: false },
+    'chart-tail-bars': { init: initTailBars, loaded: false },
+    'chart-tail-heatmap': { init: initTailHeatmap, loaded: false },
     'chart-adaptive-winrate': { init: initAdaptiveWinrate, loaded: false },
     'chart-threshold-policy': { init: initThresholdPolicy, loaded: false },
     'chart-rl-barrier-diagram': { init: initRlBarrierDiagram, loaded: false },

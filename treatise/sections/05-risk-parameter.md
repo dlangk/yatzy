@@ -1,133 +1,68 @@
 :::section{#risk-parameter}
 
-## Adding a Risk Parameter
+## Taking Risk
 
-We defined the optimal strategy as "maximize the expected score". But, what if we want to take a bit more risk? What if we want a truly legendary score, and not just a good average? We will now explore how we can adjust our risk preference, which we will call &theta;.
+We defined the optimal strategy as "maximize the expected score." Such a strategy will get the highest possible *average* score. But, reality is, most people don't play Yatzy to get a good average. We like to play to win! We all remember that one time when all stars aligned and we got 322 points, and want to experience it again! So, in that spirit, let's see if we can design a solver that takes more risk.
 
-Instead of maximising the expected score E[<var>x</var>], we built a solver that maximises E[&minus;exp(&minus;&theta;<var>x</var>)], where &theta; is a single real-valued parameter that controls risk attitude. When &theta; = 0, the exponential flattens and the solver recovers exactly the EV-optimal policy. When &theta; &lt; 0, the solver becomes risk-averse: it overweights bad outcomes and prefers consistent scores. When &theta; &gt; 0, it becomes risk-seeking: it chases high-variance plays that lift the ceiling at the cost of the floor.
-
-This is the ::concept[CARA]{cara-utility} (constant absolute risk aversion) model from decision theory. Its defining property is that the risk premium for any gamble is independent of current wealth. The solver's willingness to take a risky reroll depends only on &theta; and the gamble's shape, never on how many points have already been scored. This makes &theta; a clean, interpretable dial: turn it left for safety, turn it right for ambition.
-
-Use the slider below to see how the score distribution changes across the full &theta; range. At &theta; = 0 the familiar left-skewed EV-optimal distribution appears. As &theta; moves negative the distribution compresses (lower mean, tighter spread). As &theta; moves positive the distribution stretches toward both tails before collapsing at extreme values.
+**How can we encode risk-taking?** An expected value is calculated as the probability weighted sum E[<var>x</var>] = &Sigma;<sub>i</sub> <var>p(x<sub>i</sub>)</var> &middot; <var>x</var><sub>i</sub>. That means all scores are treated equally: going from 200 to 201 is worth exactly as much as going from 300 to 301. To make the solver care more about high scores, we transform each score using e<sup>&theta;<var>x</var></sup> before averaging. A single parameter &theta; (theta) controls the shape of this transformation. Use the slider to see: when &theta; &gt; 0, points at high scores are worth exponentially more; when &theta; &lt; 0, points at low scores dominate. At &theta; = 0, the transformation is flat and we recover the plain expected value.
 
 :::html
-<div class="chart-container" id="chart-score-distribution">
+<div class="chart-container chart-compact" id="chart-utility-curves">
   <div class="chart-controls">
     <label>&theta; = <span class="slider-value">0</span></label>
-    <input type="range" class="chart-slider" min="0" max="36" value="18">
+    <input type="range" class="chart-slider" min="0" max="28" value="13">
   </div>
-  <div id="chart-score-distribution-svg"></div>
-  <p class="chart-caption">Score distribution across 37 θ values. Drag the slider to see the shape shift from compressed to stretched.</p>
+  <div id="chart-utility-curves-svg"></div>
+  <p class="chart-caption">Marginal value of one additional point at each score level. EV (dashed): flat, every point matters equally. Risk-weighted (solid): the curve bends toward the scores the solver cares most about.</p>
 </div>
 :::
 
-The results trace a ::concept[mean-variance frontier]{free-energy} that reveals the price of risk in exact quantitative terms.
+**Think of &theta; as a risk-dial.** Turn it right and the solver takes larger risks chasing a legendary score. Turn it left and it plays like someone who really, really doesn't want to embarrass themselves. At zero, it plays for the best *average* outcome. The solver's willingness to gamble depends only on &theta; and the specific dice situation, never on how many points have been scored so far. Whether you're at 50 or 150 going into a round, the same &theta; produces the same risk attitude.
+
+Use the slider below to see how the score distribution changes across the &theta; range. At &theta; = 0 the EV-optimal distribution is shown. As you decrease &theta; the distribution compresses with lower mean and less variance. As &theta; is increased, variance increases, pushing the tails outward before collapsing at extreme values. The tail probabilities displayed below the curve show how outcomes for different score thresholds compare to &theta; = 0. The ::concept[mean-variance frontier]{free-energy} at the bottom traces where each &theta; lands in risk-return space.
 
 :::html
-<div class="chart-container" id="chart-mean-variance-frontier">
-  <div id="chart-mean-variance-frontier-svg"></div>
-  <p class="chart-caption">The mean-variance frontier: two branches reveal the price of risk in exact quantitative terms.</p>
+<div class="chart-container" id="chart-risk-theta">
+  <div id="chart-risk-theta-distribution"></div>
+  <div class="chart-controls chart-controls-center">
+    <label>&theta; = <span class="slider-value">0</span></label>
+    <input type="range" class="chart-slider" min="0" max="28" value="13">
+  </div>
+  <div id="chart-risk-theta-stats" class="tail-stats"></div>
+  <div id="chart-risk-theta-frontier"></div>
+  <p class="chart-caption">Score distribution, tail probabilities, and mean-variance frontier. Drag the slider to explore how θ reshapes the distribution and traces the frontier.</p>
 </div>
 :::
 
-The frontier is not a single curve. It splits into two branches. The risk-averse
-branch (&theta; &lt; 0) compresses variance into a narrow band of 35–38
-while mean score drops from 248.4 to 198.2 at &theta; = &minus;1.0. The
-risk-seeking branch (&theta; &gt; 0) first expands variance to a peak of 48.4
-at &theta; &asymp; 0.2, then contracts it as the mean falls to 194.5 at
-&theta; = +1.0. At the same mean of roughly 190, the two branches have
-different standard deviations: risk-seeking play is fundamentally
-noisier than risk-averse play at matched expected value.
-
-The practical sweet spots are narrow. The best &theta; for protecting the 5th
-percentile (the floor) is &minus;0.03, which lifts p5 to 183, four
-points above the EV-optimal floor of 179. The best &theta; for the 95th
-percentile (the ceiling) is +0.07, pushing p95 to 313 versus 309 at &theta; = 0.
-The best for p99 is +0.10, reaching 329. These gains are small but real, and
-they come at a precise, quantifiable cost in expected value.
+The best &theta; for protecting the 5th percentile (the floor) is &minus;0.03, which lifts p5 to 183, four points above the EV-optimal floor of 179. The best &theta; for the 95th percentile (the ceiling) is around +0.04 to +0.10, pushing p95 to 312 versus 309 at &theta; = 0. The best for p99 is +0.10, reaching 329.
 
 :::html
 <div class="chart-container" id="chart-risk-reward">
   <div id="chart-risk-reward-svg"></div>
+  <div class="chart-controls chart-controls-center">
+    <label>&theta; = <span class="slider-value">0</span></label>
+    <input type="range" class="chart-slider" min="0" max="29" value="13">
+  </div>
+  <div class="chart-stats-panel"></div>
   <p class="chart-caption">Practical sweet spots: small θ shifts yield measurable percentile gains at precise cost in expected value.</p>
 </div>
 :::
 
-There is a deep analogy to statistical mechanics. The
-::concept[log-sum-exp]{log-sum-exp} operation
-that replaces weighted averaging in the risk-sensitive Bellman equation is
-identical to the computation of
-::concept[free energy]{free-energy} in a
-thermodynamic partition function. The parameter &theta; plays the role of
-inverse temperature: at &theta; = 0, all outcomes are weighted equally
-(infinite temperature); as |&theta;| grows, the solver increasingly
-concentrates on extreme outcomes (low temperature). The mean-variance frontier
-is the equation of state. The two-branch structure is a phase diagram.
+### The Extreme Tail
+
+The solver computes the *exact* probability of every possible final score via forward dynamic programming density propagation. This let's us model things far beyond what we can afford to simulate. The charts below show the right tail of the distribution (scores 280+) for several &theta; values, using exact probabilities down to 10<sup>&minus;15</sup>.
 
 :::html
-<div class="chart-container" id="chart-free-energy-phase">
-  <div id="chart-free-energy-phase-svg"></div>
-  <p class="chart-caption">The thermodynamic analogy: θ as inverse temperature, the mean-variance frontier as equation of state.</p>
+<div class="chart-container" id="chart-tail-games-needed">
+  <div id="chart-tail-games-needed-svg"></div>
+  <p class="chart-caption">Expected number of games to observe at least one game reaching each score. Horizontal lines mark sample sizes from a human lifetime to a trillion simulated games.</p>
 </div>
 :::
 
-### Multiplayer and Adaptive Strategies
-
-Everything so far treats Yatzy as a solitaire optimisation problem: one player,
-one score, maximise it. But Yatzy is usually played against opponents, and in
-that setting the right question changes. It is no longer "what maximises my
-expected score?" but "what maximises my probability of winning?"
-
-Against an EV-optimal opponent, the EV-optimal policy wins exactly half the
-time by symmetry. But a slightly risk-seeking policy (&theta; around
-+0.05 to +0.07) can gain an edge. The mechanism is straightforward:
-risk-seeking play increases variance, which pushes more probability mass into
-both tails. Since games are decided by the higher score, the increased upside
-(p95 rising from 309 to 313) matters more than the increased downside when
-trailing. The draw rate in head-to-head play is just 0.76%, with the typical
-winning margin at 43.5 points.
-
-The disagreement between &theta; = 0.07 and &theta; = 0 reveals where risk
-tolerance changes decisions. In 12.5% of reroll situations and 12.4% of
-category selections, the two policies diverge. These disagreements cluster
-around two patterns. First,
-::concept[Yatzy preservation]{backward-induction}:
-at &theta; &asymp; 0.05–0.07, the solver keeps Yatzy-seeking dice
-combinations in 42.8% of relevant states versus 38.8% at &theta; = 0.
-The risk-seeking policy holds out for the 50-point jackpot more often. Second,
-straight chasing: the risk-seeking solver is more willing to break a safe pair
-to chase a Large Straight, accepting the lower hit rate for the higher payoff.
-
 :::html
-<div class="chart-container" id="chart-adaptive-winrate">
-  <div id="chart-adaptive-winrate-svg"></div>
-  <p class="chart-caption">Slightly risk-seeking play (θ ≈ 0.05–0.07) gains an edge in head-to-head matchups.</p>
-</div>
-:::
-
-The real insight is that the optimal &theta; depends on game state. A player
-who is behind should increase &theta; to generate variance; a player who is
-ahead should decrease it to protect the lead. This leads naturally to a
-::concept[threshold policy]{threshold-policy}:
-estimate the score differential at each decision point and select the strategy
-table (indexed by &theta;) that maximises win probability given the current
-gap. The adaptive policy does not require solving a new DP; it simply
-switches between pre-computed strategy tables based on a score-differential
-threshold.
-
-The cost of risk-seeking is visible in category hit rates. The EV-optimal
-solver achieves a 92% Full House hit rate across one million games. At
-&theta; = +3.0, this collapses to 54%. The solver sacrifices reliable
-mid-range categories to chase Yatzy and straights. The upper bonus achievement
-rate at &theta; = 0 is 83.6%, and it declines monotonically as &theta;
-increases. Both extremes converge to similarly poor mean scores: &theta; =
-&minus;1.0 yields 198.2, and &theta; = +1.0 yields 194.5. Excessive caution
-is as costly as excessive ambition.
-
-:::html
-<div class="chart-container" id="chart-threshold-policy">
-  <div id="chart-threshold-policy-svg"></div>
-  <p class="chart-caption">Adaptive θ: increase risk when trailing, protect the lead when ahead.</p>
+<div class="chart-container" id="chart-tail-bars">
+  <div id="chart-tail-bars-svg"></div>
+  <p class="chart-caption">Exact probability of reaching each score threshold, grouped by θ. Higher θ lifts the bars at every threshold, but the effect is tiny compared to the exponential drop-off.</p>
 </div>
 :::
 
@@ -135,52 +70,71 @@ is as costly as excessive ambition.
 
 ### The Exponential Utility Framework
 
-The utility function is <var>u</var>(<var>x</var>) = &minus;exp(&minus;&theta;<var>x</var>).
-The certainty equivalent (the deterministic score that provides equal
-utility to the random outcome) is:
+The utility function is <var>u</var>(<var>x</var>) = e<sup>&theta;<var>x</var></sup>. The solver maximizes the *certainty equivalent* (CE): the guaranteed score that the solver considers equally desirable to playing the random game. Imagine someone offers you a deal: skip the game and receive a fixed number of points instead. How many points would it take? That number is the CE.
 
 :::equation
-CE = (1/&theta;) &middot; ln(E[exp(&theta; &middot; total)])
+CE = (1/&theta;) &middot; ln E[e<sup>&theta; &middot; total</sup>]
 :::
 
-For &theta; &gt; 0, CE &gt; E[total]: the risk-seeker values a gamble above
-its expected value. For &theta; &lt; 0, CE &lt; E[total]: the risk-averter
-discounts the gamble below its expectation. The gap CE &minus; E[total] is
-the risk premium, and it scales with both &theta; and the variance of the
-outcome distribution.
+For &theta; &gt; 0, CE &gt; E[total]: the risk-seeker values a gamble above its expected value, because the chance of a high score is worth something on its own. For &theta; &lt; 0, CE &lt; E[total]: the risk-averter would accept fewer guaranteed points to avoid the chance of a disaster. The gap CE &minus; E[total] is the risk premium, and it scales with both &theta; and the variance of the outcome distribution.
 
-### Log-Domain Computation
+This framework is known as ::concept[Constant Absolute Risk Aversion]{cara-utility} (CARA) in decision theory. Its defining property: the solver's risk attitude depends only on &theta; and the shape of the gamble, never on how many points have already been scored. Scoring 100 in the first five rounds does not make the solver more reckless in round six.
 
-Direct computation of exp(&theta; &middot; score) overflows for moderate
-&theta; and typical scores around 250. The solver works entirely in the
-log domain, storing <var>L</var>(<var>S</var>) = ln(E[exp(&theta; &middot; total) | <var>S</var>]).
-The chance-node recurrence becomes a log-sum-exp:
+### From Weighted Sum to Log-Sum-Exp
+
+The EV solver and the &theta; solver have the same structure. Both use probability-weighted averaging at chance nodes and argmax at decision nodes. The only difference is *what gets averaged*.
+
+At a chance node, the EV solver computes a weighted sum of raw state values:
+
+:::equation
+E(keep) = &Sigma;<sub>r</sub> P(keep &rarr; r) &middot; V(r)
+:::
+
+The &theta; solver computes the same weighted sum, but of *exponentiated* state values:
+
+:::equation
+exp(L(keep)) = &Sigma;<sub>r</sub> P(keep &rarr; r) &middot; exp(L(r))
+:::
+
+where <var>L</var>(<var>S</var>) = ln E[e<sup>&theta; &middot; total</sup> | <var>S</var>]. The exponential e<sup>&theta;<var>x</var></sup> amplifies extreme values before the averaging happens. High scores contribute exponentially more when &theta; &gt; 0, low scores when &theta; &lt; 0.
+
+Direct computation of exp(&theta; &middot; score) overflows for moderate &theta; and typical scores around 250. The solver works entirely in the log domain, where this weighted sum becomes a log-sum-exp (LSE):
 
 :::equation
 <var>L</var>(keep) = LSE<sub>r</sub> { ln(<var>P</var>(keep &rarr; r)) + <var>L</var>(r) }
 :::
 
-where LSE is computed with the standard numerical stability trick:
-LSE(<var>x</var><sub>1</sub>, &hellip;, <var>x</var><sub>n</sub>) =
-<var>m</var> + ln(&Sigma; exp(<var>x</var><sub>i</sub> &minus; <var>m</var>)),
-with <var>m</var> = max(<var>x</var><sub>i</sub>).
+LSE is computed with the standard numerical stability trick: LSE(<var>x</var><sub>1</sub>, &hellip;, <var>x</var><sub>n</sub>) = <var>m</var> + ln(&Sigma; exp(<var>x</var><sub>i</sub> &minus; <var>m</var>)), with <var>m</var> = max(<var>x</var><sub>i</sub>).
+
+At decision nodes, the solver picks the action that maximizes <var>L</var> when &theta; &gt; 0, or minimizes it when &theta; &lt; 0 (because dividing CE = <var>L</var>/&theta; by a negative &theta; flips the direction).
+
+### Policy Degeneration at Large |&theta;|
+
+When |&theta;| is large, the exponential amplification becomes so extreme that only the single best (or worst) outcome matters. The LSE at a chance node approaches a plain max:
+
+:::equation
+LSE &asymp; max<sub>i</sub>(<var>x</var><sub>i</sub>) &nbsp;&nbsp; when |&theta;| &middot; &sigma; &gt;&gt; 1
+:::
+
+where &sigma; is the spread of state values at that node. The transition depends on a dimensionless control parameter: the product |&theta;| &middot; &sigma;<sub>node</sub>. In Yatzy, the typical per-node score spread is &sigma;<sub>node</sub> &asymp; 10, giving three regimes:
+
+| |&theta;| | |&theta;| &middot; &sigma; | Regime |
+|-------:|------------------:|--------|
+| &lt; 0.03 | &lt; 0.3 | Near-EV: policy barely differs from &theta; = 0 |
+| 0.03&ndash;0.20 | 0.3&ndash;2 | Active: meaningful risk/return tradeoffs |
+| &gt; 0.5 | &gt; 5 | Degenerate: LSE &asymp; max, policy frozen |
+
+The marginal utility chart tells the same story from the score side: at |&theta;| = 0.5, the marginal value is effectively zero everywhere except the extreme tail. The solver is running a soft-max over outcomes, concentrating all its attention on the single best reachable score. Increasing |&theta;| further cannot change which action achieves that maximum, so the policy stops changing.
+
+The degenerate max-policy does reach higher ceilings: the observed maximum across 1M games rises from 352 at &theta; = 0 to 362 at &theta; &asymp; 0.1. But it pays for those ceilings by sacrificing everything else (Full House hit rate drops from 92% to 54%, mean score from 248 to 210). The max-policy's best games are spectacular but vanishingly rare. With only 1M simulations, the observed maximum barely changes beyond &theta; &asymp; 0.1 because the ceiling-achieving games have become so improbable that even a million rolls cannot reliably sample them. In the limit, the max-policy converges to the theoretical maximum of the game, but with a probability so low it would take billions of simulated games to observe.
 
 ### f32 Numerical Stability
 
-The solver uses f32 throughout for performance. This creates a numerical
-stability boundary. At |&theta;| &le; 0.15, the exponential utility can be
-computed in the "utility domain" via direct weighted averaging,
-with the same speed as the EV solver. Beyond |&theta;| &asymp; 0.166,
-mantissa erasure in f32 subtraction corrupts the weighted sums. At
-|&theta;| &asymp; 0.235, raw exponentials overflow f32 entirely. The
-implementation switches to log-domain LSE for |&theta;| &gt; 0.15, which
-is numerically stable but roughly 2.5× slower due to the transcendental
-function calls.
+The solver uses f32 throughout for performance. This creates a numerical stability boundary. At |&theta;| &le; 0.15, the exponential utility can be computed in the "utility domain" via direct weighted averaging, with the same speed as the EV solver. Beyond |&theta;| &asymp; 0.166, mantissa erasure in f32 subtraction corrupts the weighted sums. At |&theta;| &asymp; 0.235, raw exponentials overflow f32 entirely. The implementation switches to log-domain LSE for |&theta;| &gt; 0.15, which is numerically stable but roughly 2.5&times; slower due to the transcendental function calls.
 
 ### Near-Origin Approximations
 
-Near &theta; = 0, the mean and standard deviation are well-approximated by
-quadratics:
+Near &theta; = 0, the mean and standard deviation are well-approximated by quadratics:
 
 :::equation
 mean(&theta;) &asymp; 247.0 &minus; 0.9&theta; &minus; 618&theta;<sup>2</sup>
@@ -190,36 +144,17 @@ mean(&theta;) &asymp; 247.0 &minus; 0.9&theta; &minus; 618&theta;<sup>2</sup>
 std(&theta;) &asymp; 39.5 + 53.5&theta; &minus; 17&theta;<sup>2</sup>
 :::
 
-Mean loss is quadratic (second-order around the optimum, as expected from
-perturbing a maximum). Standard deviation gain is linear in &theta;
-(dominant term: 53.5&theta;). This asymmetry (quadratic cost, linear
-benefit) creates the narrow window where tail gains are cheap.
+Mean loss is quadratic (second-order around the optimum, as expected from perturbing a maximum). Standard deviation gain is linear in &theta; (dominant term: 53.5&theta;). This asymmetry (quadratic cost, linear benefit) creates the narrow window where tail gains are cheap.
 
 ### Win Probability and Variance
 
-In a symmetric two-player game where both players use the same policy, the
-win probability is exactly 50% minus half the draw rate. With the EV-optimal
-policy, the draw rate is 0.76%, giving each player a 49.62% win probability.
-The winning margin distribution has mean 43.5 points and heavy right tail;
-blowout wins of 80+ points are common, reflecting the high variance
-(&sigma; &asymp; 38) of individual game scores.
+In a symmetric two-player game where both players use the same policy, the win probability is exactly 50% minus half the draw rate. With the EV-optimal policy, the draw rate is 0.76%, giving each player a 49.62% win probability. The winning margin distribution has mean 43.5 points and heavy right tail; blowout wins of 80+ points are common, reflecting the high variance (&sigma; &asymp; 38) of individual game scores.
 
-For a risk-seeking player (&theta; = +0.07) facing an EV-optimal opponent,
-the win rate shifts modestly. The increased variance is a double-edged sword:
-p95 rises to 313 (+4 vs EV-optimal) but p5 drops to 159 (&minus;20). The
-net effect on win probability depends on whether the opponent's score
-distribution concentrates in the region where the risk-seeker's added
-upside exceeds the added downside.
+For a risk-seeking player (&theta; = +0.07) facing an EV-optimal opponent, the win rate shifts modestly. The increased variance is a double-edged sword: p95 rises to 313 (+4 vs EV-optimal) but p5 drops to 159 (&minus;20). The net effect on win probability depends on whether the opponent's score distribution concentrates in the region where the risk-seeker's added upside exceeds the added downside.
 
 ### Disagreement Anatomy
 
-At &theta; = 0.07 versus &theta; = 0, category disagreements are concentrated
-in the upper section. The risk-seeking solver is more willing to take a zero
-in a lower-value upper category (Ones, Twos) to preserve the option of
-chasing Yatzy or Full House later. Reroll disagreements centre on keep
-decisions where a safe pair competes with a speculative straight draw. The
-12.5% reroll disagreement rate translates to roughly 5–6 different keep
-decisions per 15-round game.
+At &theta; = 0.07 versus &theta; = 0, category disagreements are concentrated in the upper section. The risk-seeking solver is more willing to take a zero in a lower-value upper category (Ones, Twos) to preserve the option of chasing Yatzy or Full House later. Reroll disagreements centre on keep decisions where a safe pair competes with a speculative straight draw. The 12.5% reroll disagreement rate translates to roughly 5–6 different keep decisions per 15-round game.
 
 :::
 
@@ -227,7 +162,7 @@ decisions per 15-round game.
 
 ### Implementation: Solver Dispatch
 
-The batched solver dispatches to one of three code paths based on &theta;:
+The three code paths correspond to the three computational regimes. The EV path uses direct weighted sums. The utility path computes the same weighted sum in exponential space without leaving f32. The LSE path works in log domain for numerical stability, at the cost of transcendental function calls. All three produce the same data structure: a strategy table mapping every reachable state to an optimal action.
 
 ```rust
 // batched_solver.rs — solver dispatch by θ regime
@@ -238,12 +173,7 @@ match theta.classify() {
 }
 ```
 
-The utility-domain path is actually *faster* than EV because the
-NEON FMA kernels can fuse the utility weighting into the existing multiply-
-accumulate pipeline. The LSE path requires per-element `exp()`
-calls via the fast Cephes polynomial approximation in
-`neon_fast_exp_f32x4`, adding ~2 ULP error but keeping the
-solve under 3 seconds for any &theta;.
+The utility-domain path is actually *faster* than EV because the NEON FMA kernels can fuse the utility weighting into the existing multiply-accumulate pipeline. The LSE path requires per-element `exp()` calls via the fast Cephes polynomial approximation in `neon_fast_exp_f32x4`, adding ~2 ULP error but keeping the solve under 3 seconds for any &theta;.
 
 ```rust
 // Log-sum-exp at a chance node (simplified)
@@ -257,44 +187,7 @@ fn lse_chance_node(log_probs: &[f32], log_values: &[f32]) -> f32 {
 }
 ```
 
-The full &theta; sweep (37 values) is resumable: each strategy table is
-written to `data/strategy_tables/all_states_theta_*.bin` and
-skipped on subsequent runs if the file already exists. Deleting these files
-after changing solver code is mandatory.
-
-### Adaptive Policy Implementation
-
-The adaptive policy loads multiple strategy tables into memory (one per
-&theta; value) and selects at runtime based on estimated score differential:
-
-```rust
-// Adaptive θ selection based on score gap
-fn select_theta(my_score: f32, opp_estimate: f32, turns_left: u8) -> f32 {
-    let gap = my_score - opp_estimate;
-    let urgency = 1.0 - (turns_left as f32 / 15.0);
-
-    if gap < -30.0 * (1.0 - urgency) {
-        0.10  // Far behind: maximum risk-seeking
-    } else if gap < -10.0 {
-        0.05  // Moderately behind: mild risk-seeking
-    } else if gap > 30.0 {
-        -0.03 // Far ahead: protect the lead
-    } else {
-        0.0   // Close game: EV-optimal
-    }
-}
-```
-
-The strategy tables are memory-mapped (~16 MB each), so switching between
-them is a pointer swap with no I/O cost. The score-gap thresholds are
-derived from the mean-variance frontier: the 30-point threshold corresponds
-to roughly 0.8&sigma; of the score distribution, the point where the
-probability of overtaking shifts meaningfully.
-
-```bash
-# Simulate head-to-head with adaptive policy
-just simulate --games 1000000 --adaptive --opponent-theta 0.0
-```
+The full &theta; sweep (37 values) is resumable: each strategy table is written to `data/strategy_tables/all_states_theta_*.bin` and skipped on subsequent runs if the file already exists. Deleting these files after changing solver code is mandatory.
 
 :::
 
