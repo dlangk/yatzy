@@ -48,8 +48,6 @@ export async function initRiskTheta() {
         points,
         mean: summary ? summary.mean : 0,
         std: summary ? summary.std : 0,
-        scoreMin: summary ? summary.min : 0,
-        scoreMax: summary ? summary.max : 0,
       };
     });
 
@@ -78,14 +76,14 @@ export async function initRiskTheta() {
 
   // Precompute reference values
   const thresholds = [
-    { score: 200, above: false, label: 'Below 200', bad: true },
-    { score: 248.4, above: true, label: 'Above EV (248)', bad: false },
-    { score: 310, above: true,  label: 'Above 310', bad: false },
+    { score: 100, above: false, label: 'P(≤ 100)', bad: true },
+    { score: 200, above: false, label: 'P(≤ 200)', bad: true },
+    { score: 248.4, above: true, label: 'P(≥ EV)', bad: false },
+    { score: 310, above: true,  label: 'P(≥ 310)', bad: false },
+    { score: 360, above: true,  label: 'P(≥ 360)', bad: false },
   ];
   const refProbs = thresholds.map(t =>
     integrateTail(curves[refIdx].points, t.score, t.above));
-  const refMin = curves[refIdx].scoreMin;
-  const refMax = curves[refIdx].scoreMax;
 
   function render(idx) {
     const cur = curves[idx];
@@ -191,26 +189,24 @@ export async function initRiskTheta() {
         .text('+1\u03c3');
     }
 
-    // min / max lines
+    // Threshold lines at 100 and 360
     for (const { val, label, anchor, dx } of [
-      { val: cur.scoreMin, label: `min = ${cur.scoreMin}`, anchor: 'start', dx: 4 },
-      { val: cur.scoreMax, label: `max = ${cur.scoreMax}`, anchor: 'end', dx: -4 },
+      { val: 100, label: '100', anchor: 'start', dx: 4 },
+      { val: 360, label: '360', anchor: 'end', dx: -4 },
     ]) {
-      if (val > 0 && val < 400) {
-        g.append('line')
-          .attr('x1', x(val)).attr('x2', x(val))
-          .attr('y1', 0).attr('y2', height)
-          .attr('stroke', getMutedColor())
-          .attr('stroke-width', 1)
-          .attr('stroke-dasharray', '2,3')
-          .attr('opacity', 0.6);
-        g.append('text')
-          .attr('x', x(val) + dx).attr('y', 26)
-          .attr('text-anchor', anchor)
-          .attr('fill', getMutedColor())
-          .style('font-size', '9px')
-          .text(label);
-      }
+      g.append('line')
+        .attr('x1', x(val)).attr('x2', x(val))
+        .attr('y1', 0).attr('y2', height)
+        .attr('stroke', getMutedColor())
+        .attr('stroke-width', 1)
+        .attr('stroke-dasharray', '2,3')
+        .attr('opacity', 0.6);
+      g.append('text')
+        .attr('x', x(val) + dx).attr('y', 26)
+        .attr('text-anchor', anchor)
+        .attr('fill', getMutedColor())
+        .style('font-size', '9px')
+        .text(label);
     }
 
     // Axes
@@ -261,46 +257,55 @@ export async function initRiskTheta() {
 
   // ── Threshold probability stats (middle) ──────────────────────────
 
+  /** Format a probability (0-1) for display. Uses scientific notation for tiny values. */
+  function formatProb(p) {
+    const pct = p * 100;
+    if (pct >= 0.1) return `${pct.toFixed(1)}%`;
+    if (p === 0) return '0';
+    const exp = Math.floor(Math.log10(p));
+    const coeff = p / Math.pow(10, exp);
+    return `${coeff.toFixed(1)}&thinsp;&times;&thinsp;10<sup>${exp}</sup>`;
+  }
+
   function renderTailStats(cur) {
     const el = document.getElementById('chart-risk-theta-stats');
     if (!el) return;
 
-    const isAtRef = Math.abs(cur.theta) < 0.001;
-
-    function scoreStat(val, refVal, label, higherIsBetter) {
-      const delta = val - refVal;
-      const isBetter = higherIsBetter ? delta > 0.5 : delta < -0.5;
-      const isWorse = higherIsBetter ? delta < -0.5 : delta > 0.5;
-      const color = isWorse ? COLORS.riskSeeking : isBetter ? '#2ca02c' : getMutedColor();
-      const sign = delta > 0 ? '+' : '';
-      return `<div class="tail-stat">
-        <div class="tail-stat-value">${val.toFixed(0)}</div>
-        <div class="tail-stat-change" style="color:${color}">${sign}${delta.toFixed(0)} vs &theta;=0</div>
-        <div class="tail-stat-label">${label}</div>
-      </div>`;
-    }
-
-    function probStat(idx) {
-      const pct = integrateTail(cur.points, thresholds[idx].score, thresholds[idx].above) * 100;
+    function probStat(idx, useSciNotation) {
+      const prob = integrateTail(cur.points, thresholds[idx].score, thresholds[idx].above);
+      const pct = prob * 100;
       const refPct = refProbs[idx] * 100;
       const relChange = refPct > 0.01 ? ((pct - refPct) / refPct) * 100 : 0;
       const isWorse = thresholds[idx].bad ? relChange > 0.5 : relChange < -0.5;
       const isBetter = thresholds[idx].bad ? relChange < -0.5 : relChange > 0.5;
       const color = isWorse ? COLORS.riskSeeking : isBetter ? '#2ca02c' : getMutedColor();
-      const sign = relChange > 0 ? '+' : '';
+      const valueStr = useSciNotation ? formatProb(prob) : `${pct.toFixed(1)}%`;
+      let changeStr;
+      if (useSciNotation) {
+        const ratio = refProbs[idx] > 0 ? prob / refProbs[idx] : 0;
+        let ratioStr;
+        if (ratio === 0) ratioStr = '—';
+        else if (Math.abs(ratio - 1) < 0.05) ratioStr = '1&times;';
+        else if (ratio >= 1) ratioStr = `${ratio.toFixed(1)}&times;`;
+        else ratioStr = `1/${(1 / ratio).toFixed(0)}&times;`;
+        changeStr = `${ratioStr} vs &theta;=0`;
+      } else {
+        const sign = relChange > 0 ? '+' : '';
+        changeStr = `${sign}${relChange.toFixed(0)}% vs &theta;=0`;
+      }
       return `<div class="tail-stat">
-        <div class="tail-stat-value">${pct.toFixed(1)}%</div>
-        <div class="tail-stat-change" style="color:${color}">${sign}${relChange.toFixed(0)}% vs &theta;=0</div>
+        <div class="tail-stat-value">${valueStr}</div>
+        <div class="tail-stat-change" style="color:${color}">${changeStr}</div>
         <div class="tail-stat-label">${thresholds[idx].label}</div>
       </div>`;
     }
 
     el.innerHTML =
-      scoreStat(cur.scoreMin, refMin, 'Min', true) +
-      probStat(0) +
-      probStat(1) +
-      probStat(2) +
-      scoreStat(cur.scoreMax, refMax, 'Max', true);
+      probStat(0, true) +
+      probStat(1, false) +
+      probStat(2, false) +
+      probStat(3, false) +
+      probStat(4, true);
   }
 
   // ── Mean-variance frontier (bottom) ───────────────────────────────

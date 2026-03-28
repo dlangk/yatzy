@@ -588,6 +588,18 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   line-height: 1.3;
+  height: 1.2em;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+}
+
+.tail-stat-value sup {
+  font-size: 0.6em;
+  line-height: 0;
+  vertical-align: baseline;
+  position: relative;
+  top: -0.5em;
 }
 
 .tail-stat-change {
@@ -596,6 +608,18 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   line-height: 1.3;
+  height: 0.9em;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+}
+
+.tail-stat-change sup {
+  font-size: 0.6em;
+  line-height: 0;
+  vertical-align: baseline;
+  position: relative;
+  top: -0.5em;
 }
 
 .tail-stat-label {
