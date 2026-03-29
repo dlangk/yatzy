@@ -118,8 +118,10 @@
 .slider-value {
   font-family: var(--font-mono);
   font-size: 0.85rem;
-  min-width: 5em;
+  min-width: 2.5em;
   font-weight: 600;
+  display: inline-block;
+  text-align: right;
 }
 
 /* Dropdowns */

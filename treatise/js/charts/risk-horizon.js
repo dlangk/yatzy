@@ -132,20 +132,22 @@ export async function initRiskHorizon() {
       .attr('stroke-width', 1.5).attr('stroke-dasharray', '6,4').attr('opacity', 0.7);
 
     // Legend
-    const lx = w - 148, ly0 = y(0.115);
+    const ls = 12;
+    const lyCen = (y(0.12) + y(0.07)) / 2;
+    const lx = 14, ly0 = lyCen - ls;
     dyn.append('line').attr('x1', lx).attr('x2', lx + 18).attr('y1', ly0).attr('y2', ly0)
       .attr('stroke', thetaColor(sign * 0.04)).attr('stroke-width', 2.5);
     dyn.append('text').attr('x', lx + 22).attr('y', ly0).attr('dominant-baseline', 'middle')
       .attr('fill', getTextColor()).style('font-size', '10px').text('Variance-scaled');
-    dyn.append('line').attr('x1', lx).attr('x2', lx + 18).attr('y1', ly0 + 16).attr('y2', ly0 + 16)
+    dyn.append('line').attr('x1', lx).attr('x2', lx + 18).attr('y1', ly0 + ls).attr('y2', ly0 + ls)
       .attr('stroke', getMutedColor()).attr('stroke-width', 1.5)
       .attr('stroke-dasharray', '6,4').attr('opacity', 0.7);
-    dyn.append('text').attr('x', lx + 22).attr('y', ly0 + 16).attr('dominant-baseline', 'middle')
+    dyn.append('text').attr('x', lx + 22).attr('y', ly0 + ls).attr('dominant-baseline', 'middle')
       .attr('fill', getMutedColor()).style('font-size', '10px').text('Linear');
-    dyn.append('line').attr('x1', lx).attr('x2', lx + 18).attr('y1', ly0 + 32).attr('y2', ly0 + 32)
+    dyn.append('line').attr('x1', lx).attr('x2', lx + 18).attr('y1', ly0 + 2 * ls).attr('y2', ly0 + 2 * ls)
       .attr('stroke', thetaColor(sign * 0.08)).attr('stroke-width', 1.5)
       .attr('stroke-dasharray', '3,3').attr('opacity', 0.3);
-    dyn.append('text').attr('x', lx + 22).attr('y', ly0 + 32).attr('dominant-baseline', 'middle')
+    dyn.append('text').attr('x', lx + 22).attr('y', ly0 + 2 * ls).attr('dominant-baseline', 'middle')
       .attr('fill', getMutedColor()).style('font-size', '10px').text('Unclamped θ*');
   }
 
@@ -155,7 +157,7 @@ export async function initRiskHorizon() {
     slider.addEventListener('input', function () {
       const d = +this.value;
       if (sliderLabel) {
-        sliderLabel.textContent = d > 0 ? `+${d}` : d === 0 ? '0' : `${d}`;
+        sliderLabel.textContent = d > 0 ? `+${d}` : d === 0 ? '\u00a00' : `${d}`;
       }
       render(d);
     });
