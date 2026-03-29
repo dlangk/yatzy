@@ -1,4 +1,4 @@
-// @ts-ignore - shared module served at runtime
+// @ts-expect-error - shared module served at runtime
 import { createDieSVG } from '/yatzy/shared/dice.js';
 
 /** DOM handles and update function returned by {@link createDie}. */
