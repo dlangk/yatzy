@@ -87,7 +87,7 @@ pub fn load_all_state_values(ctx: &mut YatzyContext, filename: &str) -> bool {
     let header_ptr = mmap.as_ptr() as *const StateFileHeader;
     let header = unsafe { &*header_ptr };
     if header.magic != STATE_FILE_MAGIC
-        || (header.version != STATE_FILE_VERSION && header.version != STATE_FILE_VERSION_V5)
+        || (header.version != STATE_FILE_VERSION && header.version != STATE_FILE_VERSION_THETA)
     {
         println!(
             "Invalid file format (magic=0x{:08x} version={})",
@@ -131,7 +131,7 @@ pub fn load_state_values_standalone(filename: &str) -> Option<StateValues> {
     let header_ptr = mmap.as_ptr() as *const StateFileHeader;
     let header = unsafe { &*header_ptr };
     if header.magic != STATE_FILE_MAGIC
-        || (header.version != STATE_FILE_VERSION && header.version != STATE_FILE_VERSION_V5)
+        || (header.version != STATE_FILE_VERSION && header.version != STATE_FILE_VERSION_THETA)
     {
         eprintln!(
             "Invalid file format for {}: magic=0x{:08x} version={}",
@@ -166,7 +166,7 @@ pub fn save_all_state_values(ctx: &YatzyContext, filename: &str) {
         version: if ctx.theta == 0.0 {
             STATE_FILE_VERSION
         } else {
-            STATE_FILE_VERSION_V5
+            STATE_FILE_VERSION_THETA
         },
         total_states: NUM_STATES as u32,
         theta_bits: ctx.theta.to_bits(),
