@@ -22,7 +22,7 @@ use crate::widget_solver::{
 
 use super::adaptive::TurnConfig;
 use super::heuristic::{heuristic_pick_category, heuristic_reroll_mask};
-use super::strategy::{GameView, PlayerState, Strategy};
+use super::strategy::{GameView, PlayerState, Strategy, UnderdogPolicy};
 
 // ── Inline helpers (duplicated for perf, same as engine.rs / adaptive.rs) ─
 
@@ -623,6 +623,218 @@ pub fn simulate_multiplayer(
         score_stds,
         head_to_head,
         avg_margin_when_winning,
+    }
+}
+
+// ── Theta diagnostics ────────────────────────────────────────────────────
+
+/// Per-turn theta and EV-deficit statistics for Player 2.
+#[derive(Clone, Default)]
+pub struct ThetaDiagnostics {
+    pub n: u32,
+    pub turn_theta_sum: [f64; 15],
+    pub turn_theta_abs_sum: [f64; 15],
+    pub turn_deficit_sum: [f64; 15],
+    pub turn_deficit_sq_sum: [f64; 15],
+    pub turn_positive: [u32; 15],
+    pub turn_negative: [u32; 15],
+    pub turn_zero: [u32; 15],
+}
+
+impl ThetaDiagnostics {
+    pub fn merge(&mut self, other: &ThetaDiagnostics) {
+        self.n += other.n;
+        for t in 0..15 {
+            self.turn_theta_sum[t] += other.turn_theta_sum[t];
+            self.turn_theta_abs_sum[t] += other.turn_theta_abs_sum[t];
+            self.turn_deficit_sum[t] += other.turn_deficit_sum[t];
+            self.turn_deficit_sq_sum[t] += other.turn_deficit_sq_sum[t];
+            self.turn_positive[t] += other.turn_positive[t];
+            self.turn_negative[t] += other.turn_negative[t];
+            self.turn_zero[t] += other.turn_zero[t];
+        }
+    }
+
+    pub fn print_summary(&self) {
+        let n = self.n as f64;
+        println!("\nPer-Turn Theta Diagnostics (P2, {} games)", self.n);
+        println!("{:>4} {:>7} {:>7} {:>7} {:>9} {:>9} {:>9}",
+            "Turn", "θ=0%", "θ>0%", "θ<0%", "Mean|θ|", "MeanDef", "StdDef");
+        println!("{}", "-".repeat(62));
+        for t in 0..15 {
+            let z = self.turn_zero[t] as f64 / n * 100.0;
+            let p = self.turn_positive[t] as f64 / n * 100.0;
+            let neg = self.turn_negative[t] as f64 / n * 100.0;
+            let abs_theta = self.turn_theta_abs_sum[t] / n;
+            let mean_def = self.turn_deficit_sum[t] / n;
+            let var_def = (self.turn_deficit_sq_sum[t] / n) - mean_def * mean_def;
+            let std_def = var_def.max(0.0).sqrt();
+            println!("{:4} {:6.1}% {:6.1}% {:6.1}% {:9.4} {:9.1} {:9.1}",
+                t, z, p, neg, abs_theta, mean_def, std_def);
+        }
+    }
+}
+
+/// Play one game with theta diagnostics for P2.
+fn play_one_game_with_diagnostics(
+    ctx: &YatzyContext,
+    strategies: &[Strategy],
+    rng: &mut SmallRng,
+    diag: &mut ThetaDiagnostics,
+) -> GameOutcome {
+    let n = strategies.len();
+    let mut states = vec![PlayerState::default(); n];
+
+    for turn in 0..CATEGORY_COUNT {
+        for player_idx in 0..n {
+            let (cat, scr, new_upper) = if strategies[player_idx].is_heuristic() {
+                play_single_turn_heuristic(&states[player_idx], rng)
+            } else {
+                let view = GameView {
+                    my_index: player_idx,
+                    players: &states,
+                    turn,
+                };
+                let config = strategies[player_idx].resolve_turn(&view);
+
+                // Record diagnostics for P2 (player_idx == 1)
+                if player_idx == 1 && n >= 2 {
+                    let theta = config.theta;
+                    // Compute EV deficit using P2's view and the θ=0 state values
+                    let deficit = if let super::strategy::StrategyKind::MultiplayerAdaptive { tables, .. } = &strategies[1].kind {
+                        let ev_idx = tables.iter().position(|t| t.theta == 0.0);
+                        if let Some(idx) = ev_idx {
+                            UnderdogPolicy::ev_deficit(&view, tables[idx].sv.as_slice())
+                        } else {
+                            0.0
+                        }
+                    } else {
+                        0.0
+                    };
+
+                    diag.turn_theta_sum[turn] += theta as f64;
+                    diag.turn_theta_abs_sum[turn] += theta.abs() as f64;
+                    diag.turn_deficit_sum[turn] += deficit as f64;
+                    diag.turn_deficit_sq_sum[turn] += (deficit as f64) * (deficit as f64);
+                    if theta > 0.001 {
+                        diag.turn_positive[turn] += 1;
+                    } else if theta < -0.001 {
+                        diag.turn_negative[turn] += 1;
+                    } else {
+                        diag.turn_zero[turn] += 1;
+                    }
+                }
+
+                play_single_turn(ctx, &config, &states[player_idx], turn, rng)
+            };
+
+            states[player_idx].upper_score = new_upper;
+            states[player_idx].scored_categories |= 1 << cat;
+            states[player_idx].total_score += scr;
+        }
+    }
+
+    diag.n += 1;
+
+    let final_scores: Vec<i32> = states
+        .iter()
+        .map(|s| s.total_score + if s.upper_score >= 63 { 50 } else { 0 })
+        .collect();
+
+    let max_score = *final_scores.iter().max().unwrap();
+    let winners: Vec<usize> = final_scores
+        .iter()
+        .enumerate()
+        .filter(|(_, &s)| s == max_score)
+        .map(|(i, _)| i)
+        .collect();
+
+    let winner = if winners.len() == 1 {
+        Some(winners[0])
+    } else {
+        None
+    };
+
+    GameOutcome {
+        scores: final_scores,
+        winner,
+    }
+}
+
+/// Batch multiplayer simulation with theta diagnostics (sequential, for diagnostic runs).
+pub fn simulate_multiplayer_with_diagnostics(
+    ctx: &YatzyContext,
+    strategies: &[Strategy],
+    games: u32,
+    seed: u64,
+) -> (MultiplayerResult, ThetaDiagnostics) {
+    let mut diag = ThetaDiagnostics::default();
+    let mut outcomes = Vec::with_capacity(games as usize);
+
+    for i in 0..games as u64 {
+        let mut rng = SmallRng::seed_from_u64(seed.wrapping_add(i));
+        outcomes.push(play_one_game_with_diagnostics(ctx, strategies, &mut rng, &mut diag));
+    }
+
+    let result = aggregate_outcomes(strategies, &outcomes, games);
+    (result, diag)
+}
+
+/// Aggregate game outcomes into a MultiplayerResult.
+fn aggregate_outcomes(strategies: &[Strategy], outcomes: &[GameOutcome], games: u32) -> MultiplayerResult {
+    let n = strategies.len();
+    let mut wins = vec![0u32; n];
+    let mut draws = 0u32;
+    let mut score_sums = vec![0.0f64; n];
+    let mut score_sq_sums = vec![0.0f64; n];
+    let mut head_to_head = vec![vec![0u32; n]; n];
+    let mut margin_sums = vec![0.0f64; n];
+    let mut win_counts_for_margin = vec![0u32; n];
+
+    for outcome in outcomes {
+        for (i, &s) in outcome.scores.iter().enumerate() {
+            score_sums[i] += s as f64;
+            score_sq_sums[i] += (s as f64) * (s as f64);
+        }
+        match outcome.winner {
+            Some(w) => {
+                wins[w] += 1;
+                let winner_score = outcome.scores[w];
+                for j in 0..n {
+                    if j != w {
+                        head_to_head[w][j] += 1;
+                    }
+                }
+                let second_best = outcome.scores.iter().enumerate()
+                    .filter(|(k, _)| *k != w).map(|(_, &s)| s).max().unwrap_or(0);
+                margin_sums[w] += (winner_score - second_best) as f64;
+                win_counts_for_margin[w] += 1;
+            }
+            None => {
+                draws += 1;
+                for i in 0..n {
+                    for j in 0..n {
+                        if i != j && outcome.scores[i] > outcome.scores[j] {
+                            head_to_head[i][j] += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let g = games as f64;
+    let score_means: Vec<f64> = score_sums.iter().map(|&s| s / g).collect();
+    let score_stds: Vec<f64> = score_sq_sums.iter().zip(score_means.iter())
+        .map(|(&sq, &m)| (sq / g - m * m).max(0.0).sqrt()).collect();
+    let win_rates: Vec<f64> = wins.iter().map(|&w| w as f64 / g * 100.0).collect();
+    let avg_margin_when_winning: Vec<f64> = margin_sums.iter().zip(win_counts_for_margin.iter())
+        .map(|(&m, &c)| if c > 0 { m / c as f64 } else { 0.0 }).collect();
+
+    MultiplayerResult {
+        strategies: strategies.iter().map(|s| s.name.clone()).collect(),
+        games, wins, win_rates, draws, score_means, score_stds,
+        head_to_head, avg_margin_when_winning,
     }
 }
 

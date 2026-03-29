@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="css/charts.css">
   <link rel="stylesheet" href="css/treatise.css">
   <link rel="stylesheet" href="/yatzy/shared/dice.css">
+  <link rel="stylesheet" href="vendor/katex/katex.min.css">
   <script src="vendor/d3.v7.min.js"></script>
   <script src="vendor/marked.min.js"></script>
 </head>
@@ -65,6 +66,8 @@
   import { initFreeEnergyPhase } from './js/charts/free-energy-phase.js';
   import { initAdaptiveWinrate } from './js/charts/adaptive-winrate.js';
   import { initThresholdPolicy } from './js/charts/threshold-policy.js';
+  import { initGameReplay } from './js/charts/game-replay.js';
+  import { initRiskHorizon } from './js/charts/risk-horizon.js';
   import { initOracleWinrate } from './js/charts/oracle-winrate.js';
   // Chart modules — Compression
   import { initRlBarrierDiagram } from './js/charts/rl-barrier-diagram.js';
@@ -164,6 +167,8 @@
     'chart-tail-heatmap': { init: initTailHeatmap, loaded: false },
     'chart-adaptive-winrate': { init: initAdaptiveWinrate, loaded: false },
     'chart-threshold-policy': { init: initThresholdPolicy, loaded: false },
+    'chart-game-replay': { init: initGameReplay, loaded: false },
+    'chart-risk-horizon': { init: initRiskHorizon, loaded: false },
     'chart-oracle-winrate': { init: initOracleWinrate, loaded: false },
     'chart-rl-barrier-diagram': { init: initRlBarrierDiagram, loaded: false },
     'chart-surrogate-pareto': { init: initSurrogatePareto, loaded: false },

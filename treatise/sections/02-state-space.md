@@ -95,31 +95,31 @@ There is one final structural property that simplifies Yatzy: it is "one-directi
 **State space size.** With 64 possible upper scores and 2<sup>15</sup> = 32,768 category masks:
 
 :::equation
-|<var>S</var>| = 64 &times; 2<sup>15</sup> = 2,097,152
+|S| = 64 \times 2^{15} = 2{,}097{,}152
 :::
 
 **Layered DAG.** The states form a directed acyclic graph with 16 layers, numbered 1 through 16. Layer <var>l</var> contains all states where |<var>C</var>| = <var>l</var> &minus; 1 (exactly <var>l</var> &minus; 1 categories scored). Every transition goes strictly from layer <var>l</var> to layer <var>l</var>+1, since scoring a category adds exactly one element to <var>C</var>. Layer 1 has a single category mask (the empty set), layer 16 has a single mask (all categories scored). The number of states per layer is:
 
 :::equation
-|layer <var>l</var>| = C(15, <var>l</var> &minus; 1) &times; 64
+|\text{layer } l| = \binom{15}{l - 1} \times 64
 :::
 
 **Dice multisets.** A roll of 5 dice from {1, &hellip;, 6} is represented as a frequency vector (<var>f</var><sub>1</sub>, &hellip;, <var>f</var><sub>6</sub>) where <var>f<sub>i</sub></var> counts face <var>i</var> and &sum; <var>f<sub>i</sub></var> = 5. The number of such vectors is the multiset coefficient:
 
 :::equation
-|<var>R</var><sub>5,6</sub>| = C(5 + 6 &minus; 1, 5) = C(10, 5) = 252
+|R_{5,6}| = \binom{5 + 6 - 1}{5} = \binom{10}{5} = 252
 :::
 
 **Keep multisets.** A keep is a sub-multiset of a roll: 0 to 5 dice chosen from {1, &hellip;, 6}. Since dice showing the same face are interchangeable, the number of distinct keeps of size <var>k</var> is the stars-and-bars multiset coefficient:
 
 :::equation
-C(6 + <var>k</var> &minus; 1, <var>k</var>) = C(5 + <var>k</var>, <var>k</var>)
+\binom{6 + k - 1}{k} = \binom{5 + k}{k}
 :::
 
 Summing over all possible keep sizes:
 
 :::equation
-|<var>K</var>| = &sum;<sub><var>k</var>=0</sub><sup>5</sup> C(5 + <var>k</var>, <var>k</var>) = 1 + 6 + 21 + 56 + 126 + 252 = 462 = C(11, 5)
+|K| = \sum_{k=0}^{5} \binom{5+k}{k} = 1 + 6 + 21 + 56 + 126 + 252 = 462 = \binom{11}{5}
 :::
 
 Many of the 2<sup>5</sup> = 32 binary keep/reroll masks per roll produce the same keep-multiset. For instance, keeping dice #1 and #2 from (3, 3, 3, 5, 5) is identical to keeping dice #1 and #3. This deduplication reduces work by roughly 47%.
@@ -127,17 +127,17 @@ Many of the 2<sup>5</sup> = 32 binary keep/reroll masks per roll produce the sam
 **Widget structure.** Each turn decomposes into a six-layer sub-DAG. Let <var>D</var> = <var>R</var><sub>5,6</sub> (252 dice multisets), <var>H</var> = <var>K</var> (462 keep multisets), and <var>C</var><sub>avail</sub> = 15 &minus; |<var>C</var>| available categories. The layers alternate between chance nodes (dice outcomes) and decision nodes (keep or score choices):
 
 :::equation
-nodes/widget = 1 + |<var>D</var>| + |<var>H</var>| + |<var>D</var>| + |<var>H</var>| + |<var>D</var>| = 1 + 252 + 462 + 252 + 462 + 252 = 1,681
+\text{nodes/widget} = 1 + |D| + |H| + |D| + |H| + |D| = 1 + 252 + 462 + 252 + 462 + 252 = 1{,}681
 :::
 
 **Reachability pruning.** Not every (<var>m</var>, <var>C</var>) pair can occur in a real game. A state is reachable only if its upper score <var>m</var> can be produced by some combination of scores from the upper categories already in <var>C</var>. Let <var>M</var> = <var>C</var> &cap; {0, &hellip;, 5} be the subset of scored upper categories. Reachability is computed via forward DP:
 
 :::equation
-<var>R</var>(0, &empty;) = true &nbsp;&nbsp;&nbsp; (base case)
+R(0, \emptyset) = \text{true} \qquad \text{(base case)}
 :::
 
 :::equation
-<var>R</var>(<var>n</var>, <var>M</var>) = &exist; face <var>x</var> &in; <var>M</var>, count <var>c</var> &in; {0, &hellip;, 5} : <var>c</var> &middot; <var>x</var> &le; <var>n</var> &and; <var>R</var>(<var>n</var> &minus; <var>c</var> &middot; <var>x</var>, <var>M</var> &setminus; {<var>x</var>})
+R(n, M) = \exists\, \text{face } x \in M,\; \text{count } c \in \{0, \ldots, 5\} : c \cdot x \leq n \;\land\; R(n - c \cdot x,\; M \setminus \{x\})
 :::
 
 For each upper-category face <var>x</var>, the player could have scored 0 to 5 copies of it (0 meaning the category was used but contributed nothing, which is only possible if the roll contained no <var>x</var>s). This DP runs over all 64 subsets of the 6 upper categories and all 64 upper scores. The result: 31.8% of states are pruned, leaving approximately 1,430,000 reachable states.
@@ -145,7 +145,7 @@ For each upper-category face <var>x</var>, the player could have scored 0 to 5 c
 **Successor function.** When scoring category <var>c</var> on roll <var>r</var> from state (<var>m</var>, <var>C</var>), the successor state is:
 
 :::equation
-(<var>m</var>&prime;, <var>C</var>&prime;) = (min(<var>m</var> + <var>u</var>(<var>r</var>, <var>c</var>), 63), &nbsp; <var>C</var> &cup; {<var>c</var>})
+(m', C') = (\min(m + u(r, c),\; 63),\; C \cup \{c\})
 :::
 
 where <var>u</var>(<var>r</var>, <var>c</var>) is the upper-score contribution (non-zero only for categories 0 through 5, equal to the sum of matching face values). The min(·, 63) capping ensures the successor index stays within [0, 63].

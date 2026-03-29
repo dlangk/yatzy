@@ -34,7 +34,7 @@ Use the slider below to see how the score distribution changes across the &theta
 </div>
 :::
 
-The best &theta; for protecting the 5th percentile (the floor) is &minus;0.03, which lifts p5 to 183, four points above the EV-optimal floor of 179. The best &theta; for the 95th percentile (the ceiling) is around +0.04 to +0.10, pushing p95 to 312 versus 309 at &theta; = 0. The best for p99 is +0.10, reaching 329.
+In the chart below you see what &theta; is optimal for different percentiles. One conclusion is that a sligth increase in risk-taking might be worth it for most players. p75 is bumped a few points for &theta; = 0.04. At that level, you are 20% more likely to get a score above 310, but only pay 
 
 :::html
 <div class="chart-container" id="chart-risk-reward">
@@ -73,7 +73,7 @@ The solver computes the *exact* probability of every possible final score via fo
 The utility function is <var>u</var>(<var>x</var>) = e<sup>&theta;<var>x</var></sup>. The solver maximizes the *certainty equivalent* (CE): the guaranteed score that the solver considers equally desirable to playing the random game. Imagine someone offers you a deal: skip the game and receive a fixed number of points instead. How many points would it take? That number is the CE.
 
 :::equation
-CE = (1/&theta;) &middot; ln E[e<sup>&theta; &middot; total</sup>]
+CE = \frac{1}{\theta} \cdot \ln E[e^{\theta \cdot \text{total}}]
 :::
 
 For &theta; &gt; 0, CE &gt; E[total]: the risk-seeker values a gamble above its expected value, because the chance of a high score is worth something on its own. For &theta; &lt; 0, CE &lt; E[total]: the risk-averter would accept fewer guaranteed points to avoid the chance of a disaster. The gap CE &minus; E[total] is the risk premium, and it scales with both &theta; and the variance of the outcome distribution.
@@ -87,13 +87,13 @@ The EV solver and the &theta; solver have the same structure. Both use probabili
 At a chance node, the EV solver computes a weighted sum of raw state values:
 
 :::equation
-E(keep) = &Sigma;<sub>r</sub> P(keep &rarr; r) &middot; V(r)
+E(\text{keep}) = \sum_{r} P(\text{keep} \to r) \cdot V(r)
 :::
 
 The &theta; solver computes the same weighted sum, but of *exponentiated* state values:
 
 :::equation
-exp(L(keep)) = &Sigma;<sub>r</sub> P(keep &rarr; r) &middot; exp(L(r))
+\exp(L(\text{keep})) = \sum_{r} P(\text{keep} \to r) \cdot \exp(L(r))
 :::
 
 where <var>L</var>(<var>S</var>) = ln E[e<sup>&theta; &middot; total</sup> | <var>S</var>]. The exponential e<sup>&theta;<var>x</var></sup> amplifies extreme values before the averaging happens. High scores contribute exponentially more when &theta; &gt; 0, low scores when &theta; &lt; 0.
@@ -101,7 +101,7 @@ where <var>L</var>(<var>S</var>) = ln E[e<sup>&theta; &middot; total</sup> | <va
 Direct computation of exp(&theta; &middot; score) overflows for moderate &theta; and typical scores around 250. The solver works entirely in the log domain, where this weighted sum becomes a log-sum-exp (LSE):
 
 :::equation
-<var>L</var>(keep) = LSE<sub>r</sub> { ln(<var>P</var>(keep &rarr; r)) + <var>L</var>(r) }
+L(\text{keep}) = \text{LSE}_{r} \{ \ln(P(\text{keep} \to r)) + L(r) \}
 :::
 
 LSE is computed with the standard numerical stability trick: LSE(<var>x</var><sub>1</sub>, &hellip;, <var>x</var><sub>n</sub>) = <var>m</var> + ln(&Sigma; exp(<var>x</var><sub>i</sub> &minus; <var>m</var>)), with <var>m</var> = max(<var>x</var><sub>i</sub>).
@@ -113,7 +113,7 @@ At decision nodes, the solver picks the action that maximizes <var>L</var> when 
 When |&theta;| is large, the exponential amplification becomes so extreme that only the single best (or worst) outcome matters. The LSE at a chance node approaches a plain max:
 
 :::equation
-LSE &asymp; max<sub>i</sub>(<var>x</var><sub>i</sub>) &nbsp;&nbsp; when |&theta;| &middot; &sigma; &gt;&gt; 1
+\text{LSE} \approx \max_{i}(x_{i}) \quad \text{when} \quad |\theta| \cdot \sigma \gg 1
 :::
 
 where &sigma; is the spread of state values at that node. The transition depends on a dimensionless control parameter: the product |&theta;| &middot; &sigma;<sub>node</sub>. In Yatzy, the typical per-node score spread is &sigma;<sub>node</sub> &asymp; 10, giving three regimes:
@@ -137,14 +137,38 @@ The solver uses f32 throughout for performance. This creates a numerical stabili
 Near &theta; = 0, the mean and standard deviation are well-approximated by quadratics:
 
 :::equation
-mean(&theta;) &asymp; 247.0 &minus; 0.9&theta; &minus; 618&theta;<sup>2</sup>
+\text{mean}(\theta) \approx 247.0 - 0.9\theta - 618\theta^{2}
 :::
 
 :::equation
-std(&theta;) &asymp; 39.5 + 53.5&theta; &minus; 17&theta;<sup>2</sup>
+\text{std}(\theta) \approx 39.5 + 53.5\theta - 17\theta^{2}
 :::
 
 Mean loss is quadratic (second-order around the optimum, as expected from perturbing a maximum). Standard deviation gain is linear in &theta; (dominant term: 53.5&theta;). This asymmetry (quadratic cost, linear benefit) creates the narrow window where tail gains are cheap.
+
+### The Mean-Variance Frontier and the Marginal Rate of Substitution
+
+The ::concept[mean-variance frontier]{mean-variance-frontier} in the chart above traces where each &theta; lands in (standard deviation, mean) space. Each &theta; table maximizes a specific certainty equivalent. Using the cumulant generating function K(&theta;) = ln E[e<sup>&theta;X</sup>], the CE expands as:
+
+:::equation
+CE_{\theta} \approx E + \frac{\theta}{2} \cdot \text{Var} + \frac{\theta^{2}}{6} \cdot \kappa_{3} + \ldots
+:::
+
+where &kappa;<sub>3</sub> is the third cumulant (skewness). For small |&theta;|, the CE is dominated by the first two terms. Each &theta; table maximizes this CE, and on the efficient frontier CE is locally constant (you cannot increase one term without decreasing the other). Taking the total derivative and setting dCE = 0:
+
+:::equation
+dE + \frac{\theta}{2} \cdot dV = 0 \Rightarrow \frac{\partial E}{\partial V} = -\frac{\theta}{2}
+:::
+
+This is the **marginal rate of substitution** (MRS): the exact price, in expected points, that the solver pays for each unit of variance. Running the solver with &theta; = 0.10 finds the point on the frontier where the tangent slope is &minus;0.05: the solver accepts a drop of 1 mean point for every 20 units of variance gained. At &theta; = 0 the slope is zero (the peak: maximum EV, variance ignored). At &theta; = &minus;0.10 the slope is +0.05: the solver sacrifices mean to crush variance.
+
+**Where the approximation breaks down.** The MRS formula &part;E/&part;V = &minus;&theta;/2 is a first-order result. It holds well for |&theta;| &lt; 0.05, the "active" regime where the &theta;<sup>2</sup> skewness term is small. Beyond that range, two effects distort the frontier:
+
+1. **Skewness.** Yatzy scores have positive skewness (heavy right tail from Yatzy category and straights). For &theta; &gt; 0, the &kappa;<sub>3</sub> term gives the solver "free" CE from the right tail, so it trades less mean per unit of variance than &minus;&theta;/2 predicts. For &theta; &lt; 0, the skewness penalty compounds with the variance penalty.
+
+2. **Phase transitions.** Around &theta; &asymp; &minus;0.15, the solver abruptly abandons the 50-point upper bonus (the expected value of chasing it no longer justifies the variance cost under strong risk aversion). This creates a discontinuous jump in the frontier that no smooth tangent line can capture.
+
+These effects explain the two-branch structure visible in the frontier chart: the risk-averse branch (&theta; &lt; 0) and the risk-seeking branch (&theta; &gt; 0) follow different paths in mean-variance space because they activate different strategic levers (eliminating downside vs. chasing upside) with different skewness profiles. The MRS formula accurately predicts the local geometry near &theta; = 0, and the multiplayer section uses this relationship to derive the optimal adaptive risk parameter for head-to-head play.
 
 ### Win Probability and Variance
 
@@ -188,6 +212,8 @@ fn lse_chance_node(log_probs: &[f32], log_values: &[f32]) -> f32 {
 ```
 
 The full &theta; sweep (37 values) is resumable: each strategy table is written to `data/strategy_tables/all_states_theta_*.bin` and skipped on subsequent runs if the file already exists. Deleting these files after changing solver code is mandatory.
+
+**Domain boundary artifact.** The utility and LSE paths are mathematically equivalent but accumulate f32 rounding differently, so the optimal action can disagree at a handful of states near the |&theta;|&nbsp;=&nbsp;0.15 boundary. The effect is small (order 1 point on mean score) and comparable to the 22-state f32/f64 divergence measured for the EV path.
 
 :::
 

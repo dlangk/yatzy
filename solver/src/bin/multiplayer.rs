@@ -2,7 +2,8 @@ use std::time::Instant;
 
 use yatzy::phase0_tables;
 use yatzy::simulation::multiplayer::{
-    aggregate_from_records, simulate_multiplayer, simulate_multiplayer_with_recording,
+    aggregate_from_records, simulate_multiplayer, simulate_multiplayer_with_diagnostics,
+    simulate_multiplayer_with_recording,
 };
 use yatzy::simulation::raw_storage::save_multiplayer_recording;
 use yatzy::simulation::strategy::Strategy;
@@ -14,6 +15,7 @@ struct Args {
     seed: u64,
     output: Option<String>,
     record: bool,
+    diagnostics: bool,
 }
 
 fn parse_args() -> Args {
@@ -23,6 +25,7 @@ fn parse_args() -> Args {
     let mut seed = 42u64;
     let mut output: Option<String> = None;
     let mut record = false;
+    let mut diagnostics = false;
 
     let mut i = 1;
     while i < args.len() {
@@ -60,6 +63,9 @@ fn parse_args() -> Args {
             "--record" => {
                 record = true;
             }
+            "--diagnostics" => {
+                diagnostics = true;
+            }
             "--help" | "-h" => {
                 println!("Usage: yatzy-multiplayer [OPTIONS]");
                 println!();
@@ -81,6 +87,16 @@ fn parse_args() -> Args {
                 println!("  mp:underdog      Continuous ramp: θ scales with EV deficit (default θ_max=0.05, scale=50)");
                 println!("  mp:underdog:0.07 Custom θ_max");
                 println!("  mp:underdog:0.05:60 Custom θ_max and scale");
+                println!("  mp:protect       Protect-only: risk-averse when leading (EV-based)");
+                println!("  mp:protect:0.03:50 Custom protect:scale");
+                println!("  mp:symmetric     Symmetric: risk-seeking when trailing, risk-averse when leading");
+                println!("  mp:symmetric:0.05:0.03:40 Custom seek:protect:scale");
+                println!("  mp:hailmary      Late Hail Mary: aggressive θ in last turns when trailing");
+                println!("  mp:hailmary:0.20:12:5 Custom theta:activate_turn:deficit_threshold");
+                println!("  mp:hailmary-sym  Combined: symmetric early + Hail Mary late");
+                println!("  mp:hailmary-sym:0.20:12:5 Custom theta:activate_turn:threshold");
+                println!("  mp:varscaled     Variance-scaled: θ = deficit/(V1+V2), clamped");
+                println!("  mp:varscaled:0.05:0.03 Custom pos_clamp:neg_clamp");
                 println!();
                 println!("Example:");
                 println!(
@@ -123,6 +139,7 @@ fn parse_args() -> Args {
         seed,
         output,
         record,
+        diagnostics,
     }
 }
 
@@ -165,15 +182,19 @@ fn main() {
     );
 
     let t2 = Instant::now();
-    let (result, records) = if args.record {
+    let (result, records, diag) = if args.diagnostics {
+        let (res, diag) =
+            simulate_multiplayer_with_diagnostics(&ctx, &strategies, args.num_games, args.seed);
+        (res, None, Some(diag))
+    } else if args.record {
         let recs =
             simulate_multiplayer_with_recording(&ctx, &strategies, args.num_games, args.seed);
         let names: Vec<String> = strategies.iter().map(|s| s.name.clone()).collect();
         let res = aggregate_from_records(&recs, &names);
-        (res, Some(recs))
+        (res, Some(recs), None)
     } else {
         let res = simulate_multiplayer(&ctx, &strategies, args.num_games, args.seed);
-        (res, None)
+        (res, None, None)
     };
     let sim_ms = t2.elapsed().as_secs_f64() * 1000.0;
 
@@ -295,5 +316,10 @@ fn main() {
             std::process::exit(1);
         });
         println!("Results saved to {}", json_path);
+    }
+
+    // Print diagnostics if enabled
+    if let Some(ref diag) = diag {
+        diag.print_summary();
     }
 }

@@ -41,11 +41,11 @@ converge on five dice and a scorecard.
 
 The key quantitative results span four levels of analysis:
 
-:::equation
-Solver: 248.4 EV, 1.1s solve, 37 &theta; sweep<br>
-Compression: 227.5 EV from 100 rules (59.7% gap closed)<br>
-Semantic rerolls: 184.4 EV, +15.7 over bitmask (168.7)<br>
-Human model: 4 params (&theta;, &beta;, &gamma;, d), 30 scenarios, 648-combo grid
+:::insight
+Solver: 248.4 EV, 1.1s solve, 37 \theta sweep\\
+Compression: 227.5 EV from 100 rules (59.7\% gap closed)\\
+Semantic rerolls: 184.4 EV, +15.7 over bitmask (168.7)\\
+Human model: 4 params (\theta, \beta, \gamma, d), 30 scenarios, 648-combo grid
 :::
 
 The incompressible residual of 20.9 EV establishes a lower bound on the

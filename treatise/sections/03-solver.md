@@ -119,39 +119,31 @@ The solver evaluates the Bellman equation in four stages. Terminal states have a
 **Terminal value (layer 16):**
 
 :::equation
-<var>V</var>(<var>u</var>, <var>S</var>) = [<var>u</var> &ge; 63] &middot; 50
+V(u, S) = [u \geq 63] \cdot 50
 :::
 
 **Best category for a final roll:**
 
 :::equation
-<var>Q</var><sub>cat</sub>(<var>u</var>, <var>S</var>, <var>d</var>) =
-max<sub><var>c</var> &notin; <var>S</var></sub>
-( score(<var>d</var>, <var>c</var>) + <var>V</var>(<var>u</var>&prime;, <var>S</var> &cup; {<var>c</var>}) )
+Q_{\text{cat}}(u, S, d) = \max_{c \notin S} \left( \text{score}(d, c) + V(u', S \cup \{c\}) \right)
 :::
 
 **Best keep at reroll stage <var>t</var> (ping-pong):**
 
 :::equation
-<var>Q</var><sub>keep</sub>(<var>u</var>, <var>S</var>, <var>d</var>, <var>t</var>) =
-max<sub><var>h</var> &sube; <var>d</var></sub>
-&sum;<sub><var>d</var>&prime;</sub> <var>P</var>(<var>h</var> &rarr; <var>d</var>&prime;) &middot;
-<var>Q</var><sub>prev</sub>(<var>u</var>, <var>S</var>, <var>d</var>&prime;, <var>t</var>&minus;1)
+Q_{\text{keep}}(u, S, d, t) = \max_{h \subseteq d} \sum_{d'} P(h \to d') \cdot Q_{\text{prev}}(u, S, d', t-1)
 :::
 
 **Turn-start expected score:**
 
 :::equation
-<var>V</var>(<var>u</var>, <var>S</var>) =
-&sum;<sub><var>d</var></sub> <var>w</var>(<var>d</var>) &middot;
-<var>Q</var><sub>keep</sub>(<var>u</var>, <var>S</var>, <var>d</var>, 2)
-&nbsp;/&nbsp; 7776
+V(u, S) = \frac{\sum_{d} w(d) \cdot Q_{\text{keep}}(u, S, d, 2)}{7776}
 :::
 
 **Keep-multiset deduplication.** The key to efficiency is factoring the keep-evaluation into two steps. Let <var>H</var> = {<var>h</var><sub>1</sub>, &hellip;, <var>h</var><sub>462</sub>} be the set of unique keep-multisets. For each <var>h</var> &in; <var>H</var>:
 
 :::equation
-<var>E</var>[<var>h</var>] = &sum;<sub><var>d</var>&prime;</sub> <var>P</var>(<var>h</var> &rarr; <var>d</var>&prime;) &middot; <var>Q</var><sub>prev</sub>(<var>d</var>&prime;)
+E[h] = \sum_{d'} P(h \to d') \cdot Q_{\text{prev}}(d')
 :::
 
 Then for each roll <var>d</var>, the best keep is just max over the (small) subset of <var>H</var> compatible with <var>d</var>.

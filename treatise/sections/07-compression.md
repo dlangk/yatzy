@@ -221,7 +221,7 @@ of category rules and EV(<var>N</var>) the mean score under category-only
 evaluation with optimal rerolls:
 
 :::equation
-EV(0) = 196.7 &nbsp;&rarr;&nbsp; EV(50) = 216.5 &nbsp;&rarr;&nbsp; EV(100) = 227.5
+EV(0) = 196.7 \quad \rightarrow \quad EV(50) = 216.5 \quad \rightarrow \quad EV(100) = 227.5
 :::
 
 Phase 1 (<var>N</var> = 0–20): foundation, +2.7 EV. Phase 2
