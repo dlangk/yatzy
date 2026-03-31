@@ -2,11 +2,13 @@
 
 ## Multiplayer and Adaptive Strategies
 
-Most people play Yatzy as if it were a single-player optimization problem, and for good reason. Two parallel Yatzy games are independent: the dice you roll do not affect the dice your opponent rolls. Nothing you do changes what is available to them. In simultaneous play, the optimal strategy is simply to maximize expected value.
+I think very few people play Yatzy by themselves 😅 But, even if you play with others, you likely make decisions as if you played alone. That makes sense. Two parallel Yatzy games are independent. The dice you roll do not affect the dice your opponents roll. You cannot do anything about the other players game.
 
-But sequential play introduces an asymmetry. In the standard format, Player 2 observes Player 1's trajectory (running score, categories consumed, upper-section progress) before making each decision. This raises a foundational question: can a player who adapts their risk posture based on the opponent's visible progress improve their probability of *winning*?
+But, it turns out, sequential play introduces a slight asymmetry. Let's assume standard format two player Yatzy. Player 1 goes first, Player 2 goes second. Each player takes turn, and after 15 turns, the game is over. This step gives Player 2 the ability to observe Player 1's score, categories and upper-section progress before making decisions.
 
-**The short answer: yes, but barely.** If both players use the fixed, EV-optimal strategy, they each win roughly 50% of decisive games. A player who dynamically adapts their risk can push this to 50.9%: fewer than nine extra wins per thousand games. For all practical purposes, Yatzy remains a game of parallel solitaire.
+The obvious question then becomes: Can Player 2 use their knowledge of Player 1's game to improve their probability of *winning*?
+
+**The short answer: yes, but only by 0.9% percentage points.** The obvious baseline is that if both players use the fixed, EV-optimal strategy, they each win 50% of games. Let's explore what limits how far we can push the win percentage for Player 2 by using information about Player 1's game.
 
 :::html
 <div class="chart-container" id="chart-game-replay">
@@ -15,60 +17,33 @@ But sequential play introduces an asymmetry. In the standard format, Player 2 ob
 </div>
 :::
 
-The path to that 0.9% is surprisingly rich. It involves a variance-scaling formula derived from Z-score maximization, exposes the structural failure of proxy utility functions in threshold games, and demands a 6.4 GB backward-induction computation to establish the absolute theoretical ceiling.
+### Adaptive Risk Taking
 
-### The Framework: Trading EV for Variance
+The mechanism by which a player can adapt to their opponent is by taking more or less risk. In practice, that means trading expected value for variance according to the frontier mapped out in Section 5. There, we introduced the ::concept[exponential utility]{cara-utility} U(x) = e<sup>&theta;x</sup>, where &theta; controls risk taking. We also showed how precomputed strategy tables across a grid of &theta; values produce diffrent points on the ::concept[mean-variance frontier]{mean-variance-frontier}.
 
-To adapt to an opponent, a player needs the ability to intentionally trade expected value for variance. Section 5 introduced the ::concept[exponential utility]{cara-utility} U(x) = e<sup>&theta;x</sup>, where &theta; controls the risk posture, and showed how precomputed strategy tables across a grid of &theta; values produce a spectrum of risk postures.
+The relationship (derived in the math section below) is the **marginal rate of substitution**: &part;E/&part;V = &minus;&theta;/2.
 
-Each &theta; table finds a different point on the ::concept[mean-variance frontier]{mean-variance-frontier}. The key relationship (derived in the math section below) is the **marginal rate of substitution**: &part;E/&part;V = &minus;&theta;/2. This gives &theta; a precise geometric meaning. At &theta; = 0, the solver sits at peak EV. At &theta; = 0.10, it slides right along the frontier, accepting a drop of 1 point of EV per 20 units of variance gained. At &theta; = &minus;0.10, it slides left, paying EV to crush variance. This relationship is the engine connecting static risk tables to dynamic win-probability optimization.
+In practice, Player 2 does not know the opponent's final score. Player 2 can only observe Player 1's trajectory unfold turn by turn. From the visible state, Player 2 can estimate the opponent's expected final score via a state-value table lookup: E[final] = current_total + EV_remaining(state). The challenge is determining exactly how much risk to take based on the EV deficit (the opponent's expected final minus own expected final).
 
-The baseline head-to-head (H2H) win rate, where both players use the EV-optimal &theta; = 0 policy (excluding draws), is **50.04%**.
+### Why Variance Matters
 
-### The Oracle Ceiling
+My first intuition was to scale risk (&theta;) linearly with the EV deficit. But a 15-point deficit at turn 2 is noise: there are 13 turns of dice rolls left, each adding uncertainty. The same deficit at turn 14 is an emergency. To find the optimal amount of risk, we need to account for how much uncertainty remains.
 
-Before building any adaptive strategy, we establish a ceiling. If you knew your opponent's final score before the game began, and picked the single best constant &theta; for that exact outcome, how much would it help?
+Player 2's goal is not to maximize their own score. It is to maximize P(S<sub>2</sub> &gt; S<sub>1</sub>): the probability that their final score exceeds Player 1's. Because 15 turns of dice rolls produce many independent random events, final scores are approximately Gaussian. The *difference* S<sub>2</sub> &minus; S<sub>1</sub> is therefore also Gaussian, with mean E<sub>2</sub> &minus; E<sub>1</sub> and variance V<sub>1</sub> + V<sub>2</sub> (a standard result: variances add when subtracting independent random variables).
 
-The chart below splits opponent final scores into seven bands and shows, for each band, the win rate of EV-optimal play alongside the win rate of the best possible fixed &theta; for that band. This "oracle" has information no real player could have: it knows the opponent's total in advance and selects its risk posture accordingly.
+Player 2 wins when this difference is positive. For a Gaussian, the probability of exceeding zero is entirely determined by the ::concept[Z-score]{z-score}: Z = (E<sub>2</sub> &minus; E<sub>1</sub>) / &radic;(V<sub>1</sub> + V<sub>2</sub>). A higher Z-score means the center of the bell curve is further from the losing side, which means a larger probability of winning. Maximizing the Z-score is therefore identical to maximizing win probability.
 
-:::html
-<div class="chart-container" id="chart-oracle-winrate">
-  <div id="chart-oracle-winrate-svg"></div>
-  <p class="chart-caption">Conditional win rates per opponent score band. Gray: EV-optimal (&theta; = 0). Colored: best fixed &theta; for each band, colored by the optimal &theta; value (blue = conservative, orange = risk-seeking).</p>
-</div>
-:::
+Player 2 controls their own expected score and variance by choosing a &theta; table. Taking more risk (higher &theta;) increases variance but reduces expected score. There is a tension: increasing E<sub>2</sub> pushes the numerator up, but if it comes at the cost of inflating V<sub>2</sub>, the denominator grows and the Z-score can actually drop.
 
-When the opponent scored below 200, the oracle plays conservatively (&theta; = &minus;0.03), protecting a near-certain lead. When the opponent scored above 280, it plays risk-seeking (&theta; = +0.04), because only tail outcomes can win against a strong score. The transition from negative to positive &theta; happens near the mean (~250), where the two distributions overlap most.
-
-The overall oracle win rate is **~50.6% H2H**: a gain of +0.60 percentage points over EV-optimal. That is the ceiling for any strategy that picks one constant &theta; per game.
-
-### Turn-by-Turn Adaptation
-
-In practice, Player 2 does not know the opponent's final score. They observe it unfold turn by turn. From the visible state, Player 2 can estimate the opponent's expected final score via a state-value table lookup: E[final] = current_total + EV_remaining(state).
-
-The simplest adaptive policy scales &theta; linearly with the *EV deficit* (opponent's expected final minus own expected final). When trailing, increase &theta;; when leading, decrease it. Three variants tested at 10 million games each:
-
-| Policy | Description | H2H Win Rate | Net Advantage |
-|--------|-------------|-------------|---------------|
-| Seek-only | &theta; ramps 0 &rarr; +0.05 when trailing | 50.44% | +0.41pp |
-| Protect-only | &theta; ramps 0 &rarr; &minus;0.03 when leading | 50.20% | +0.16pp |
-| Symmetric | Seek when trailing + protect when leading | 50.57% | +0.53pp |
-
-The symmetric policy approaches the oracle ceiling (+0.53pp vs. +0.60pp) despite having far less information. It manages this because turn-by-turn switching pays the mean-score penalty only for turns where &theta; deviates from zero, while the oracle pays for all 15 turns. Risk-seeking when trailing contributes roughly 75% of the advantage; protecting when leading adds the remaining 25%.
-
-An intuitive extension is to play EV-optimal for most of the game, then "go for broke" in the last 2-3 turns when trailing. Every such "Hail Mary" variant performed worse than the symmetric policy, and most were worse than the EV-optimal baseline. The failure is structural: under large &theta;, the exponential utility e<sup>&theta;x</sup> amplifies extreme scores so aggressively that the solver chases maximum-score outcomes rather than outcomes that beat the target. Under U(x) = e<sup>0.50x</sup>, scoring 50 points has over 3 million times the utility of scoring 20 points. The table becomes a *max-score chaser* rather than a *target optimizer*. Continuous proxy utilities cannot express the step-function logic of a head-to-head match, where winning by 1 point is exactly as valuable as winning by 100.
-
-### Variance-Scaled Risk
-
-The symmetric policy has a structural flaw: it is horizon-blind. A 15-point deficit receives the same &theta; at turn 2 and turn 14, even though early deficits are noise (remaining variance is large) and late deficits are emergencies (remaining variance is small).
-
-The fix comes from a clean derivation (detailed in the math section). If we model the final scores as approximately Gaussian, Player 2 maximizes P(S<sub>2</sub> &gt; S<sub>1</sub>) by maximizing the Z-score of the score difference. Equating the match-optimal slope with the tables' built-in MRS yields:
+The calculus (detailed in the math section below) resolves this tension exactly. By differentiating the Z-score with respect to V<sub>2</sub> and equating the result with the tables' built-in exchange rate between mean and variance (&part;E/&part;V = &minus;&theta;/2), we get:
 
 :::equation
 \theta^* = \frac{E_1 - E_2}{V_1 + V_2}
 :::
 
-This is positive when trailing (seek risk), negative when leading (protect), and scales inversely with remaining uncertainty. Early in the game V<sub>1</sub> + V<sub>2</sub> exceeds 3000, suppressing &theta;* even for large deficits. Late in the game it drops below 500, amplifying small deficits into decisive risk adjustments. If the opponent is on the bubble for the 50-point upper bonus, their remaining variance V<sub>1</sub> is large; the formula commands patience. The moment the opponent locks or fails the bonus, V<sub>1</sub> collapses, &theta;* spikes, and the policy pivots.
+This formula dictates exactly how much risk to take. It is positive when trailing (seek risk), negative when leading (protect), and vanishes when scores are even. Crucially, it scales inversely with remaining uncertainty. Early in the game V<sub>1</sub> + V<sub>2</sub> exceeds 3000, suppressing &theta;* even for large deficits. Late in the game it drops below 500, amplifying small deficits into decisive risk adjustments. If the opponent is on the bubble for the 50-point upper bonus, their remaining variance V<sub>1</sub> is large; the formula commands patience. The moment the opponent locks or fails the bonus, V<sub>1</sub> collapses, &theta;* spikes, and the policy pivots.
+
+In contrast, a simple linear policy that ignores variance (setting &theta; proportional to the deficit alone) applies the same risk at turn 2 and turn 14. This is structurally horizon-blind and leaves performance on the table, as the results below confirm.
 
 Use the slider below to see how the same deficit produces different &theta; at different turns. The variance-scaled policy (solid) is conservative early and aggressive late. The linear policy (dashed) applies the same &theta; regardless of turn. The faded line shows unclamped &theta;*, which shoots into the degeneration zone in the final turns.
 
@@ -83,41 +58,50 @@ Use the slider below to see how the same deficit produces different &theta; at d
 </div>
 :::
 
-The remaining variance is extracted in O(1) from two table lookups (see math section), and the raw &theta;* is clamped to [&minus;0.05, +0.07] to prevent the utility degeneration described above.
+The remaining variance is extracted in O(1) from two table lookups (see math section), and the raw &theta;* is clamped to [&minus;0.05, +0.07] to prevent the utility degeneration described in Section 5.
 
-| Policy | H2H Win Rate | Net Advantage |
-|--------|-------------|---------------|
-| Variance-scaled [&minus;0.05, +0.07] | **50.9%** | **+0.86pp** |
-| Symmetric (reference) | 50.6% | +0.53pp |
+### The Theoretical Ceiling
 
-The variance-scaled policy is 2x more conservative than symmetric in early turns and 2x more aggressive in late turns, with the crossover at turn 8. A parameter sweep over 9 clamp configurations confirmed the landscape is flat above +0.07 on the seek side and insensitive to the protect clamp. The policy has reached its architectural ceiling within the &theta;-table-switching framework.
+Before reporting results, let's establish the theoretical limits. How much advantage can Player 2 possibly extract?
 
-### The Absolute Ceiling: 3D Threshold Tablebase
+**The constant-&theta; oracle.** As a first bound, suppose Player 2 knew the opponent's final score before the game began, and could pick the single best &theta; for that outcome. The chart below splits opponent final scores into seven bands and shows, for each band, the win rate of EV-optimal play alongside the win rate of the best possible fixed &theta; for that band.
 
-The variance-scaled policy is constrained to selecting one precomputed &theta; table per turn. How close is this to the theoretical maximum? To answer that, we solve a different game entirely.
+:::html
+<div class="chart-container" id="chart-oracle-winrate">
+  <div id="chart-oracle-winrate-svg"></div>
+  <p class="chart-caption">Conditional win rates per opponent score band. Gray: EV-optimal (&theta; = 0). Colored: best fixed &theta; for each band, colored by the optimal &theta; value (blue = conservative, orange = risk-seeking).</p>
+</div>
+:::
 
-**The clairvoyant game.** Player 1 plays all 15 turns in isolation and writes their final score on a piece of paper. Player 2 then plays knowing exactly what number they must beat. This is a fundamentally different format from interleaved play. So why compute it?
+When the opponent scored below 200, the oracle plays conservatively (&theta; = &minus;0.03). We know we can reduce variance by reducing risk, and if the loss in mean is less than the variance, and we know the final score of the other player, we can improve our chances of winning. Reversely, if the opponent scored above 280, the Oracle will be more risk-seeking (&theta; = +0.04). That's because we know it will take a tail-outcome to beat Player 1. The transition from negative to positive &theta; happens near the mean (~250), where the two distributions overlap most. The overall oracle win rate is **~50.6% H2H**: a gain of +0.60 percentage points over EV-optimal.
 
-The answer is *information relaxation*, a technique from dynamic programming. Three properties make this "breached" game a rigorous ceiling for the real game:
+**The unconstrained clairvoyant.** The constant-&theta; oracle is limited to selecting one precomputed &theta; table per game. A stronger bound comes from solving a different game entirely: Player 1 plays all 15 turns in isolation and writes their final score on a piece of paper. Player 2 then plays knowing exactly what number they must beat.
 
-First, **Player 1 is a fixed environment.** Because Player 1 uses the EV-optimal policy and ignores Player 2, turn order does not affect Player 1's score distribution. To Player 2, Player 1 is not a reactive opponent; they are a complex random number generator.
+This is a fundamentally different format from interleaved play, but *information relaxation* makes it a rigorous ceiling. First, Player 1 uses the EV-optimal policy and ignores Player 2, so turn order does not affect Player 1's score distribution. To Player 2, Player 1 is not a reactive opponent; they are a complex random number generator. Second, more information never hurts: a policy with perfect future information always performs at least as well as one with partial present information. Third, revealing the final score collapses the state space. The exact turn-by-turn optimum requires a joint-state MDP with approximately 164 trillion states. By revealing the final score, Player 1's game tree reduces to a single target number T, shrinking the problem to 1.43 million states &times; 384 possible targets, solvable in under 6 minutes.
 
-Second, **more information never hurts.** A policy with perfect future information always performs at least as well as one with partial present information. The clairvoyant never wastes EV on a risk it did not need, and never plays it safe when the opponent is about to roll a Yatzy on turn 14.
+We solved a 3D backward-induction DP over the state space (upper_score, scored_categories, target_score_needed). For each reachable state and target score, the solver maximizes P(final_score &gt; T). Unlike the &theta; tables, the optimal category depends on the target: at T = 200, the solver prefers safe scoring; at T = 300, it makes entirely different trade-offs. No continuous utility function can express this step-function logic, where winning by 1 point is exactly as valuable as winning by 100.
 
-Third, **it collapses the state space.** The exact turn-by-turn optimum requires a joint-state MDP with approximately 164 trillion states. By revealing the final score, Player 1's game tree reduces to a single target number T, shrinking the problem to 1.43 million states, solvable in under 6 minutes.
+The clairvoyant ceiling is **~55.3% H2H**: a gain of +5.3 percentage points. The 4.7pp gap between the constant-&theta; oracle (50.6%) and the clairvoyant (55.3%) isolates the structural cost of continuous proxy utilities. Both have perfect information; the difference is purely in the expressiveness of their decision-making.
 
-We solved a 3D backward-induction DP over the state space (upper_score, scored_categories, target_score_needed). For each of 1.43 million reachable states and 384 target scores, the solver maximizes P(final_score &gt; T). Unlike the &theta; tables, the optimal category depends on the target: at T = 200, the solver prefers safe scoring; at T = 300, it makes entirely different trade-offs.
+### Turn-by-Turn Adaptation
 
-| Strategy | H2H Win Rate | Net Advantage | % of Ceiling |
-|----------|-------------|---------------|-------------|
-| EV-optimal baseline | 50.04% | 0.00pp | 0% |
-| Constant-&theta; oracle | ~50.6% | +0.60pp | 11% |
-| Variance-scaled (best heuristic) | 50.9% | +0.86pp | 16% |
-| **Unconstrained clairvoyant** | **~55.3%** | **+5.3pp** | **100%** |
+With the theoretical bounds established, we can now evaluate practical strategies. We tested five adaptive policies at 10 million games each, alongside the two theoretical bounds:
 
-**The action gap.** The 4.7pp gap between the constant-&theta; oracle (50.6%) and the unconstrained clairvoyant (55.3%) isolates the structural cost of continuous proxy utilities. Both have perfect information; the difference is purely in decision-making. The clairvoyant executes non-linear sacrifice plays (intentionally zeroing a risky category to lock in exact points needed) that no continuous utility function can express.
+| Strategy | H2H Win Rate | Net Advantage |
+|----------|-------------|---------------|
+| EV-optimal baseline | 50.04% | 0.00pp |
+| Seek-only (linear) | 50.44% | +0.41pp |
+| Protect-only (linear) | 50.20% | +0.16pp |
+| Symmetric (linear) | 50.57% | +0.53pp |
+| Constant-&theta; oracle | ~50.6% | +0.60pp |
+| **Variance-scaled [&minus;0.05, +0.07]** | **50.9%** | **+0.86pp** |
+| Unconstrained clairvoyant | ~55.3% | +5.3pp |
 
-**The stochastic washout effect.** Even with clairvoyant knowledge and unconstrained decisions, the maximum edge is ~5.3 percentage points. Under realistic sequential observation, it collapses to +0.86pp: fewer than 9 extra wins per 1000 games. The aleatoric entropy of 15 turns of dice rolls overwhelmingly dominates the strategic bandwidth of reactive play. Our best heuristic captures 16% of the combined ceiling; the true sequential optimum lies somewhere in [50.9%, 55.3%], and the heuristic captures more than 16% of the realistically achievable advantage.
+The linear policies scale &theta; proportionally with the EV deficit but ignore remaining variance. Risk-seeking when trailing contributes roughly 75% of the advantage; protecting when leading adds the remaining 25%. We also tested "Hail Mary" variants that play EV-optimal until the last 2-3 turns then spike &theta;. Every such variant performed worse than the linear policies: under large &theta;, the exponential utility becomes a max-score chaser rather than a target optimizer.
+
+The variance-scaled policy surpasses the constant-&theta; oracle despite having less information, because it pays the mean-score penalty only on turns where &theta; deviates from zero. It is 2x more conservative than the symmetric policy in early turns and 2x more aggressive in late turns, with the crossover at turn 8. A parameter sweep over 9 clamp configurations confirmed the landscape is flat above +0.07 on the seek side and insensitive to the protect clamp.
+
+**The stochastic washout effect.** Even with clairvoyant knowledge and unconstrained decisions, the maximum edge is ~5.3 percentage points. Under realistic sequential observation, it collapses to +0.86pp: fewer than 9 extra wins per 1000 games. The aleatoric entropy of 15 turns of dice rolls overwhelmingly dominates the strategic bandwidth of reactive play. The true sequential optimum lies somewhere in [50.9%, 55.3%], and our best heuristic captures the lower end of this range.
 
 :::math
 
@@ -139,13 +123,15 @@ This is the marginal rate of substitution on the mean-variance frontier. Running
 
 ### The Z-Score Derivation
 
-Model final scores as independent distributions with means E<sub>i</sub> and variances V<sub>i</sub>. Player 2 maximizes:
+**Setup.** Model final scores S<sub>1</sub>, S<sub>2</sub> as independent distributions with means E<sub>i</sub> and variances V<sub>i</sub>. Their difference S<sub>2</sub> &minus; S<sub>1</sub> has mean E<sub>2</sub> &minus; E<sub>1</sub> and variance V<sub>1</sub> + V<sub>2</sub> (variances add for independent variables). Under the Gaussian approximation, the probability that Player 2 wins is:
 
 :::equation
 P(S_2 > S_1) = \Phi(Z) \quad \text{where} \quad Z = \frac{E_2 - E_1}{\sqrt{V_1 + V_2}}
 :::
 
-Player 2 controls (E<sub>2</sub>, V<sub>2</sub>) by choosing &theta;. Taking dZ/dV<sub>2</sub> = 0:
+Since &Phi; is monotonically increasing, maximizing Z is equivalent to maximizing win probability.
+
+**The optimization.** Player 2 controls (E<sub>2</sub>, V<sub>2</sub>) by choosing a &theta; table. Player 1's (E<sub>1</sub>, V<sub>1</sub>) are fixed. Taking dZ/dV<sub>2</sub> = 0 via the quotient rule:
 
 :::equation
 \frac{dZ}{dV_2} = \frac{\frac{\partial E_2}{\partial V_2} \cdot \sqrt{V_1 + V_2} - \frac{E_2 - E_1}{2\sqrt{V_1 + V_2}}}{V_1 + V_2} = 0
@@ -154,22 +140,22 @@ Player 2 controls (E<sub>2</sub>, V<sub>2</sub>) by choosing &theta;. Taking dZ/
 The numerator vanishes when:
 
 :::equation
-\frac{\partial E_2}{\partial V_2}(V_1 + V_2) = \frac{E_2 - E_1}{2}
+\frac{\partial E_2}{\partial V_2} = \frac{E_2 - E_1}{2(V_1 + V_2)}
 :::
 
-Substituting &part;E<sub>2</sub>/&part;V<sub>2</sub> = &minus;&theta;/2 from the MRS:
+**Connecting to the &theta; tables.** From the MRS derived above, each &theta; table satisfies &part;E/&part;V = &minus;&theta;/2 at its operating point. Substituting:
 
 :::equation
-\left(-\frac{\theta^*}{2}\right)(V_1 + V_2) = \frac{E_2 - E_1}{2}
+-\frac{\theta^*}{2} = \frac{E_2 - E_1}{2(V_1 + V_2)}
 :::
 
-The 1/2 factors cancel, yielding:
+The factors of 2 cancel, yielding:
 
 :::equation
 \theta^* = \frac{E_1 - E_2}{V_1 + V_2}
 :::
 
-**Properties.** The formula is positive when trailing (E<sub>1</sub> &gt; E<sub>2</sub>), negative when leading, and vanishes when even. It scales inversely with total remaining variance: early in the game V<sub>1</sub> + V<sub>2</sub> &gt; 3000, suppressing &theta;* even for large deficits. Late in the game V<sub>1</sub> + V<sub>2</sub> &lt; 500, amplifying small deficits into meaningful risk adjustments.
+**Interpretation.** The formula is positive when trailing (E<sub>1</sub> &gt; E<sub>2</sub>), commanding risk-seeking play. It is negative when leading, commanding conservative play. It vanishes when scores are even. The denominator is the key: the same point deficit produces a small &theta;* early (V<sub>1</sub> + V<sub>2</sub> &gt; 3000) and a large &theta;* late (V<sub>1</sub> + V<sub>2</sub> &lt; 500).
 
 ### The O(1) Variance Extraction
 
