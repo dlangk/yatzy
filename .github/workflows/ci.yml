@@ -49,6 +49,22 @@ jobs:
         run: npx vitest run
         working-directory: frontend
 
+  analytics:
+    name: Analytics (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install
+        run: uv sync --all-extras
+        working-directory: analytics
+      - name: Lint
+        run: uv run ruff check .
+        working-directory: analytics
+      - name: Test
+        run: uv run pytest
+        working-directory: analytics
+
   treatise:
     name: Treatise (build)
     runs-on: ubuntu-latest

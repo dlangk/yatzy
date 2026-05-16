@@ -46,17 +46,27 @@ function injectStyles() {
     .site-nav a {
       text-decoration: none;
       color: var(--text-muted, #555);
-      padding: 2px 12px;
+      padding: 0 12px;
       border-radius: 5px;
-      line-height: 20px;
+      font-size: 15px;
+      display: inline-flex;
+      align-items: center;
       height: 24px;
-      transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+      box-sizing: border-box;
+      transition: background 0.15s, color 0.15s, box-shadow 0.15s, border-color 0.15s;
       position: relative;
       width: 80px;
-      text-align: center;
+      justify-content: center;
       font-weight: 600;
       border: 1px solid var(--border, #d4d3cd);
       background: var(--bg, #f6f5ef);
+    }
+
+    .site-nav a.site-nav-home {
+      width: auto;
+      font-size: 13px;
+      font-weight: 400;
+      padding: 0 10px;
     }
 
     .site-nav a:hover {
@@ -131,6 +141,13 @@ function injectNav() {
 
   const links = document.createElement('div');
   links.className = 'site-nav-links';
+
+  // Back to langkilde.se
+  const home = document.createElement('a');
+  home.href = 'https://langkilde.se';
+  home.textContent = '← langkilde.se';
+  home.className = 'site-nav-home';
+  links.appendChild(home);
 
   for (const page of PAGES) {
     const a = document.createElement('a');

@@ -73,7 +73,7 @@ Before reporting results, let's establish the theoretical limits. How much advan
 </div>
 :::
 
-When the opponent scored below 200, the oracle plays conservatively (&theta; = &minus;0.03). We know we can reduce variance by reducing risk, and if the loss in mean is less than the variance, and we know the final score of the other player, we can improve our chances of winning. Reversely, if the opponent scored above 280, the Oracle will be more risk-seeking (&theta; = +0.04). That's because we know it will take a tail-outcome to beat Player 1. The transition from negative to positive &theta; happens near the mean (~250), where the two distributions overlap most. The overall oracle win rate is **~50.6% H2H**: a gain of +0.60 percentage points over EV-optimal.
+When the opponent scored below 200, the oracle plays conservatively (&theta; = &minus;0.03). We know we can reduce variance by reducing risk, and if the loss in mean is less than the variance, and we know the final score of the other player, we can improve our chances of winning. Reversely, if the opponent scored above 280, the Oracle will be more risk-seeking (&theta; = +0.04). That's because we know it will take a tail-outcome to beat Player 1. The transition from negative to positive &theta; happens near the mean (~250), where the two distributions overlap most. The overall oracle win rate is **50.6% H2H**: a gain of +0.60 percentage points over EV-optimal.
 
 **The unconstrained clairvoyant.** The constant-&theta; oracle is limited to selecting one precomputed &theta; table per game. A stronger bound comes from solving a different game entirely: Player 1 plays all 15 turns in isolation and writes their final score on a piece of paper. Player 2 then plays knowing exactly what number they must beat.
 
@@ -81,7 +81,7 @@ This is a fundamentally different format from interleaved play, but *information
 
 We solved a 3D backward-induction DP over the state space (upper_score, scored_categories, target_score_needed). For each reachable state and target score, the solver maximizes P(final_score &gt; T). Unlike the &theta; tables, the optimal category depends on the target: at T = 200, the solver prefers safe scoring; at T = 300, it makes entirely different trade-offs. No continuous utility function can express this step-function logic, where winning by 1 point is exactly as valuable as winning by 100.
 
-The clairvoyant ceiling is **~55.3% H2H**: a gain of +5.3 percentage points. The 4.7pp gap between the constant-&theta; oracle (50.6%) and the clairvoyant (55.3%) isolates the structural cost of continuous proxy utilities. Both have perfect information; the difference is purely in the expressiveness of their decision-making.
+The clairvoyant ceiling is **55.3% H2H**: a gain of +5.3 percentage points. The 4.7pp gap between the constant-&theta; oracle (50.6%) and the clairvoyant (55.3%) isolates the structural cost of continuous proxy utilities. Both have perfect information; the difference is purely in the expressiveness of their decision-making.
 
 ### Turn-by-Turn Adaptation
 
@@ -93,9 +93,9 @@ With the theoretical bounds established, we can now evaluate practical strategie
 | Seek-only (linear) | 50.44% | +0.41pp |
 | Protect-only (linear) | 50.20% | +0.16pp |
 | Symmetric (linear) | 50.57% | +0.53pp |
-| Constant-&theta; oracle | ~50.6% | +0.60pp |
+| Constant-&theta; oracle | 50.6% | +0.60pp |
 | **Variance-scaled [&minus;0.05, +0.07]** | **50.9%** | **+0.86pp** |
-| Unconstrained clairvoyant | ~55.3% | +5.3pp |
+| Unconstrained clairvoyant | 55.3% | +5.3pp |
 
 The linear policies scale &theta; proportionally with the EV deficit but ignore remaining variance. Risk-seeking when trailing contributes roughly 75% of the advantage; protecting when leading adds the remaining 25%. We also tested "Hail Mary" variants that play EV-optimal until the last 2-3 turns then spike &theta;. Every such variant performed worse than the linear policies: under large &theta;, the exponential utility becomes a max-score chaser rather than a target optimizer.
 
