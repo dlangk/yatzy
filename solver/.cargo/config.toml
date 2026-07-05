@@ -1,2 +1,6 @@
 [build]
+# -unroll-threshold=1200: makes LLVM unroll the variable-trip-count CSR dot
+# products in the per-game decide path (measured -7.5% on 1M-game simulate,
+# bit-identical; sweep showed 500 = no effect, 1200 = optimal). Internal LLVM
+# option: an unknown-option error on a future toolchain means re-sweep it.
 rustflags = ["-C", "target-cpu=native"]

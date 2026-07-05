@@ -140,13 +140,20 @@ fn batched_group53(
     for kid in 0..NUM_KEEP_MULTISETS {
         let start = kt.row_start[kid] as usize;
         let end = kt.row_start[kid + 1] as usize;
-        let kev = &mut keep_ev[kid];
+        // SAFETY: kid < NUM_KEEP_MULTISETS = keep_ev.len().
+        debug_assert!(kid < keep_ev.len());
+        let kev = unsafe { keep_ev.get_unchecked_mut(kid) };
         *kev = [0.0f32; 64];
 
         for k in start..end {
             let prob = unsafe { *vals.get_unchecked(k) };
             let col = unsafe { *cols.get_unchecked(k) } as usize;
-            let e_row = &e_prev[col];
+            // SAFETY: cols entries are dice-set indices < 252 = e_prev.len()
+            // (phase0 KeepTable construction). Bounds check here is a panic
+            // side-exit that blocks LLVM from register-promoting the 64-f32
+            // accumulator row (16 q-regs), forcing ~9.5x memory round-trips.
+            debug_assert!(col < e_prev.len());
+            let e_row = unsafe { e_prev.get_unchecked(col) };
             unsafe { neon_fma_64(kev, e_row, prob) };
         }
     }
@@ -158,7 +165,10 @@ fn batched_group53(
 
         for j in 0..kt.unique_count[ds_i] as usize {
             let kid = unsafe { *kt.unique_keep_ids[ds_i].get_unchecked(j) } as usize;
-            let kev = &keep_ev[kid];
+            // SAFETY: kid < NUM_KEEP_MULTISETS = keep_ev.len() (unique_keep_ids
+            // construction). Same register-promotion rationale as Step 1.
+            debug_assert!(kid < keep_ev.len());
+            let kev = unsafe { keep_ev.get_unchecked(kid) };
             unsafe { neon_max_64(row, kev) };
         }
     }
@@ -175,7 +185,9 @@ fn batched_group1(ctx: &YatzyContext, e: &[[f32; 64]]) -> [f32; 64] {
     let mut result = [0.0f32; 64];
     for ds_i in 0..252 {
         let prob = ctx.dice_set_probabilities[ds_i] as f32;
-        let e_row = &e[ds_i];
+        // SAFETY: ds_i < 252 = e.len() (BatchedBuffers rows).
+        debug_assert!(ds_i < e.len());
+        let e_row = unsafe { e.get_unchecked(ds_i) };
         unsafe { neon_fma_64(&mut result, e_row, prob) };
     }
     result
@@ -315,7 +327,9 @@ fn batched_group53_risk(
     for kid in 0..NUM_KEEP_MULTISETS {
         let start = kt.row_start[kid] as usize;
         let end = kt.row_start[kid + 1] as usize;
-        let kev = &mut keep_ev[kid];
+        // SAFETY: kid < NUM_KEEP_MULTISETS = keep_ev.len().
+        debug_assert!(kid < keep_ev.len());
+        let kev = unsafe { keep_ev.get_unchecked_mut(kid) };
 
         if start == end {
             *kev = [empty_val; 64];
@@ -326,7 +340,12 @@ fn batched_group53_risk(
         let mut max_vals = [f32::NEG_INFINITY; 64];
         for k in start..end {
             let col = unsafe { *cols.get_unchecked(k) } as usize;
-            let e_row = &e_prev[col];
+            // SAFETY: cols entries are dice-set indices < 252 = e_prev.len()
+            // (phase0 KeepTable construction). Bounds check here is a panic
+            // side-exit that blocks LLVM from register-promoting the 64-f32
+            // accumulator row (16 q-regs), forcing ~9.5x memory round-trips.
+            debug_assert!(col < e_prev.len());
+            let e_row = unsafe { e_prev.get_unchecked(col) };
             unsafe { neon_max_64(&mut max_vals, e_row) };
         }
 
@@ -335,7 +354,12 @@ fn batched_group53_risk(
         for k in start..end {
             let prob = unsafe { *vals.get_unchecked(k) };
             let col = unsafe { *cols.get_unchecked(k) } as usize;
-            let e_row = &e_prev[col];
+            // SAFETY: cols entries are dice-set indices < 252 = e_prev.len()
+            // (phase0 KeepTable construction). Bounds check here is a panic
+            // side-exit that blocks LLVM from register-promoting the 64-f32
+            // accumulator row (16 q-regs), forcing ~9.5x memory round-trips.
+            debug_assert!(col < e_prev.len());
+            let e_row = unsafe { e_prev.get_unchecked(col) };
             unsafe { neon_weighted_exp_sum_64(&mut sums, e_row, &max_vals, prob) };
         }
 
@@ -352,7 +376,10 @@ fn batched_group53_risk(
 
         for j in 0..kt.unique_count[ds_i] as usize {
             let kid = unsafe { *kt.unique_keep_ids[ds_i].get_unchecked(j) } as usize;
-            let kev = &keep_ev[kid];
+            // SAFETY: kid < NUM_KEEP_MULTISETS = keep_ev.len() (unique_keep_ids
+            // construction). Same register-promotion rationale as Step 1.
+            debug_assert!(kid < keep_ev.len());
+            let kev = unsafe { keep_ev.get_unchecked(kid) };
             if minimize {
                 unsafe { neon_min_64(row, kev) };
             } else {
@@ -368,7 +395,9 @@ fn batched_group1_risk(ctx: &YatzyContext, e: &[[f32; 64]]) -> [f32; 64] {
     // Pass 1: NEON max — find max per up
     let mut max_vals = [f32::NEG_INFINITY; 64];
     for ds_i in 0..252 {
-        let e_row = &e[ds_i];
+        // SAFETY: ds_i < 252 = e.len() (BatchedBuffers rows).
+        debug_assert!(ds_i < e.len());
+        let e_row = unsafe { e.get_unchecked(ds_i) };
         unsafe { neon_max_64(&mut max_vals, e_row) };
     }
 
@@ -376,7 +405,9 @@ fn batched_group1_risk(ctx: &YatzyContext, e: &[[f32; 64]]) -> [f32; 64] {
     let mut sums = [0.0f32; 64];
     for ds_i in 0..252 {
         let prob = ctx.dice_set_probabilities[ds_i] as f32;
-        let e_row = &e[ds_i];
+        // SAFETY: ds_i < 252 = e.len() (BatchedBuffers rows).
+        debug_assert!(ds_i < e.len());
+        let e_row = unsafe { e.get_unchecked(ds_i) };
         unsafe { neon_weighted_exp_sum_64(&mut sums, e_row, &max_vals, prob) };
     }
 
@@ -435,7 +466,12 @@ fn batched_group53_max(
 
         for k in start..end {
             let col = unsafe { *cols.get_unchecked(k) } as usize;
-            let e_row = &e_prev[col];
+            // SAFETY: cols entries are dice-set indices < 252 = e_prev.len()
+            // (phase0 KeepTable construction). Bounds check here is a panic
+            // side-exit that blocks LLVM from register-promoting the 64-f32
+            // accumulator row (16 q-regs), forcing ~9.5x memory round-trips.
+            debug_assert!(col < e_prev.len());
+            let e_row = unsafe { e_prev.get_unchecked(col) };
             unsafe { neon_max_64(km, e_row) };
         }
     }
@@ -458,7 +494,9 @@ fn batched_group53_max(
 fn batched_group1_max(e: &[[f32; 64]]) -> [f32; 64] {
     let mut result = [f32::NEG_INFINITY; 64];
     for ds_i in 0..252 {
-        let e_row = &e[ds_i];
+        // SAFETY: ds_i < 252 = e.len() (BatchedBuffers rows).
+        debug_assert!(ds_i < e.len());
+        let e_row = unsafe { e.get_unchecked(ds_i) };
         unsafe { neon_max_64(&mut result, e_row) };
     }
     result
@@ -606,13 +644,20 @@ fn batched_group53_utility(
     for kid in 0..NUM_KEEP_MULTISETS {
         let start = kt.row_start[kid] as usize;
         let end = kt.row_start[kid + 1] as usize;
-        let kev = &mut keep_ev[kid];
+        // SAFETY: kid < NUM_KEEP_MULTISETS = keep_ev.len().
+        debug_assert!(kid < keep_ev.len());
+        let kev = unsafe { keep_ev.get_unchecked_mut(kid) };
         *kev = [0.0f32; 64];
 
         for k in start..end {
             let prob = unsafe { *vals.get_unchecked(k) };
             let col = unsafe { *cols.get_unchecked(k) } as usize;
-            let e_row = &e_prev[col];
+            // SAFETY: cols entries are dice-set indices < 252 = e_prev.len()
+            // (phase0 KeepTable construction). Bounds check here is a panic
+            // side-exit that blocks LLVM from register-promoting the 64-f32
+            // accumulator row (16 q-regs), forcing ~9.5x memory round-trips.
+            debug_assert!(col < e_prev.len());
+            let e_row = unsafe { e_prev.get_unchecked(col) };
             unsafe { neon_fma_64(kev, e_row, prob) };
         }
     }
@@ -624,7 +669,10 @@ fn batched_group53_utility(
 
         for j in 0..kt.unique_count[ds_i] as usize {
             let kid = unsafe { *kt.unique_keep_ids[ds_i].get_unchecked(j) } as usize;
-            let kev = &keep_ev[kid];
+            // SAFETY: kid < NUM_KEEP_MULTISETS = keep_ev.len() (unique_keep_ids
+            // construction). Same register-promotion rationale as Step 1.
+            debug_assert!(kid < keep_ev.len());
+            let kev = unsafe { keep_ev.get_unchecked(kid) };
             if minimize {
                 unsafe { neon_min_64(row, kev) };
             } else {
@@ -808,13 +856,20 @@ fn batched_group53_with_argmax(
     for kid in 0..NUM_KEEP_MULTISETS {
         let start = kt.row_start[kid] as usize;
         let end = kt.row_start[kid + 1] as usize;
-        let kev = &mut keep_ev[kid];
+        // SAFETY: kid < NUM_KEEP_MULTISETS = keep_ev.len().
+        debug_assert!(kid < keep_ev.len());
+        let kev = unsafe { keep_ev.get_unchecked_mut(kid) };
         *kev = [0.0f32; 64];
 
         for k in start..end {
             let prob = unsafe { *vals.get_unchecked(k) };
             let col = unsafe { *cols.get_unchecked(k) } as usize;
-            let e_row = &e_prev[col];
+            // SAFETY: cols entries are dice-set indices < 252 = e_prev.len()
+            // (phase0 KeepTable construction). Bounds check here is a panic
+            // side-exit that blocks LLVM from register-promoting the 64-f32
+            // accumulator row (16 q-regs), forcing ~9.5x memory round-trips.
+            debug_assert!(col < e_prev.len());
+            let e_row = unsafe { e_prev.get_unchecked(col) };
             unsafe { neon_fma_64(kev, e_row, prob) };
         }
     }
@@ -829,7 +884,10 @@ fn batched_group53_with_argmax(
 
         for j in 0..kt.unique_count[ds_i] as usize {
             let kid = unsafe { *kt.unique_keep_ids[ds_i].get_unchecked(j) } as usize;
-            let kev = &keep_ev[kid];
+            // SAFETY: kid < NUM_KEEP_MULTISETS = keep_ev.len() (unique_keep_ids
+            // construction). Same register-promotion rationale as Step 1.
+            debug_assert!(kid < keep_ev.len());
+            let kev = unsafe { keep_ev.get_unchecked(kid) };
             // j+1 encoding: 0 is keep-all, so unique keep j gets encoded as j+1
             // SAFETY: idx_slice is exactly 64 bytes (sliced as [idx_base..idx_base+64]), so cast to &mut [u8; 64] is valid.
             let mut idx_arr: &mut [u8; 64] =
