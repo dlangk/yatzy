@@ -98,7 +98,7 @@ Server: axum on port 9000, stateless, `Arc<YatzyContext>` shared state.
 - θ grid: 37 values from -3.0 to +3.0 in `configs/theta_grid.toml`
 - Math: `theory/foundations/risk-parameter-theta.md`
 - Strategy analysis: `theory/strategy/risk-sensitive-strategy.md`
-- **CRITICAL**: Delete `data/strategy_tables/all_states_theta_*.bin` after changing solver code!
+- **CRITICAL**: Delete `data/strategy_tables/all_states_theta_*.bin` AND `data/strategy_tables/oracle.bin` after changing solver code! A stale oracle silently plays an old policy (`just simulate` mtime-checks it against the θ=0 table as a backstop).
 
 ## Storage Format
 

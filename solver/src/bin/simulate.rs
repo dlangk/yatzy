@@ -169,6 +169,28 @@ fn parse_args() -> Args {
     }
 }
 
+/// Load the policy oracle for θ=0 if present and not stale.
+///
+/// A stale oracle would silently play an old policy: reject it when its
+/// mtime predates the θ=0 strategy table (both are rewritten by
+/// yatzy-precompute, the oracle only with --oracle).
+fn try_load_fresh_oracle() -> Option<yatzy::types::PolicyOracle> {
+    let oracle_meta = std::fs::metadata(ORACLE_FILE_PATH).ok()?;
+    if let Ok(table_meta) = std::fs::metadata(state_file_path(0.0)) {
+        if let (Ok(o), Ok(t)) = (oracle_meta.modified(), table_meta.modified()) {
+            if o < t {
+                eprintln!(
+                    "WARNING: {} is older than the strategy table; ignoring it. \
+                     Rebuild with `just precompute-oracle`.",
+                    ORACLE_FILE_PATH
+                );
+                return None;
+            }
+        }
+    }
+    load_oracle(ORACLE_FILE_PATH)
+}
+
 fn main() {
     let _base = yatzy::env_config::init_base_path();
     let args = parse_args();
@@ -533,12 +555,24 @@ fn main() {
                 "Simulating {} games ({} threads)...",
                 num_games, num_threads
             );
-            // Lockstep is ~5x faster and statistically equivalent (same optimal
-            // policy, different PRNG). Vertical remains for θ≠0 / max-policy /
-            // explicit --vertical (bit-compatible regeneration of old outputs).
+            // Engine selection, fastest first. Oracle (O(1) precomputed
+            // decisions) when data/strategy_tables/oracle.bin exists and is
+            // not older than the strategy table; else lockstep (~5x faster
+            // than vertical, statistically equivalent — same optimal policy,
+            // different PRNG). Vertical remains for θ≠0 / max-policy /
+            // explicit --vertical (bit-compatible regeneration of old
+            // outputs).
             let result = if theta == 0.0 && !max_policy && !vertical {
-                println!("  Mode: lockstep (horizontal processing)");
-                simulate_batch_lockstep(&ctx, num_games, seed)
+                match try_load_fresh_oracle() {
+                    Some(oracle) => {
+                        println!("  Mode: oracle lockstep (O(1) policy lookups)");
+                        simulate_batch_lockstep_oracle(&ctx, &oracle, num_games, seed)
+                    }
+                    None => {
+                        println!("  Mode: lockstep (horizontal processing)");
+                        simulate_batch_lockstep(&ctx, num_games, seed)
+                    }
+                }
             } else {
                 simulate_batch(&ctx, num_games, seed)
             };

@@ -72,6 +72,12 @@ struct DecisionTable {
     score: [u8; 252],
 }
 
+// The macOS tiny-zone allocator ceiling is 1008 bytes: one more byte moves
+// Box<DecisionTable> to the contended small-zone allocator (measured 27x
+// slower per alloc under 18-thread contention, ~2ms/turn hidden cost).
+// Growing this struct needs an allocation-strategy rethink, not just a field.
+const _: () = assert!(std::mem::size_of::<DecisionTable>() <= 1008);
+
 /// Minimum games in a group before building a DecisionTable pays for itself.
 /// Break-even is ~252 games (table build costs 252 argmaxes per decision
 /// level vs one per game). Measured at 1M games on M5 Max: 384 and 256

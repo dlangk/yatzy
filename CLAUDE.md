@@ -28,7 +28,7 @@ See component CLAUDE.md files for detailed guidance:
 - NEVER trade solver performance for code aesthetics. Run `just bench-check` after Rust changes
 - Intentionally duplicated hot-path code is marked `// PERF: intentional`. Do not refactor it
 - All state values use f32 throughout. See `solver/CLAUDE.md` for state layout and θ parameter details
-- Delete `data/strategy_tables/all_states_theta_*.bin` after changing solver code
+- Delete `data/strategy_tables/all_states_theta_*.bin` AND `data/strategy_tables/oracle.bin` after changing solver code (a stale oracle silently plays an old policy; `just simulate` also mtime-checks it)
 - When modifying an API endpoint, update `solver/CLAUDE.md` AND `frontend/src/api.ts` AND `frontend/CLAUDE.md`
 - When a conversation produces new insights, update the appropriate file in `theory/` (see `theory/README.md`)
 
