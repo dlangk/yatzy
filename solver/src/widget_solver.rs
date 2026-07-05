@@ -201,6 +201,21 @@ pub fn choose_best_reroll_mask(
     sort_dice_set(&mut sorted_dice);
     let ds_index = find_dice_set_index(ctx, &sorted_dice);
 
+    let (best_mask, best_val) = choose_best_reroll_mask_by_ds(ctx, e_ds_for_masks, ds_index);
+    *best_ev = best_val as f64;
+    best_mask
+}
+
+/// Argmax reroll mask for a dice set given by index (dice already canonical).
+///
+/// Same decision as [`choose_best_reroll_mask`], including tie-breaking;
+/// used to build per-state decision tables in the lockstep engine.
+#[inline(always)]
+pub fn choose_best_reroll_mask_by_ds(
+    ctx: &YatzyContext,
+    e_ds_for_masks: &[f32; 252],
+    ds_index: usize,
+) -> (i32, f32) {
     let kt = &ctx.keep_table;
     let vals = &kt.vals;
     let cols = &kt.cols;
@@ -226,8 +241,7 @@ pub fn choose_best_reroll_mask(
         }
     }
 
-    *best_ev = best_val as f64;
-    best_mask
+    (best_mask, best_val)
 }
 
 /// Find best reroll mask under max-policy: chance nodes use max instead of Σ P·x.
