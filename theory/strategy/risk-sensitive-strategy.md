@@ -4,9 +4,9 @@
 
 We generalize the solver to optimize exponential utility rather than expected value:
 
-$$U(x) = -\frac{e^{-\theta x}}{\theta}$$
+$$U(x) = \frac{e^{\theta x}}{\theta}, \qquad \text{CE}(X) = \frac{1}{\theta}\ln \mathbb{E}[e^{\theta X}]$$
 
-where θ > 0 is risk-seeking, θ < 0 is risk-averse, and θ → 0 recovers the EV-optimal policy. The DP recursion is identical except the objective at chance nodes becomes a certainty equivalent rather than an expectation.
+where θ > 0 is risk-seeking, θ < 0 is risk-averse, and θ → 0 recovers the EV-optimal policy. (With the sign convention $-e^{-\theta x}/\theta$ the labels would flip; the solver maximizes $\mathbb{E}[e^{\theta X}]$ for θ > 0 and minimizes it for θ < 0, matching the convention here.) The DP recursion is identical except the objective at chance nodes becomes a certainty equivalent rather than an expectation.
 
 This is CARA (constant absolute risk aversion) utility: the risk premium for a given gamble is independent of current wealth. The parameter θ controls how the solver weights upside vs downside at every decision point.
 
@@ -25,7 +25,7 @@ We solved the full DP for 37 θ values from −3.0 to +3.0 with progressive spac
 | +0.05 | 244.5 | 43.2 | 164 | 244 | 312 | 327 |
 | +0.07 | 240.9 | 45.3 | 159 | 241 | 313 | 328 |
 | +0.10 | 235.9 | 46.9 | 155 | 237 | 312 | 329 |
-| +0.20 | 223.8 | 48.4 | 148 | 225 | 308 | 329 |
+| +0.20 | 225.3 | 48.3 | 148 | 228 | 308 | 329 |
 | +1.00 | 194.5 | 46.3 | 128 | 188 | 276 | 309 |
 
 **Best θ per quantile:**
@@ -44,10 +44,10 @@ The optimal θ shifts from negative (risk-averse) for lower quantiles to positiv
 
 The (mean, σ) curve is not a single curve. It traces two distinct branches:
 
-- **Risk-averse branch** (θ < 0): σ stays nearly flat at 35–38 as mean drops from 248 to 182. Variance compresses without moving much.
-- **Risk-seeking branch** (θ > 0): σ rises to 48.4 (at θ ≈ 0.2), then falls back to 44 as mean drops from 248 to 186.
+- **Risk-averse branch** (θ < 0): σ stays nearly flat at 35–40 as mean drops from 248.4 to 188.5 (θ = −3). Variance compresses without moving much.
+- **Risk-seeking branch** (θ > 0): σ rises to 48.3 (at θ ≈ 0.2), then falls back to 44 as mean drops from 248 to 186.
 
-At the same mean (~190), the risk-seeking branch (θ ≈ 1) has σ ≈ 46 vs σ ≈ 37 for the risk-averse branch (θ ≈ −1.5). A quadratic fit across all points gives R² = 0.37 — confirming these are two distinct branches, not a single frontier.
+At the same mean (~190), the risk-seeking branch (θ ≈ 1) has σ ≈ 46 vs σ ≈ 37 for the risk-averse branch (θ ≈ −1.5). A quadratic fit across all 37 sweep points gives R² = 0.21 — confirming these are two distinct branches, not a single frontier.
 
 This is analogous to a mean-variance frontier in portfolio theory, except the classical efficient frontier is a single hyperbola. The two-branch structure arises because risk-averse and risk-seeking policies achieve the same mean loss through fundamentally different mechanisms.
 
@@ -55,12 +55,12 @@ This is analogous to a mean-variance frontier in portfolio theory, except the cl
 
 Near θ = 0, both mean and std are well-approximated by quadratics:
 
-$$\text{mean}(\theta) \approx 247.0 - 0.9\theta - 618\theta^2$$
+$$\text{mean}(\theta) \approx 247.0 - 9.9\theta - 602\theta^2$$
 $$\text{std}(\theta) \approx 39.5 + 53.5\theta - 17\theta^2$$
 
 Mean loss is quadratic (second-order around the optimum, as expected from perturbing a maximum). Std gain is linear in θ (dominant term: 53.5θ). This asymmetry — quadratic cost, linear benefit — creates a narrow window where tail gains are cheap.
 
-For p95 specifically: the Gaussian approximation p95 ≈ μ + 1.645σ predicts the peak location (θ ≈ 0.05) but overpredicts the level by ~4 points (predicted 316 vs actual 313). The Gaussian model fails because the score distribution's skewness changes with θ: mildly thin-tailed near θ = 0, increasingly heavy-tailed for θ > 0.2. Mean and σ locate the p95 peak; the third moment determines its height.
+For p95 specifically: the Gaussian approximation p95 ≈ μ + 1.645σ predicts the peak location (θ ≈ 0.05) but overpredicts the level by ~3 points (predicted 315.7 vs actual 313). The Gaussian model fails because the score distribution's skewness changes with θ: mildly thin-tailed near θ = 0, increasingly heavy-tailed for θ > 0.2. Mean and σ locate the p95 peak; the third moment determines its height.
 
 ## 5. The Asymmetry of Risk
 
@@ -228,8 +228,8 @@ Simulating 100K games under θ = 0 reveals an hourglass structure in the state s
 
 Mid-game is maximally diffuse. Late-game concentrates sharply: at turn 15, the top 10 states account for 82% of games.
 
-**Turn 1 fills opportunistically.** Two Pairs (10.5%) and Full House (10.0%) lead because they require specific patterns — when they hit, the solver takes them.
+**Turn 1 fills opportunistically.** Fives (12.1%) and Fours (10.7%) lead, with Two Pairs (10.6%) and Full House (9.9%) close behind — pattern categories get taken when they hit early.
 
 **Turn 15 reveals the dump hierarchy.** Four of a Kind (20.6%) and Large Straight (17.1%) are most often left for last. Both are high-variance categories with specific requirements. One Pair is almost never last (2.5%) — trivially easy to score.
 
-**Bonus achievement.** 83.6% of games reach upper score 63 at turn 15. The optimal solver prioritizes the bonus aggressively.
+**Bonus achievement.** 83.6% of games have already reached upper score 63 when entering the final turn (start-of-turn-15 state, per this section's convention). The end-of-game bonus rate is 89.8%; the difference is games that secure the bonus on the last fill. The optimal solver prioritizes the bonus aggressively.

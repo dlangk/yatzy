@@ -25,4 +25,4 @@ Decision trees encode these thresholds *natively* as split points. Neural networ
 | 15    | 81K       | 239        | -9         |
 | 20    | 413K      | 245        | -3         |
 
-A depth-20 tree with 413K parameters achieves 98.6% of optimal play, compressing the 8 MB lookup table by ~20×.
+A depth-20 tree with 413K parameters achieves 98.6% of optimal play, compressing the 8 MB of live table values by ~16×.

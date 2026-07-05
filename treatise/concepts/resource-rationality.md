@@ -15,7 +15,7 @@ In Yatzy, four parameters capture different types of cognitive constraint:
 - **theta (risk preference)**: how the player weighs upside vs. downside. Not a constraint per se, but a preference that shapes which outcomes the player cares about.
 - **beta (precision)**: how noisy the player's action selection is. High beta means near-deterministic choice of the best-evaluated option; low beta means frequent "mistakes" where suboptimal actions are chosen. This captures attention and evaluation noise.
 - **gamma (myopia)**: how far ahead the player looks. gamma = 1 means full consideration of all future consequences; gamma = 0 means the player ignores all future states and plays greedily for immediate score. Values in between geometrically discount future rounds.
-- **d (depth)**: how many reroll steps the player actually evaluates. d = 0 means the player only considers which category to score, not which dice to keep. d = 1 means one level of keep evaluation. d = 2 means full evaluation of both rerolls.
+- **d (depth)**: the evaluation-fidelity parameter, implemented as a surrogate decision-tree depth (grid values 8, 20, and 999 = exact). Lower d means coarser, noisier evaluation of each decision. It is not a reroll-truncation count: the player always sees all decision levels, just through a blunter evaluator.
 
 ## Cognitive Cost Interpretation
 

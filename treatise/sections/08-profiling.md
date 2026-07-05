@@ -66,7 +66,7 @@ The parameter &theta; selects which pre-computed strategy table (state values)
 backs the Q-value computation. &gamma; &lt; 1 discounts future state values,
 making the player myopic. <var>d</var> &isin; {8, 20, 999} truncates lookahead
 depth by adding noise to Q-values computed from shallower search. The estimator
-runs 24 independent Nelder-Mead optimizations (8 start points × 3
+runs 18 independent Nelder-Mead optimizations (6 start points × 3
 <var>d</var> values) and selects the maximum-likelihood fit, with a weak
 log-normal prior on &beta; centered at 3 to prevent drift in flat regions.
 
@@ -123,12 +123,12 @@ The Q-grid for cognitive profiling uses 108 parameter combinations:
 ```python
 # Q-grid parameter space (108 combinations)
 theta_grid = [-0.05, -0.02, 0.0, 0.02, 0.05, 0.1]    # 6 values
-gamma_grid = [0.3, 0.5, 0.7, 0.85, 0.95, 1.0]         # 6 values
+gamma_grid = [0.3, 0.6, 0.8, 0.9, 0.95, 1.0]          # 6 values
 depth_grid = [8, 20, 999]                                # 3 values
 # Total: 6 x 6 x 3 = 108 combos
 
 # Player card grid
-beta_grid  = [0.5, 1, 2, 3, 5, 10]                     # 6 values
+beta_grid  = [0.5, 1.0, 2.0, 4.0, 7.0, 10.0]           # 6 values
 # Total cards: 6 x 6 x 6 x 3 = 648 combos x 10K games
 ```
 

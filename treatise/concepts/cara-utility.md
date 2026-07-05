@@ -4,7 +4,7 @@
 
 ## The Function
 
-> u(x) = -exp(-theta * x)
+> u(x) = exp(theta * x)   (maximized for theta > 0, minimized for theta < 0)
 
 where theta is the **risk parameter**:
 
@@ -40,7 +40,7 @@ For Yatzy scores around 250, the key scale is 1/score ~ 0.004. Values of |theta|
 
 The **certainty equivalent** of a random outcome X under CARA utility is:
 
-> CE(X) = -(1/theta) * log(E[exp(-theta * X)])
+> CE(X) = (1/theta) * log(E[exp(theta * X)])
 
 This is the guaranteed score the agent considers equally desirable to the random outcome. For theta < 0, CE < E[X]: the agent would accept a lower guaranteed score to avoid uncertainty. The gap E[X] - CE is the **risk premium** -- the price the agent would pay for insurance.
 

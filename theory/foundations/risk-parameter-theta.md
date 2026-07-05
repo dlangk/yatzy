@@ -1,5 +1,14 @@
 # Risk-Sensitive Solver: The theta Parameter
 
+> **Review note (2026-07, single-reviewer, not independently confirmed):**
+> the core math verified correct (probability-weighted LSE recurrence,
+> cumulant expansion L = thetaE + theta^2 Var/2, theta_critical range via
+> methods 1-2). Flagged as errors: the theta < 0 objective as stated
+> contradicts the solver's min rule; the risk-premium sign is inverted; the
+> free-energy mapping is off by a factor of -beta; the f32 overflow
+> justification is quantitatively wrong; method 3 is used outside its
+> validity. Details: reviews/accuracy-review-2026-07.md.
+
 This document describes the mathematical framework for risk-sensitive Yatzy solving. The standard solver maximizes expected score. The risk-sensitive solver generalizes this by introducing a parameter theta that controls the tradeoff between expected value and score variance.
 
 ---

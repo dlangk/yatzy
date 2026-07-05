@@ -16,6 +16,6 @@ Working forward doesn't work because you don't know the future. But working back
 
 ## In Yatzy
 
-The solver processes all 2,097,152 states grouped by how many categories remain. It starts with states where 14 of 15 categories are filled (one turn left), then 13, and so on. Each group depends only on already-computed future states.
+The solver processes the ~1.43 million reachable states (of 2,097,152 total slots) grouped by how many categories remain. It starts with states where 14 of 15 categories are filled (one turn left), then 13, and so on. Each group depends only on already-computed future states.
 
-The entire backward pass takes ~2.3 seconds and produces a complete strategy table.
+The entire backward pass takes about a second on an M1 Max (roughly 0.1 seconds on an M5 Max) and produces a complete strategy table.

@@ -22,9 +22,9 @@ For any single dice outcome, the number of unique keeps is much smaller -- typic
 
 ## Why Deduplication Matters
 
-Without deduplication, the solver would evaluate redundant keeps that produce identical future expected values. Collapsing 31 masks down to the unique multisets saves roughly **85% of the work** in the keep-evaluation phase.
+Without deduplication, the solver would evaluate redundant keeps that produce identical future expected values. Collapsing 31 masks down to the unique multisets saves roughly **47% of the keep evaluations** per dice set (about 16.3 unique keeps instead of 31 masks).
 
-This is not a micro-optimization. The keep-evaluation phase is the dominant cost in the widget solver. An 85% reduction in redundant evaluations translates directly into a ~6x speedup in the most expensive part of the computation.
+This is a solid but not dramatic win on its own: the measured whole-precompute speedup from mask deduplication was about 1.4x. The larger, related win is deduplicating the keep EV computation itself across dice sets (462 unique keep multisets serve all 252 dice sets), which cuts the dot products in the keep-evaluation phase by roughly 89% (~8.9x).
 
 ## Counting Multisets
 

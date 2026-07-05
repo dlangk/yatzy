@@ -1,5 +1,17 @@
 # The Mathematics of Optimal Yatzy
 
+> **Review note (2026-07, single-reviewer, not independently confirmed):**
+> an adversarial math review flagged the three Part V proofs as unsound AS
+> WRITTEN, while judging the conclusions plausibly repairable: (1) the
+> Pexider/VNM sufficiency argument applies a real-interval theorem to a
+> discrete bounded domain and overreaches to a universal claim; (2) the
+> CARA-incompleteness counterexample prescribes an action that is verifiably
+> the worst non-losing option under its own constraints; (3) the
+> approximate-completeness epsilon bound is numerically vacuous at the
+> game's sigma = 38.5 and rests on a premise the document's own Part VII
+> data contradicts. The Part I-II MDP formulation and Bellman recurrences
+> verified correct. Details: reviews/accuracy-review-2026-07.md.
+
 ## Part I: The Game as a Mathematical Object
 
 ### Rules and Structure

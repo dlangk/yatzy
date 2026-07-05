@@ -14,7 +14,7 @@ Yatzy has really interesting properties that make it fun to both play and pick a
 
 [CHART: Score Spray. ~2,000 games displayed as a scatter plot (subsampled from 10,000 simulated games to represent a lifetime of play). Each dot is one game's total score.]
 
-As you can see, scores vary wildly even for an optimal player. Even if you play perfectly, 1 out of 10 games will be below 203 points. And you will, during an entire lifetime, experience maybe a handful of games above 320 points.
+As you can see, scores vary wildly even for an optimal player. Even if you play perfectly, 1 out of 10 games will be below 203 points. And you will, during an entire lifetime, experience maybe a handful of games above 330 points (exact forward-DP: P(X > 330) = 0.35%, about 7 games in 2,000; games above 320 are more common, about 35 in 2,000).
 
 This explains why Yatzy is fun for families: It has room for skill, but it's actually mostly luck! The best player will win slightly more, but anyone can get lucky and beat the strongest player by a wide margin. Parents will win a bit more, but their kids will regularly beat them.
 
@@ -90,28 +90,30 @@ Not all of those ~2.1M states can actually occur in a real game. For example, an
 
 Reachable states by layer (number of categories scored):
 
-NOTE: The "Reachable" column in reachability.json contains approximate (rounded) values used for chart visualization. The per-layer counts do not match exact combinatorial computation. For example, layer 1 (1 category scored) has exactly 45 reachable states (6 upper categories x 6 possible scores each + 9 lower categories x 1 upper-score value), not 340. The rounded values sum to ~1,415,205, which does not match the stated total of 1,430,000. The per-layer breakdown should be recomputed from the solver's exact reachability DP for precise verification.
+NOTE: The per-layer counts below are the EXACT values from the solver's reachability DP (regenerated 2026-07); they replace an earlier approximate table. They sum to 1,430,528 including the 64 terminal states. If reachability.json still carries the old rounded values, regenerate it.
 
 The aggregate claims in the treatise prose (~1.43M reachable states, 31.8% pruned) are correct.
 
-| Categories Scored | Total States | Reachable (approx) |
+| Categories Scored | Total States | Reachable (exact, solver output 2026-07) |
 |-------------------|-------------|-------------------|
 | 0 (Start) | 64 | 1 |
-| 1 | 960 | ~340 (exact: 45) |
-| 2 | 6,720 | ~3,200 |
-| 3 | 29,120 | ~16,500 |
-| 4 | 87,360 | ~55,000 |
-| 5 | 192,192 | ~130,000 |
-| 6 | 320,320 | ~225,000 |
-| 7 | 411,840 | ~290,000 |
-| 8 | 411,840 | ~280,000 |
-| 9 | 320,320 | ~210,000 |
-| 10 | 192,192 | ~120,000 |
-| 11 | 87,360 | ~52,000 |
-| 12 | 29,120 | ~26,000 |
-| 13 | 6,720 | ~6,200 |
-| 14 | 960 | ~900 |
+| 1 | 960 | 45 |
+| 2 | 6,720 | 756 |
+| 3 | 29,120 | 5,932 |
+| 4 | 87,360 | 27,224 |
+| 5 | 192,192 | 82,211 |
+| 6 | 320,320 | 174,355 |
+| 7 | 411,840 | 269,592 |
+| 8 | 411,840 | 310,209 (peak) |
+| 9 | 320,320 | 267,883 |
+| 10 | 192,192 | 173,274 |
+| 11 | 87,360 | 82,860 |
+| 12 | 29,120 | 28,486 |
+| 13 | 6,720 | 6,677 |
+| 14 | 960 | 959 |
 | 15 (All scored) | 64 | 64 |
+
+Total reachable including terminal states: 1,430,528.
 
 **Verification: Total column sums to 2,097,152. Total states per layer = C(15, k) x 64. Per-layer reachable counts are approximate and need recomputation.**
 
@@ -239,12 +241,12 @@ All ~1.43M widgets are solved in the same way, starting from layer 16 and workin
 | State values | 16 MB | One f32 per state slot (4,194,304 x 4 bytes; stride-128 padding for branchless access) |
 | Precomputed scores | 15 KB | 252 dice sets x 15 categories x 4 bytes |
 | Sparse keep table | 35 KB | 4,368 non-zero (f32, i32) pairs + row pointers |
-| Reverse dice lookup | 32 KB | 5D index_lookup for O(1) dice to index |
+| Reverse dice lookup | 30 KB | 5D index_lookup for O(1) dice to index (7,776 x 4 B) |
 | Keep frequency lookup | 182 KB | Horner hash table (46,656 entries) |
 | Reachability mask | 4 KB | 64 x 64 booleans |
 | Batched buffers | 247 KB/thread | Two ping-pong [f32;64] x 252 + keep_ev |
 
-Total working set during precomputation: <17 MB.
+Total working set during precomputation: ~18 MB at 8 threads (~21 MB at 18 threads).
 During serving (mmap mode): 16 MB mapped, ~250 KB active.
 
 **Performance:** Full backward sweep over 1.43 million reachable states completes in 1.10 seconds on an Apple M1 Max with 8 performance cores.
@@ -275,7 +277,7 @@ Let's start by looking at the big picture: The score distribution.
 | P5 | 179 |
 | P95 | 309 |
 
-**Full exact distribution (density_exact.json):**
+**Full exact distribution (outputs/density/density_0.json):**
 
 Source: Forward-DP exact PMF computation (zero variance, not Monte Carlo).
 
@@ -319,7 +321,7 @@ It's clearly not a normal distribution. The shape has bumps and shoulders that a
 - Small Straight ceiling: 15 points. Correct.
 - Bonus: 50 points. Correct.
 
-These four yes/no events create 16 sub-populations. Each sub-population is roughly Gaussian in its "residual" score (the non-binary categories), centered around 154 to 177 points, then shifted upward by whichever binary events fired. The peaks in the overall distribution appear where multiple sub-populations pile up at similar total scores. For example, the shoulder near 254 is where "Bonus + Large Straight + no Yatzy" (mean 244) overlaps with "Bonus + Small Straight + Large Straight" (mean 262) and "Bonus + Yatzy only" (mean 270).
+These four yes/no events create 16 sub-populations. Each sub-population is roughly Gaussian in its "residual" score (the non-binary categories), centered around 152 to 177 points, then shifted upward by whichever binary events fired. The peaks in the overall distribution appear where multiple sub-populations pile up at similar total scores. For example, the shoulder near 254 is where "Bonus + Large Straight + no Yatzy" (mean 244) overlaps with "Bonus + Small Straight + Large Straight" (mean 262) and "Bonus + Yatzy only" (mean 270).
 
 **16-component mixture data (mixture.json):**
 
@@ -343,7 +345,7 @@ These four yes/no events create 16 sub-populations. Each sub-population is rough
 | 16 | Yes | Yes | Yes | Yes | 0.0521 | 311.5 | 14.8 |
 
 **Verification of prose claims about sub-populations:**
-- "centered around 154 to 177 points" -> Residual means (subtracting binary contributions): Pop 1 = 154.2 (no events), Pop 9 = 220.2 - 50(bonus) = 170.2, Pop 13 = 269.8 - 50 - 50 = 169.8, Pop 16 = 311.5 - 50 - 50 - 15 - 20 = 176.5. Range of residuals: 154.2 to 176.5. Correct.
+- "centered around 152 to 177 points" -> Residual means (subtracting binary contributions): full range across all 16 populations is 152.2 to 176.6 (e.g. Pop 1 = 154.2 with no events; Pop 9 = 220.2 - 50(bonus) = 170.2; Pop 13 = 269.8 - 50 - 50 = 169.8; Pop 16 = 311.5 - 50 - 50 - 15 - 20 = 176.5).
 - "Bonus + Large Straight + no Yatzy" (mean 244) -> Pop 10: mean 243.5. Text says 244. Close (rounded).
 - "Bonus + Small Straight + Large Straight" (mean 262) -> Pop 12: mean 261.6. Text says 262. Close (rounded).
 - "Bonus + Yatzy only" (mean 270) -> Pop 13: mean 269.8. Text says 270. Close (rounded).
@@ -489,7 +491,7 @@ The 22-point correlated advantage can be decomposed further. Approximately 10 po
 
 All data in this document comes from two sources:
 
-1. **Exact forward-DP computation** (density_exact.json): Zero-variance PMF over all possible games. Produces the exact mean (248.44), percentiles, and full score distribution. This is mathematically exact, not sampled.
+1. **Exact forward-DP computation** (outputs/density/density_0.json): Zero-variance PMF over all possible games. Produces the exact mean (248.44), percentiles, and full score distribution. This is mathematically exact, not sampled.
 
 2. **Monte Carlo simulation** (1,000,000 games under optimal play, theta=0): Produces per-category statistics (means, zero rates, fill turns, correlations), mixture decomposition, and fill-turn heatmaps. At 1M games, standard error of the mean is ~0.04 points.
 

@@ -27,7 +27,7 @@ Keep-EV Deduplication (L1 Cache): The sparse dot product for keeping dice redund
 State Index Layout Swapping (L2 Cache): Reordering the state index to scored \* 64 + upper*score ensures that all 64 upper-score variants for a given category mask sit in a contiguous 256-byte block, perfectly aligning with L1/L2 cache lines during successor lookups.
 f32 Precision Verification: Halving the state array to 8MB allowed it to fit in the System Level Cache. Empirical validation proved that casting DP accumulation from f64 to f32 induced a maximum absolute error of 0.000458 points. Out of 1.43M states, this flipped exactly 22 marginal decisions, none of which had a measurable impact on gameplay EV.
 2.3 Results: The Bimodal Distribution and Max-Policy Failure
-Under EV-optimal play, the mean score is 248.4 ($\sigma = 38.5$). The distribution is highly right-skewed and strictly non-normal. It is a bimodal mixture distribution driven by two binary events: the Upper Bonus (~87% hit rate) and Yatzy (~38.8% hit rate).
+Under EV-optimal play, the mean score is 248.4 ($\sigma = 38.5$). The distribution is highly right-skewed and strictly non-normal. It is a bimodal mixture distribution driven by two binary events: the Upper Bonus (~90% hit rate) and Yatzy (~38.8% hit rate).
 The Max-Policy Failure: If we replace chance nodes with a max operator (assuming perfect dice luck), the precomputed root value is 374. However, playing this "max-policy" with actual random dice scores a disastrous 118.7 mean. The policy spreads overconfidence uniformly, failing to prioritize scarce resources.
 2.4 The Hourglass Structure
 Simulating optimal play reveals a strict Hourglass Structure in the state space graph:
@@ -116,7 +116,7 @@ Section 7: The Reinforcement Learning Wall
 7.1 The 5% Gap and the Bonus Discontinuity
 [FLAG: Cross-Variant Baseline Conflict]
 The RL literature (e.g., Pape 2025, Häfner 2021) reports RL agents reaching ~241 points, falling 5% short of the American Yahtzee optimal (254.59). Their agents achieve the upper bonus ~25% of the time (vs optimal ~68%).
-In contrast, our optimal Scandinavian Yatzy solver scores 248.4, achieving the upper bonus ~87% of the time. Our internal IQN RL agent scored 205.3 on Scandinavian Yatzy. While the exact point values and optimal hit rates differ between variants, the fundamental empirical finding aligns perfectly: RL agents systematically fail to learn the upper-section bonus coordination, resulting in a massive performance gap.
+In contrast, our optimal Scandinavian Yatzy solver scores 248.4, achieving the upper bonus ~90% of the time. Our internal IQN RL agent scored 205.3 on Scandinavian Yatzy. While the exact point values and optimal hit rates differ between variants, the fundamental empirical finding aligns perfectly: RL agents systematically fail to learn the upper-section bonus coordination, resulting in a massive performance gap.
 Missing the bonus an extra ~43% of the time costs exactly ~15 expected points, explaining the entirety of the RL gap. This failure stems from three interacting barriers:
 Discontinuous Value Function: The 50-point step-function at exactly 63 points requires distinct value surfaces for all 8,192 combinatorial category regimes. Standard MLPs lack the Fourier capacity.
 13-Turn Stochastic Credit Assignment: Sacrificing 5 immediate points to place Fives in the upper section yields a 50-point payoff 10 turns later. The massive episodic dice noise ($\sigma \approx 38.5$) completely drowns out this gradient signal.

@@ -13,13 +13,13 @@ Cross-referencing all quantitative claims in `theory/`. Most are consistent; dis
 | `foundations/risk-parameter-theta.md` L286 | ~1.1 s EV | Post-NEON (MEMORY.md canonical) |
 | `lab-reports/neon-intrinsics.md` | ~0.48 s (utility domain) | Post-NEON, |θ|≤0.15 |
 
-**Resolution**: Not contradictory — these are measurements at different optimization stages. The chronological progression is:
-- Original C: ~20 min → Step 7 (Rayon): ~2.3 s → NEON intrinsics: ~1.1 s → utility-domain shortcut: ~0.49 s
+**Resolution**: Not contradictory — these are measurements at different optimization stages. The measured progression per the lab reports is:
+- Original C: ~20 min → Step 7 (Rayon): ~2.3 s → batched SoA: ~1.40 s → pre-NEON baseline: ~1.30 s → NEON: ~1.10 s end-to-end EV precompute (0.48 s DP compute) → utility-domain θ-class: ~0.49 s
 
-**Canonical values** (post all optimizations):
-- EV (θ=0): **1.10 s**
-- Utility (|θ|≤0.15): **~0.49 s**
-- LSE (|θ|>0.15): **~2.7 s**
+**Canonical values** (M1 Max, post all optimizations; M5 Max 2026-07 values in `solver/CLAUDE.md`):
+- EV (θ=0): **1.10 s** (M5 Max: 113 ms DP compute)
+- Utility (|θ|≤0.15): **~0.49 s** (M5 Max: ~0.12 s)
+- LSE (|θ|>0.15): **~2.7 s** (M5 Max: ~0.60 s)
 
 ---
 
@@ -56,9 +56,13 @@ Cross-referencing all quantitative claims in `theory/`. Most are consistent; dis
 | `lab-reports/optimization-log.md` L253 | 4.2 h (37 thetas) |
 | `strategy/theta-sweep-architecture.md` L255 | 3.7 h (37 thetas) |
 
-**Resolution**: Measurement noise between different hardware runs. ~12% difference is within normal variation for a multi-hour computation. The theta-sweep-architecture file was written later and may reflect a cleaner benchmark.
+**Resolution** (corrected 2026-07): not different hardware runs. Both numbers
+sit in the SAME table in theta-sweep-architecture.md: 3.7 h is the
+simulate/evolve stage row, 4.2 h is the total row of the same run.
+optimization-log.md quotes the total.
 
-**Status**: Minor discrepancy, not material. Use **~4 h** as approximate value.
+**Status**: Not a discrepancy. Use **4.2 h total** (3.7 h of it density
+evolution) for the 37-θ sweep on M1 Max.
 
 ---
 
@@ -70,12 +74,20 @@ Cross-referencing all quantitative claims in `theory/`. Most are consistent; dis
 | `foundations/optimal-play-and-distributions.md` L65 | ~90% | "Bonus hit rate (θ=0)" |
 | `strategy/risk-sensitive-strategy.md` L235 | 83.6% | "Bonus achievement rate" |
 
-**Resolution**: These may measure slightly different things:
-- 87% and ~90% likely refer to the fraction of games where upper section total ≥ 63
-- 83.6% may use a different threshold or measurement methodology
-- The ~90% figure is approximate ("~") and could round from 87%
+**Resolution** (settled 2026-07 with fresh data): the θ=0 optimal-policy
+end-of-game bonus rate is **89.77% ± 0.04%** (1M-game MC, corroborated by the
+exact mixture decomposition 55.1% + 34.7% = 89.8%). So:
+- **~90% is correct** (canonical value).
+- **87% is wrong** (≈30 standard errors from the measurement; it cannot be
+  sampling noise and cannot round to ~90%). It stems from an older or flawed
+  run and has been corrected where it appeared.
+- **83.6% is a different statistic**, not a contradiction: it is the fraction
+  of games that have already secured the bonus when *entering* the final turn
+  (start-of-turn-15 state; exact forward-DP gives 0.8378). The remaining
+  ~6 points of games secure the bonus on the last fill.
 
-**Status**: Genuine minor inconsistency. The mixture decomposition data shows bonus fraction = component 3 + component 4 ≈ 90% (from the mixture model), while simulation may yield 83.6–87% depending on measurement method.
+**Status**: Resolved. Canonical: **89.8%** end-of-game, **83.8%** entering
+the final turn.
 
 ---
 
@@ -84,10 +96,10 @@ Cross-referencing all quantitative claims in `theory/`. Most are consistent; dis
 | Source | Value |
 |--------|-------|
 | Most sources | 248.4 |
-| `strategy/applications-and-appendices.md` L23 | 248.3 |
+| `strategy/applications-and-appendices.md` L43 (also L140, L143) | 248.3 |
 | `lab-reports/hardware-and-hot-path.md` L86 | f64: 248.439987, f32: 248.440140 |
 
-**Resolution**: Rounding. The true f64 value is 248.4400. "248.4" rounds correctly to 1 decimal; "248.3" appears once and is likely a typo or different rounding convention.
+**Resolution** (corrected 2026-07): the 248.3 occurrences in applications-and-appendices.md are OBSERVED Monte Carlo means from finite runs (a 10K-game profiling run, SE ~0.39, and 200K-game sweep rows at theta = -0.01/+0.005), not statements of the exact EV. They are within sampling error of the exact 248.4400677 and need no correction; only prose that states the canonical EV must say 248.4.
 
 **Canonical value**: **248.4** (rounded to 1 decimal)
 
@@ -106,10 +118,21 @@ Cross-referencing all quantitative claims in `theory/`. Most are consistent; dis
 
 ## Summary
 
-The theory directory is **remarkably consistent**. Out of 117+ quantitative claims:
-- **0 genuine contradictions** in final/canonical values
-- **5 temporal discrepancies** (pre-optimization vs post-optimization measurements)
-- **1 minor inconsistency** (bonus hit rate: 83.6% vs 87% vs ~90%)
-- **1 likely rounding difference** (248.3 vs 248.4)
+Revised 2026-07 after a full adversarial re-audit (see
+`accuracy-review-2026-07.md`). The original bottom line of "0 genuine
+contradictions" was overstated:
 
-All discrepancies have clear explanations and do not affect the correctness of the treatise content.
+- The bonus rate contained **one genuine contradiction in a canonical value**
+  (87% was simply wrong; ~90% correct; 83.6% a different, correct statistic).
+- The 248.3 occurrences turned out to be legitimate finite-sample Monte Carlo
+  observations, not typos (section 6), but the original "rounding convention"
+  explanation was still wrong.
+- Section 4's "different hardware runs" explanation was wrong: 3.7 h vs 4.2 h
+  are the stage and total rows of the SAME run's table.
+- Section 1's optimization chronology skipped stages; the measured progression
+  is 2.3 s (Rayon) → 1.40 s (batched SoA) → 1.30 s (pre-NEON) → ~1.10 s
+  end-to-end EV (0.48 s compute) → 0.49 s utility-domain.
+
+The registry-scale re-audit found ~200 confirmed issues across theory/ and
+treatise/ (mostly stale line references and drifted numbers); the corrected
+state is recorded in `accuracy-review-2026-07.md`.

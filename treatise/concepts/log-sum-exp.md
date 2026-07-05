@@ -20,11 +20,11 @@ This is mathematically exact -- no approximation is involved. It is purely a rea
 
 ## Why It Matters for Risk-Sensitive DP
 
-The risk-sensitive Bellman equation replaces the standard max with a soft-max:
+In the risk-sensitive solver, the LSE appears at **chance nodes** as a probability-weighted log-sum-exp over dice outcomes:
 
-> V(s) = (1/theta) * LSE(theta * Q(s, a_1), ..., theta * Q(s, a_n))
+> L(keep) = LSE_r( ln P(keep -> r) + L(r) ) = m + ln( sum_r P(keep -> r) * exp(L(r) - m) )
 
-As theta -> 0, this converges to max(Q(s, a_i)) -- the risk-neutral case. As |theta| grows, the soft-max interpolates between max (theta > 0) and min (theta < 0) of the Q-values.
+Decision nodes (keep selection, category choice) keep a **hard** optimum: max for theta > 0, min for theta < 0. As theta -> 0, (1/theta) * L recovers the plain expectation at chance nodes; the aggregation at decision nodes is a hard max/min at every theta.
 
 For |theta| <= 0.15, the solver works in the utility domain directly (exp values are manageable in float32). For |theta| > 0.15, it switches to the log domain and uses the LSE trick throughout. This threshold was determined empirically by measuring where float32 precision begins to degrade.
 

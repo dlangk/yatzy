@@ -10,7 +10,7 @@ The threshold of 63 equals exactly three of each die face: 3×1 + 3×2 + 3×3 + 
 
 The bonus is the single most important strategic consideration:
 
-- Optimal play achieves the bonus **87% of the time**, contributing ~43.5 expected points
+- Optimal play achieves the bonus **90% of the time** (89.77% measured over 1M games), contributing ~44.9 expected points
 - A greedy strategy that ignores bonus tracking achieves it only **1.2% of the time**
 - Risk-averse strategies (negative θ) primarily work by *protecting the bonus* — ensuring you don't fall short of 63
 

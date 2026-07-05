@@ -27,7 +27,7 @@ The DP oracle can label any game state instantly via table lookup. A typical tra
 | Decision tree (depth 10) | 6,249 | 216 | -32 |
 | Decision tree (depth 15) | 81K | 239 | -9 |
 | Decision tree (depth 20) | 413K | 245 | -3 |
-| MLP (64 hidden) | ~15K | 222 | -26 |
+| MLP (64 hidden) | ~11K | 221 | -27 |
 
 Decision trees outperform neural networks at equal parameter counts because Yatzy decisions are fundamentally threshold-based. The optimal action often changes at sharp boundaries (e.g., "if upper_gap <= 7, change strategy"), which trees encode natively as split points but MLPs must approximate with smooth activations.
 
@@ -43,7 +43,7 @@ A well-designed distillation pipeline weights training examples by state frequen
 
 ## Why Not Just Use the Table?
 
-The full oracle table requires the solver infrastructure to generate and ~16 MB to store per decision type (category selection, keep-with-1-reroll, keep-with-2-rerolls). A distilled model can run on any device, requires no precomputation, provides interpretable explanations for its decisions, and opens the door to human-comprehensible strategy guides. The tradeoff between model size and play quality defines a Pareto frontier of practical interest.
+The full strategy table requires the solver infrastructure to generate and ~16 MB to store per theta value; one table serves all three decision types (category selection, keep-with-1-reroll, keep-with-2-rerolls), with decisions recomputed at lookup time. A fully materialized per-decision oracle is ~3.2 GB. A distilled model can run on any device, requires no precomputation, provides interpretable explanations for its decisions, and opens the door to human-comprehensible strategy guides. The tradeoff between model size and play quality defines a Pareto frontier of practical interest.
 
 ## Distillation vs. Direct RL
 

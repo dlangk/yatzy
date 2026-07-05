@@ -36,12 +36,15 @@ need to discover the reward structure.
 
 The results reveal a clear winner:
 ::concept[decision trees]{decision-tree}
-dominate MLPs at every parameter budget. A depth-20 decision tree ensemble
-(413K total parameters across three decision types) achieves a mean game
-score of 245, just 3 points below the optimal 248. A comparably-sized
-MLP achieves only 241. The gap widens at smaller scales: at 2,000 parameters,
-a depth-10 decision tree scores 216 while a two-layer MLP of similar size
-manages 221 with five times the parameters.
+dominate MLPs on per-decision accuracy at every parameter budget, and win
+at the top end: a depth-20 decision tree ensemble (413K total parameters
+across three decision types) achieves a mean game score of 245, just
+3 points below the optimal 248, while the largest MLP trained (42K total
+parameters, roughly 10x smaller) reaches 241. At mid-range budgets the
+game-level ranking flips: the 11K-parameter MLP ensemble scores 221
+while the 6K-parameter depth-10 decision tree scores 216. The MLP's soft
+decision boundaries buy game-level robustness in that band, even though
+trees stay ahead on raw per-decision agreement.
 
 :::html
 <div class="chart-container" id="chart-surrogate-pareto">
@@ -170,9 +173,9 @@ optimal play. At each decision point, the feature vector encodes:
   </thead>
   <tbody>
     <tr><td>Dice face counts</td><td class="num">6</td><td>Count of each face value (1–6)</td></tr>
-    <tr><td>Dice aggregates</td><td class="num">4</td><td>Sum, max count, distinct faces, max face</td></tr>
+    <tr><td>Dice aggregates</td><td class="num">3</td><td>Sum, max face count, distinct faces</td></tr>
     <tr><td>Category availability</td><td class="num">15</td><td>Binary: is each category still open?</td></tr>
-    <tr><td>Game state</td><td class="num">4</td><td>Turn number, upper score, bonus achieved, rerolls left</td></tr>
+    <tr><td>Game state</td><td class="num">5</td><td>Turn number, upper score, upper categories left, bonus secured, bonus deficit</td></tr>
   </tbody>
 </table>
 :::
@@ -193,10 +196,10 @@ conflicts exist. Every unique game state maps to exactly one optimal action.
     <tr><td>DT depth-5</td><td class="num">276</td><td class="num">157</td><td class="num">9.4%</td><td class="num">53.7</td></tr>
     <tr><td>DT depth-8</td><td class="num">1,878</td><td class="num">192</td><td class="num">35.6%</td><td class="num">11.7</td></tr>
     <tr><td>DT depth-10</td><td class="num">6,249</td><td class="num">216</td><td class="num">54.0%</td><td class="num">11.5</td></tr>
-    <tr><td>MLP [64,32]</td><td class="num">5,000</td><td class="num">221</td><td class="num">66.8%</td><td class="num">6.4</td></tr>
+    <tr><td>MLP [64,32]</td><td class="num">11,023</td><td class="num">221</td><td class="num">66.8%</td><td class="num">6.4</td></tr>
     <tr><td>DT depth-15</td><td class="num">81,237</td><td class="num">239</td><td class="num">77.0%</td><td class="num">3.4</td></tr>
     <tr><td>DT depth-20</td><td class="num">412,629</td><td class="num">245</td><td class="num">84.4%</td><td class="num">1.4</td></tr>
-    <tr><td>Optimal (lookup)</td><td class="num">2,097,152</td><td class="num">248</td><td class="num">~87%</td><td class="num">0</td></tr>
+    <tr><td>Optimal (lookup)</td><td class="num">2,097,152</td><td class="num">248</td><td class="num">~90%</td><td class="num">0</td></tr>
   </tbody>
 </table>
 :::
@@ -209,7 +212,8 @@ should score 247.0, and actual game simulation yields 245 (roughly
 
 At matched parameter counts, MLPs trail decision trees on category decisions,
 the hardest task (15 classes, complex bonus interactions). A 14K-param
-MLP achieves category EV loss comparable to a 2K-param depth-10 tree. The gap
+MLP reaches a category EV loss of 1.9, comparable to a depth-15 tree
+(~30K params, 2.1) but well behind what trees achieve per parameter. The gap
 narrows for reroll decisions, where the MLP's soft decision boundaries help
 with near-tied actions. But overall, the combinatorial structure of Yatzy
 strongly favours axis-aligned partitioning over learned embeddings.
@@ -225,7 +229,7 @@ EV(0) = 196.7 &nbsp;&rarr;&nbsp; EV(50) = 216.5 &nbsp;&rarr;&nbsp; EV(100) = 227
 :::
 
 Phase 1 (<var>N</var> = 0–20): foundation, +2.7 EV. Phase 2
-(<var>N</var> = 25–70): acceleration, +21.9 EV with peak marginal value
+(<var>N</var> = 20–70): acceleration, +21.9 EV with peak marginal value
 of 0.74 EV/rule in the 26–40 band. Phase 3 (<var>N</var> = 70–100):
 saturation, +6.2 EV. The phase transition at <var>N</var> &approx; 25
 coincides with the algorithm's discovery of upper-section management rules,
@@ -262,10 +266,10 @@ YATZY_BASE_PATH=. solver/target/release/yatzy-export-training-data \
     --games 200000 \
     --output data/training/
 
-# Produces three files:
-#   category_decisions.csv   (~3M records, 29 features)
-#   reroll1_decisions.csv    (~3M records, 30 features)
-#   reroll2_decisions.csv    (~3M records, 30 features)
+# Produces three binary files (32-byte header, little-endian):
+#   category_decisions.bin   (~3M records, 29 features)
+#   reroll1_decisions.bin    (~3M records, 30 features)
+#   reroll2_decisions.bin    (~3M records, 30 features)
 ```
 
 ### Training a Decision Tree Ensemble
@@ -282,11 +286,9 @@ for dtype in ['category', 'reroll1', 'reroll2']:
 
     dt = DecisionTreeClassifier(
         max_depth=20,
-        min_samples_leaf=5,
-        class_weight='balanced',
+        random_state=42,
     )
-    dt.fit(df[features], df['action'], sample_weight=df['gap'])
-    # Weight by gap: mistakes on high-gap decisions cost more
+    dt.fit(df[features], df['action'])
 ```
 
 ### Error Analysis: Where the Last Point Hides

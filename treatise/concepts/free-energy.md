@@ -6,7 +6,7 @@ The **free energy** is a concept from statistical mechanics that connects the ri
 
 The risk-sensitive value of a state is:
 
-> V(s) = -(1/theta) * log E[exp(-theta * score | s)]
+> V(s) = (1/theta) * log E[exp(theta * score) | s]
 
 This is the **certainty equivalent** under CARA utility. In statistical mechanics, the identical expression appears as the Helmholtz free energy:
 
@@ -20,7 +20,7 @@ where beta = 1/(k_B * T) is the inverse temperature and Z = sum of exp(-beta * E
 |---|---|
 | Inverse temperature beta | Risk parameter theta |
 | Energy level E_i | Negative score -score_i |
-| Partition function Z | E[exp(-theta * score)] |
+| Partition function Z | E[exp(theta * score)] |
 | Free energy F | Value function V(s) |
 | Boltzmann distribution | Optimal mixed strategy weights |
 
@@ -30,8 +30,8 @@ High theta (risk-seeking) corresponds to high temperature: the system explores w
 
 The analogy is more than cosmetic. It imports powerful mathematical results from physics:
 
-- **Convexity**: the free energy is convex in theta, guaranteeing a smooth, well-behaved interpolation between risk-averse and risk-seeking strategies
-- **Derivatives**: dV/d(theta) at theta=0 gives the variance of the score distribution, connecting risk sensitivity to score volatility. Higher derivatives give cumulants (skewness, kurtosis).
+- **Convexity**: the cumulant generating function K(theta) = log E[e^(theta X)] = theta * V(theta) is convex in theta, guaranteeing a smooth, well-behaved interpolation between risk-averse and risk-seeking strategies (V itself need not be convex)
+- **Derivatives**: dV/d(theta) at theta=0 gives half the variance of the score distribution (about 741 points-squared here), connecting risk sensitivity to score volatility. Higher derivatives of K(theta) give cumulants (skewness, kurtosis).
 - **Large deviations**: the free energy framework naturally handles tail probabilities via the Legendre transform, which is exactly what risk-averse players care about
 - **Phase transitions**: abrupt changes in optimal strategy as theta varies correspond to phase transitions in the physical system
 

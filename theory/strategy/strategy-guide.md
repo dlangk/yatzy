@@ -4,7 +4,7 @@ Based on gap analysis of 100,000 games comparing a pattern-matching heuristic (m
 
 ## Tier 1: The One Rule That Matters Most
 
-**The upper bonus is worth 50 points and drives nearly half of all EV loss.** You need 63 points across Ones through Sixes (averaging 3-of-each-face). The optimal solver gets the bonus 87% of the time; the heuristic gets it 1.2%. Every reroll and category decision should be filtered through: "does this help or hurt my bonus chances?"
+**The upper bonus is worth 50 points and drives nearly half of all EV loss.** You need 63 points across Ones through Sixes (averaging 3-of-each-face). The optimal solver gets the bonus 90% of the time; the heuristic gets it 1.2%. Every reroll and category decision should be filtered through: "does this help or hurt my bonus chances?"
 
 ## Tier 2: The Five Biggest Mistakes
 

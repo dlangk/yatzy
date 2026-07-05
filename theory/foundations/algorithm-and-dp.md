@@ -29,7 +29,7 @@ The algorithm computes $E(S)$ — the expected score under optimal play starting
 ### State indexing
 
 ```
-state_index(m, C) = C × 64 + m
+state_index(m, C) = C × 128 + m   (STATE_STRIDE = 128: slots 64-127 duplicate the capped value for branchless upper-category access)
 ```
 
 This places all 64 upper-score variants of the same bitmask $C$ in a contiguous 256-byte block (64 × 4 bytes at f32 precision). This is critical for Group 6 cache performance (§5.3).
@@ -60,7 +60,7 @@ $$E(S) = \sum_{r \in R_{5,6}} P(\perp \to r) \cdot E(S, r, 2)$$
 
 ### Memory model
 
-- **Persistent**: `E_table[S]` for all ~1.43M reachable states → ~8 MB (2,097,152 × f32)
+- **Persistent**: `E_table[S]` for all ~1.43M reachable states → 16 MB on disk (4,194,304 padded slots × f32; 8 MB of live values)
 - **Per-widget**: Two ping-pong buffers `e[0]`, `e[1]` each 252 × f32 → ~2 KB (freed after each widget)
 
 ## 3. Computation Pipeline
@@ -174,4 +174,4 @@ The recurrence changes:
 - **Group 6**: $\text{val} = \theta \cdot \text{scr} + sv[\text{successor}]$ (log-domain contribution)
 - **Group 1**: LSE over initial rolls (stochastic node, always the same regardless of $\theta$ sign)
 
-Runtime: ~7s for $\theta \neq 0$ vs ~2.3s for $\theta = 0$ (the 2-pass LSE is ~3× slower than a single-pass dot product per keep).
+Runtime (pre-NEON build): ~7s for $\theta \neq 0$ vs ~2.3s for $\theta = 0$; post-NEON canonical values are ~2.7s (LSE) vs ~1.1s (EV) on M1 Max, and ~0.6s vs ~0.12s on M5 Max (2026-07). The 2-pass LSE is ~2.5-3x slower than a single-pass dot product per keep.

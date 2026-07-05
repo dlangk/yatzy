@@ -25,7 +25,7 @@ Category mistakes account for nearly half the gap despite being the least freque
 
 **4. Yatzy over-chasing via rerolls (~2.8 pts/game).** On second reroll, the heuristic continues rerolling when optimal would keep all five dice. This occurs when the current hand scores well and rerolling risks breaking a scoring combination. The heuristic's blind Yatzy chase (always rerolling non-matching dice when 3-of-a-kind is present) costs 2.75 pts/game.
 
-**5. Bonus rate collapse.** The cumulative effect: the heuristic achieves the upper bonus in only 1.2% of games vs 87% for optimal. The 50-point bonus swing explains ~43 points of the 82.6-point gap. Every category and reroll mistake that fails to advance the upper score compounds into bonus failure.
+**5. Bonus rate collapse.** The cumulative effect: the heuristic achieves the upper bonus in only 1.2% of games vs ~90% for optimal. The 50-point bonus swing explains ~43 points of the 82.6-point gap. Every category and reroll mistake that fails to advance the upper score compounds into bonus failure.
 
 ### 1.3 Why Errors Compound
 
@@ -167,7 +167,7 @@ Per-decision EV loss is a useful proxy, but doesn't account for error compoundin
 | mlp_64 | 11,023 | 221 | 43.1 | 146 | 224 | 291 | 66.8% |
 | dt_d15 | 81,237 | 239 | 42.1 | 161 | 241 | 305 | 77.0% |
 | dt_d20 | 412,629 | 245 | 40.6 | 168 | 246 | 308 | 84.4% |
-| optimal | 2,097,152 | 248 | 39 | — | 248 | — | ~87% |
+| optimal | 2,097,152 | 248 | 39 | — | 248 | — | ~90% |
 
 **Key findings.**
 

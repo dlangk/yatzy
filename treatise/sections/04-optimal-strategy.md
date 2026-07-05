@@ -115,7 +115,7 @@ for game in 0..n_games {
 
 The position explorer uses the same `/evaluate` endpoint as the
 game UI. Given dice, upper score, scored categories, and rerolls
-remaining, the solver returns all 252 keep-mask EVs and 15
+remaining, the solver returns all 32 keep-mask EVs and 15
 category EVs:
 
 ```rust

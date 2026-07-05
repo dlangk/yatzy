@@ -191,7 +191,7 @@ Why does RL fail at dice? Three interacting barriers:
 > **Visual Prompt 5: The RL Gap Number Line**
 > * **Chart Type:** Horizontal Number Line / Ruler.
 > * **Axes:** Mean Score from 100 to 260.
-> * **Data Shown:** Markers placing the agents: Max-Policy Simulation (~118), Random Play (~140), Average Human (~215), Best RL Agent (~236), Exact DP Optimum (248.4).
+> * **Data Shown:** Markers placing the agents: Max-Policy Simulation (~118), Random Play (~140), Average Human (~215), Best RL Agent (~241, Häfner 2021 under Yatzy rules; ~236 was his American-Yahtzee number), Exact DP Optimum (248.4).
 > * **Key Annotations:** A bracket highlighting the ~12-point "RL Gap" between neural approximation and absolute mathematical truth. Label it "The Signal-to-Noise Chasm."
 > * **Insight:** Visually scales the "last mile" problem in AI. Neural networks easily learn the heuristics that beat humans, but fail to close the final 5% gap to mathematical perfection due to structural noise.
 >

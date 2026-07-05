@@ -150,7 +150,7 @@ You have mapped the absolute limits of stochastic optimal control. Depending on 
 * **Compute:**  seconds | **Memory:**  MB
 * **Objective:**
 * **The Catch:** Sub-optimal for exact Variance because of Scoreboard Amnesia.
-* **The Verdict:** The undisputed king of **Solitaire Gameplay**. Because exponential curves are strictly monotonic, CARA always wants more points. It provides the smoothest, most human-logical "High Score" gameplay, mapping 99% of the efficient frontier for 0.5% of the compute cost.
+* **The Verdict:** The undisputed king of **Solitaire Gameplay**. Because exponential curves are strictly monotonic, CARA always wants more points. It provides the smoothest, most human-logical "High Score" gameplay, mapping most of the efficient frontier for under 1% of the (proposed) 3D tablebase's compute cost (0.48s vs ~60s) and memory (16 MB vs ~3.2 GB); the 99%/0.5% figures were never measured.
 
 #### 2. The 3D Threshold Tablebase (The Gladiator)
 

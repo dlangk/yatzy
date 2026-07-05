@@ -122,11 +122,12 @@ where &sigma; is the spread of state values at that node. The transition depends
 |-------:|------------------:|--------|
 | &lt; 0.03 | &lt; 0.3 | Near-EV: policy barely differs from &theta; = 0 |
 | 0.03&ndash;0.20 | 0.3&ndash;2 | Active: meaningful risk/return tradeoffs |
-| &gt; 0.5 | &gt; 5 | Degenerate: LSE &asymp; max, policy frozen |
+| 0.20&ndash;1.5 | 2&ndash;15 | Extreme: policy still shifting (disagreement vs &theta; = 0 grows from 32% at &theta; = 0.5 to 44% at &theta; = 3) |
+| &gt; 1.5 | &gt; 15 | Degenerate: LSE &asymp; max, policy effectively frozen |
 
 The marginal utility chart tells the same story from the score side: at |&theta;| = 0.5, the marginal value is effectively zero everywhere except the extreme tail. The solver is running a soft-max over outcomes, concentrating all its attention on the single best reachable score. Increasing |&theta;| further cannot change which action achieves that maximum, so the policy stops changing.
 
-The degenerate max-policy does reach higher ceilings: the observed maximum across 1M games rises from 352 at &theta; = 0 to 362 at &theta; &asymp; 0.1. But it pays for those ceilings by sacrificing everything else (Full House hit rate drops from 92% to 54%, mean score from 248 to 210). The max-policy's best games are spectacular but vanishingly rare. With only 1M simulations, the observed maximum barely changes beyond &theta; &asymp; 0.1 because the ceiling-achieving games have become so improbable that even a million rolls cannot reliably sample them. In the limit, the max-policy converges to the theoretical maximum of the game, but with a probability so low it would take billions of simulated games to observe.
+The extreme regime does reach higher ceilings: the observed maximum rises from 354 at &theta; = 0 (1M games) to 362 at &theta; &asymp; 0.1 (200K games). But it pays for those ceilings by sacrificing everything else (at &theta; = 3, the Full House hit rate drops from 92% to 54% and the mean score from 248 to about 186). The best games are spectacular but vanishingly rare: the ceiling-achieving games become so improbable that even a million rolls cannot reliably sample them. In the limit, the max-policy converges to the theoretical maximum of the game, but with a probability on the order of 10<sup>&minus;19</sup>, far beyond what any feasible simulation could observe.
 
 ### f32 Numerical Stability
 
@@ -154,7 +155,7 @@ For a risk-seeking player (&theta; = +0.07) facing an EV-optimal opponent, the w
 
 ### Disagreement Anatomy
 
-At &theta; = 0.07 versus &theta; = 0, category disagreements are concentrated in the upper section. The risk-seeking solver is more willing to take a zero in a lower-value upper category (Ones, Twos) to preserve the option of chasing Yatzy or Full House later. Reroll disagreements centre on keep decisions where a safe pair competes with a speculative straight draw. The 12.5% reroll disagreement rate translates to roughly 5–6 different keep decisions per 15-round game.
+At &theta; = 0.07 versus &theta; = 0, category disagreements are concentrated in the upper section. The risk-seeking solver is more willing to take a zero in a lower-value upper category (Ones, Twos) to preserve the option of chasing Yatzy or Full House later. Reroll disagreements centre on keep decisions where a safe pair competes with a speculative straight draw. The 12.5% reroll disagreement rate translates to roughly 4 different keep decisions per 15-round game (about 5.6 changed decisions per game when category picks are included).
 
 :::
 

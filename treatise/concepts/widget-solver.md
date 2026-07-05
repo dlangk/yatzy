@@ -17,7 +17,7 @@ The groups alternate between "nature rolls dice" (chance) and "player decides" (
 
 ## Scale of the Computation
 
-Each widget evaluation touches approximately 45,000 intermediate values. Multiply by the ~1.43 million reachable states, and the full backward pass involves roughly 64 billion floating-point operations. Despite this scale, careful SIMD vectorization and memory layout allow the entire computation to complete in about 1 second on Apple Silicon.
+Each widget evaluation costs approximately 45,000 CPU cycles (measured on M1 Max; the widget holds 1,681 internal values). Multiply by the ~1.43 million reachable states, and the full backward pass involves roughly 64 billion floating-point operations. Despite this scale, careful SIMD vectorization and memory layout allow the entire computation to complete in about 1 second on Apple Silicon.
 
 The per-state cost breaks down roughly as:
 
@@ -29,7 +29,7 @@ The keep-evaluation phases (Groups 2 and 4) account for most of the computation 
 
 ## Ping-Pong Buffers
 
-The solver alternates between two pre-allocated buffers. One holds the values being computed (current layer); the other holds the already-solved future values (next layer). After each scored-mask group is complete, the buffers swap roles. This avoids allocation overhead and keeps memory usage constant at ~32 MB regardless of the number of states processed.
+Within one widget, the solver alternates between two pre-allocated 252x64 scratch buffers: one holds the layer being computed, the other the previous layer's values, swapping roles between the reroll stages. State values themselves live in a single 16 MB table that is written in place (each level reads only the already-finished level above it). The per-thread scratch is ~250 KB; nothing scales with the number of states processed.
 
 The buffer swap is a pointer exchange, not a data copy. This zero-cost swap pattern is critical when processing millions of states.
 

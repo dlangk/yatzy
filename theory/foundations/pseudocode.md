@@ -73,10 +73,22 @@ COMPUTE_REACHABILITY():
                     R(n, S_upper) <- true
                     break both loops
 
-    // Result: ~31.8% of (S_upper, n) pairs are unreachable.
-    // A state (C, m) is valid only if R(m, C intersect {1..6}) is true.
+    // CAP SEMANTICS (correction, 2026-07 review): m = 63 represents ALL
+    // upper totals >= 63, so the capped reachability at m = 63 must be
+    // an OR over achievable exact totals >= 63, not "exactly 63":
+    //
+    //   R_capped(m, S_upper)  = R(m, S_upper)                 for m < 63
+    //   R_capped(63, S_upper) = OR over n' >= 63 of R(n', S_upper)
+    //
+    // Using exact-total semantics at m = 63 wrongly prunes reachable
+    // states (2,792 instead of the correct 2,794 (S_upper, m) pairs) and
+    // would make backward induction read uncomputed successors. The
+    // implementation (phase0_tables.rs) uses the capped form.
 
-    VALID_STATES <- { (C, m) : R(m, C intersect {1..6}) = true
+    // Result: ~31.8% of (S_upper, m) pairs are unreachable.
+    // A state (C, m) is valid only if R_capped(m, C intersect {1..6}) is true.
+
+    VALID_STATES <- { (C, m) : R_capped(m, C intersect {1..6}) = true
                                AND 0 <= m <= 63 }
 ```
 

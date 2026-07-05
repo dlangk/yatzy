@@ -91,7 +91,7 @@ Total induction time: 673s (~11 min) for 300 rules across 3 decision types.
 | Mode | Policy EV | Oracle EV | Gap | Notes |
 |------|-----------|-----------|-----|-------|
 | Category-only (optimal rerolls) | **227.5** | 248.4 | **20.9** | Isolates category rule quality |
-| Full rules (all 300) | **168.7** | 248.4 | **79.8** | Reroll rules are the bottleneck |
+| Full rules (all 300) | **168.7** | 248.4 | **79.7** | Reroll rules are the bottleneck |
 
 ### Category-Only Distribution (1M games)
 

@@ -22,7 +22,7 @@ Yatzy has really interesting properties that make it fun to both play and pick a
 </div>
 :::
 
-As you can see, scores vary wildly even for an optimal player. Even if you play *perfectly*, 1 out of 10 games will be below 203 points. And you will, during an entire lifetime, experience myabe a handful of games above 320 points.
+As you can see, scores vary wildly even for an optimal player. Even if you play *perfectly*, 1 out of 10 games will be below 203 points. And you will, during an entire lifetime, experience maybe a handful of games above 330 points.
 
 **This explains why Yatzy is fun for families: It has room for skill, but it's actually mostly luck!** 😅 The best player will win slightly more, but anyone can get lucky and beat the strongest player by a wide margin. Parents will win a bit more, but their kids will regularly beat them.
 

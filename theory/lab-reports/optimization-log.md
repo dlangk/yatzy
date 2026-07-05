@@ -228,9 +228,9 @@ Safety cutoff at |θ| ≤ 0.15: f32 overflow at e^(θ*374) when θ > 0.235; mant
 
 | Grid | Count | Range | Precompute time |
 |------|------:|-------|----------------:|
-| dense | 19 | [-0.1, +0.1] | ~25s |
-| sparse | 17 | [-3.0, +3.0] | ~83s |
-| all | 37 | [-3.0, +3.0] | ~2.5 min |
+| dense | 19 | [-0.1, +0.1] | ~25s (pre-NEON; ~10s post-NEON) |
+| sparse | 17 | [-3.0, +3.0] | ~83s (pre-NEON; ~33s post-NEON) |
+| all | 37 | [-3.0, +3.0] | ~2.5 min (pre-NEON; ~1 min post-NEON) |
 | frontier | 89 | [-1.0, +1.0] | ~12 min |
 
 Grid spacing follows the dimensionless control parameter |θ| * σ_EV: dense sampling in the 0.03 < |θ| < 0.1 range where the Pareto frontier bends sharply; coarse sampling in the degenerate |θ| ≥ 1 region where LSE collapses to max/min.

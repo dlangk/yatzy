@@ -13,6 +13,6 @@ This gives 32,768 × 64 = **2,097,152 unique states**.
 
 ## Why It Matters
 
-A finite, enumerable state space means we can solve the game *exactly*. We compute the optimal expected value for every single state, store the results in an 8 MB lookup table, and answer any "what should I do?" question with a simple table lookup.
+A finite, enumerable state space means we can solve the game *exactly*. We compute the optimal expected value for every single state, store the results in a 16 MB on-disk lookup table (8 MB of live values inside stride-128 padding), and answer any "what should I do?" question with a simple table lookup.
 
 Games with astronomically large state spaces (like Go, with ~10^170 states) require approximation. Yatzy's 2M states fit comfortably in memory, making exact solutions feasible.

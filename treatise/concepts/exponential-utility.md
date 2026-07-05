@@ -4,9 +4,9 @@
 
 ## The Function
 
-Instead of maximizing E[score], we maximize:
+Instead of maximizing E[score], we optimize:
 
-> E[e^(θ · score)]
+> E[e^(θ · score)]   (maximized for θ > 0, minimized for θ < 0; both maximize the certainty equivalent CE = (1/θ) ln E[e^(θ · score)])
 
 where θ (theta) is the **risk parameter**. In practice, we work in the log domain for numerical stability:
 

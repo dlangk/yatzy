@@ -41,7 +41,7 @@ $$ U(X) = X + \Omega \cdot \mathbf{1}_{X \ge T^*} $$
 When you push this equation backward through the 3.22 GB state space, the agent's psychology violently splinters into three perfect phases:
 
 **Phase A: The Psychopath ()**
-While the 5% dream is alive, the -point bounty dominates the vector space. The agent plays like an absolute maniac. If it rolls a guaranteed 25-point Full House on Turn 2, it will ruthlessly throw it away to hunt for a Yahtzee. It gladly incinerates Expected Value because EV is mathematically meaningless compared to the  bounty. It sacrifices the 95% to push the probability of reaching 318 as high as the physics of the dice allow.
+While the 5% dream is alive, the -point bounty dominates the vector space. The agent plays like an absolute maniac. If it rolls a guaranteed 26-point Full House on Turn 2, it will ruthlessly throw it away to hunt for a Yahtzee. It gladly incinerates Expected Value because EV is mathematically meaningless compared to the  bounty. It sacrifices the 95% to push the probability of reaching 318 as high as the physics of the dice allow.
 
 **Phase B: The Failsafe ()**
 It is Turn 6. The dice betrayed you. The 5% dream is dead.

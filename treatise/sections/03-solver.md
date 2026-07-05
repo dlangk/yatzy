@@ -211,7 +211,7 @@ scored_masks.par_iter().for_each(|&scored| {
 
 ### Sparse Transition Table ([source](https://github.com/dlangk/yatzy/blob/main/solver/src/types.rs#L25-L40))
 
-The keep-to-outcome probability matrix is stored in Compressed Sparse Row (CSR) format. For each of the 462 keeps, `row_start[ki]` marks where its non-zero entries begin in the `vals` and `cols` arrays. The matrix has only 4,368 non-zero entries out of a potential 462 &times; 252 = 116,424 (96.2% sparse). Total storage: ~17 KB for the sparse data. The hot path reads it as:
+The keep-to-outcome probability matrix is stored in Compressed Sparse Row (CSR) format. For each of the 462 keeps, `row_start[ki]` marks where its non-zero entries begin in the `vals` and `cols` arrays. The matrix has only 4,368 non-zero entries out of a potential 462 &times; 252 = 116,424 (96.2% sparse). Total storage: ~36 KB for the sparse data (values, columns, and row offsets). The hot path reads it as:
 
 ```rust
 // types.rs — CSR sparse dot product
@@ -227,7 +227,7 @@ The keep-evaluation kernel uses ARM NEON instructions to process four f32 values
 ```rust
 // simd.rs — NEON FMA+max kernel
 #[inline(always)]
-pub unsafe fn neon_fma_max_f32x4(
+pub unsafe fn neon_fma_64(
     acc: float32x4_t,
     a: float32x4_t,
     b: float32x4_t,
@@ -271,7 +271,7 @@ At the global level, the solver keeps one `f32` per state slot: `4,194,304 &time
 
 :::html
 <div class="chart-container" id="chart-memory-lifecycle">
-  <p class="chart-caption">Memory footprint: one 8 MB table of expected scores, plus 2 KB of scratch space per widget.</p>
+  <p class="chart-caption">Memory footprint: one 16 MB table of expected scores (8 MB of live values inside stride-128 padding), plus 2 KB of scratch space per widget.</p>
 </div>
 :::
 
@@ -287,7 +287,7 @@ At the global level, the solver keeps one `f32` per state slot: `4,194,304 &time
 | Reachability mask | 4 KB | 64 &times; 64 booleans |
 | Batched buffers | 247 KB/thread | Two ping-pong [f32; 64] &times; 252 + keep_ev |
 
-**Total working set during precomputation:** <17 MB.
+**Total working set during precomputation:** ~18 MB at 8 threads (~21 MB at the M5 Max default of 18 threads).
 **During serving (mmap mode):** 16 MB mapped, ~250 KB active.
 
 :::

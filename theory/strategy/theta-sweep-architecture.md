@@ -31,9 +31,9 @@ L(S) = ln(E[e^(theta * total) | S]).
 
 | Mode | Theta range | Stochastic nodes | Decision nodes | Runtime |
 |------|-------------|-----------------|----------------|---------|
-| EV | theta = 0 | Weighted sum | argmax | ~1.3s |
-| Utility domain | 0 < \|theta\| <= 0.15 | Weighted sum | argmax/argmin | ~1.3s |
-| Log domain (LSE) | \|theta\| > 0.15 | Log-sum-exp | argmax/argmin | ~7.4s |
+| EV | theta = 0 | Weighted sum | argmax | ~1.1s |
+| Utility domain | 0 < \|theta\| <= 0.15 | Weighted sum | argmax/argmin | ~0.49s |
+| Log domain (LSE) | \|theta\| > 0.15 | Log-sum-exp | argmax/argmin | ~2.7s |
 
 Measured on Apple M1 Max, 8 threads. The EV and utility-domain solvers share
 identical inner loops for stochastic nodes (plain SpMM weighted sums). The
@@ -74,7 +74,7 @@ covers the entire "interesting" range where risk preferences produce meaningfull
 different strategies (|theta| < 0.2, per the regime map in
 `risk_parameter_theta.md`).
 
-For |theta| > 0.15, the existing log-domain solver runs at ~7.4s. These extreme
+For |theta| > 0.15, the existing log-domain solver runs at ~2.7s (post-NEON, M1 Max; an earlier pre-NEON build measured ~7.4s). These extreme
 theta values produce degenerate strategies (LSE collapses to max/min), so speed
 is unimportant.
 

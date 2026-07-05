@@ -42,7 +42,7 @@ No study has explicitly constructed a mean-standard deviation Pareto frontier fo
 
 ### Scandinavian Yatzy
 
-**Larsson and Sjöberg (KTH, 2012)** were the first to compute the optimal Yatzy strategy, arriving at EV = **248.63 points**. The two additional categories (One Pair, Two Pairs) expand the category-subset state space from 2^13 = 8,192 to 2^15 = 32,768 (a fourfold increase), partially offset by the absence of the Yahtzee Bonus/Joker system. The maximum possible Yatzy score is 374 (vs Yahtzee's theoretical 1,575 with 13 consecutive Yahtzees). Our solver reproduces this EV (248.44 after the 50-point bonus correction).
+**Larsson and Sjöberg (KTH, 2012)** were the first to compute the optimal Yatzy strategy, arriving at EV = **248.63 points**. The two additional categories (One Pair, Two Pairs) expand the category-subset state space from 2^13 = 8,192 to 2^15 = 32,768 (a fourfold increase), partially offset by the absence of the Yahtzee Bonus/Joker system. The maximum possible Yatzy score is 374 (vs Yahtzee's theoretical 1,575 with 13 consecutive Yahtzees). Our solver computes an exact EV of 248.44 under the identical ruleset, 0.19 points below their published 248.63; the small gap is unexplained (no bonus-rule difference accounts for it) and most likely reflects an approximation or rule nuance in the 2012 implementation.
 
 ### Other Variants
 
@@ -71,9 +71,9 @@ Multiple RL groups have applied deep RL to Yahtzee, consistently reaching ~95% o
 
 ### Published Results
 
-**Pape (2025, arXiv:2601.00007)** systematically compared REINFORCE, A2C, and PPO with multi-headed networks on NVIDIA A40 GPUs. A2C achieved median 241.78 points (within 5.0% of 254.59). REINFORCE and PPO proved significantly more sensitive to hyperparameters.
+**Pape (2025, arXiv:2601.00007)** systematically compared REINFORCE, A2C, and PPO with multi-headed networks on a local NVIDIA RTX 3090 and AWS Tesla T4 GPUs. A2C achieved median 241.78 points (within 5.0% of 254.59). REINFORCE and PPO proved significantly more sensitive to hyperparameters.
 
-**Häfner's Yahtzotron (2021)** demonstrated A2C effectiveness using JAX/Haiku with a pre-training curriculum (greedy table → advantage table → full A2C), reaching ~240-242 average in ~2 hours on a single CPU. Genetic optimization baseline plateaued at ~130 points.
+**Häfner's Yahtzotron (2021)** demonstrated A2C effectiveness using JAX/Haiku with a pre-training curriculum (greedy table → advantage table → full A2C), reaching ~236-241 average (236.2 under Yahtzee rules, 241 under Yatzy rules) in ~2 hours on a single CPU. Genetic optimization baseline plateaued at ~130 points.
 
 **Dutschke** achieved 241.6 average with MLP-based Q-learning after 8,000 games. **Yuan (2023)** managed only 159 points in two-player DQN. **Kang & Schroeder (2018, Stanford)** achieved 99% win rate against random opponents with hierarchical MAXQ but only 68% against greedy.
 
@@ -192,7 +192,7 @@ Based on comparison against all published work:
 
 ### Established (matching prior art)
 
-- EV-optimal Scandinavian Yatzy strategy matching Larsson & Sjöberg's 248.63
+- EV-optimal Scandinavian Yatzy strategy closely corroborating Larsson & Sjöberg's 248.63 (ours: exact 248.44; 0.19-point gap unexplained)
 - Backward induction over the full state space with keep-multiset deduplication
 - Score distribution analysis confirming non-normality from binary categories
 

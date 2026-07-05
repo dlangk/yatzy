@@ -15,8 +15,8 @@ Points on the frontier represent **efficient** strategies — you cannot increas
 
 The Yatzy frontier is asymmetric:
 
-- **Risk-averse side** (left/downward): the curve is steep. A small sacrifice in mean score buys a large reduction in variance. This is "cheap insurance."
-- **Risk-seeking side** (right/upward): the curve is flat. You must accept a lot more variance to gain a little more mean. High scores are expensive to chase.
+- **Risk-averse side** (theta < 0): hedging is shallow and quickly exhausted. The minimum-variance point (theta = -0.05) trims sigma by only 7% (38.5 to 35.7) at a cost of 3.3 mean points, and more negative theta is strictly dominated (theta = -0.20 has both lower mean and higher sigma than theta = 0).
+- **Risk-seeking side** (theta > 0): no extra mean exists to gain (theta = 0 is the mean-optimum); positive theta buys variance (sigma up to 47-48) while giving up mean. What it purchases is tail mass, not average performance.
 
 ## Origin
 

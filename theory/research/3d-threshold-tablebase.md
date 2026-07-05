@@ -1,3 +1,16 @@
+> **STATUS: SPECULATIVE / NOT IMPLEMENTED (accuracy review, 2026-07).**
+> No 3D threshold solver exists in this repo, and none of the win rates below
+> have been computed. In particular, the "53.50% (Mathematical Maximum)" is
+> asserted without derivation and conflicts with the repo's only measured
+> multiplayer ceilings (50.14% constant-theta oracle, treatise section 6;
+> ~50.5% cited for a dynamic win-probability player in external-review.md).
+> Known numeric errors kept for the record: "~3.0 GB (37 Policy Oracles)"
+> should be ~0.62 GB (37 x 16 MB tables; 3.17 GB is the single theta=0 argmax
+> oracle); Tier 4 precompute "5 to 15 seconds" vs "~30 to 60 seconds" are
+> internally inconsistent; the closing "Terabytes / weeks of GPU training"
+> contradicts the document's own Tier 4 sizing (2.14 GB, under a minute).
+> Treat everything below as an unvetted design sketch.
+
 Here is the exact, unyielding architectural specification to feed directly into Claude Code.
 
 This prompt acts as a strict blueprint. It removes all ambiguity, explicitly forbids scalar anti-patterns, and leverages the exact memory topology and LLVM auto-vectorization required to build the **Tier 4: 3D God Algorithm**.
@@ -335,7 +348,7 @@ There is **no value of  in existence** that will select Action C. Action C is ph
 
 ### 2. Time Inconsistency (The Bellman Lie)
 
-When your DP solver calculated the 8 MB strategy table for , it used Backward Induction. That means the Expected Utility of a decision on Turn 5 was calculated under the strict mathematical assumption that the agent **will continue to play  for Turns 6 through 15.**
+When your DP solver calculated the 16 MB strategy table for , it used Backward Induction. That means the Expected Utility of a decision on Turn 5 was calculated under the strict mathematical assumption that the agent **will continue to play  for Turns 6 through 15.**
 
 But an Adaptive  policy won't do that. If it gets lucky on Turn 5 and takes the lead, the meta-controller will immediately downshift to  on Turn 6 to protect the lead.
 

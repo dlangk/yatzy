@@ -42,9 +42,9 @@ Without optimal substructure, you would need to consider all possible game histo
 
 For the risk-sensitive solver (theta != 0), the Bellman equation generalizes to:
 
-> V(s) = (1/theta) * log( sum_a exp(theta * [R(s,a) + sum P(s'|s,a) * V(s')]) )
+> L(s) = opt_a [ theta * R(s,a) + LSE_{s'}( ln P(s'|s,a) + L(s') ) ],   V(s) = L(s) / theta
 
-The max is replaced by a **soft-max** (log-sum-exp). When theta -> 0, this recovers the standard max. When theta < 0, it biases toward actions with lower variance. The mathematical structure is identical; only the aggregation operator changes.
+where opt is a **hard** max (theta > 0) or min (theta < 0) at decision nodes, and the probability-weighted log-sum-exp handles chance nodes. When theta -> 0 the recursion recovers the standard expectation-and-max form. When theta < 0, low-variance actions are favored. The mathematical structure is identical; only the chance-node aggregation changes.
 
 ## Historical Note
 
@@ -58,6 +58,6 @@ The total cost of solving the Bellman equation for all Yatzy states is:
 
 > O(|S| * |A| * |S'|)
 
-where |S| is the number of states (~1.43M reachable), |A| is the number of actions per state (up to 462 keeps x 15 categories), and |S'| is the number of stochastic outcomes per action (up to 252 dice outcomes). This product is large but finite and fixed -- roughly 64 billion floating-point operations for the full backward pass.
+where |S| is the number of states (~1.43M reachable), |A| is the number of actions per state (up to 462 keeps x 15 categories), and |S'| is the number of stochastic outcomes per action (up to 252 dice outcomes). This product is large but finite and fixed -- roughly 64 billion CPU cycles for the full backward pass (1.43M widgets at a measured ~45,000 cycles each on M1 Max; the pure FLOP count is lower, ~20-40 billion).
 
 The key insight is that this cubic-looking cost is actually traversed once, not iteratively. Unlike value iteration (which may need dozens of passes to converge), backward induction requires exactly one pass through the state space. This single-pass property is what makes the ~1-second solve time possible.
