@@ -22,14 +22,30 @@ fn ev(ctx: &YatzyContext, up: i32, scored: i32) -> f64 {
     ctx.state_values.as_slice()[state_index(up as usize, scored as usize)] as f64
 }
 
-fn setup() -> Option<Box<YatzyContext>> {
+/// `cargo test` runs from solver/ with the data directory at the repo
+/// root, so fall back to the parent directory if needed.
+fn resolve_state_file() -> Option<String> {
     let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
     let _ = std::env::set_current_dir(&base_path);
+
+    let state_file = yatzy::storage::state_file_path(0.0);
+    if file_exists(&state_file) {
+        return Some(state_file);
+    }
+    let parent = format!("../{}", state_file);
+    if file_exists(&parent) {
+        return Some(parent);
+    }
+    None
+}
+
+fn setup() -> Option<Box<YatzyContext>> {
+    let path = resolve_state_file()?;
 
     let mut ctx = YatzyContext::new_boxed();
     phase0_tables::precompute_lookup_tables(&mut ctx);
 
-    if !load_all_state_values(&mut ctx, "data/all_states.bin") {
+    if !load_all_state_values(&mut ctx, &path) {
         return None;
     }
     Some(ctx)
@@ -621,14 +637,12 @@ fn test_score_category_consistency() {
 
 #[test]
 fn test_file_format() {
-    let _ctx = match setup() {
-        Some(c) => c,
+    let path = match resolve_state_file() {
+        Some(p) => p,
         None => return,
     };
 
-    assert!(file_exists("data/all_states.bin"));
-
-    let data = std::fs::read("data/all_states.bin").unwrap();
+    let data = std::fs::read(&path).unwrap();
     assert!(data.len() >= 16);
 
     // Check header

@@ -22,6 +22,7 @@ struct Args {
     policy: Option<String>,
     full_recording: bool,
     lockstep: bool,
+    vertical: bool,
     use_oracle: bool,
 }
 
@@ -35,6 +36,7 @@ fn parse_args() -> Args {
     let mut policy: Option<String> = None;
     let mut full_recording = false;
     let mut lockstep = false;
+    let mut vertical = false;
     let mut use_oracle = false;
 
     let policy_names: Vec<&str> = POLICY_CONFIGS.iter().map(|p| p.name).collect();
@@ -84,6 +86,9 @@ fn parse_args() -> Args {
             "--lockstep" => {
                 lockstep = true;
             }
+            "--vertical" => {
+                vertical = true;
+            }
             "--oracle" => {
                 use_oracle = true;
             }
@@ -110,6 +115,7 @@ fn parse_args() -> Args {
                     policy_names.join(", ")
                 );
                 println!("  --oracle           Use precomputed policy oracle (θ=0 lockstep only)");
+                println!("  --vertical         Force the per-game vertical engine (θ=0 --output defaults to lockstep)");
                 std::process::exit(0);
             }
             other => {
@@ -158,6 +164,7 @@ fn parse_args() -> Args {
         policy,
         full_recording,
         lockstep,
+        vertical,
         use_oracle,
     }
 }
@@ -174,6 +181,7 @@ fn main() {
         policy: policy_name,
         full_recording,
         lockstep,
+        vertical,
         use_oracle,
     } = args;
 
@@ -525,7 +533,15 @@ fn main() {
                 "Simulating {} games ({} threads)...",
                 num_games, num_threads
             );
-            let result = simulate_batch(&ctx, num_games, seed);
+            // Lockstep is ~5x faster and statistically equivalent (same optimal
+            // policy, different PRNG). Vertical remains for θ≠0 / max-policy /
+            // explicit --vertical (bit-compatible regeneration of old outputs).
+            let result = if theta == 0.0 && !max_policy && !vertical {
+                println!("  Mode: lockstep (horizontal processing)");
+                simulate_batch_lockstep(&ctx, num_games, seed)
+            } else {
+                simulate_batch(&ctx, num_games, seed)
+            };
 
             let per_game_us = result.elapsed.as_secs_f64() * 1e6 / num_games as f64;
             let throughput = num_games as f64 / result.elapsed.as_secs_f64();

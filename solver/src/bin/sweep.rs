@@ -6,6 +6,7 @@
 use std::time::Instant;
 
 use yatzy::phase0_tables;
+use yatzy::simulation::lockstep::simulate_batch_lockstep;
 use yatzy::simulation::sweep::{
     ensure_strategy_table, format_theta_dir, range_grid, resolve_grid, scan_inventory, theta_eq,
     theta_scores_path,
@@ -177,8 +178,12 @@ fn main() {
         }
         ctx.theta = theta;
 
-        // Simulate
-        let result = simulate_batch(&ctx, games as usize, seed);
+        // Simulate (lockstep is EV-only, so only the θ=0 leg can use it)
+        let result = if theta == 0.0 {
+            simulate_batch_lockstep(&ctx, games as usize, seed)
+        } else {
+            simulate_batch(&ctx, games as usize, seed)
+        };
 
         // Save scores
         let path = theta_scores_path(theta);
