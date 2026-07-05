@@ -86,7 +86,7 @@ Server: axum on port 9000, stateless, `Arc<YatzyContext>` shared state.
 ## Concurrency Model
 
 - **tokio** (rt-multi-thread): async HTTP server
-- **rayon** (8 threads): parallel backward induction and batch simulation
+- **rayon** (defaults to `std::thread::available_parallelism()`, overridable via `RAYON_NUM_THREADS`): parallel backward induction and batch simulation
 - No shared mutable state at runtime — context is immutable after precomputation
 - Density endpoint uses `tokio::spawn_blocking` for CPU-heavy forward DP
 
@@ -115,18 +115,19 @@ just bench          # Print only
 
 Baseline: `.benchmarks/performance-baseline.json`. Threshold: `max(mean + 3σ, mean × 1.10)`.
 
-### Reference Numbers (M1 Max, 8 threads)
+### Reference Numbers
 
-| Benchmark | Time |
-|-----------|------|
-| Precompute θ=0 (EV) | ~1.1s |
-| Precompute \|θ\|≤0.15 (utility) | ~0.49s |
-| Precompute \|θ\|>0.15 (LSE) | ~2.7s |
-| Lockstep simulation | ~232K games/s |
-| Oracle simulation | ~5.6M games/s |
-| API `/evaluate` | 2-9μs |
-| Density evolution (oracle) | ~3.0s |
-| Density evolution (non-oracle) | ~381s |
+| Benchmark | M1 Max (8 threads) | M5 Max (18 threads) |
+|-----------|---------------------|----------------------|
+| Precompute θ=0 (EV) | ~1.1s | ~0.23s |
+| Precompute \|θ\|≤0.15 (utility) | ~0.49s | — |
+| Precompute \|θ\|>0.15 (LSE) | ~2.7s | — |
+| Lockstep simulation (100k) | 342 ms | 182 ms |
+| Lockstep simulation | ~232K games/s | ~550K games/s |
+| Oracle simulation | ~5.6M games/s | — |
+| API `/evaluate` | 2-9μs | 2-6μs |
+| Density evolution (oracle) | ~3.0s | — |
+| Density evolution (non-oracle) | ~381s | — |
 
 ## Module Structure
 
