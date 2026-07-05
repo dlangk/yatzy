@@ -136,8 +136,11 @@ fn batched_group53(
     let vals = &kt.vals;
     let cols = &kt.cols;
 
-    // Step 1: NEON FMA — keep_ev[kid][up] += prob * e_prev[ds'][up]
-    for kid in 0..NUM_KEEP_MULTISETS {
+    // Step 1: NEON FMA — keep_ev[kid][up] += prob * e_prev[ds'][up].
+    // Only the 210 keeps of size <= 4 are ever read by Step 2 (masks 1..31
+    // reroll at least one die); the 252 size-5 rows are dead and skipped.
+    for &kid16 in kt.used_kids.iter() {
+        let kid = kid16 as usize;
         let start = kt.row_start[kid] as usize;
         let end = kt.row_start[kid + 1] as usize;
         // SAFETY: kid < NUM_KEEP_MULTISETS = keep_ev.len().
@@ -158,15 +161,36 @@ fn batched_group53(
         }
     }
 
-    // Step 2: NEON max — e_curr[ds][up] = max(e_prev[ds][up], keep_ev[kid][up])
+    // Step 2: subset-max lattice. M[K] = max over all sub-multisets K' of K
+    // of keep_ev[K'], built in place ascending by keep size (used_kids
+    // ordering guarantees children are final before their parents). Then
+    // e_curr[ds] = max(e_prev[ds] (keep-all), M[size-4 children of ds]).
+    // max is exact and order-independent, so e_curr is bit-identical to the
+    // direct per-ds max over unique_keep_ids, at ~1600 row-maxes vs 4116.
+    let kev_ptr = keep_ev.as_mut_ptr();
+    for &kid16 in kt.used_kids.iter() {
+        let kid = kid16 as usize;
+        let cnt = kt.kid_child_count[kid] as usize;
+        if cnt == 0 {
+            continue; // size-0 keep: M = keep_ev
+        }
+        // SAFETY: children have strictly smaller keep size, so child != kid;
+        // all indices < NUM_KEEP_MULTISETS = keep_ev.len().
+        let dst = unsafe { &mut *kev_ptr.add(kid) };
+        for j in 0..cnt {
+            let child = kt.kid_children[kid][j] as usize;
+            debug_assert!(child != kid && child < NUM_KEEP_MULTISETS);
+            let src = unsafe { &*(kev_ptr.add(child) as *const [f32; 64]) };
+            unsafe { neon_max_64(dst, src) };
+        }
+    }
+
     for ds_i in 0..252 {
         e_curr[ds_i] = e_prev[ds_i];
         let row = &mut e_curr[ds_i];
-
-        for j in 0..kt.unique_count[ds_i] as usize {
-            let kid = unsafe { *kt.unique_keep_ids[ds_i].get_unchecked(j) } as usize;
-            // SAFETY: kid < NUM_KEEP_MULTISETS = keep_ev.len() (unique_keep_ids
-            // construction). Same register-promotion rationale as Step 1.
+        for j in 0..kt.ds_child_count[ds_i] as usize {
+            let kid = kt.ds_children[ds_i][j] as usize;
+            // SAFETY: kid < NUM_KEEP_MULTISETS = keep_ev.len().
             debug_assert!(kid < keep_ev.len());
             let kev = unsafe { keep_ev.get_unchecked(kid) };
             unsafe { neon_max_64(row, kev) };
@@ -323,8 +347,10 @@ fn batched_group53_risk(
         f32::NEG_INFINITY
     };
 
-    // Step 1: compute LSE for each keep-multiset
-    for kid in 0..NUM_KEEP_MULTISETS {
+    // Step 1: compute LSE for each keep-multiset (size <= 4 only; size-5
+    // rows are never read by Step 2)
+    for &kid16 in kt.used_kids.iter() {
+        let kid = kid16 as usize;
         let start = kt.row_start[kid] as usize;
         let end = kt.row_start[kid + 1] as usize;
         // SAFETY: kid < NUM_KEEP_MULTISETS = keep_ev.len().
@@ -369,15 +395,36 @@ fn batched_group53_risk(
         }
     }
 
-    // Step 2: NEON min/max — for each dice set, find opt over its unique keeps
+    // Step 2: subset-min/max lattice (see batched_group53 — min and max are
+    // both order-independent, so results are bit-identical to the direct scan).
+    let kev_ptr = keep_ev.as_mut_ptr();
+    for &kid16 in kt.used_kids.iter() {
+        let kid = kid16 as usize;
+        let cnt = kt.kid_child_count[kid] as usize;
+        if cnt == 0 {
+            continue;
+        }
+        // SAFETY: children have strictly smaller keep size, so child != kid;
+        // all indices < NUM_KEEP_MULTISETS = keep_ev.len().
+        let dst = unsafe { &mut *kev_ptr.add(kid) };
+        for j in 0..cnt {
+            let child = kt.kid_children[kid][j] as usize;
+            debug_assert!(child != kid && child < NUM_KEEP_MULTISETS);
+            let src = unsafe { &*(kev_ptr.add(child) as *const [f32; 64]) };
+            if minimize {
+                unsafe { neon_min_64(dst, src) };
+            } else {
+                unsafe { neon_max_64(dst, src) };
+            }
+        }
+    }
+
     for ds_i in 0..252 {
         e_curr[ds_i] = e_prev[ds_i]; // mask=0: keep all
         let row = &mut e_curr[ds_i];
-
-        for j in 0..kt.unique_count[ds_i] as usize {
-            let kid = unsafe { *kt.unique_keep_ids[ds_i].get_unchecked(j) } as usize;
-            // SAFETY: kid < NUM_KEEP_MULTISETS = keep_ev.len() (unique_keep_ids
-            // construction). Same register-promotion rationale as Step 1.
+        for j in 0..kt.ds_child_count[ds_i] as usize {
+            let kid = kt.ds_children[ds_i][j] as usize;
+            // SAFETY: kid < NUM_KEEP_MULTISETS = keep_ev.len().
             debug_assert!(kid < keep_ev.len());
             let kev = unsafe { keep_ev.get_unchecked(kid) };
             if minimize {
@@ -457,8 +504,9 @@ fn batched_group53_max(
     let kt = &ctx.keep_table;
     let cols = &kt.cols;
 
-    // Step 1: NEON max outcome for each unique keep-multiset
-    for kid in 0..NUM_KEEP_MULTISETS {
+    // Step 1: NEON max outcome for each used keep-multiset (size <= 4 only)
+    for &kid16 in kt.used_kids.iter() {
+        let kid = kid16 as usize;
         let start = kt.row_start[kid] as usize;
         let end = kt.row_start[kid + 1] as usize;
         let km = &mut keep_max[kid];
@@ -476,13 +524,30 @@ fn batched_group53_max(
         }
     }
 
-    // Step 2: NEON max over unique keeps (decision node)
+    // Step 2: subset-max lattice (see batched_group53; bit-identical)
+    let km_ptr = keep_max.as_mut_ptr();
+    for &kid16 in kt.used_kids.iter() {
+        let kid = kid16 as usize;
+        let cnt = kt.kid_child_count[kid] as usize;
+        if cnt == 0 {
+            continue;
+        }
+        // SAFETY: children have strictly smaller keep size, so child != kid;
+        // all indices < NUM_KEEP_MULTISETS = keep_max.len().
+        let dst = unsafe { &mut *km_ptr.add(kid) };
+        for j in 0..cnt {
+            let child = kt.kid_children[kid][j] as usize;
+            debug_assert!(child != kid && child < NUM_KEEP_MULTISETS);
+            let src = unsafe { &*(km_ptr.add(child) as *const [f32; 64]) };
+            unsafe { neon_max_64(dst, src) };
+        }
+    }
+
     for ds_i in 0..252 {
         e_curr[ds_i] = e_prev[ds_i]; // mask=0: keep all
         let row = &mut e_curr[ds_i];
-
-        for j in 0..kt.unique_count[ds_i] as usize {
-            let kid = unsafe { *kt.unique_keep_ids[ds_i].get_unchecked(j) } as usize;
+        for j in 0..kt.ds_child_count[ds_i] as usize {
+            let kid = kt.ds_children[ds_i][j] as usize;
             let km = &keep_max[kid];
             unsafe { neon_max_64(row, km) };
         }
@@ -640,8 +705,10 @@ fn batched_group53_utility(
     let vals = &kt.vals;
     let cols = &kt.cols;
 
-    // Step 1: NEON weighted sum per keep (identical to EV solver)
-    for kid in 0..NUM_KEEP_MULTISETS {
+    // Step 1: NEON weighted sum per keep (identical to EV solver; size <= 4
+    // only — size-5 rows are never read by Step 2)
+    for &kid16 in kt.used_kids.iter() {
+        let kid = kid16 as usize;
         let start = kt.row_start[kid] as usize;
         let end = kt.row_start[kid + 1] as usize;
         // SAFETY: kid < NUM_KEEP_MULTISETS = keep_ev.len().
@@ -662,15 +729,35 @@ fn batched_group53_utility(
         }
     }
 
-    // Step 2: NEON decision node — min/max over keeps
+    // Step 2: subset-min/max lattice (see batched_group53; bit-identical)
+    let kev_ptr = keep_ev.as_mut_ptr();
+    for &kid16 in kt.used_kids.iter() {
+        let kid = kid16 as usize;
+        let cnt = kt.kid_child_count[kid] as usize;
+        if cnt == 0 {
+            continue;
+        }
+        // SAFETY: children have strictly smaller keep size, so child != kid;
+        // all indices < NUM_KEEP_MULTISETS = keep_ev.len().
+        let dst = unsafe { &mut *kev_ptr.add(kid) };
+        for j in 0..cnt {
+            let child = kt.kid_children[kid][j] as usize;
+            debug_assert!(child != kid && child < NUM_KEEP_MULTISETS);
+            let src = unsafe { &*(kev_ptr.add(child) as *const [f32; 64]) };
+            if minimize {
+                unsafe { neon_min_64(dst, src) };
+            } else {
+                unsafe { neon_max_64(dst, src) };
+            }
+        }
+    }
+
     for ds_i in 0..252 {
         e_curr[ds_i] = e_prev[ds_i]; // mask=0: keep all
         let row = &mut e_curr[ds_i];
-
-        for j in 0..kt.unique_count[ds_i] as usize {
-            let kid = unsafe { *kt.unique_keep_ids[ds_i].get_unchecked(j) } as usize;
-            // SAFETY: kid < NUM_KEEP_MULTISETS = keep_ev.len() (unique_keep_ids
-            // construction). Same register-promotion rationale as Step 1.
+        for j in 0..kt.ds_child_count[ds_i] as usize {
+            let kid = kt.ds_children[ds_i][j] as usize;
+            // SAFETY: kid < NUM_KEEP_MULTISETS = keep_ev.len().
             debug_assert!(kid < keep_ev.len());
             let kev = unsafe { keep_ev.get_unchecked(kid) };
             if minimize {

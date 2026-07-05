@@ -225,6 +225,56 @@ pub fn precompute_keep_table(ctx: &mut YatzyContext) {
         kt.mask_to_keep[ds * 32] = keep_lookup[lookup_key as usize];
     }
 
+    // 3d: Lattice tables for the batched solver.
+    // used_kids: keeps of size <= 4 (Step 2 only reads these — masks 1..31
+    // always reroll at least one die), sorted ascending by size so the
+    // in-place subset-max pass sees finalized children.
+    let mut used: Vec<u16> = (0..num_keeps)
+        .filter(|&ki| keep_size[ki] <= 4)
+        .map(|ki| ki as u16)
+        .collect();
+    used.sort_by_key(|&ki| keep_size[ki as usize]);
+    kt.used_kids = used;
+
+    // kid_children[ki]: keep ids of (ki minus one distinct face).
+    for ki in 0..num_keeps {
+        let sz = keep_size[ki];
+        if sz == 0 || sz > 4 {
+            continue;
+        }
+        let mut cnt = 0usize;
+        for f in 0..6 {
+            if keep_freq[ki][f] > 0 {
+                let mut cf = keep_freq[ki];
+                cf[f] -= 1;
+                let key = ((((cf[0] * 6 + cf[1]) * 6 + cf[2]) * 6 + cf[3]) * 6 + cf[4]) * 6 + cf[5];
+                kt.kid_children[ki][cnt] = keep_lookup[key as usize] as u16;
+                cnt += 1;
+            }
+        }
+        kt.kid_child_count[ki] = cnt as u8;
+    }
+
+    // ds_children[ds]: the size-4 sub-multisets of ds (ds minus one distinct face).
+    for ds in 0..252usize {
+        let dice = &ctx.all_dice_sets[ds];
+        let mut df = [0i32; 6];
+        for i in 0..5 {
+            df[(dice[i] - 1) as usize] += 1;
+        }
+        let mut cnt = 0usize;
+        for f in 0..6 {
+            if df[f] > 0 {
+                let mut cf = df;
+                cf[f] -= 1;
+                let key = ((((cf[0] * 6 + cf[1]) * 6 + cf[2]) * 6 + cf[3]) * 6 + cf[4]) * 6 + cf[5];
+                kt.ds_children[ds][cnt] = keep_lookup[key as usize] as u16;
+                cnt += 1;
+            }
+        }
+        kt.ds_child_count[ds] = cnt as u8;
+    }
+
     let nnz = kt.vals.len();
     println!(
         "    Keep-multiset table: {} keeps, {} nnz, avg {:.1} unique/ds, {:.1} KB",

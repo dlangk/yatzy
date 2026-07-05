@@ -37,6 +37,18 @@ pub struct KeepTable {
     pub mask_to_keep: Vec<i32>,
     /// Representative mask: keep_to_mask[ds*32 + j] = first mask for unique keep j.
     pub keep_to_mask: Vec<i32>,
+    /// Keep ids of size ≤ 4 (the only rows Step 2 ever reads; masks 1..31
+    /// always reroll ≥ 1 die), sorted ascending by keep size. 210 entries.
+    pub used_kids: Vec<u16>,
+    /// Lattice children: kid minus one distinct face (for the subset-max DP).
+    /// Only populated for kids of size 1..=4.
+    pub kid_children: Vec<[u16; 6]>,
+    /// Number of valid entries in kid_children[kid] (= distinct faces of kid).
+    pub kid_child_count: [u8; NUM_KEEP_MULTISETS],
+    /// Per dice set: its size-4 sub-multisets (ds minus one distinct face) as kid ids.
+    pub ds_children: [[u16; 5]; NUM_DICE_SETS],
+    /// Number of valid entries in ds_children[ds] (= distinct faces of ds).
+    pub ds_child_count: [u8; NUM_DICE_SETS],
 }
 
 impl Default for KeepTable {
@@ -55,6 +67,11 @@ impl KeepTable {
             unique_keep_ids: [[0; 31]; NUM_DICE_SETS],
             mask_to_keep: vec![-1; NUM_DICE_SETS * 32],
             keep_to_mask: vec![0; NUM_DICE_SETS * 32],
+            used_kids: Vec::new(),
+            kid_children: vec![[0u16; 6]; NUM_KEEP_MULTISETS],
+            kid_child_count: [0; NUM_KEEP_MULTISETS],
+            ds_children: [[0u16; 5]; NUM_DICE_SETS],
+            ds_child_count: [0; NUM_DICE_SETS],
         }
     }
 }
