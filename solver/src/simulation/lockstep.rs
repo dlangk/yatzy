@@ -27,7 +27,7 @@ use crate::widget_solver::{choose_best_reroll_mask, compute_max_ev_for_n_rerolls
 
 use super::engine::SimulationResult;
 use super::fast_prng::SplitMix64;
-use super::radix_sort::radix_sort_by_state;
+use super::radix_sort::{radix_sort_by_state, radix_sort_by_state_into, RadixScratch};
 
 /// Per-game mutable state during lockstep simulation.
 struct GameState {
@@ -250,26 +250,33 @@ pub fn simulate_batch_lockstep(
         })
         .collect();
 
+    // Per-turn buffers, hoisted: allocating these fresh every turn costs
+    // ~36 MB of page-faulted allocations per turn at 1M games.
+    let mut dice_per_game: Vec<[i32; 5]> = vec![[0i32; 5]; num_games];
+    let mut keys: Vec<u32> = vec![0u32; num_games];
+    let mut sorted = RadixScratch::new();
+    let mut caches: Vec<StateCache> = Vec::new();
+    let mut game_to_cache: Vec<u32> = vec![0u32; num_games];
+
     for turn in 0..CATEGORY_COUNT {
         let is_last_turn = turn == CATEGORY_COUNT - 1;
 
         // Step 1: Roll initial dice for all games
-        let mut dice_per_game: Vec<[i32; 5]> = games
+        games
             .par_iter_mut()
-            .map(|g| roll_dice(&mut g.rng))
-            .collect();
+            .zip(dice_per_game.par_iter_mut())
+            .for_each(|(g, dice)| *dice = roll_dice(&mut g.rng));
 
         // Step 2: Build state keys and radix sort to group games by state
-        let keys: Vec<u32> = games
-            .iter()
-            .map(|g| state_index(g.upper_score as usize, g.scored as usize) as u32)
-            .collect();
+        for (k, g) in keys.iter_mut().zip(games.iter()) {
+            *k = state_index(g.upper_score as usize, g.scored as usize) as u32;
+        }
 
-        let sorted = radix_sort_by_state(&keys, num_games);
+        radix_sort_by_state_into(&keys, num_games, &mut sorted);
 
         // Step 3: Compute per-state caches in parallel
         // Collect unique state indices (from group headers)
-        let caches: Vec<StateCache> = sorted
+        sorted
             .groups
             .par_iter()
             .map(|&(si, _, _)| {
@@ -283,13 +290,14 @@ pub fn simulate_batch_lockstep(
                 compute_max_ev_for_n_rerolls(ctx, &cache.e_ds_0, &mut cache.e_ds_1);
                 cache
             })
-            .collect();
+            .collect_into_vec(&mut caches);
 
         // Step 4: Build game→cache mapping from sorted groups, then apply
         // decisions for all games in parallel.
         // Invert group-to-game mapping: radix sort produces (state, start, count) groups
         // in sorted.indices; this loop builds a per-game cache index for O(1) lookup.
-        let mut game_to_cache = vec![0u32; num_games];
+        // Every game appears in exactly one group, so the buffer is fully
+        // overwritten each turn.
         for (group_idx, &(_si, group_start, group_count)) in sorted.groups.iter().enumerate() {
             for j in group_start..(group_start + group_count) {
                 game_to_cache[sorted.indices[j as usize] as usize] = group_idx as u32;

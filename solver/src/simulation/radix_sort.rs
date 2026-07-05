@@ -15,20 +15,50 @@ pub struct SortedGroups {
     pub groups: Vec<(u32, u32, u32)>,
 }
 
-/// Sort game indices by state_index using 2-pass counting sort.
-///
-/// Returns sorted indices plus group boundaries for efficient iteration.
-pub fn radix_sort_by_state(keys: &[u32], n: usize) -> SortedGroups {
+/// Reusable buffers for [`radix_sort_by_state_into`]. Hoist one of these
+/// outside a per-turn loop to avoid three N-sized allocations per call.
+pub struct RadixScratch {
+    /// Pass-1 output (intermediate ordering).
+    buf: Vec<u32>,
+    /// Pass-2 output: game indices sorted by key.
+    pub indices: Vec<u32>,
+    /// (state_index, start, count) for each non-empty group.
+    pub groups: Vec<(u32, u32, u32)>,
+}
+
+impl RadixScratch {
+    pub fn new() -> Self {
+        RadixScratch {
+            buf: Vec::new(),
+            indices: Vec::new(),
+            groups: Vec::new(),
+        }
+    }
+}
+
+impl Default for RadixScratch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sort game indices by state_index using 2-pass counting sort, writing the
+/// result into `scratch` (buffers are reused across calls; contents are
+/// fully overwritten).
+pub fn radix_sort_by_state_into(keys: &[u32], n: usize, scratch: &mut RadixScratch) {
     debug_assert_eq!(keys.len(), n);
 
-    // Pass 1: sort by low 11 bits (2048 buckets)
-    let mut src: Vec<u32> = (0..n as u32).collect();
-    let mut dst = vec![0u32; n];
+    scratch.buf.resize(n, 0);
+    scratch.indices.resize(n, 0);
+    scratch.groups.clear();
+    let mid = &mut scratch.buf;
+    let dst = &mut scratch.indices;
 
     const BITS1: u32 = 11;
     const MASK1: u32 = (1 << BITS1) - 1; // 0x7FF
     const BUCKETS1: usize = 1 << BITS1; // 2048
 
+    // Pass 1: sort by low 11 bits (2048 buckets).
     // Phase 1: Histogram — count elements per bucket
     let mut hist = [0u32; BUCKETS1];
     for &k in keys.iter() {
@@ -43,16 +73,15 @@ pub fn radix_sort_by_state(keys: &[u32], n: usize) -> SortedGroups {
         sum += count;
     }
 
-    // Phase 3: Scatter — place elements in sorted order
-    for &idx in src.iter() {
+    // Phase 3: Scatter — the input ordering is the identity, so iterate
+    // 0..n directly instead of materializing an index array.
+    for idx in 0..n as u32 {
         let bucket = (keys[idx as usize] & MASK1) as usize;
-        dst[hist[bucket] as usize] = idx;
+        mid[hist[bucket] as usize] = idx;
         hist[bucket] += 1;
     }
 
-    // Pass 2: sort by bits 11-20 (1024 buckets — max state_index is ~4M for stride 128)
-    std::mem::swap(&mut src, &mut dst);
-
+    // Pass 2: sort by bits 11-21 (2048 buckets — max state_index is ~4M for stride 128)
     const BITS2: u32 = 11;
     const SHIFT2: u32 = BITS1;
     const MASK2: u32 = (1 << BITS2) - 1;
@@ -60,7 +89,7 @@ pub fn radix_sort_by_state(keys: &[u32], n: usize) -> SortedGroups {
 
     // Phase 1: Histogram — count elements per bucket
     let mut hist2 = [0u32; BUCKETS2];
-    for &idx in src.iter() {
+    for &idx in mid.iter() {
         hist2[((keys[idx as usize] >> SHIFT2) & MASK2) as usize] += 1;
     }
 
@@ -73,31 +102,39 @@ pub fn radix_sort_by_state(keys: &[u32], n: usize) -> SortedGroups {
     }
 
     // Phase 3: Scatter — place elements in sorted order
-    for &idx in src.iter() {
+    for &idx in mid.iter() {
         let bucket = ((keys[idx as usize] >> SHIFT2) & MASK2) as usize;
         dst[hist2[bucket] as usize] = idx;
         hist2[bucket] += 1;
     }
 
     // Build groups from sorted order
-    let mut groups: Vec<(u32, u32, u32)> = Vec::new();
     if n > 0 {
         let mut start = 0u32;
         let mut current_key = keys[dst[0] as usize];
         for i in 1..n {
             let k = keys[dst[i] as usize];
             if k != current_key {
-                groups.push((current_key, start, i as u32 - start));
+                scratch.groups.push((current_key, start, i as u32 - start));
                 current_key = k;
                 start = i as u32;
             }
         }
-        groups.push((current_key, start, n as u32 - start));
+        scratch.groups.push((current_key, start, n as u32 - start));
     }
+}
 
+/// Sort game indices by state_index using 2-pass counting sort.
+///
+/// Returns sorted indices plus group boundaries for efficient iteration.
+/// Allocates fresh buffers; use [`radix_sort_by_state_into`] with a hoisted
+/// [`RadixScratch`] when calling in a loop.
+pub fn radix_sort_by_state(keys: &[u32], n: usize) -> SortedGroups {
+    let mut scratch = RadixScratch::new();
+    radix_sort_by_state_into(keys, n, &mut scratch);
     SortedGroups {
-        indices: dst,
-        groups,
+        indices: scratch.indices,
+        groups: scratch.groups,
     }
 }
 
@@ -154,5 +191,31 @@ mod tests {
         let result = radix_sort_by_state(&keys, 0);
         assert_eq!(result.indices.len(), 0);
         assert_eq!(result.groups.len(), 0);
+    }
+
+    #[test]
+    fn test_scratch_reuse_across_calls() {
+        // Reusing one scratch across calls with different keys and sizes
+        // must produce the same result as fresh allocations.
+        let mut scratch = RadixScratch::new();
+        let inputs: Vec<Vec<u32>> = vec![
+            vec![5, 3, 8, 3, 1, 5, 8, 1],
+            vec![42, 42, 42],
+            vec![0, 4_000_000, 128, 256, 4_000_000, 128, 7, 7, 7, 7],
+            vec![],
+            vec![2048, 0, 2048, 4096, 1],
+        ];
+        for keys in &inputs {
+            radix_sort_by_state_into(keys, keys.len(), &mut scratch);
+            let fresh = radix_sort_by_state(keys, keys.len());
+            assert_eq!(scratch.indices, fresh.indices);
+            assert_eq!(scratch.groups, fresh.groups);
+            // Sorted order + group coverage
+            for i in 1..scratch.indices.len() {
+                assert!(keys[scratch.indices[i - 1] as usize] <= keys[scratch.indices[i] as usize]);
+            }
+            let total: u32 = scratch.groups.iter().map(|&(_, _, c)| c).sum();
+            assert_eq!(total as usize, keys.len());
+        }
     }
 }
