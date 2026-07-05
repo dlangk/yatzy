@@ -350,24 +350,29 @@ pub fn compute_max_ev_for_n_rerolls(
     e_ds_prev: &[f32; 252],
     e_ds_current: &mut [f32; 252],
 ) {
-    let kt = &ctx.keep_table;
-    let vals = &kt.vals;
-    let cols = &kt.cols;
-
-    // Step 1: compute EV for each unique keep-multiset (462 dot products)
     let mut keep_ev = [0.0f32; NUM_KEEP_MULTISETS];
-    for kid in 0..NUM_KEEP_MULTISETS {
-        let start = kt.row_start[kid] as usize;
-        let end = kt.row_start[kid + 1] as usize;
-        let mut ev: f32 = 0.0;
-        for k in start..end {
-            unsafe {
-                ev += *vals.get_unchecked(k)
-                    * e_ds_prev.get_unchecked(*cols.get_unchecked(k) as usize);
-            }
-        }
-        keep_ev[kid] = ev;
-    }
+    compute_max_ev_and_keep_ev(ctx, e_ds_prev, e_ds_current, &mut keep_ev);
+}
+
+/// Like [`compute_max_ev_for_n_rerolls`] but also exposes the per-keep EVs.
+///
+/// The inner dot-product loop is IDENTICAL in FP order to the one in
+/// [`choose_best_reroll_mask_by_ds`], so `keep_ev_out[kid]` matches what a
+/// per-game argmax would compute bit-for-bit. The lockstep engine persists
+/// these arrays in its per-state caches so per-game reroll decisions become
+/// pure lookups.
+#[inline(always)]
+pub fn compute_max_ev_and_keep_ev(
+    ctx: &YatzyContext,
+    e_ds_prev: &[f32; 252],
+    e_ds_current: &mut [f32; 252],
+    keep_ev_out: &mut [f32; NUM_KEEP_MULTISETS],
+) {
+    let kt = &ctx.keep_table;
+
+    // Step 1: compute EV for each used keep-multiset (210 dot products;
+    // size-5 keeps are never referenced by unique_keep_ids)
+    compute_keep_ev(ctx, e_ds_prev, keep_ev_out);
 
     // Step 2: for each dice set, find max over its unique keeps (O(1) lookup each)
     for ds_i in 0..252 {
@@ -376,13 +381,68 @@ pub fn compute_max_ev_for_n_rerolls(
             // SAFETY: j < unique_count[ds_i] ≤ 31, bounded by KeepTable construction;
             // kid < 462 (NUM_KEEP_MULTISETS), bounded by unique_keep_ids precomputation.
             let kid = unsafe { *kt.unique_keep_ids[ds_i].get_unchecked(j) } as usize;
-            let ev = unsafe { *keep_ev.get_unchecked(kid) };
+            let ev = unsafe { *keep_ev_out.get_unchecked(kid) };
             if ev > best_val {
                 best_val = ev;
             }
         }
         e_ds_current[ds_i] = best_val;
     }
+}
+
+/// Per-keep EVs only: `keep_ev_out[kid] = Σ P(kid→ds')·e_ds[ds']` for the 210
+/// used keeps (size ≤ 4). Identical inner-loop FP order to
+/// [`choose_best_reroll_mask_by_ds`], so values match a per-game recompute
+/// bit-for-bit. Size-5 entries are left untouched (never read).
+#[inline(always)]
+pub fn compute_keep_ev(
+    ctx: &YatzyContext,
+    e_ds: &[f32; 252],
+    keep_ev_out: &mut [f32; NUM_KEEP_MULTISETS],
+) {
+    let kt = &ctx.keep_table;
+    let vals = &kt.vals;
+    let cols = &kt.cols;
+
+    for &kid16 in kt.used_kids.iter() {
+        let kid = kid16 as usize;
+        let start = kt.row_start[kid] as usize;
+        let end = kt.row_start[kid + 1] as usize;
+        let mut ev: f32 = 0.0;
+        for k in start..end {
+            unsafe {
+                ev += *vals.get_unchecked(k) * e_ds.get_unchecked(*cols.get_unchecked(k) as usize);
+            }
+        }
+        keep_ev_out[kid] = ev;
+    }
+}
+
+/// Argmax reroll mask from precomputed per-keep EVs.
+///
+/// Iterates unique keeps in the same order with the same strict `>` as
+/// [`choose_best_reroll_mask_by_ds`], and `keep_ev` values are bit-identical
+/// to that function's internal dot products (see [`compute_keep_ev`]) — so
+/// decisions, including tie-breaks, are identical.
+#[inline(always)]
+pub fn choose_best_reroll_mask_by_keep_ev(
+    ctx: &YatzyContext,
+    keep_ev: &[f32; NUM_KEEP_MULTISETS],
+    e_ds: &[f32; 252],
+    ds_index: usize,
+) -> i32 {
+    let kt = &ctx.keep_table;
+    let mut best_val = e_ds[ds_index]; // mask=0: keep all
+    let mut best_mask = 0i32;
+    for j in 0..kt.unique_count[ds_index] as usize {
+        let kid = unsafe { *kt.unique_keep_ids[ds_index].get_unchecked(j) } as usize;
+        let ev = unsafe { *keep_ev.get_unchecked(kid) };
+        if ev > best_val {
+            best_val = ev;
+            best_mask = kt.keep_to_mask[ds_index * 32 + j];
+        }
+    }
+    best_mask
 }
 
 /// DP-only variant of Groups 5/3 for max-policy mode.

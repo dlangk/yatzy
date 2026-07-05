@@ -24,7 +24,8 @@ use crate::dice_mechanics::{find_dice_set_index, sort_dice_set};
 use crate::game_mechanics::update_upper_score;
 use crate::types::YatzyContext;
 use crate::widget_solver::{
-    choose_best_reroll_mask, choose_best_reroll_mask_by_ds, compute_max_ev_for_n_rerolls,
+    choose_best_reroll_mask_by_ds, choose_best_reroll_mask_by_keep_ev, compute_keep_ev,
+    compute_max_ev_and_keep_ev,
 };
 
 use super::engine::SimulationResult;
@@ -39,10 +40,18 @@ struct GameState {
     rng: SplitMix64,
 }
 
-/// Cached per-state computation: e_ds_0[252] and e_ds_1[252].
+/// Cached per-state computation: e_ds_0[252], e_ds_1[252], and per-keep EVs.
 struct StateCache {
     e_ds_0: [f32; 252],
     e_ds_1: [f32; 252],
+    /// Per-keep EVs against e_ds_0 (second-reroll decisions). Free by-product
+    /// of computing e_ds_1; bit-identical to the per-game dot products.
+    keep_ev_0: [f32; NUM_KEEP_MULTISETS],
+    /// Per-keep EVs against e_ds_1 (first-reroll decisions). Costs one extra
+    /// 210-row pass, so only computed for groups with at least
+    /// [`KEEP_EV_THRESHOLD`] games.
+    keep_ev_1: [f32; NUM_KEEP_MULTISETS],
+    has_keep_ev_1: bool,
     /// Precomputed argmax decisions, built only for groups with at least
     /// [`TABLE_THRESHOLD`] games (see `simulate_batch_lockstep` Step 3).
     table: Option<Box<DecisionTable>>,
@@ -69,6 +78,10 @@ struct DecisionTable {
 /// perform identically, 1024 leaves ~50 ms on the table; 384 chosen for
 /// the lower table-build overhead.
 const TABLE_THRESHOLD: u32 = 384;
+
+/// Minimum games in a group before the extra keep_ev_1 pass (210 CSR dot
+/// products, ~2.5us) beats per-game first-reroll argmaxes (~1us each).
+const KEEP_EV_THRESHOLD: u32 = 3;
 
 /// Roll 5 random dice and sort them.
 #[inline(always)]
@@ -312,13 +325,29 @@ pub fn simulate_batch_lockstep(
                 let mut cache = StateCache {
                     e_ds_0: [0.0f32; 252],
                     e_ds_1: [0.0f32; 252],
+                    keep_ev_0: [0.0f32; NUM_KEEP_MULTISETS],
+                    keep_ev_1: [0.0f32; NUM_KEEP_MULTISETS],
+                    has_keep_ev_1: false,
                     table: None,
                 };
                 compute_group6(ctx, sv, up, scored as i32, &mut cache.e_ds_0);
-                compute_max_ev_for_n_rerolls(ctx, &cache.e_ds_0, &mut cache.e_ds_1);
+                // keep_ev_0 is a free by-product of the e_ds_0 -> e_ds_1 pass
+                // (identical FP order to the per-game argmax dot products).
+                compute_max_ev_and_keep_ev(
+                    ctx,
+                    &cache.e_ds_0,
+                    &mut cache.e_ds_1,
+                    &mut cache.keep_ev_0,
+                );
+                if count >= KEEP_EV_THRESHOLD {
+                    compute_keep_ev(ctx, &cache.e_ds_1, &mut cache.keep_ev_1);
+                    cache.has_keep_ev_1 = true;
+                }
 
                 // Fat groups: precompute all 252 per-dice-set decisions once
-                // instead of recomputing the argmax per game.
+                // instead of recomputing the argmax per game. Mask argmaxes
+                // are pure lookups over the persisted keep_ev arrays
+                // (identical values and tie-breaking as the per-game path).
                 if count >= TABLE_THRESHOLD {
                     let mut t = Box::new(DecisionTable {
                         first_mask: [0u8; 252],
@@ -327,8 +356,18 @@ pub fn simulate_batch_lockstep(
                         score: [0u8; 252],
                     });
                     for ds in 0..NUM_DICE_SETS {
-                        let (m2, _) = choose_best_reroll_mask_by_ds(ctx, &cache.e_ds_1, ds);
-                        let (m1, _) = choose_best_reroll_mask_by_ds(ctx, &cache.e_ds_0, ds);
+                        let m2 = choose_best_reroll_mask_by_keep_ev(
+                            ctx,
+                            &cache.keep_ev_1,
+                            &cache.e_ds_1,
+                            ds,
+                        );
+                        let m1 = choose_best_reroll_mask_by_keep_ev(
+                            ctx,
+                            &cache.keep_ev_0,
+                            &cache.e_ds_0,
+                            ds,
+                        );
                         t.first_mask[ds] = m2 as u8;
                         t.second_mask[ds] = m1 as u8;
                         let (cat, scr) = if is_last_turn {
@@ -385,25 +424,40 @@ pub fn simulate_batch_lockstep(
                     };
                     (t.cat[ds2] as usize, t.score[ds2] as i32)
                 } else {
-                    // First reroll
-                    let mut best_ev = 0.0;
-                    let mask1 = choose_best_reroll_mask(ctx, &cache.e_ds_1, dice, &mut best_ev);
+                    // Fallback path: dice are canonical (sorted), so the
+                    // dice-set index threads through instead of re-sorting.
+                    let mut ds = find_dice_set_index(ctx, dice);
+
+                    // First reroll: keep_ev_1 lookups when the group paid for
+                    // them, else the per-game dot-product argmax (identical
+                    // decisions either way).
+                    let mask1 = if cache.has_keep_ev_1 {
+                        choose_best_reroll_mask_by_keep_ev(ctx, &cache.keep_ev_1, &cache.e_ds_1, ds)
+                    } else {
+                        choose_best_reroll_mask_by_ds(ctx, &cache.e_ds_1, ds).0
+                    };
                     if mask1 != 0 {
                         apply_reroll(dice, mask1, &mut g.rng);
+                        ds = find_dice_set_index(ctx, dice);
                     }
 
-                    // Second reroll
-                    let mask2 = choose_best_reroll_mask(ctx, &cache.e_ds_0, dice, &mut best_ev);
+                    // Second reroll: keep_ev_0 is always available.
+                    let mask2 = choose_best_reroll_mask_by_keep_ev(
+                        ctx,
+                        &cache.keep_ev_0,
+                        &cache.e_ds_0,
+                        ds,
+                    );
                     if mask2 != 0 {
                         apply_reroll(dice, mask2, &mut g.rng);
+                        ds = find_dice_set_index(ctx, dice);
                     }
 
                     // Score
-                    let ds_index = find_dice_set_index(ctx, dice);
                     if is_last_turn {
-                        find_best_category_final(ctx, g.upper_score, g.scored, ds_index)
+                        find_best_category_final(ctx, g.upper_score, g.scored, ds)
                     } else {
-                        find_best_category(ctx, sv, g.upper_score, g.scored, ds_index)
+                        find_best_category(ctx, sv, g.upper_score, g.scored, ds)
                     }
                 };
 
