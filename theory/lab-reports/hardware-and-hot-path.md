@@ -373,3 +373,40 @@ Phase 2: Backward induction (~2.3s)
 Output: E_table[2,097,152] → 8 MB binary file
   Game-start EV: E(0, ∅) ≈ 248.44 points
 ```
+
+## 6. M5 Max Round 2 (2026-07): Measured Wins and Dead Ends
+
+An ultracode research pass (8 parallel specialists, each micro-benchmarking on the actual machine) re-examined both hot paths on the M5 Max (18 cores: 6 Super + 12 Performance, NO efficiency cores; all cores deliver 4.0-4.3 GHz and identical FMA throughput, so 18 threads is measured-optimal).
+
+### Landed (all bit-identical unless noted)
+
+| Change | Effect |
+|--------|--------|
+| Bounds-check elision in batched kernels (`get_unchecked`) | DP 203 to 158 ms. The panic side-exit blocked LLVM from register-promoting the 64-f32 accumulator row (~9.5x memory round-trips per keep) |
+| Dead-row skip (210 used keeps) + subset-max lattice Step 2 | DP 158 to 113 ms. Max/min are order-independent, so the lattice is bit-identical |
+| keep_ev persistence in lockstep StateCache | 1M sim 760 to 365 ms. Per-game argmaxes and DecisionTable builds become lookups with identical FP values and tie-breaks |
+| Branchless 9-exchange dice sort network | The selection sort compiled to branches mispredicting ~5x per call on fresh dice |
+| Stable parallel radix sort + group-ordered decide | 1M sim 365 to ~310 ms. Chunk-minor scatter ordering preserves stability, hence bit-identity |
+| Oracle auto-routing in `just simulate` | 1M sim ~81 ms (statistically equivalent, not bit-identical: tie handling differs via representative masks) |
+
+### Measured dead ends (do not re-litigate without new evidence)
+
+- **SME/AMX dense reformulation of the DP kernel**: the kernel is 3.75% dense; dense GEMM inflates FLOPs 26.7x while SME's peak advantage over NEON is only 16.4x (measured 2183 vs 133 GFLOPS single-core). Accelerate sgemm at 462x252x64 measured 11.2 us vs 8.0 us for sparse NEON. Chip-wide FMOPA saturates at ~2.65 TFLOPS (shared per-cluster units), so 18 threads cannot scale onto it: full-dense conversion would cost ~12x more wall time than today's sparse NEON. Streaming-SVE vector code measured 15x slower than NEON for this shape.
+- **PGO**: less than 1%, within noise (profile verifiably applied; binary shrank 547 to 526 KB).
+- **-Zbuild-std (nightly)**: zero; hot paths barely touch std.
+- **target-cpu=apple-m5 (explicit)**: 2-3% SLOWER than native (=apple-m4 scheduling model on rustc 1.95); recheck when rustc's host detection learns M5.
+- **-C llvm-args=-unroll-threshold=1200**: -7.5% on 1M simulate but +65% on the 10k benchmark (I-cache bloat in scalar cache-build loops); rejected, and superseded by keep_ev persistence.
+- **Software prefetch, u16 CSR cols, 2-widget interleave**: zero to negative (the CSR is 35 KB, L1/L2-resident; the kernel is load-throughput bound, not latency bound).
+- **Multinomial stratification for fat groups**: distributionally INCORRECT with deterministic outcome assignment (position-within-group bias compounds across turns); the fix (per-group shuffles) costs more than the ~15 ms it saves. Alias-table dice-set sampling is a legitimate alternative but saves only ~3-4% post-keep_ev.
+- **Allocator arenas, superpages, madvise on the 16 MB table**: no effect. One landmine documented in code: `DecisionTable` sits exactly at the macOS tiny-zone allocator ceiling (1008 bytes); one more byte costs a measured 27x per allocation under 18-thread contention (compile-time assert added).
+- **Thread-count reduction / QoS pinning**: 18 threads optimal (homogeneous cores); QoS only reduces variance under external load.
+
+### Open options, deliberately not taken
+
+- Single-die convolution factorization of group53 Step 1 (measured 3.4x on that loop, DP to ~95 ms): NOT bit-identical (f32 reordering, ~1e-4 value shifts) - requires the statistical-equivalence gate and regenerating all strategy tables. Revisit if DP time matters again.
+- Packed u16 oracle (3.17 GB to 1.06 GB, 1M sim 85 to 56 ms): format migration across 4 consumer sites; needs a golden-compare test. Worth doing if disk footprint or cold-start matters.
+
+## See Also
+
+- `optimization-log.md`: chronological optimization history (M1 Max era)
+- `../foundations/algorithm-and-dp.md`: the DP being optimized
