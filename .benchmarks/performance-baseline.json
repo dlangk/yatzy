@@ -1,57 +1,71 @@
 {
-  "machine": "Apple M1 Max",
-  "date": "2026-03-07",
-  "rust_version": "rustc 1.93.1 (01f6ddf75 2026-02-11)",
-  "threads": 8,
+  "machine": "Apple M5 Max",
+  "date": "2026-07-05",
+  "rust_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "threads": 18,
   "entries": [
     {
       "name": "phase0_tables",
-      "mean_ms": 0.7440,
-      "std_ms": 0.3132,
-      "p95_ms": 1.6726,
-      "threshold_ms": 1.6836
+      "mean_ms": 0.5956,
+      "std_ms": 0.2219,
+      "p95_ms": 0.6715,
+      "threshold_ms": 1.2613
     },
     {
       "name": "precompute_ev",
-      "mean_ms": 497.5264,
-      "std_ms": 36.2809,
-      "p95_ms": 559.0393,
-      "threshold_ms": 606.3691
+      "mean_ms": 203.3176,
+      "std_ms": 0.8657,
+      "p95_ms": 205.0030,
+      "threshold_ms": 223.6493
     },
     {
       "name": "simulate_lockstep_10k",
-      "mean_ms": 94.7553,
-      "std_ms": 0.7078,
-      "p95_ms": 96.1889,
-      "threshold_ms": 99.4931
+      "mean_ms": 37.1398,
+      "std_ms": 0.7064,
+      "p95_ms": 38.0772,
+      "threshold_ms": 40.8537
     },
     {
       "name": "simulate_lockstep_100k",
-      "mean_ms": 569.2961,
-      "std_ms": 8.2672,
-      "p95_ms": 581.4638,
-      "threshold_ms": 597.7609
+      "mean_ms": 176.9655,
+      "std_ms": 2.8864,
+      "p95_ms": 180.7504,
+      "threshold_ms": 194.6621
+    },
+    {
+      "name": "simulate_lockstep_1m",
+      "mean_ms": 1179.8335,
+      "std_ms": 10.2723,
+      "p95_ms": 1199.7803,
+      "threshold_ms": 1297.8168
+    },
+    {
+      "name": "simulate_vertical_100k",
+      "mean_ms": 598.7738,
+      "std_ms": 2.4842,
+      "p95_ms": 601.9221,
+      "threshold_ms": 658.6512
     },
     {
       "name": "api_evaluate_2rerolls",
-      "mean_ms": 0.0085,
+      "mean_ms": 0.0059,
       "std_ms": 0.0002,
-      "p95_ms": 0.0086,
-      "threshold_ms": 0.0093
+      "p95_ms": 0.0060,
+      "threshold_ms": 0.0065
     },
     {
       "name": "api_evaluate_0rerolls",
-      "mean_ms": 0.0018,
-      "std_ms": 0.0000,
-      "p95_ms": 0.0019,
-      "threshold_ms": 0.0019
+      "mean_ms": 0.0013,
+      "std_ms": 0.0001,
+      "p95_ms": 0.0013,
+      "threshold_ms": 0.0015
     },
     {
       "name": "api_evaluate_late_game",
-      "mean_ms": 0.0079,
-      "std_ms": 0.0001,
-      "p95_ms": 0.0080,
-      "threshold_ms": 0.0083
+      "mean_ms": 0.0054,
+      "std_ms": 0.0015,
+      "p95_ms": 0.0055,
+      "threshold_ms": 0.0099
     }
   ]
 }

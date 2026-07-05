@@ -13,6 +13,7 @@ use std::time::Instant;
 
 use yatzy::api_computations::compute_roll_response;
 use yatzy::phase0_tables;
+use yatzy::simulation::engine::simulate_batch;
 use yatzy::simulation::lockstep::simulate_batch_lockstep;
 use yatzy::state_computation::compute_all_state_values_nocache;
 use yatzy::storage::{load_all_state_values, state_file_path};
@@ -110,7 +111,7 @@ fn run_bench<F: FnMut()>(name: &str, iterations: usize, mut f: F) -> BenchResult
 
 // ── Baseline I/O ───────────────────────────────────────────────────────────
 
-fn save_baseline(results: &[BenchResult], path: &str) {
+fn save_baseline(results: &[BenchResult], path: &str, num_threads: usize) {
     let entries: Vec<String> = results
         .iter()
         .map(|r| {
@@ -122,10 +123,11 @@ fn save_baseline(results: &[BenchResult], path: &str) {
         .collect();
 
     let json = format!(
-        "{{\n  \"machine\": \"Apple M1 Max\",\n  \"date\": \"{}\",\n  \"rust_version\": \"{}\",\n  \"threads\": {},\n  \"entries\": [\n{}\n  ]\n}}\n",
+        "{{\n  \"machine\": \"{}\",\n  \"date\": \"{}\",\n  \"rust_version\": \"{}\",\n  \"threads\": {},\n  \"entries\": [\n{}\n  ]\n}}\n",
+        get_machine(),
         get_date(),
         get_rust_version(),
-        std::env::var("RAYON_NUM_THREADS").unwrap_or_else(|_| "8".into()),
+        num_threads,
         entries.join(",\n")
     );
 
@@ -217,6 +219,18 @@ fn get_date() -> String {
         .to_string()
 }
 
+fn get_machine() -> String {
+    let output = std::process::Command::new("sysctl")
+        .args(["-n", "machdep.cpu.brand_string"])
+        .output()
+        .ok();
+    output
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "unknown".into())
+}
+
 fn get_rust_version() -> String {
     let output = std::process::Command::new("rustc")
         .arg("--version")
@@ -297,7 +311,8 @@ fn main() {
 
     // ── Benchmark 1: Phase 0 lookup tables ─────────────────────────────────
     println!("Phase 0: Lookup tables");
-    results.push(run_bench("phase0_tables", 10, || {
+    // 30 iterations: sub-millisecond bench, mean is scheduler-noise sensitive
+    results.push(run_bench("phase0_tables", 30, || {
         let mut ctx = YatzyContext::new_boxed();
         phase0_tables::precompute_lookup_tables(&mut ctx);
     }));
@@ -329,6 +344,17 @@ fn main() {
 
         results.push(run_bench("simulate_lockstep_100k", 5, || {
             simulate_batch_lockstep(&sim_ctx, 100_000, 42);
+        }));
+
+        // KPI B: `just simulate` runs 1M games through this engine
+        results.push(run_bench("simulate_lockstep_1m", 5, || {
+            simulate_batch_lockstep(&sim_ctx, 1_000_000, 42);
+        }));
+
+        // Guards the vertical engine (θ≠0 sweeps, winrate, percentile_sweep,
+        // player_card_grid, full-recording paths)
+        results.push(run_bench("simulate_vertical_100k", 5, || {
+            simulate_batch(&sim_ctx, 100_000, 42);
         }));
         println!();
 
@@ -369,7 +395,7 @@ fn main() {
     // ── Results summary ────────────────────────────────────────────────────
     match mode {
         Mode::Record => {
-            save_baseline(&results, baseline_path);
+            save_baseline(&results, baseline_path, num_threads);
         }
         Mode::Check => {
             if let Some(baseline) = load_baseline(baseline_path) {
