@@ -379,14 +379,17 @@ fn compute_all_state_values_impl(
     if was_utility {
         let t_conv = Instant::now();
         let sv = ctx.state_values.as_mut_slice();
-        for i in 0..NUM_STATES {
-            let u = sv[i];
-            if u > 0.0 {
-                sv[i] = u.ln();
-            }
-            // u == 0.0 maps to -inf in log domain, which is correct
-            // (unreachable states stay as initialized)
-        }
+        sv[..NUM_STATES]
+            .par_chunks_mut(64 * 1024)
+            .for_each(|chunk| {
+                for u in chunk.iter_mut() {
+                    if *u > 0.0 {
+                        *u = u.ln();
+                    }
+                    // u == 0.0 maps to -inf in log domain, which is correct
+                    // (unreachable states stay as initialized)
+                }
+            });
         println!(
             "Converted utility→log domain ({} states) in {:.2} ms",
             NUM_STATES,
