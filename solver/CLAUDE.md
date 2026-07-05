@@ -117,24 +117,27 @@ Baseline: `.benchmarks/performance-baseline.json`. Threshold: `max(mean + 3σ, m
 
 ### Reference Numbers
 
-| Benchmark | M1 Max (8 threads) | M5 Max (18 threads) |
+| Benchmark | M1 Max (8 threads) | M5 Max (18 threads, 2026-07) |
 |-----------|---------------------|----------------------|
-| Precompute θ=0 (EV) | ~1.1s | ~0.21s (cold, end-to-end) |
-| Precompute \|θ\|≤0.15 (utility) | ~0.49s | — |
-| Precompute \|θ\|>0.15 (LSE) | ~2.7s | — |
-| Lockstep simulation (100k) | 342 ms | ~153 ms |
-| Lockstep simulation (1M) | — | ~760 ms (~1.3M games/s) |
-| Lockstep simulation | ~232K games/s | ~1.3M games/s |
-| Oracle simulation | ~5.6M games/s | — |
+| Precompute θ=0 (EV), DP compute | ~1.1s | 113 ms |
+| Precompute θ=0, cold end-to-end (`just precompute`) | — | ~0.12s |
+| Precompute \|θ\|≤0.15 (utility) | ~0.49s | ~0.12s |
+| Precompute \|θ\|>0.15 (LSE) | ~2.7s | ~0.60s |
+| Lockstep simulation (100k) | 342 ms | ~105 ms |
+| Lockstep simulation (1M) | — | ~283 ms (~3.5M games/s) |
+| Oracle simulation (1M) | — | ~81 ms (~12M games/s) |
+| `just simulate` 1M end-to-end | — | ~0.09s (oracle) / ~0.30s (lockstep) |
 | API `/evaluate` | 2-9μs | 2-6μs |
 | Density evolution (oracle) | ~3.0s | — |
 | Density evolution (non-oracle) | ~381s | — |
 
-`just simulate` (θ=0, `--output`) uses the lockstep engine by default; pass
-`--vertical` to force the per-game engine (bit-compatible with pre-2026-07
-outputs). Lockstep builds per-group DecisionTables (reroll masks + category
-per dice set) for groups with ≥384 games; smaller groups compute the argmax
-per game.
+`just simulate` (θ=0, `--output`) picks the fastest available engine:
+the PolicyOracle when `data/strategy_tables/oracle.bin` exists and is newer
+than the θ=0 table (`just precompute-oracle`, one-time ~0.8s, 3.17 GB), else
+lockstep. Pass `--vertical` to force the per-game engine (bit-compatible
+with pre-2026-07 outputs). Lockstep persists per-keep EVs per state and
+builds per-group DecisionTables for groups ≥384 games. Optimization history
+and measured dead ends: `theory/lab-reports/hardware-and-hot-path.md` §6.
 
 ## Module Structure
 

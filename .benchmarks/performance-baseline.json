@@ -6,66 +6,66 @@
   "entries": [
     {
       "name": "phase0_tables",
-      "mean_ms": 0.4023,
-      "std_ms": 0.1336,
-      "p95_ms": 0.4114,
-      "threshold_ms": 0.8032
+      "mean_ms": 0.5303,
+      "std_ms": 0.1913,
+      "p95_ms": 0.5558,
+      "threshold_ms": 1.1043
     },
     {
       "name": "precompute_ev",
-      "mean_ms": 203.3438,
-      "std_ms": 2.0518,
-      "p95_ms": 206.9348,
-      "threshold_ms": 223.6781
+      "mean_ms": 113.1105,
+      "std_ms": 0.6423,
+      "p95_ms": 113.9140,
+      "threshold_ms": 124.4216
     },
     {
       "name": "simulate_lockstep_10k",
-      "mean_ms": 36.7361,
-      "std_ms": 1.1168,
-      "p95_ms": 38.2727,
-      "threshold_ms": 40.4097
+      "mean_ms": 34.5689,
+      "std_ms": 0.8757,
+      "p95_ms": 35.9626,
+      "threshold_ms": 38.0258
     },
     {
       "name": "simulate_lockstep_100k",
-      "mean_ms": 149.4980,
-      "std_ms": 0.9532,
-      "p95_ms": 150.5334,
-      "threshold_ms": 164.4478
+      "mean_ms": 104.5141,
+      "std_ms": 1.6698,
+      "p95_ms": 106.8966,
+      "threshold_ms": 114.9655
     },
     {
       "name": "simulate_lockstep_1m",
-      "mean_ms": 758.3649,
-      "std_ms": 5.3776,
-      "p95_ms": 769.0075,
-      "threshold_ms": 834.2014
+      "mean_ms": 282.7229,
+      "std_ms": 2.6488,
+      "p95_ms": 286.8684,
+      "threshold_ms": 310.9952
     },
     {
       "name": "simulate_vertical_100k",
-      "mean_ms": 590.4489,
-      "std_ms": 4.5396,
-      "p95_ms": 597.9388,
-      "threshold_ms": 649.4937
+      "mean_ms": 578.0724,
+      "std_ms": 1.6657,
+      "p95_ms": 579.9540,
+      "threshold_ms": 635.8797
     },
     {
       "name": "api_evaluate_2rerolls",
-      "mean_ms": 0.0070,
-      "std_ms": 0.0039,
-      "p95_ms": 0.0068,
-      "threshold_ms": 0.0187
+      "mean_ms": 0.0052,
+      "std_ms": 0.0002,
+      "p95_ms": 0.0052,
+      "threshold_ms": 0.0059
     },
     {
       "name": "api_evaluate_0rerolls",
-      "mean_ms": 0.0016,
-      "std_ms": 0.0022,
+      "mean_ms": 0.0012,
+      "std_ms": 0.0001,
       "p95_ms": 0.0015,
-      "threshold_ms": 0.0083
+      "threshold_ms": 0.0015
     },
     {
       "name": "api_evaluate_late_game",
-      "mean_ms": 0.0062,
-      "std_ms": 0.0043,
-      "p95_ms": 0.0061,
-      "threshold_ms": 0.0190
+      "mean_ms": 0.0049,
+      "std_ms": 0.0008,
+      "p95_ms": 0.0053,
+      "threshold_ms": 0.0072
     }
   ]
 }
