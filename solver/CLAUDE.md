@@ -6,7 +6,7 @@ Rust HPC engine: backward-induction DP, Monte Carlo simulation, REST API.
 
 ```bash
 cargo build --release         # Build (~30s with LTO)
-cargo test                    # 185 tests (138 unit + 14 API + 8 property + 25 integration, 2 ignored)
+cargo test                    # 189 tests (139 unit + 14 API + 8 property + 28 integration, 2 ignored)
 cargo fmt --check             # Formatting
 cargo clippy                  # Lints
 
@@ -119,15 +119,22 @@ Baseline: `.benchmarks/performance-baseline.json`. Threshold: `max(mean + 3σ, m
 
 | Benchmark | M1 Max (8 threads) | M5 Max (18 threads) |
 |-----------|---------------------|----------------------|
-| Precompute θ=0 (EV) | ~1.1s | ~0.23s |
+| Precompute θ=0 (EV) | ~1.1s | ~0.21s (cold, end-to-end) |
 | Precompute \|θ\|≤0.15 (utility) | ~0.49s | — |
 | Precompute \|θ\|>0.15 (LSE) | ~2.7s | — |
-| Lockstep simulation (100k) | 342 ms | 182 ms |
-| Lockstep simulation | ~232K games/s | ~550K games/s |
+| Lockstep simulation (100k) | 342 ms | ~153 ms |
+| Lockstep simulation (1M) | — | ~760 ms (~1.3M games/s) |
+| Lockstep simulation | ~232K games/s | ~1.3M games/s |
 | Oracle simulation | ~5.6M games/s | — |
 | API `/evaluate` | 2-9μs | 2-6μs |
 | Density evolution (oracle) | ~3.0s | — |
 | Density evolution (non-oracle) | ~381s | — |
+
+`just simulate` (θ=0, `--output`) uses the lockstep engine by default; pass
+`--vertical` to force the per-game engine (bit-compatible with pre-2026-07
+outputs). Lockstep builds per-group DecisionTables (reroll masks + category
+per dice set) for groups with ≥384 games; smaller groups compute the argmax
+per game.
 
 ## Module Structure
 
