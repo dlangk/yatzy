@@ -17,6 +17,10 @@ setup:
 precompute:
     YATZY_BASE_PATH=. solver/target/release/yatzy-precompute
 
+# θ=0 strategy table + policy oracle (~3.17 GB; makes `just simulate` ~10x faster)
+precompute-oracle:
+    YATZY_BASE_PATH=. solver/target/release/yatzy-precompute --oracle
+
 # Precompute state values for a specific θ (~7s)
 precompute-theta theta:
     YATZY_BASE_PATH=. solver/target/release/yatzy-precompute --theta {{theta}}
