@@ -24,6 +24,11 @@ pub struct RadixScratch {
     pub indices: Vec<u32>,
     /// (state_index, start, count) for each non-empty group.
     pub groups: Vec<(u32, u32, u32)>,
+    /// keys[indices[i]] materialized during the pass-2 scatter, so group
+    /// boundary detection scans sequentially instead of gathering.
+    sorted_keys: Vec<u32>,
+    /// Per-(chunk, bucket) histograms/cursors for the parallel path.
+    chunk_hists: Vec<u32>,
 }
 
 impl RadixScratch {
@@ -32,6 +37,8 @@ impl RadixScratch {
             buf: Vec::new(),
             indices: Vec::new(),
             groups: Vec::new(),
+            sorted_keys: Vec::new(),
+            chunk_hists: Vec::new(),
         }
     }
 }
@@ -138,6 +145,141 @@ pub fn radix_sort_by_state(keys: &[u32], n: usize) -> SortedGroups {
     }
 }
 
+/// Below this input size the serial sort wins (rayon fork/join overhead).
+const PAR_SORT_THRESHOLD: usize = 200_000;
+
+/// Stable parallel counting sort, output identical to
+/// [`radix_sort_by_state_into`].
+///
+/// Each pass: per-chunk histograms (parallel), a bucket-major/chunk-minor
+/// exclusive prefix scan (serial, 2048×chunks adds), then an in-order
+/// per-chunk scatter (parallel). Chunk-minor ordering preserves the global
+/// input order within every bucket, i.e. the sort is stable, so
+/// indices/groups are bit-identical to the serial result.
+pub fn radix_sort_by_state_into_parallel(keys: &[u32], n: usize, scratch: &mut RadixScratch) {
+    use rayon::prelude::*;
+
+    if n < PAR_SORT_THRESHOLD {
+        radix_sort_by_state_into(keys, n, scratch);
+        return;
+    }
+    debug_assert_eq!(keys.len(), n);
+
+    const BITS: u32 = 11;
+    const MASK: u32 = (1 << BITS) - 1;
+    const BUCKETS: usize = 1 << BITS;
+
+    scratch.buf.resize(n, 0);
+    scratch.indices.resize(n, 0);
+    scratch.sorted_keys.resize(n, 0);
+    scratch.groups.clear();
+
+    let n_chunks = rayon::current_num_threads().clamp(1, 64);
+    let chunk = n.div_ceil(n_chunks);
+    scratch.chunk_hists.resize(n_chunks * BUCKETS, 0);
+
+    // ── Pass 1: bucket by low 11 bits; input order is the identity ──
+    let hists = &mut scratch.chunk_hists;
+    hists
+        .par_chunks_mut(BUCKETS)
+        .enumerate()
+        .for_each(|(c, h)| {
+            h.fill(0);
+            let lo = c * chunk;
+            let hi = ((c + 1) * chunk).min(n);
+            for key in &keys[lo..hi] {
+                h[(key & MASK) as usize] += 1;
+            }
+        });
+    // Exclusive prefix: bucket-major, chunk-minor → per-chunk write bases.
+    let mut sum = 0u32;
+    for b in 0..BUCKETS {
+        for c in 0..n_chunks {
+            let idx = c * BUCKETS + b;
+            let count = hists[idx];
+            hists[idx] = sum;
+            sum += count;
+        }
+    }
+    // Scatter: each chunk owns disjoint per-(bucket, chunk) segments of mid.
+    let mid_addr = scratch.buf.as_mut_ptr() as usize;
+    hists
+        .par_chunks_mut(BUCKETS)
+        .enumerate()
+        .for_each(|(c, cursors)| {
+            let mid = mid_addr as *mut u32;
+            let lo = c * chunk;
+            let hi = ((c + 1) * chunk).min(n);
+            for i in lo..hi {
+                let b = (keys[i] & MASK) as usize;
+                // SAFETY: cursor ranges are disjoint across chunks by the
+                // prefix-scan construction; every write lands in-bounds
+                // (total counts sum to n).
+                unsafe { *mid.add(cursors[b] as usize) = i as u32 };
+                cursors[b] += 1;
+            }
+        });
+
+    // ── Pass 2: bucket by bits 11-21, reading mid; also materialize keys ──
+    let mid_ref = &scratch.buf;
+    let hists = &mut scratch.chunk_hists;
+    hists
+        .par_chunks_mut(BUCKETS)
+        .enumerate()
+        .for_each(|(c, h)| {
+            h.fill(0);
+            let lo = c * chunk;
+            let hi = ((c + 1) * chunk).min(n);
+            for &idx in &mid_ref[lo..hi] {
+                h[((keys[idx as usize] >> BITS) & MASK) as usize] += 1;
+            }
+        });
+    let mut sum = 0u32;
+    for b in 0..BUCKETS {
+        for c in 0..n_chunks {
+            let idx = c * BUCKETS + b;
+            let count = hists[idx];
+            hists[idx] = sum;
+            sum += count;
+        }
+    }
+    let dst_addr = scratch.indices.as_mut_ptr() as usize;
+    let sk_addr = scratch.sorted_keys.as_mut_ptr() as usize;
+    hists
+        .par_chunks_mut(BUCKETS)
+        .enumerate()
+        .for_each(|(c, cursors)| {
+            let dst = dst_addr as *mut u32;
+            let sk = sk_addr as *mut u32;
+            let lo = c * chunk;
+            let hi = ((c + 1) * chunk).min(n);
+            for &idx in &mid_ref[lo..hi] {
+                let key = keys[idx as usize];
+                let b = ((key >> BITS) & MASK) as usize;
+                let pos = cursors[b] as usize;
+                // SAFETY: same disjoint-segment argument as pass 1.
+                unsafe {
+                    *dst.add(pos) = idx;
+                    *sk.add(pos) = key;
+                }
+                cursors[b] += 1;
+            }
+        });
+
+    // ── Group boundaries: sequential scan over the materialized keys ──
+    let sk = &scratch.sorted_keys;
+    let mut start = 0u32;
+    let mut current_key = sk[0];
+    for (i, &k) in sk.iter().enumerate().skip(1) {
+        if k != current_key {
+            scratch.groups.push((current_key, start, i as u32 - start));
+            current_key = k;
+            start = i as u32;
+        }
+    }
+    scratch.groups.push((current_key, start, n as u32 - start));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -191,6 +333,39 @@ mod tests {
         let result = radix_sort_by_state(&keys, 0);
         assert_eq!(result.indices.len(), 0);
         assert_eq!(result.groups.len(), 0);
+    }
+
+    #[test]
+    fn test_parallel_matches_serial() {
+        // The parallel sort must be stable, i.e. produce bit-identical
+        // indices AND groups vs the serial sort, above and below the
+        // parallel threshold.
+        let mut state = 0x9E3779B97F4A7C15u64;
+        let mut next = move || {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            ((state >> 33) as u32) % 4_194_304
+        };
+        for &n in &[
+            1usize,
+            1000,
+            PAR_SORT_THRESHOLD - 1,
+            PAR_SORT_THRESHOLD + 12_345,
+            300_001,
+        ] {
+            let keys: Vec<u32> = (0..n).map(|_| next()).collect();
+            let mut serial = RadixScratch::new();
+            radix_sort_by_state_into(&keys, n, &mut serial);
+            let mut parallel = RadixScratch::new();
+            radix_sort_by_state_into_parallel(&keys, n, &mut parallel);
+            assert_eq!(
+                serial.indices, parallel.indices,
+                "indices differ at n={}",
+                n
+            );
+            assert_eq!(serial.groups, parallel.groups, "groups differ at n={}", n);
+        }
     }
 
     #[test]

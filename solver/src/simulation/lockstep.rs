@@ -30,7 +30,7 @@ use crate::widget_solver::{
 
 use super::engine::SimulationResult;
 use super::fast_prng::SplitMix64;
-use super::radix_sort::{radix_sort_by_state_into, RadixScratch};
+use super::radix_sort::{radix_sort_by_state_into_parallel, RadixScratch};
 
 /// Per-game mutable state during lockstep simulation.
 struct GameState {
@@ -82,6 +82,77 @@ const TABLE_THRESHOLD: u32 = 384;
 /// Minimum games in a group before the extra keep_ev_1 pass (210 CSR dot
 /// products, ~2.5us) beats per-game first-reroll argmaxes (~1us each).
 const KEEP_EV_THRESHOLD: u32 = 3;
+
+/// One game's full turn: two reroll decisions, category choice, state update.
+///
+/// Table path: pure lookups (groups >= TABLE_THRESHOLD). Fallback path:
+/// keep_ev lookup argmaxes (identical values and tie-breaking as the direct
+/// dot-product argmax; see widget_solver::compute_keep_ev).
+#[inline(always)]
+fn process_game_turn(
+    ctx: &YatzyContext,
+    sv: &[f32],
+    cache: &StateCache,
+    g: &mut GameState,
+    dice: &mut [i32; 5],
+    is_last_turn: bool,
+) {
+    let (cat, scr) = if let Some(t) = &cache.table {
+        // Table path: dice are canonical (sorted), decisions are
+        // pure lookups. Identical argmax as the fallback path.
+        let ds0 = find_dice_set_index(ctx, dice);
+        let mask1 = t.first_mask[ds0] as i32;
+        let ds1 = if mask1 != 0 {
+            apply_reroll(dice, mask1, &mut g.rng);
+            find_dice_set_index(ctx, dice)
+        } else {
+            ds0
+        };
+        let mask2 = t.second_mask[ds1] as i32;
+        let ds2 = if mask2 != 0 {
+            apply_reroll(dice, mask2, &mut g.rng);
+            find_dice_set_index(ctx, dice)
+        } else {
+            ds1
+        };
+        (t.cat[ds2] as usize, t.score[ds2] as i32)
+    } else {
+        // Fallback path: dice are canonical (sorted), so the
+        // dice-set index threads through instead of re-sorting.
+        let mut ds = find_dice_set_index(ctx, dice);
+
+        // First reroll: keep_ev_1 lookups when the group paid for
+        // them, else the per-game dot-product argmax (identical
+        // decisions either way).
+        let mask1 = if cache.has_keep_ev_1 {
+            choose_best_reroll_mask_by_keep_ev(ctx, &cache.keep_ev_1, &cache.e_ds_1, ds)
+        } else {
+            choose_best_reroll_mask_by_ds(ctx, &cache.e_ds_1, ds).0
+        };
+        if mask1 != 0 {
+            apply_reroll(dice, mask1, &mut g.rng);
+            ds = find_dice_set_index(ctx, dice);
+        }
+
+        // Second reroll: keep_ev_0 is always available.
+        let mask2 = choose_best_reroll_mask_by_keep_ev(ctx, &cache.keep_ev_0, &cache.e_ds_0, ds);
+        if mask2 != 0 {
+            apply_reroll(dice, mask2, &mut g.rng);
+            ds = find_dice_set_index(ctx, dice);
+        }
+
+        // Score
+        if is_last_turn {
+            find_best_category_final(ctx, g.upper_score, g.scored, ds)
+        } else {
+            find_best_category(ctx, sv, g.upper_score, g.scored, ds)
+        }
+    };
+
+    g.upper_score = update_upper_score(g.upper_score, cat, scr);
+    g.scored |= 1 << cat;
+    g.total_score += scr;
+}
 
 /// Roll 5 random dice and sort them.
 #[inline(always)]
@@ -296,7 +367,6 @@ pub fn simulate_batch_lockstep(
     let mut keys: Vec<u32> = vec![0u32; num_games];
     let mut sorted = RadixScratch::new();
     let mut caches: Vec<StateCache> = Vec::new();
-    let mut game_to_cache: Vec<u32> = vec![0u32; num_games];
 
     for turn in 0..CATEGORY_COUNT {
         let is_last_turn = turn == CATEGORY_COUNT - 1;
@@ -308,11 +378,13 @@ pub fn simulate_batch_lockstep(
             .for_each(|(g, dice)| *dice = roll_dice(&mut g.rng));
 
         // Step 2: Build state keys and radix sort to group games by state
-        for (k, g) in keys.iter_mut().zip(games.iter()) {
-            *k = state_index(g.upper_score as usize, g.scored as usize) as u32;
-        }
+        keys.par_iter_mut()
+            .zip(games.par_iter())
+            .for_each(|(k, g)| {
+                *k = state_index(g.upper_score as usize, g.scored as usize) as u32;
+            });
 
-        radix_sort_by_state_into(&keys, num_games, &mut sorted);
+        radix_sort_by_state_into_parallel(&keys, num_games, &mut sorted);
 
         // Step 3: Compute per-state caches in parallel
         // Collect unique state indices (from group headers)
@@ -384,89 +456,43 @@ pub fn simulate_batch_lockstep(
             })
             .collect_into_vec(&mut caches);
 
-        // Step 4: Build game→cache mapping from sorted groups, then apply
-        // decisions for all games in parallel.
-        // Invert group-to-game mapping: radix sort produces (state, start, count) groups
-        // in sorted.indices; this loop builds a per-game cache index for O(1) lookup.
-        // Every game appears in exactly one group, so the buffer is fully
-        // overwritten each turn.
-        for (group_idx, &(_si, group_start, group_count)) in sorted.groups.iter().enumerate() {
-            for j in group_start..(group_start + group_count) {
-                game_to_cache[sorted.indices[j as usize] as usize] = group_idx as u32;
-            }
-        }
-
-        // Process all games in parallel — each game looks up its cache by index.
-        games
-            .par_iter_mut()
-            .zip(dice_per_game.par_iter_mut())
-            .enumerate()
-            .for_each(|(gi, (g, dice))| {
-                let cache = &caches[game_to_cache[gi] as usize];
-
-                let (cat, scr) = if let Some(t) = &cache.table {
-                    // Table path: dice are canonical (sorted), decisions are
-                    // pure lookups. Identical argmax as the fallback path.
-                    let ds0 = find_dice_set_index(ctx, dice);
-                    let mask1 = t.first_mask[ds0] as i32;
-                    let ds1 = if mask1 != 0 {
-                        apply_reroll(dice, mask1, &mut g.rng);
-                        find_dice_set_index(ctx, dice)
-                    } else {
-                        ds0
-                    };
-                    let mask2 = t.second_mask[ds1] as i32;
-                    let ds2 = if mask2 != 0 {
-                        apply_reroll(dice, mask2, &mut g.rng);
-                        find_dice_set_index(ctx, dice)
-                    } else {
-                        ds1
-                    };
-                    (t.cat[ds2] as usize, t.score[ds2] as i32)
-                } else {
-                    // Fallback path: dice are canonical (sorted), so the
-                    // dice-set index threads through instead of re-sorting.
-                    let mut ds = find_dice_set_index(ctx, dice);
-
-                    // First reroll: keep_ev_1 lookups when the group paid for
-                    // them, else the per-game dot-product argmax (identical
-                    // decisions either way).
-                    let mask1 = if cache.has_keep_ev_1 {
-                        choose_best_reroll_mask_by_keep_ev(ctx, &cache.keep_ev_1, &cache.e_ds_1, ds)
-                    } else {
-                        choose_best_reroll_mask_by_ds(ctx, &cache.e_ds_1, ds).0
-                    };
-                    if mask1 != 0 {
-                        apply_reroll(dice, mask1, &mut g.rng);
-                        ds = find_dice_set_index(ctx, dice);
-                    }
-
-                    // Second reroll: keep_ev_0 is always available.
-                    let mask2 = choose_best_reroll_mask_by_keep_ev(
-                        ctx,
-                        &cache.keep_ev_0,
-                        &cache.e_ds_0,
-                        ds,
-                    );
-                    if mask2 != 0 {
-                        apply_reroll(dice, mask2, &mut g.rng);
-                        ds = find_dice_set_index(ctx, dice);
-                    }
-
-                    // Score
-                    if is_last_turn {
-                        find_best_category_final(ctx, g.upper_score, g.scored, ds)
-                    } else {
-                        find_best_category(ctx, sv, g.upper_score, g.scored, ds)
-                    }
+        // Step 4: process games group-by-group. Each group's StateCache /
+        // DecisionTable stays cache-hot for all of its games, and no
+        // game→cache inversion pass is needed. Every game index appears in
+        // exactly one group (the sort is a partition), so the raw-pointer
+        // accesses into games/dice are disjoint — same argument as the
+        // AtomicPtr scatter in state_computation.rs. Each game's RNG stream
+        // and decisions are independent of processing order, so scores are
+        // bit-identical to the game-index-order scan.
+        let games_addr = games.as_mut_ptr() as usize;
+        let dice_addr = dice_per_game.as_mut_ptr() as usize;
+        sorted.groups.par_iter().enumerate().for_each(
+            |(group_idx, &(_si, group_start, group_count))| {
+                let cache = &caches[group_idx];
+                let idx =
+                    &sorted.indices[group_start as usize..(group_start + group_count) as usize];
+                let process = |gi: usize| {
+                    // SAFETY: gi appears in exactly one group; disjoint access.
+                    let g = unsafe { &mut *(games_addr as *mut GameState).add(gi) };
+                    let dice = unsafe { &mut *(dice_addr as *mut [i32; 5]).add(gi) };
+                    process_game_turn(ctx, sv, cache, g, dice, is_last_turn);
                 };
-
-                g.upper_score = update_upper_score(g.upper_score, cat, scr);
-                g.scored |= 1 << cat;
-                g.total_score += scr;
-            });
+                // Fat groups (e.g. turn 0 is a single group of all games)
+                // split into parallel chunks to avoid load imbalance.
+                if group_count >= 16_384 {
+                    idx.par_chunks(4_096).for_each(|chunk| {
+                        for &gi in chunk {
+                            process(gi as usize);
+                        }
+                    });
+                } else {
+                    for &gi in idx {
+                        process(gi as usize);
+                    }
+                }
+            },
+        );
     }
-
     // Apply bonus
     let mut scores: Vec<i32> = games
         .iter()
