@@ -46,6 +46,8 @@ async function openDrawer(slug, triggerEl) {
   triggerEl.classList.add('active');
   currentSlug = slug;
 
+  window.yatzyTrack?.('concept_drawer_open', { concept: slug });
+
   // Fetch and cache
   if (!cache.has(slug)) {
     try {

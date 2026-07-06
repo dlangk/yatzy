@@ -122,6 +122,22 @@
   initDepthToggle();
   document.querySelectorAll('a[href^="http"]').forEach(a => { a.target = '_blank'; a.rel = 'noopener'; });
 
+  // Widget-interaction analytics (GA4 via window.yatzyTrack, set up by nav.js;
+  // no-ops off production). Delegated so it covers every chart, current and
+  // future. 'change' catches slider commits/selects (one event per adjust,
+  // not the continuous 'input' stream); clicks are limited to chart buttons.
+  const treatiseRoot = document.getElementById('treatise-root');
+  treatiseRoot.addEventListener('change', (e) => {
+    const c = e.target.closest('.chart-container');
+    if (c && c.id) window.yatzyTrack?.('widget_interact', { widget: c.id.replace(/^chart-/, ''), action: 'slider' });
+  }, { passive: true });
+  treatiseRoot.addEventListener('click', (e) => {
+    const btn = e.target.closest('.chart-btn');
+    if (!btn) return;
+    const c = btn.closest('.chart-container');
+    if (c && c.id) window.yatzyTrack?.('widget_interact', { widget: c.id.replace(/^chart-/, ''), action: 'button' });
+  }, { passive: true });
+
   // Charts use CSS variables (var(--text), var(--grid), etc.) for theme colors,
   // so they update automatically when the .dark class toggles. No re-init needed.
 

@@ -8,9 +8,11 @@ import { TOTAL_DICE } from './constants.ts';
 import { getState, dispatch, subscribe } from './store.ts';
 import { initApp } from './App.ts';
 import { evaluate, getStateValue, fetchDensity } from './api.ts';
+import { initPlayAnalytics } from './analytics.ts';
 
 const root = document.getElementById('root')!;
 initApp(root);
+initPlayAnalytics();
 
 // Side effect: auto-evaluate after roll/reroll.
 // Captures trajectory event info from the action that triggered the eval,

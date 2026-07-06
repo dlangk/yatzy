@@ -12,6 +12,9 @@ import { initResultPanel } from './components/result-panel.js';
 import { initPlayerCard } from './components/player-card.js';
 import { initQuestionList } from './components/question-list.js';
 import { loadPlayerCardGrid } from './player-card-data.js';
+import { initProfileAnalytics } from './analytics.js';
+
+initProfileAnalytics();
 
 // Load scenarios on init
 (async function init() {

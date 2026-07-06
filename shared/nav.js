@@ -179,5 +179,74 @@ function injectNav() {
   if (oldToggle) oldToggle.style.display = 'none';
 }
 
+// ── Analytics (GA4, dedicated "Yatzy" property) ────────────────────────────
+// Mirrors langkilde.se's Analytics.astro: gtag.js (~150 KB) is deferred until
+// the first real interaction (or a 10s fallback) so it stays out of the
+// Lighthouse trace window and off bots, and never loads on localhost. All
+// three UIs (treatise, play, profile) load this file, so this is the single
+// place GA is wired up. `app` is set as a default param on every hit
+// (page_view + custom events) so the property's reports can be sliced per UI.
+const GA_ID = 'G-EKNV4GY2ZN';
+
+function initAnalytics() {
+  // Dev/preview guard: nav.js is plain JS with no build-time env, so unlike
+  // the blog's `import.meta.env.PROD` gate we allowlist the production host.
+  // This blocks the dev server on every form (localhost, 127.0.0.1, 0.0.0.0,
+  // a LAN IP via `vite --host`, any preview host) — a denylist would leak
+  // those. Off-production, keep a no-op yatzyTrack so callers need no env check.
+  const host = location.hostname;
+  const isProd = host === 'langkilde.se' || host.endsWith('.langkilde.se');
+  if (!isProd) {
+    window.yatzyTrack = window.yatzyTrack || function () {};
+    return;
+  }
+
+  // Define dataLayer + gtag and queue js/config immediately (cheap, no
+  // network) so custom events fired before gtag.js loads are correctly
+  // ordered after config. Only the ~150 KB script is deferred.
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { window.dataLayer.push(arguments); }
+  window.gtag = window.gtag || gtag;
+
+  const app = detectActive(); // 'treatise' | 'play' | 'profile'
+  const path = location.pathname.replace(/\/+$/, '') || '/';
+
+  window.gtag('js', new Date());
+  window.gtag('set', { app: app }); // default param on all subsequent events
+  window.gtag('config', GA_ID, {
+    page_path: path,
+    // Strip hash so TOC/footnote clicks don't spawn extra page_views.
+    page_location: location.origin + path,
+  });
+
+  // Public helper for the three UIs: window.yatzyTrack('event_name', {params}).
+  // Call it defensively, e.g. window.yatzyTrack?.('game_start', {...}).
+  window.yatzyTrack = function (name, params) {
+    window.gtag('event', name, Object.assign({ app: app }, params || {}));
+  };
+
+  let gaLoaded = false;
+  function loadGA() {
+    if (gaLoaded) return;
+    gaLoaded = true;
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+    document.head.appendChild(script);
+  }
+
+  function onFirstInteraction() {
+    if (gaLoaded) return;
+    if ('requestIdleCallback' in window) requestIdleCallback(loadGA, { timeout: 2000 });
+    else setTimeout(loadGA, 0);
+  }
+  ['pointerdown', 'scroll', 'keydown', 'touchstart'].forEach(function (type) {
+    window.addEventListener(type, onFirstInteraction, { once: true, passive: true, capture: true });
+  });
+  // Count visitors who never interact, well after page quiescence.
+  window.addEventListener('load', function () { setTimeout(loadGA, 10000); });
+}
+
+initAnalytics();
 injectStyles();
 injectNav();
