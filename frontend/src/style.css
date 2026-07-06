@@ -16,6 +16,22 @@
   --color-danger: #b40426;
 }
 
+.dark {
+  --bg: #1a1a1a;
+  --bg-alt: #252525;
+  --text: #e0ddd5;
+  --text-muted: #999;
+  --accent: rgba(243, 112, 33, 0.9);
+  --accent-light: rgba(243, 112, 33, 0.15);
+  --border: #3a3a3a;
+  --color-blue: #6b8de3;
+  --color-red: #e05252;
+  --color-orange: #F37021;
+  --color-green: #4caf50;
+  --color-success: #4caf50;
+  --color-danger: #e05252;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
 }

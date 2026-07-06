@@ -16,3 +16,4 @@ Performance experiments with measured results on Apple M1 Max hardware.
 | `scaling-laws.md` | 146 | How solver performance scales with state space and θ grid size |
 | `semantic-reroll-actions.md` | 148 | Semantic reroll action encoding and its effect on surrogate training |
 | `strategy-guide-prompt.md` | 166 | LLM-generated strategy guide evaluation against solver |
+| `turn-by-turn-adaptive-advantage.md` | 210 | Sequential multiplayer: four policy classes, variance-scaled best at +0.86pp, 54.87% ceiling |

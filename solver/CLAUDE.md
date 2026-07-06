@@ -5,10 +5,11 @@ Rust HPC engine: backward-induction DP, Monte Carlo simulation, REST API.
 ## Commands
 
 ```bash
-cargo build --release         # Build (~30s with LTO)
-cargo test                    # 189 tests (139 unit + 14 API + 8 property + 28 integration, 2 ignored)
-cargo fmt --check             # Formatting
-cargo clippy                  # Lints
+cargo build --release                  # Build (~30s with LTO)
+cargo build --features timing          # Build with per-level timing output enabled
+cargo test                             # 189 tests (139 unit + 14 API + 8 property + 28 integration, 2 ignored)
+cargo fmt --check                      # Formatting
+cargo clippy                           # Lints
 
 # From repo root (YATZY_BASE_PATH=.):
 just precompute               # θ=0 strategy table (~1.1s)
@@ -36,7 +37,9 @@ Single crate (not a workspace). Release profile: opt-level 3, fat LTO, codegen-u
 ## Core Data Structures
 
 ### YatzyContext (`types.rs`)
+
 Central context holding all precomputed tables and state values.
+
 - `state_values: StateValues` — E[score | optimal play] for all 4,194,304 state slots
 - `keep_table: KeepTable` — CSR-format probability matrix (462 unique keeps × 252 dice sets)
 - `dice_set_probabilities: [f64; NUM_DICE_SETS]` — P(dice set) for each of 252 ordered combinations
@@ -45,6 +48,7 @@ Central context holding all precomputed tables and state values.
 - `theta: f32` — risk parameter (0 = EV-optimal)
 
 ### State Representation (`constants.rs`)
+
 - S = (upper_score, scored_categories) where m ∈ [0,63], C = 15-bit bitmask
 - `STATE_STRIDE = 128` (topological padding: indices 64-127 duplicate the capped value)
 - `state_index(up, scored) = scored * 128 + up`
@@ -52,10 +56,13 @@ Central context holding all precomputed tables and state values.
 - Only ~1.43M states are reachable after pruning
 
 ### KeepTable (`types.rs`)
+
 Sparse probability matrix in CSR format. For each dice set, maps to ≤462 unique kept-dice multisets with transition probabilities. Key dedup: 462 unique keeps vs 31 raw reroll masks (~47% reduction).
 
 ### PolicyOracle (`types.rs`)
+
 Precomputed argmax decisions for θ=0. Three flat `Vec<u8>` arrays (~3.17 GB total):
+
 - `oracle_cat[si * 252 + ds]` — best category (0-14)
 - `oracle_keep1[si * 252 + ds]` — best keep with 1 reroll left
 - `oracle_keep2[si * 252 + ds]` — best keep with 2 rerolls left

@@ -8,6 +8,7 @@
     "markdown-it": "^14.0.0"
   },
   "dependencies": {
-    "@fontsource/newsreader": "^5.2.10"
+    "@fontsource/newsreader": "^5.2.10",
+    "katex": "^0.16.44"
   }
 }

@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, readdirSync } from "fs";
 import { join, basename } from "path";
 import MarkdownIt from "markdown-it";
+import katex from "katex";
 import { inlineDieSVG } from "../shared/dice.js";
 
 const SECTIONS_DIR = join(import.meta.dirname, "sections");
@@ -18,6 +19,7 @@ function processShortcodes(src) {
   const out = [];
   const stack = []; // track nested blocks
   let htmlBlock = null; // accumulator for :::html blocks
+  let eqBlock = null;   // accumulator for :::equation blocks
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -30,12 +32,26 @@ function processShortcodes(src) {
         // End html passthrough — emit accumulated content raw
         out.push(htmlBlock.join("\n"));
         htmlBlock = null;
+      } else if (top.type === "equation") {
+        // End equation block — render LaTeX via KaTeX
+        const latex = eqBlock.join(" ").trim();
+        eqBlock = null;
+        try {
+          const rendered = katex.renderToString(latex, {
+            displayMode: true,
+            throwOnError: false,
+          });
+          out.push(`<div class="equation">${rendered}</div>`);
+        } catch (e) {
+          console.warn(`  ⚠ KaTeX error: ${e.message}`);
+          out.push(`<div class="equation katex-error">${latex}</div>`);
+        }
       } else if (top.type === "section") {
         out.push("</section>");
       } else if (top.type === "part-title") {
         out.push("</div>");
       } else {
-        // math, code, equation, insight
+        // math, code, insight
         out.push(`\n</div>`);
       }
       continue;
@@ -50,6 +66,9 @@ function processShortcodes(src) {
       if (type === "html") {
         stack.push({ type: "html" });
         htmlBlock = [];
+      } else if (type === "equation") {
+        stack.push({ type: "equation" });
+        eqBlock = [];
       } else if (type === "section") {
         stack.push({ type: "section" });
         out.push(id ? `<section id="${id}">` : "<section>");
@@ -57,7 +76,7 @@ function processShortcodes(src) {
         stack.push({ type: "part-title" });
         out.push(`<div class="part-title">`);
       } else {
-        // math, code, equation, insight
+        // math, code, insight
         const cls = CLASS_MAP[type] || type;
         stack.push({ type });
         out.push(`<div class="${cls}">\n`);
@@ -68,6 +87,12 @@ function processShortcodes(src) {
     // Inside html block — accumulate raw
     if (htmlBlock !== null) {
       htmlBlock.push(line);
+      continue;
+    }
+
+    // Inside equation block — accumulate raw LaTeX
+    if (eqBlock !== null) {
+      eqBlock.push(line);
       continue;
     }
 

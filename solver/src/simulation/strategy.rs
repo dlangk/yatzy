@@ -99,6 +99,21 @@ impl MultiplayerPolicy for TrailingRisk {
 /// Available θ values for the underdog ramp (must have precomputed tables).
 const UNDERDOG_THETAS: &[f32] = &[0.0, 0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07];
 
+/// Available θ values for the symmetric policy (positive + negative).
+const SYMMETRIC_THETAS: &[f32] = &[
+    -0.07, -0.06, -0.05, -0.04, -0.03, -0.02, -0.015, -0.01, -0.005, 0.0, 0.005, 0.01, 0.015,
+    0.02, 0.03, 0.04, 0.05, 0.06, 0.07,
+];
+
+/// Available θ values for the Hail Mary policy (aggressive late-game).
+const HAILMARY_THETAS: &[f32] = &[0.0, 0.10, 0.15, 0.20, 0.25, 0.30, 0.50];
+
+/// Combined symmetric + Hail Mary θ values.
+const HAILMARY_SYM_THETAS: &[f32] = &[
+    -0.07, -0.06, -0.05, -0.04, -0.03, -0.02, -0.015, -0.01, -0.005, 0.0, 0.005, 0.01, 0.015,
+    0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.10, 0.15, 0.20, 0.25, 0.30, 0.50,
+];
+
 /// Opponent-aware adaptive strategy with continuous θ ramp.
 ///
 /// Uses **expected final scores** (current total + EV remaining from state-value
@@ -119,7 +134,7 @@ pub struct UnderdogPolicy {
 
 impl UnderdogPolicy {
     /// Compute the EV deficit: best opponent expected final − my expected final.
-    fn ev_deficit(view: &GameView, ev_sv: &[f32]) -> f32 {
+    pub(crate) fn ev_deficit(view: &GameView, ev_sv: &[f32]) -> f32 {
         let my = view.me();
         let my_ev_remaining =
             ev_sv[state_index(my.upper_score as usize, my.scored_categories as usize)];
@@ -154,6 +169,290 @@ impl MultiplayerPolicy for UnderdogPolicy {
         let desired_theta = self.theta_max * (deficit / self.scale).clamp(0.0, 1.0);
 
         // Snap to nearest precomputed table
+        tables
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| {
+                (a.theta - desired_theta)
+                    .abs()
+                    .partial_cmp(&(b.theta - desired_theta).abs())
+                    .unwrap()
+            })
+            .map(|(i, _)| i)
+            .unwrap_or(self.ev_idx)
+    }
+}
+
+// ── ProtectOnlyPolicy ────────────────────────────────────────────────────
+
+/// Opponent-aware adaptive strategy: risk-averse when leading, EV-optimal otherwise.
+///
+/// Mirror of [`UnderdogPolicy`]: uses the same EV-deficit calculation but only
+/// adjusts when ahead (deficit < 0), ramping θ toward negative values.
+pub struct ProtectOnlyPolicy {
+    pub ev_idx: usize,
+    pub theta_max_protect: f32, // max |θ| when far ahead (applied as negative)
+    pub scale: f32,
+}
+
+impl MultiplayerPolicy for ProtectOnlyPolicy {
+    fn name(&self) -> &str {
+        "protect"
+    }
+
+    fn select_theta_index(&self, view: &GameView, tables: &[ThetaTable]) -> usize {
+        if view.turn <= 1 {
+            return self.ev_idx;
+        }
+        let ev_sv = tables[self.ev_idx].sv.as_slice();
+        let deficit = UnderdogPolicy::ev_deficit(view, ev_sv);
+
+        if deficit >= 0.0 {
+            // Trailing or even: play EV-optimal
+            return self.ev_idx;
+        }
+
+        // Leading: ramp toward negative θ
+        let desired_theta = -self.theta_max_protect * (-deficit / self.scale).clamp(0.0, 1.0);
+
+        tables
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| {
+                (a.theta - desired_theta)
+                    .abs()
+                    .partial_cmp(&(b.theta - desired_theta).abs())
+                    .unwrap()
+            })
+            .map(|(i, _)| i)
+            .unwrap_or(self.ev_idx)
+    }
+}
+
+// ── SymmetricUnderdogPolicy ──────────────────────────────────────────────
+
+/// Opponent-aware adaptive strategy that adjusts both directions:
+/// risk-seeking when trailing, risk-averse when leading.
+///
+/// Uses the same EV-deficit calculation as [`UnderdogPolicy`].
+/// When deficit > 0 (trailing): θ ramps from 0 to +theta_max_seek.
+/// When deficit < 0 (leading): θ ramps from 0 to -theta_max_protect.
+pub struct SymmetricUnderdogPolicy {
+    pub ev_idx: usize,
+    pub theta_max_seek: f32,    // max positive θ when deeply trailing
+    pub theta_max_protect: f32, // max |θ| when far ahead (applied as negative)
+    pub scale: f32,             // EV deficit magnitude at which θ saturates
+}
+
+impl MultiplayerPolicy for SymmetricUnderdogPolicy {
+    fn name(&self) -> &str {
+        "symmetric"
+    }
+
+    fn select_theta_index(&self, view: &GameView, tables: &[ThetaTable]) -> usize {
+        if view.turn <= 1 {
+            return self.ev_idx;
+        }
+        let ev_sv = tables[self.ev_idx].sv.as_slice();
+        let deficit = UnderdogPolicy::ev_deficit(view, ev_sv);
+
+        let desired_theta = if deficit > 0.0 {
+            // Trailing: ramp toward positive θ
+            self.theta_max_seek * (deficit / self.scale).clamp(0.0, 1.0)
+        } else {
+            // Leading: ramp toward negative θ
+            -self.theta_max_protect * (-deficit / self.scale).clamp(0.0, 1.0)
+        };
+
+        tables
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| {
+                (a.theta - desired_theta)
+                    .abs()
+                    .partial_cmp(&(b.theta - desired_theta).abs())
+                    .unwrap()
+            })
+            .map(|(i, _)| i)
+            .unwrap_or(self.ev_idx)
+    }
+}
+
+// ── VarianceScaledPolicy ─────────────────────────────────────────────────
+
+/// Variance-scaled risk: θ* = (E₁ - E₂) / (V₁ + V₂), clamped.
+///
+/// Uses O(1) variance extraction from the θ=0.01 table:
+/// `V(state) = 200 · (sv_θ0.01[state]/0.01 - sv_θ0[state])`
+///
+/// This makes the policy horizon-aware: early in the game V₁+V₂ is large,
+/// suppressing θ even for sizable deficits. Late in the game V₁+V₂ shrinks,
+/// allowing stronger adaptation when it matters most.
+pub struct VarianceScaledPolicy {
+    pub ev_idx: usize,        // index of θ=0 table
+    pub var_idx: usize,       // index of θ=0.01 table (for variance extraction)
+    pub theta_clamp_pos: f32, // max positive θ (default 0.05)
+    pub theta_clamp_neg: f32, // max negative |θ| (default 0.03, applied as -0.03)
+}
+
+impl VarianceScaledPolicy {
+    /// Extract remaining-score variance from θ=0 and θ=0.01 tables.
+    fn remaining_variance(ev_sv: &[f32], var_sv: &[f32], upper: usize, scored: usize) -> f32 {
+        let si = state_index(upper, scored);
+        let e = ev_sv[si];
+        let l = var_sv[si];
+        // CE = L/θ = l/0.01; V ≈ 2·(CE - E)/θ = 200·(l/0.01 - e)
+        let ce = l / 0.01;
+        let v = 200.0 * (ce - e);
+        v.max(1.0) // floor at 1 to avoid division by zero in last turns
+    }
+}
+
+impl MultiplayerPolicy for VarianceScaledPolicy {
+    fn name(&self) -> &str {
+        "varscaled"
+    }
+
+    fn select_theta_index(&self, view: &GameView, tables: &[ThetaTable]) -> usize {
+        if view.turn <= 1 {
+            return self.ev_idx;
+        }
+        let ev_sv = tables[self.ev_idx].sv.as_slice();
+        let var_sv = tables[self.var_idx].sv.as_slice();
+
+        // Expected final scores
+        let my = view.me();
+        let my_e = my.total_score as f32
+            + ev_sv[state_index(my.upper_score as usize, my.scored_categories as usize)];
+        let my_v = Self::remaining_variance(
+            ev_sv, var_sv, my.upper_score as usize, my.scored_categories as usize,
+        );
+
+        let (best_opp_e, opp_v) = view
+            .opponents()
+            .map(|p| {
+                let e = p.total_score as f32
+                    + ev_sv[state_index(p.upper_score as usize, p.scored_categories as usize)];
+                let v = Self::remaining_variance(
+                    ev_sv, var_sv, p.upper_score as usize, p.scored_categories as usize,
+                );
+                (e, v)
+            })
+            .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap())
+            .unwrap_or((my_e, my_v));
+
+        let deficit = best_opp_e - my_e;
+        let total_var = my_v + opp_v;
+
+        // θ* = deficit / total_variance
+        let theta_raw = deficit / total_var;
+        let theta_clamped = theta_raw.clamp(-self.theta_clamp_neg, self.theta_clamp_pos);
+
+        tables
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| {
+                (a.theta - theta_clamped)
+                    .abs()
+                    .partial_cmp(&(b.theta - theta_clamped).abs())
+                    .unwrap()
+            })
+            .map(|(i, _)| i)
+            .unwrap_or(self.ev_idx)
+    }
+}
+
+// ── HailMaryPolicy ──────────────────────────────────────────────────────
+
+/// Late-game Hail Mary: play EV-optimal for most of the game, then switch to
+/// very aggressive θ in the last few turns when trailing.
+///
+/// Only activates when `turn >= activate_turn` AND `ev_deficit > deficit_threshold`.
+pub struct HailMaryPolicy {
+    pub ev_idx: usize,
+    pub theta_hail: f32,
+    pub activate_turn: usize,
+    pub deficit_threshold: f32,
+}
+
+impl MultiplayerPolicy for HailMaryPolicy {
+    fn name(&self) -> &str {
+        "hailmary"
+    }
+
+    fn select_theta_index(&self, view: &GameView, tables: &[ThetaTable]) -> usize {
+        if view.turn < self.activate_turn {
+            return self.ev_idx;
+        }
+        let ev_sv = tables[self.ev_idx].sv.as_slice();
+        let deficit = UnderdogPolicy::ev_deficit(view, ev_sv);
+
+        if deficit <= self.deficit_threshold {
+            return self.ev_idx;
+        }
+
+        // Snap to nearest table at theta_hail
+        tables
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| {
+                (a.theta - self.theta_hail)
+                    .abs()
+                    .partial_cmp(&(b.theta - self.theta_hail).abs())
+                    .unwrap()
+            })
+            .map(|(i, _)| i)
+            .unwrap_or(self.ev_idx)
+    }
+}
+
+// ── HailMarySymmetricPolicy ─────────────────────────────────────────────
+
+/// Combined: symmetric play for early/mid game, Hail Mary for late game when trailing.
+pub struct HailMarySymmetricPolicy {
+    pub ev_idx: usize,
+    pub theta_max_seek: f32,
+    pub theta_max_protect: f32,
+    pub scale: f32,
+    pub theta_hail: f32,
+    pub activate_turn: usize,
+    pub deficit_threshold: f32,
+}
+
+impl MultiplayerPolicy for HailMarySymmetricPolicy {
+    fn name(&self) -> &str {
+        "hailmary-sym"
+    }
+
+    fn select_theta_index(&self, view: &GameView, tables: &[ThetaTable]) -> usize {
+        if view.turn <= 1 {
+            return self.ev_idx;
+        }
+        let ev_sv = tables[self.ev_idx].sv.as_slice();
+        let deficit = UnderdogPolicy::ev_deficit(view, ev_sv);
+
+        // Late game + trailing hard: Hail Mary
+        if view.turn >= self.activate_turn && deficit > self.deficit_threshold {
+            return tables
+                .iter()
+                .enumerate()
+                .min_by(|(_, a), (_, b)| {
+                    (a.theta - self.theta_hail)
+                        .abs()
+                        .partial_cmp(&(b.theta - self.theta_hail).abs())
+                        .unwrap()
+                })
+                .map(|(i, _)| i)
+                .unwrap_or(self.ev_idx);
+        }
+
+        // Otherwise: symmetric policy
+        let desired_theta = if deficit > 0.0 {
+            self.theta_max_seek * (deficit / self.scale).clamp(0.0, 1.0)
+        } else {
+            -self.theta_max_protect * (-deficit / self.scale).clamp(0.0, 1.0)
+        };
+
         tables
             .iter()
             .enumerate()
@@ -351,12 +650,234 @@ impl Strategy {
                         kind: StrategyKind::MultiplayerAdaptive { tables, policy },
                     });
                 }
+                "symmetric" => {
+                    // mp:symmetric[:theta_seek[:theta_protect[:scale]]]
+                    let theta_max_seek: f32 = if parts.len() > 1 {
+                        parts[1]
+                            .parse()
+                            .map_err(|_| format!("Invalid theta_seek: {}", parts[1]))?
+                    } else {
+                        0.05
+                    };
+                    let theta_max_protect: f32 = if parts.len() > 2 {
+                        parts[2]
+                            .parse()
+                            .map_err(|_| format!("Invalid theta_protect: {}", parts[2]))?
+                    } else {
+                        0.03
+                    };
+                    let scale: f32 = if parts.len() > 3 {
+                        parts[3]
+                            .parse()
+                            .map_err(|_| format!("Invalid scale: {}", parts[3]))?
+                    } else {
+                        50.0
+                    };
+
+                    // Load all tables in the symmetric range
+                    let thetas: Vec<f32> = SYMMETRIC_THETAS
+                        .iter()
+                        .copied()
+                        .filter(|&t| t >= -theta_max_protect - 1e-6 && t <= theta_max_seek + 1e-6)
+                        .collect();
+                    let tables = load_theta_tables(&thetas, base_path)?;
+
+                    let ev_idx = tables
+                        .iter()
+                        .position(|t| t.theta == 0.0)
+                        .expect("θ=0 table missing");
+
+                    let policy = Box::new(SymmetricUnderdogPolicy {
+                        ev_idx,
+                        theta_max_seek,
+                        theta_max_protect,
+                        scale,
+                    });
+
+                    let name = if parts.len() == 1 {
+                        "mp:symmetric".to_string()
+                    } else {
+                        format!(
+                            "mp:symmetric:{}:{}:{}",
+                            theta_max_seek, theta_max_protect, scale
+                        )
+                    };
+
+                    return Ok(Strategy {
+                        name,
+                        kind: StrategyKind::MultiplayerAdaptive { tables, policy },
+                    });
+                }
+                "protect" => {
+                    // mp:protect[:theta_protect[:scale]]
+                    let theta_max_protect: f32 = if parts.len() > 1 {
+                        parts[1]
+                            .parse()
+                            .map_err(|_| format!("Invalid theta_protect: {}", parts[1]))?
+                    } else {
+                        0.03
+                    };
+                    let scale: f32 = if parts.len() > 2 {
+                        parts[2]
+                            .parse()
+                            .map_err(|_| format!("Invalid scale: {}", parts[2]))?
+                    } else {
+                        50.0
+                    };
+
+                    // Load negative θ tables from -theta_max_protect to 0
+                    let thetas: Vec<f32> = SYMMETRIC_THETAS
+                        .iter()
+                        .copied()
+                        .filter(|&t| t >= -theta_max_protect - 1e-6 && t <= 1e-6)
+                        .collect();
+                    let tables = load_theta_tables(&thetas, base_path)?;
+
+                    let ev_idx = tables
+                        .iter()
+                        .position(|t| t.theta == 0.0)
+                        .expect("θ=0 table missing");
+
+                    let policy = Box::new(ProtectOnlyPolicy {
+                        ev_idx,
+                        theta_max_protect,
+                        scale,
+                    });
+
+                    let name = if parts.len() == 1 {
+                        "mp:protect".to_string()
+                    } else {
+                        format!("mp:protect:{}:{}", theta_max_protect, scale)
+                    };
+
+                    return Ok(Strategy {
+                        name,
+                        kind: StrategyKind::MultiplayerAdaptive { tables, policy },
+                    });
+                }
+                "hailmary" => {
+                    // mp:hailmary[:theta[:activate_turn[:threshold]]]
+                    let theta_hail: f32 = if parts.len() > 1 {
+                        parts[1].parse().map_err(|_| format!("Invalid theta: {}", parts[1]))?
+                    } else {
+                        0.20
+                    };
+                    let activate_turn: usize = if parts.len() > 2 {
+                        parts[2].parse().map_err(|_| format!("Invalid turn: {}", parts[2]))?
+                    } else {
+                        12
+                    };
+                    let deficit_threshold: f32 = if parts.len() > 3 {
+                        parts[3].parse().map_err(|_| format!("Invalid threshold: {}", parts[3]))?
+                    } else {
+                        5.0
+                    };
+
+                    let thetas: Vec<f32> = HAILMARY_THETAS
+                        .iter().copied().filter(|&t| t <= theta_hail + 1e-6).collect();
+                    let tables = load_theta_tables(&thetas, base_path)?;
+                    let ev_idx = tables.iter().position(|t| t.theta == 0.0).expect("θ=0 missing");
+
+                    let policy = Box::new(HailMaryPolicy {
+                        ev_idx, theta_hail, activate_turn, deficit_threshold,
+                    });
+                    let name = if parts.len() == 1 {
+                        "mp:hailmary".to_string()
+                    } else {
+                        format!("mp:hailmary:{}:{}:{}", theta_hail, activate_turn, deficit_threshold)
+                    };
+                    return Ok(Strategy {
+                        name, kind: StrategyKind::MultiplayerAdaptive { tables, policy },
+                    });
+                }
+                "hailmary-sym" => {
+                    // mp:hailmary-sym[:theta_hail[:activate_turn[:threshold]]]
+                    let theta_hail: f32 = if parts.len() > 1 {
+                        parts[1].parse().map_err(|_| format!("Invalid theta: {}", parts[1]))?
+                    } else {
+                        0.20
+                    };
+                    let activate_turn: usize = if parts.len() > 2 {
+                        parts[2].parse().map_err(|_| format!("Invalid turn: {}", parts[2]))?
+                    } else {
+                        12
+                    };
+                    let deficit_threshold: f32 = if parts.len() > 3 {
+                        parts[3].parse().map_err(|_| format!("Invalid threshold: {}", parts[3]))?
+                    } else {
+                        5.0
+                    };
+
+                    // Load all tables needed: symmetric range + hail mary range
+                    let thetas: Vec<f32> = HAILMARY_SYM_THETAS
+                        .iter().copied().filter(|&t| t <= theta_hail + 1e-6).collect();
+                    let tables = load_theta_tables(&thetas, base_path)?;
+                    let ev_idx = tables.iter().position(|t| t.theta == 0.0).expect("θ=0 missing");
+
+                    let policy = Box::new(HailMarySymmetricPolicy {
+                        ev_idx,
+                        theta_max_seek: 0.05,
+                        theta_max_protect: 0.03,
+                        scale: 50.0,
+                        theta_hail,
+                        activate_turn,
+                        deficit_threshold,
+                    });
+                    let name = if parts.len() == 1 {
+                        "mp:hailmary-sym".to_string()
+                    } else {
+                        format!("mp:hailmary-sym:{}:{}:{}", theta_hail, activate_turn, deficit_threshold)
+                    };
+                    return Ok(Strategy {
+                        name, kind: StrategyKind::MultiplayerAdaptive { tables, policy },
+                    });
+                }
+                "varscaled" => {
+                    // mp:varscaled[:pos_clamp[:neg_clamp]]
+                    let theta_clamp_pos: f32 = if parts.len() > 1 {
+                        parts[1].parse().map_err(|_| format!("Invalid pos_clamp: {}", parts[1]))?
+                    } else {
+                        0.05
+                    };
+                    let theta_clamp_neg: f32 = if parts.len() > 2 {
+                        parts[2].parse().map_err(|_| format!("Invalid neg_clamp: {}", parts[2]))?
+                    } else {
+                        0.03
+                    };
+
+                    // Load symmetric range tables (covers [-neg..+pos]) plus θ=0.01 for variance
+                    let mut thetas: Vec<f32> = SYMMETRIC_THETAS
+                        .iter().copied()
+                        .filter(|&t| t >= -theta_clamp_neg - 1e-6 && t <= theta_clamp_pos + 1e-6)
+                        .collect();
+                    // Ensure θ=0.01 is present for variance extraction
+                    if !thetas.iter().any(|&t| (t - 0.01).abs() < 1e-6) {
+                        thetas.push(0.01);
+                        thetas.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                    }
+                    let tables = load_theta_tables(&thetas, base_path)?;
+
+                    let ev_idx = tables.iter().position(|t| t.theta == 0.0).expect("θ=0 missing");
+                    let var_idx = tables.iter().position(|t| (t.theta - 0.01).abs() < 1e-6).expect("θ=0.01 missing");
+
+                    let policy = Box::new(VarianceScaledPolicy {
+                        ev_idx, var_idx, theta_clamp_pos, theta_clamp_neg,
+                    });
+                    let name = if parts.len() == 1 {
+                        "mp:varscaled".to_string()
+                    } else {
+                        format!("mp:varscaled:{}:{}", theta_clamp_pos, theta_clamp_neg)
+                    };
+                    return Ok(Strategy {
+                        name, kind: StrategyKind::MultiplayerAdaptive { tables, policy },
+                    });
+                }
                 other => return Err(format!("Unknown multiplayer policy: {}", other)),
             }
         }
 
         Err(format!(
-            "Unknown strategy spec: '{}'. Expected: ev, human, theta:<f>, adaptive:<name>, mp:trailing[:<threshold>], mp:underdog[:<theta_max>[:<scale>]]",
+            "Unknown strategy spec: '{}'. Expected: ev, human, theta:<f>, adaptive:<name>, mp:trailing, mp:underdog, mp:protect, mp:symmetric, mp:hailmary, mp:hailmary-sym, mp:varscaled",
             spec
         ))
     }
@@ -426,6 +947,57 @@ fn load_theta_tables(thetas: &[f32], base_path: &Path) -> Result<Vec<ThetaTable>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_protect_only_policy() {
+        let tables = fake_ramp_tables(100.0);
+        // fake_ramp_tables creates [0.0, 0.01, 0.02, 0.03, 0.04, 0.05]
+        // ProtectOnly needs negative tables; build custom set
+        use crate::constants::NUM_STATES;
+        let tables: Vec<ThetaTable> = [-0.03, -0.02, -0.01, 0.0, 0.01]
+            .iter()
+            .map(|&theta| ThetaTable {
+                theta,
+                sv: StateValues::Owned(vec![100.0f32; NUM_STATES]),
+                minimize: theta < 0.0,
+            })
+            .collect();
+        let ev_idx = tables.iter().position(|t| t.theta == 0.0).unwrap();
+
+        let policy = ProtectOnlyPolicy {
+            ev_idx,
+            theta_max_protect: 0.03,
+            scale: 50.0,
+        };
+
+        // Turn 0 → always ev
+        let players = vec![
+            PlayerState { total_score: 100, ..Default::default() },
+            PlayerState { total_score: 150, ..Default::default() },
+        ];
+        let view = GameView { my_index: 1, players: &players, turn: 0 };
+        assert_eq!(tables[policy.select_theta_index(&view, &tables)].theta, 0.0);
+
+        // Trailing → θ=0 (protect-only doesn't seek)
+        let players_trail = vec![
+            PlayerState { total_score: 150, ..Default::default() },
+            PlayerState { total_score: 100, ..Default::default() },
+        ];
+        let view_trail = GameView { my_index: 1, players: &players_trail, turn: 7 };
+        assert_eq!(tables[policy.select_theta_index(&view_trail, &tables)].theta, 0.0);
+
+        // Leading by 50 → max protect θ = -0.03
+        let view_lead = GameView { my_index: 1, players: &players, turn: 7 };
+        assert_eq!(tables[policy.select_theta_index(&view_lead, &tables)].theta, -0.03);
+
+        // Even → θ=0
+        let players_even = vec![
+            PlayerState { total_score: 100, ..Default::default() },
+            PlayerState { total_score: 100, ..Default::default() },
+        ];
+        let view_even = GameView { my_index: 1, players: &players_even, turn: 7 };
+        assert_eq!(tables[policy.select_theta_index(&view_even, &tables)].theta, 0.0);
+    }
 
     #[test]
     fn test_player_state_default() {
@@ -694,6 +1266,100 @@ mod tests {
             tables[policy.select_theta_index(&view_flipped, &tables)].theta,
             0.0
         ); // θ=0 despite equal scores
+    }
+
+    #[test]
+    fn test_symmetric_underdog_policy() {
+        // Build tables with both negative and positive θ
+        use crate::constants::NUM_STATES;
+        let ev_remaining = 100.0f32;
+        let tables: Vec<ThetaTable> = [-0.03, -0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.04, 0.05]
+            .iter()
+            .map(|&theta| ThetaTable {
+                theta,
+                sv: StateValues::Owned(vec![ev_remaining; NUM_STATES]),
+                minimize: theta < 0.0,
+            })
+            .collect();
+        let ev_idx = tables.iter().position(|t| t.theta == 0.0).unwrap();
+
+        let policy = SymmetricUnderdogPolicy {
+            ev_idx,
+            theta_max_seek: 0.05,
+            theta_max_protect: 0.03,
+            scale: 50.0,
+        };
+
+        // Turn 0 → always ev
+        let players = vec![
+            PlayerState {
+                total_score: 150,
+                ..Default::default()
+            },
+            PlayerState {
+                total_score: 100,
+                ..Default::default()
+            },
+        ];
+        let view = GameView {
+            my_index: 1,
+            players: &players,
+            turn: 0,
+        };
+        assert_eq!(tables[policy.select_theta_index(&view, &tables)].theta, 0.0);
+
+        // Trailing by 50 (same EV remaining) → max seek θ = 0.05
+        let view_trail = GameView {
+            my_index: 1,
+            players: &players,
+            turn: 7,
+        };
+        assert_eq!(
+            tables[policy.select_theta_index(&view_trail, &tables)].theta,
+            0.05
+        );
+
+        // Leading by 50 → max protect θ = -0.03
+        let players_lead = vec![
+            PlayerState {
+                total_score: 100,
+                ..Default::default()
+            },
+            PlayerState {
+                total_score: 150,
+                ..Default::default()
+            },
+        ];
+        let view_lead = GameView {
+            my_index: 1,
+            players: &players_lead,
+            turn: 7,
+        };
+        assert_eq!(
+            tables[policy.select_theta_index(&view_lead, &tables)].theta,
+            -0.03
+        );
+
+        // Even → θ = 0
+        let players_even = vec![
+            PlayerState {
+                total_score: 100,
+                ..Default::default()
+            },
+            PlayerState {
+                total_score: 100,
+                ..Default::default()
+            },
+        ];
+        let view_even = GameView {
+            my_index: 1,
+            players: &players_even,
+            turn: 7,
+        };
+        assert_eq!(
+            tables[policy.select_theta_index(&view_even, &tables)].theta,
+            0.0
+        );
     }
 
     #[test]

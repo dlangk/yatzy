@@ -74,9 +74,7 @@ In no-bonus games, the solver fills lower-section categories earlier (Small Stra
 The four-component mixture model can be written as:
 
 :::equation
-<var>f</var>(<var>x</var>) = &sum;<sub><var>i</var>=1</sub><sup>4</sup>
-&pi;<sub><var>i</var></sub> &middot;
-&phi;(<var>x</var>; &mu;<sub><var>i</var></sub>, &sigma;<sub><var>i</var></sub>)
+f(x) = \sum_{i=1}^{4} \pi_{i} \cdot \phi(x;\, \mu_{i},\, \sigma_{i})
 :::
 
 where the mixing weights &pi;<sub><var>i</var></sub> are determined by the

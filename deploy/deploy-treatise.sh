@@ -24,7 +24,13 @@ rsync -az --delete \
   --exclude='sections/*.md' \
   "$PROJECT_ROOT/treatise/" \
   "$SERVER_USER@$SERVER_HOST:/home/$SERVER_USER/yatzy-treatise/"
-echo "✓ Synced"
+
+# Sync shared/ into treatise volume so /shared/dice.js resolves at root
+rsync -az \
+  -e "ssh -i $SSH_KEY" \
+  "$PROJECT_ROOT/shared/" \
+  "$SERVER_USER@$SERVER_HOST:/home/$SERVER_USER/yatzy-treatise/shared/"
+echo "✓ Synced (including shared/)"
 
 # Health check
 echo "── Health check"

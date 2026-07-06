@@ -49,6 +49,9 @@ deploy/build/
 # Overhaul artifacts (historical)
 .overhaul/
 
+# Vite cache
+.vite/
+
 # Environment
 .env
 *.log

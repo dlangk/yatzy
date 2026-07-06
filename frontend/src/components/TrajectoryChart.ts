@@ -15,7 +15,7 @@
 import * as d3 from 'd3';
 import { getState, subscribe } from '../store.ts';
 import type { TrajectoryPoint } from '../types.ts';
-import { COLORS } from '../constants.ts';
+import { COLORS, getColors } from '../constants.ts';
 import { emitHover, onHover } from '../hoverBus.ts';
 
 const WIDTH = 568;
@@ -33,6 +33,10 @@ const EVENT_COLORS: Record<string, string> = {
   reroll: COLORS.blue,
   score: COLORS.success,
 };
+
+function eventColor(event: string): string {
+  return event === 'roll' || event === 'reroll' ? COLORS.blue : getColors().success;
+}
 
 const EVENT_LABELS: Record<string, string> = {
   start: 'Start',
@@ -118,11 +122,11 @@ function buildLegend(container: HTMLElement): void {
       label: 'P10–P90',
     },
     {
-      svg: `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="3.5" fill="${COLORS.success}" stroke="${COLORS.bg}" stroke-width="1"/></svg>`,
+      svg: `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="3.5" fill="${COLORS.success}" stroke="transparent" stroke-width="1"/></svg>`,
       label: 'Score Category',
     },
     {
-      svg: `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="3.5" fill="${COLORS.blue}" stroke="${COLORS.bg}" stroke-width="1"/></svg>`,
+      svg: `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="3.5" fill="${COLORS.blue}" stroke="transparent" stroke-width="1"/></svg>`,
       label: 'Dice Roll',
     },
   ];
@@ -149,11 +153,8 @@ export function initTrajectoryChart(container: HTMLElement): void {
     .attr('viewBox', `0 0 ${WIDTH} ${HEIGHT}`)
     .attr('preserveAspectRatio', 'xMidYMid meet');
 
-  // Background
-  svg.append('rect')
-    .attr('width', WIDTH)
-    .attr('height', HEIGHT)
-    .attr('fill', COLORS.bgPanel);
+  // Background — handled by CSS on the wrapper (.trajectory-chart background-color: var(--bg-alt))
+  // SVG itself is transparent so the CSS theme variable applies automatically.
 
   // Clip path for plot area
   svg.append('defs')
@@ -179,7 +180,7 @@ export function initTrajectoryChart(container: HTMLElement): void {
   // Hover elements — crosshair line and highlight circle (hidden by default)
   const hoverG = svg.append('g').attr('class', 'hover').style('display', 'none');
   const crosshairLine = hoverG.append('line')
-    .attr('stroke', COLORS.textMuted)
+    .attr('stroke', getColors().textMuted)
     .attr('stroke-width', 1)
     .attr('stroke-dasharray', '3,3')
     .attr('y1', MARGIN.top)
@@ -209,7 +210,7 @@ export function initTrajectoryChart(container: HTMLElement): void {
     .attr('x', WIDTH / 2)
     .attr('y', HEIGHT / 2)
     .attr('text-anchor', 'middle')
-    .attr('fill', COLORS.textMuted)
+    .attr('fill', getColors().textMuted)
     .attr('font-size', 12)
     .attr('font-family', 'monospace')
     .text('Expected Score Trajectory');
@@ -240,23 +241,24 @@ export function initTrajectoryChart(container: HTMLElement): void {
     highlightCircle
       .attr('cx', px)
       .attr('cy', py)
-      .attr('stroke', EVENT_COLORS[p.event] || COLORS.text);
+      .attr('stroke', EVENT_COLORS[p.event] || getColors().text);
 
+    const tc = getColors();
     const eventLabel = EVENT_LABELS[p.event] || p.event;
     let html = `<div><b>Turn ${p.turn} — ${eventLabel}</b></div>`;
     html += `<div>E[final]: ${p.expectedFinal.toFixed(1)}</div>`;
     html += `<div>Accumulated: ${p.accumulatedScore}</div>`;
     if (p.delta !== undefined) {
       const sign = p.delta >= 0 ? '+' : '';
-      const color = p.delta >= 0 ? COLORS.success : COLORS.danger;
+      const color = p.delta >= 0 ? tc.success : tc.danger;
       html += `<div style="color:${color}">Delta: ${sign}${p.delta.toFixed(1)}</div>`;
     }
     if (p.label) {
-      html += `<div style="color:${COLORS.textMuted}">${p.label}</div>`;
+      html += `<div style="color:${tc.textMuted}">${p.label}</div>`;
     }
     if (p.percentiles) {
       const pct = p.percentiles;
-      html += `<div style="color:${COLORS.textMuted};margin-top:2px;font-size:0.9em">`;
+      html += `<div style="color:${tc.textMuted};margin-top:2px;font-size:0.9em">`;
       html += `p10–p90: ${Math.round(pct.p10)}–${Math.round(pct.p90)}`;
       html += `<br>p1–p99: ${Math.round(pct.p1)}–${Math.round(pct.p99)}`;
       html += `</div>`;
@@ -352,6 +354,8 @@ export function initTrajectoryChart(container: HTMLElement): void {
       yTicks.push(v);
     }
 
+    const c = getColors();
+
     gridG.selectAll('line')
       .data(yTicks)
       .join('line')
@@ -359,7 +363,7 @@ export function initTrajectoryChart(container: HTMLElement): void {
       .attr('x2', WIDTH - MARGIN.right)
       .attr('y1', d => y(d))
       .attr('y2', d => y(d))
-      .attr('stroke', COLORS.borderPanel)
+      .attr('stroke', c.borderPanel)
       .attr('stroke-width', 0.5);
 
     // Y-axis labels
@@ -369,7 +373,7 @@ export function initTrajectoryChart(container: HTMLElement): void {
       .attr('x', MARGIN.left - 4)
       .attr('y', d => y(d) + 3)
       .attr('text-anchor', 'end')
-      .attr('fill', COLORS.textMuted)
+      .attr('fill', c.textMuted)
       .attr('font-size', 10)
       .attr('font-family', 'monospace')
       .text(d => String(Math.round(d)));
@@ -382,7 +386,7 @@ export function initTrajectoryChart(container: HTMLElement): void {
       .attr('x', d => x(d))
       .attr('y', HEIGHT - 8)
       .attr('text-anchor', 'middle')
-      .attr('fill', COLORS.textMuted)
+      .attr('fill', c.textMuted)
       .attr('font-size', 10)
       .attr('font-family', 'monospace')
       .text(d => String(d));
@@ -454,9 +458,15 @@ export function initTrajectoryChart(container: HTMLElement): void {
       .attr('cx', d => getX(d))
       .attr('cy', d => y(d.expectedFinal))
       .attr('r', d => d.event === 'score' ? 4 : 3)
-      .attr('fill', d => EVENT_COLORS[d.event] || COLORS.text)
-      .attr('stroke', COLORS.bg)
+      .attr('fill', d => eventColor(d.event))
+      .attr('stroke', c.bg)
       .attr('stroke-width', 1);
+  }
+
+  function refreshStaticColors() {
+    const c = getColors();
+    crosshairLine.attr('stroke', c.textMuted);
+    placeholder.attr('fill', c.textMuted);
   }
 
   render();
@@ -470,6 +480,13 @@ export function initTrajectoryChart(container: HTMLElement): void {
   // Re-render on container resize so hover overlay and legend stay correct
   const ro = new ResizeObserver(() => render());
   ro.observe(wrapper);
+
+  // Re-render on theme change (dark/light toggle updates CSS vars)
+  const themeObserver = new MutationObserver(() => {
+    refreshStaticColors();
+    render();
+  });
+  themeObserver.observe(document.documentElement, { attributeFilter: ['class'] });
 }
 
 function drawBand(

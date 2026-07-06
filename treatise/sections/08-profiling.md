@@ -58,8 +58,7 @@ The cognitive model defines action probabilities via a softmax over modified
 Q-values:
 
 :::equation
-P(<var>a</var> | <var>s</var>) &propto;
-exp(&beta; &middot; <var>Q</var><sub>&theta;,&gamma;,<var>d</var></sub>(<var>a</var>, <var>s</var>))
+P(a \mid s) \propto \exp(\beta \cdot Q_{\theta, \gamma, d}(a, s))
 :::
 
 The parameter &theta; selects which pre-computed strategy table (state values)

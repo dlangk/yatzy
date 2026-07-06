@@ -54,6 +54,11 @@ path = "src/bin/frontier_test.rs"
 required-features = ["full"]
 
 [[bin]]
+name = "yatzy-clairvoyant"
+path = "src/bin/clairvoyant.rs"
+required-features = ["full"]
+
+[[bin]]
 name = "yatzy-winrate"
 path = "src/bin/winrate.rs"
 required-features = ["full"]
