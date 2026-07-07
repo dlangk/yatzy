@@ -6,7 +6,12 @@ const cache = new Map();
 
 async function load(name) {
   if (cache.has(name)) return cache.get(name);
-  const resp = await fetch(`data/${name}`);
+  // Bypass the HTTP cache. Charts lazy-load on scroll, so these fetches run
+  // after page load and would otherwise reuse a stale cache entry. During the
+  // window when a data file was briefly missing, nginx's SPA fallback returned
+  // 200 + index.html, which browsers cached as HTML under the .json URL;
+  // `cache: 'reload'` forces a fresh network fetch so we never parse that HTML.
+  const resp = await fetch(`data/${name}`, { cache: 'reload' });
   if (!resp.ok) throw new Error(`Failed to load data/${name}: ${resp.status}`);
   const data = await resp.json();
   cache.set(name, data);
