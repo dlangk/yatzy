@@ -51,7 +51,7 @@ Three patterns are visible:
 
 **First** of all, the bonus row dominates. Bonus correlates with Sixes (+0.33), then Fives (+0.26), Fours (+0.22), and so on in value order. The bonus also correlates with lower-section categories. We know that the zero rate for Four of a Kind (+0.14) drops from 48% to 27% in games that secure the bonus. This is explained by the solver scoring zero in this category more often when still chasing the upper section bonus. In no-bonus games the solver fills Chance earlier (mean turn 7.3 vs 8.5) as a dump for mediocre rolls while still chasing upper categories. In bonus games, Chance can wait for a better roll.
 
-**Second**, every upper-upper category pair shows negative correlation. The explanation for this is that upper categories compete for turns. If the solver spends an early turn scoring Sixes, that is one fewer turn available to retry Ones. Since the solver prioritizes high-value categories, the low-value ones get whatever is left. In general, the further apart two categories are in value, the stronger the tradeoff (for example, Ones-Sixes at -0.12 vs Ones-Twos at -0.04), though this is not perfectly monotonic across all pairs.
+**Second**, every pair of two upper-section categories shows negative correlation. The explanation for this is that upper categories compete for turns. If the solver spends an early turn scoring Sixes, that is one fewer turn available to retry Ones. Since the solver prioritizes high-value categories, the low-value ones get whatever is left. In general, the further apart two categories are in value, the stronger the tradeoff (for example, Ones-Sixes at -0.12 vs Ones-Twos at -0.04), though this is not perfectly monotonic across all pairs.
 
 **Third**, Yatzy is uncorrelated with almost everything. Hitting or missing Yatzy tells you essentially nothing about the rest of your game. It is a pure lottery ticket.
 
@@ -63,11 +63,11 @@ The next chart shows when each category gets filled.
 </div>
 :::
 
-High-value upper categories, like Sixes, Fives and Fours, tend to be filled early, while Ones and Twos are deferred. Lower-section categories are bimodal: Two Pairs and Full House peak at turn 1 (grab them if you get them), while Four of a Kind and Large Straight peak at turn 15 (last resort).
+High-value upper categories, like Sixes, Fives and Fours, tend to be filled early, while Ones and Twos are deferred. Lower-section categories are bimodal: Two Pairs and Full House peak at turn 1 (score them if you get them), while Four of a Kind and Large Straight peak at turn 15 (last resort).
 
-The toggle reveals that what looks like one strategy is actually two different games superimposed. Since ~90% of games hit the bonus, the "Bonus scored" view is nearly identical to "All games." The real information is in "Bonus missed."
+The toggle shows that what looks like one strategy is actually two different game-types superimposed. Since ~90% of games hit the bonus, the "Bonus scored" view is nearly identical to "All games." The games that miss the bonus, however, are markedly different.
 
-In no-bonus games, the solver fills lower-section categories earlier (Small Straight shifts from mean turn 8.4 to 6.5, One Pair from 7.3 to 6.1) to free up late turns for upper-section retries. The result: turn 15 belongs exclusively to upper categories (Sixes 24%, Fives 19%, Fours 19%), and the bonus row spikes to 93% at turn 15. These are not zero dumps. Sixes scored on turn 15 in no-bonus games average 9.5 points with only a 9% zero rate. The solver was genuinely trying to score well on these categories the whole game; the dice just never cooperated, so the upper categories kept getting pushed later until one landed on the final turn.
+In no-bonus games, the solver fills lower-section categories earlier (Small Straight changes from mean turn 8.4 to 6.5, One Pair from 7.3 to 6.1) to free up late turns for upper-section retries. The result: turn 15 belongs exclusively to upper categories (Sixes 24%, Fives 19%, Fours 19%), and the bonus row spikes to 93% at turn 15. The solver sacrifices lower-section categories like crazy to get the bonus. Sixes scored on turn 15 in no-bonus games average 9.5 points with only a 9% zero rate. The solver is trying to score well on upper categories the whole game; the dice just never cooperated, so the upper categories kept getting pushed later.
 
 :::math
 
