@@ -406,22 +406,26 @@ def build_cfg_regret_matrix(
     num_actions = len(actions)
     n = len(features)
     all_dice = reconstruct_all_dice(features)
-    cfg_regret = np.full((n, num_actions), 999.0, dtype=np.float32)
+    ncols = bitmask_regret.shape[1]
 
-    for i in range(n):
-        dice_i = all_dice[i]
+    # cfg_to_bitmask depends only on the SORTED dice pattern, of which there are
+    # at most 252. Compute the (pattern, action) mask table once over unique
+    # patterns instead of once per record — collapses ~16M Python calls
+    # (200k records x 80 actions) to <=252 x 80. Everything else is vectorized.
+    uniq, inverse = np.unique(all_dice, axis=0, return_inverse=True)
+    uniq_masks = np.empty((len(uniq), num_actions), dtype=np.int64)
+    for u in range(len(uniq)):
+        du = uniq[u]
         for a in range(num_actions):
-            mask = cfg_to_bitmask(dice_i, actions[a])
-            if mask == -1:
-                continue
-            if mask >= bitmask_regret.shape[1]:
-                continue
-            val = bitmask_regret[i, mask]
-            if val <= -1e30:
-                continue
-            cfg_regret[i, a] = val
+            uniq_masks[u, a] = cfg_to_bitmask(du, actions[a])
 
-    return cfg_regret
+    rec_masks = uniq_masks[inverse]  # (n, num_actions), values in [-1, ncols) or bad
+    valid = (rec_masks >= 0) & (rec_masks < ncols)
+    safe = np.where(valid, rec_masks, 0)
+    rows = np.arange(n)[:, None]
+    vals = bitmask_regret[rows, safe]  # (n, num_actions)
+    take = valid & (vals > -1e30)
+    return np.where(take, vals, 999.0).astype(np.float32)
 
 
 # ── Rule induction (vectorized) ──────────────────────────────────────────
@@ -538,24 +542,23 @@ def _best_action_for_masked(
         return 0, float("inf")
 
     if semantic:
-        # Regret-minimizing: for each action, compute mean of valid regrets
-        best_action = 0
-        best_mean = float("inf")
+        # Regret-minimizing: mean valid regret per action, vectorized over all
+        # actions at once (replaces an 80-iteration Python loop that ran ~80k
+        # times). require >=50% valid per action.
         subset_regret = regret[mask]  # (n_match, num_actions)
-        for a in range(num_actions):
-            col = subset_regret[:, a]
-            valid = col < 998.0  # 999.0 = invalid
-            valid_count = int(valid.sum())
-            if valid_count < n * 0.5:
-                continue  # require ≥50% valid
-            mean_reg = float(col[valid].mean())
-            # Resource-rational: penalize complexity
-            if lam > 0 and actions is not None:
-                mean_reg += lam * actions[a].complexity
-            if mean_reg < best_mean:
-                best_mean = mean_reg
-                best_action = a
-        if best_mean == float("inf"):
+        valid = subset_regret < 998.0  # 999.0 = invalid
+        vcount = valid.sum(axis=0)  # (num_actions,)
+        vsum = np.where(valid, subset_regret, 0.0).sum(axis=0)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            means = vsum / vcount
+        means[vcount < n * 0.5] = np.inf
+        if lam > 0 and actions is not None:
+            means = means + lam * np.array(
+                [a.complexity for a in actions], dtype=np.float64
+            )
+        best_action = int(np.argmin(means))
+        best_mean = float(means[best_action])
+        if not np.isfinite(best_mean):
             return 0, float("inf")
         return best_action, best_mean
     else:

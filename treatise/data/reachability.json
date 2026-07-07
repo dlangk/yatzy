@@ -1,0 +1,84 @@
+{
+  "by_popcount": [
+    {
+      "popcount": 0,
+      "total": 64,
+      "reachable": 1
+    },
+    {
+      "popcount": 1,
+      "total": 960,
+      "reachable": 45
+    },
+    {
+      "popcount": 2,
+      "total": 6720,
+      "reachable": 756
+    },
+    {
+      "popcount": 3,
+      "total": 29120,
+      "reachable": 5932
+    },
+    {
+      "popcount": 4,
+      "total": 87360,
+      "reachable": 27224
+    },
+    {
+      "popcount": 5,
+      "total": 192192,
+      "reachable": 82211
+    },
+    {
+      "popcount": 6,
+      "total": 320320,
+      "reachable": 174355
+    },
+    {
+      "popcount": 7,
+      "total": 411840,
+      "reachable": 269592
+    },
+    {
+      "popcount": 8,
+      "total": 411840,
+      "reachable": 310209
+    },
+    {
+      "popcount": 9,
+      "total": 320320,
+      "reachable": 267883
+    },
+    {
+      "popcount": 10,
+      "total": 192192,
+      "reachable": 173274
+    },
+    {
+      "popcount": 11,
+      "total": 87360,
+      "reachable": 82860
+    },
+    {
+      "popcount": 12,
+      "total": 29120,
+      "reachable": 28486
+    },
+    {
+      "popcount": 13,
+      "total": 6720,
+      "reachable": 6677
+    },
+    {
+      "popcount": 14,
+      "total": 960,
+      "reachable": 959
+    },
+    {
+      "popcount": 15,
+      "total": 64,
+      "reachable": 64
+    }
+  ]
+}

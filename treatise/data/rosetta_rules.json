@@ -1,0 +1,124 @@
+{
+  "rules": [
+    {
+      "rank": 1,
+      "action": "Four of a Kind",
+      "category": "combo",
+      "regret": 2.5904,
+      "condition": "best_available_score >= 22",
+      "coverage": 968
+    },
+    {
+      "rank": 2,
+      "action": "Twos",
+      "category": "upper",
+      "regret": 2.5368,
+      "condition": "bonus_pace >= 1.5",
+      "coverage": 174
+    },
+    {
+      "rank": 3,
+      "action": "Four of a Kind",
+      "category": "combo",
+      "regret": 2.5104,
+      "condition": "dice_sum >= 26",
+      "coverage": 219
+    },
+    {
+      "rank": 4,
+      "action": "Four of a Kind",
+      "category": "combo",
+      "regret": 2.043,
+      "condition": "best_available_score >= 26",
+      "coverage": 437
+    },
+    {
+      "rank": 5,
+      "action": "Large Straight",
+      "category": "combo",
+      "regret": 1.7629,
+      "condition": "bonus_pace <= 1.2381 AND categories_left == 6",
+      "coverage": 247
+    },
+    {
+      "rank": 6,
+      "action": "Large Straight",
+      "category": "combo",
+      "regret": 1.5201,
+      "condition": "upper_score <= 42",
+      "coverage": 871
+    },
+    {
+      "rank": 7,
+      "action": "Four of a Kind",
+      "category": "combo",
+      "regret": 1.5011,
+      "condition": "face_count_5 >= 3 AND NOT cat_avail_ones",
+      "coverage": 1276
+    },
+    {
+      "rank": 8,
+      "action": "Large Straight",
+      "category": "combo",
+      "regret": 1.4378,
+      "condition": "bonus_pace <= 1.2381 AND zeros_available >= 4",
+      "coverage": 250
+    },
+    {
+      "rank": 9,
+      "action": "Small Straight",
+      "category": "combo",
+      "regret": 1.4094,
+      "condition": "NOT has_four_of_kind AND cat_avail_small_straight",
+      "coverage": 8188
+    },
+    {
+      "rank": 10,
+      "action": "Four of a Kind",
+      "category": "combo",
+      "regret": 1.3877,
+      "condition": "categories_left == 5 AND dice_sum >= 23",
+      "coverage": 246
+    },
+    {
+      "rank": 11,
+      "action": "Twos",
+      "category": "upper",
+      "regret": 1.1946,
+      "condition": "best_available_score >= 3 AND upper_score >= 60",
+      "coverage": 504
+    },
+    {
+      "rank": 12,
+      "action": "Ones",
+      "category": "upper",
+      "regret": 1.1737,
+      "condition": "cat_avail_sixes",
+      "coverage": 174
+    },
+    {
+      "rank": 13,
+      "action": "Ones",
+      "category": "upper",
+      "regret": 1.0976,
+      "condition": "upper_cats_left >= 3 AND face_count_2 == 0",
+      "coverage": 491
+    },
+    {
+      "rank": 14,
+      "action": "Large Straight",
+      "category": "combo",
+      "regret": 1.0455,
+      "condition": "upper_cats_left <= 3 AND bonus_pace <= 1.0238",
+      "coverage": 250
+    },
+    {
+      "rank": 15,
+      "action": "Ones",
+      "category": "upper",
+      "regret": 0.954,
+      "condition": "num_distinct >= 5",
+      "coverage": 250
+    }
+  ]
+}

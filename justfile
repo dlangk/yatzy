@@ -284,6 +284,14 @@ test-all:
 build-treatise:
     cd treatise && npm run build
 
+# Verify every data file the treatise charts reference exists (run before deploy)
+check-treatise-data:
+    node treatise/scripts/check-data.mjs
+
+# Regenerate ALL treatise chart data from scratch (density + skill-ladder dominate)
+regen-treatise-data:
+    bash treatise/scripts/regen-all-data.sh
+
 # Production build
 build:
     cd solver && cargo build --release

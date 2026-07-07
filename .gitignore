@@ -7,6 +7,14 @@ data/
 # Outputs (cheap to regenerate)
 outputs/
 
+# Exception: treatise chart data is small, committed site source (NOT the
+# expensive top-level data/). The broad `data/` rule above also matches
+# `treatise/data/`, so re-include it explicitly. Keeping these in git means a
+# fresh clone renders every chart without re-running the pipeline. Regenerate
+# with `just regen-treatise-data`; verify completeness with `just check-treatise-data`.
+!treatise/data/
+!treatise/data/**
+
 # Python virtualenvs
 .venv/
 analytics/.venv/

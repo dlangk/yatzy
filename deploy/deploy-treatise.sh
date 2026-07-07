@@ -8,6 +8,13 @@ SSH_KEY="$HOME/.ssh/id_ed25519"
 
 echo "=== Treatise Deploy ==="
 
+# Guard: refuse to deploy an incomplete data set. Because the rsync below
+# uses --delete, a working tree missing generated data files would wipe them
+# from the server. Regenerate with `just regen-treatise-data` first.
+echo "── Checking data completeness"
+node "$PROJECT_ROOT/treatise/scripts/check-data.mjs"
+echo "✓ Data complete"
+
 # Build markdown → HTML
 echo "── Building treatise"
 cd "$PROJECT_ROOT/treatise"

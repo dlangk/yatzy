@@ -1,0 +1,4 @@
+{
+  "placeholder": true,
+  "note": "Illustrative manifold. Real UMAP embeddings require the joint-manifold ML pipeline (research/rosetta/joint_manifold.py + umap-learn), which emits a PNG, not this JSON. The chart renders default clusters with a PLACEHOLDER watermark until a real embeddings export exists."
+}

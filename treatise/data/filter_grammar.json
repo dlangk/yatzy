@@ -1,0 +1,159 @@
+{
+  "actions": [
+    {
+      "action": "Face(6)",
+      "reroll1_rules": 19,
+      "reroll2_rules": 5
+    },
+    {
+      "action": "Union(Face(5),Face(6))",
+      "reroll1_rules": 17,
+      "reroll2_rules": 4
+    },
+    {
+      "action": "Face(5)",
+      "reroll1_rules": 8,
+      "reroll2_rules": 9
+    },
+    {
+      "action": "KeepAll",
+      "reroll1_rules": 4,
+      "reroll2_rules": 13
+    },
+    {
+      "action": "Union(Face(6),Triple)",
+      "reroll1_rules": 4,
+      "reroll2_rules": 9
+    },
+    {
+      "action": "MaxGroup",
+      "reroll1_rules": 8,
+      "reroll2_rules": 5
+    },
+    {
+      "action": "Union(Pair,Triple)",
+      "reroll1_rules": 6,
+      "reroll2_rules": 6
+    },
+    {
+      "action": "Face(3)",
+      "reroll1_rules": 7,
+      "reroll2_rules": 4
+    },
+    {
+      "action": "Triple",
+      "reroll1_rules": 0,
+      "reroll2_rules": 10
+    },
+    {
+      "action": "Face(4)",
+      "reroll1_rules": 6,
+      "reroll2_rules": 3
+    },
+    {
+      "action": "Face(2)",
+      "reroll1_rules": 2,
+      "reroll2_rules": 4
+    },
+    {
+      "action": "Pair",
+      "reroll1_rules": 0,
+      "reroll2_rules": 6
+    },
+    {
+      "action": "Union(Face(6),MaxGroup)",
+      "reroll1_rules": 0,
+      "reroll2_rules": 6
+    },
+    {
+      "action": "Seq",
+      "reroll1_rules": 5,
+      "reroll2_rules": 0
+    },
+    {
+      "action": "Face(1)",
+      "reroll1_rules": 1,
+      "reroll2_rules": 4
+    },
+    {
+      "action": "Union(Face(5),Pair)",
+      "reroll1_rules": 3,
+      "reroll2_rules": 0
+    },
+    {
+      "action": "Union(Face(5),Seq)",
+      "reroll1_rules": 3,
+      "reroll2_rules": 0
+    },
+    {
+      "action": "Union(Face(3),Triple)",
+      "reroll1_rules": 1,
+      "reroll2_rules": 1
+    },
+    {
+      "action": "Union(Face(4),Face(6))",
+      "reroll1_rules": 1,
+      "reroll2_rules": 1
+    },
+    {
+      "action": "Union(Triple,Seq)",
+      "reroll1_rules": 0,
+      "reroll2_rules": 2
+    },
+    {
+      "action": "Union(Face(5),MaxGroup)",
+      "reroll1_rules": 1,
+      "reroll2_rules": 1
+    },
+    {
+      "action": "Union(Face(2),Triple)",
+      "reroll1_rules": 1,
+      "reroll2_rules": 1
+    },
+    {
+      "action": "Union(MaxGroup,Seq)",
+      "reroll1_rules": 0,
+      "reroll2_rules": 1
+    },
+    {
+      "action": "Union(Face(4),Pair)",
+      "reroll1_rules": 0,
+      "reroll2_rules": 1
+    },
+    {
+      "action": "RerollAll",
+      "reroll1_rules": 1,
+      "reroll2_rules": 0
+    },
+    {
+      "action": "Union(Face(4),Triple)",
+      "reroll1_rules": 0,
+      "reroll2_rules": 1
+    },
+    {
+      "action": "Union(Face(6),Seq)",
+      "reroll1_rules": 1,
+      "reroll2_rules": 0
+    },
+    {
+      "action": "Union(Face(5),High(2))",
+      "reroll1_rules": 0,
+      "reroll2_rules": 1
+    },
+    {
+      "action": "Union(Seq,High(1))",
+      "reroll1_rules": 1,
+      "reroll2_rules": 0
+    },
+    {
+      "action": "Union(MaxGroup,Pair)",
+      "reroll1_rules": 0,
+      "reroll2_rules": 1
+    },
+    {
+      "action": "Union(Face(6),Pair)",
+      "reroll1_rules": 0,
+      "reroll2_rules": 1
+    }
+  ]
+}

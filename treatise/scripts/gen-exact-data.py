@@ -117,8 +117,11 @@ def main():
     print(f"  → {out}")
 
     # --- Sweep summary (exact stats) ---
-    # Keep existing entries for thetas outside slider range, update slider range
-    existing = json.load(open(TREATISE_DATA / "sweep_summary.json"))
+    # Keep existing entries for thetas outside slider range, update slider range.
+    # On a fresh checkout there is no seed file yet; start empty and build purely
+    # from the exact density (every theta the charts need is a slider theta).
+    sweep_path = TREATISE_DATA / "sweep_summary.json"
+    existing = json.load(open(sweep_path)) if sweep_path.exists() else []
     existing_map = {round(d["theta"], 4): d for d in existing}
 
     for theta in SLIDER_THETAS:
