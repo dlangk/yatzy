@@ -6,11 +6,13 @@ const cache = new Map();
 
 async function load(name) {
   if (cache.has(name)) return cache.get(name);
-  // Default caching: nginx serves data/ with `Cache-Control: no-cache,
-  // must-revalidate`, so the browser revalidates (cheap 304, reuses the cached
-  // body) and always gets current data. Missing files 404 instead of returning
-  // index.html, so a .json URL can never be cached as HTML. See deploy/nginx.conf.
-  const resp = await fetch(`data/${name}`);
+  // Revalidate on every load. `no-cache` sends a conditional request: the
+  // server answers 304 (unchanged) and the browser reuses the cached body, so
+  // we get efficient caching (no 3.4 MB re-download) while always seeing current
+  // data. It also cures the earlier cache poisoning: charts lazy-load on scroll,
+  // and during the outage a missing file's SPA fallback (200 + index.html) got
+  // cached as HTML under the .json URL; revalidation replaces that with real JSON.
+  const resp = await fetch(`data/${name}`, { cache: 'no-cache' });
   if (!resp.ok) throw new Error(`Failed to load data/${name}: ${resp.status}`);
   const data = await resp.json();
   cache.set(name, data);
