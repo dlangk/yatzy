@@ -2,7 +2,7 @@
 
 ## Taking Risk
 
-We defined the optimal strategy as "maximize the expected score." Such a strategy will get the highest possible *average* score. But, reality is, most people don't play Yatzy to get a good average. We like to play to win! We all remember that one time when all stars aligned and we got 322 points, and want to experience it again! So, in that spirit, let's see if we can design a solver that takes more risk.
+We defined the optimal strategy as "maximize the expected score." Such a strategy will get the highest possible *average* score. But, reality is, most people don't play Yatzy to get a good average. We like to play to win! 😜 We all remember that one time when all stars aligned and we got 322 points, and want to experience it again! So, in that spirit, let's see if we can design a solver that takes more risk.
 
 **How can we encode risk-taking?** An expected value is calculated as the probability weighted sum E[<var>x</var>] = &Sigma;<sub>i</sub> <var>p(x<sub>i</sub>)</var> &middot; <var>x</var><sub>i</sub>. That means all scores are treated equally: going from 200 to 201 is worth exactly as much as going from 300 to 301. To make the solver care more about high scores, we transform each score using e<sup>&theta;<var>x</var></sup> before averaging. A single parameter &theta; (theta) controls the shape of this transformation. Use the slider to see: when &theta; &gt; 0, points at high scores are worth exponentially more; when &theta; &lt; 0, points at low scores dominate. At &theta; = 0, the transformation is flat and we recover the plain expected value.
 
@@ -19,7 +19,7 @@ We defined the optimal strategy as "maximize the expected score." Such a strateg
 
 **Think of &theta; as a risk-dial.** Turn it right and the solver takes larger risks chasing a legendary score. Turn it left and it plays like someone who really, really doesn't want to embarrass themselves. At zero, it plays for the best *average* outcome. The solver's willingness to gamble depends only on &theta; and the specific dice situation, never on how many points have been scored so far. Whether you're at 50 or 150 going into a round, the same &theta; produces the same risk attitude.
 
-Use the slider below to see how the score distribution changes across the &theta; range. At &theta; = 0 the EV-optimal distribution is shown. As you decrease &theta; the distribution compresses with lower mean and less variance. As &theta; is increased, variance increases, pushing the tails outward before collapsing at extreme values. The tail probabilities displayed below the curve show how outcomes for different score thresholds compare to &theta; = 0. The ::concept[mean-variance frontier]{free-energy} at the bottom traces where each &theta; lands in risk-return space.
+**Use the slider below to see how the score distribution changes across the &theta; range.** At &theta; = 0 the EV-optimal distribution is shown. As you decrease &theta; the distribution compresses with lower mean and less variance. As &theta; is increased, variance increases, pushing the tails outward before collapsing at extreme values. The tail probabilities displayed below the curve show how outcomes for different score thresholds compare to &theta; = 0. The ::concept[mean-variance frontier]{free-energy} at the bottom traces where each &theta; lands in risk-return space.
 
 :::html
 <div class="chart-container" id="chart-risk-theta">
@@ -34,7 +34,7 @@ Use the slider below to see how the score distribution changes across the &theta
 </div>
 :::
 
-In the chart below you see what &theta; is optimal for different percentiles. One conclusion is that a sligth increase in risk-taking might be worth it for most players. p75 is bumped a few points for &theta; = 0.04. At that level, you are 20% more likely to get a score above 310, but only pay 
+**In the chart below you see what &theta; is optimal for different percentiles.** One conclusion is that a sligth increase in risk-taking might be worth it for most players. p75 is bumped a few points for &theta; = 0.04. At that level, you are 20% more likely to get a score above 310, but only pay a small price for it in the form of a slightly lower mean score.
 
 :::html
 <div class="chart-container" id="chart-risk-reward">
@@ -51,6 +51,8 @@ In the chart below you see what &theta; is optimal for different percentiles. On
 ### The Extreme Tail
 
 The solver computes the *exact* probability of every possible final score via forward dynamic programming density propagation. This let's us model things far beyond what we can afford to simulate. The charts below show the right tail of the distribution (scores 280+) for several &theta; values, using exact probabilities down to 10<sup>&minus;15</sup>.
+
+Here's some help on how to read the graph below: The x-axis is the target score. The y-axis shows how many games you need to play to reach that score for a certain theta. As you can see, theta = 0.5 is "worse", i.e. requires more games, to reach scores up to 333. It's only the best policy when targeting scores of 348 and above. The only problem with this insight is that it only matters if you are able to play around 2000 games, and it then shows up as a single, mindblowing score.
 
 :::html
 <div class="chart-container" id="chart-tail-games-needed">

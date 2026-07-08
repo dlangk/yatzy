@@ -2,9 +2,11 @@
 
 ## Multiplayer and Adaptive Strategies
 
-I think very few people play Yatzy by themselves 😅 But, even if you play with others, you likely make decisions as if you played alone. That makes sense. Two parallel Yatzy games are independent. The dice you roll do not affect the dice your opponents roll. You cannot do anything about the other players game.
+I think very few people play Yatzy by themselves 😅 It's possible I have during the course of this porject, but let's not talk about that.
 
-But, it turns out, sequential play introduces a slight asymmetry. Let's assume standard format two player Yatzy. Player 1 goes first, Player 2 goes second. Each player takes turn, and after 15 turns, the game is over. This step gives Player 2 the ability to observe Player 1's score, categories and upper-section progress before making decisions.
+But, even if you (like other sane people) mostly play with others, you likely make decisions *as if you played alone*. That makes sense. Two parallel Yatzy games are independent. The dice you roll do not affect the dice your opponents roll. You cannot do anything about the other players game.
+
+But, it turns out, sequential play introduces a slight asymmetry. Let's assume standard format two player Yatzy. Player 1 goes first, Player 2 goes second. Each player takes turn, and after 15 turns, the game is over. This setup gives Player 2 the ability to observe Player 1's score, category and upper-section progress before making decisions.
 
 The obvious question then becomes: Can Player 2 use their knowledge of Player 1's game to improve their probability of *winning*?
 
@@ -27,25 +29,25 @@ In practice, Player 2 does not know the opponent's final score. Player 2 can onl
 
 ### Why Variance Matters
 
-My first intuition was to scale risk (&theta;) linearly with the EV deficit. But a 15-point deficit at turn 2 is noise: there are 13 turns of dice rolls left, each adding uncertainty. The same deficit at turn 14 is an emergency. To find the optimal amount of risk, we need to account for how much uncertainty remains.
+My first attempt was to scale risk (&theta;) linearly with the EV deficit, but you quickly realize that a 15-point deficit at turn 2 is just noise. There are 13 turns left, each adding uncertainty, so what we know at that point isn't particularly useful. The same deficit at turn 14, however, is very informative. If there are only one or two turns left, and the only way to win is e.g. getting a Yatzy, then you have nothing to loose from taking risk. So, to find the optimal amount of risk at each turn, we need to account for how much uncertainty remains.
 
-Player 2's goal is not to maximize their own score. It is to maximize P(S<sub>2</sub> &gt; S<sub>1</sub>): the probability that their final score exceeds Player 1's. Because 15 turns of dice rolls produce many independent random events, final scores are approximately Gaussian. The *difference* S<sub>2</sub> &minus; S<sub>1</sub> is therefore also Gaussian, with mean E<sub>2</sub> &minus; E<sub>1</sub> and variance V<sub>1</sub> + V<sub>2</sub> (a standard result: variances add when subtracting independent random variables).
+**The key here is realizing that Player 2's goal is not to maximize their own score, or their average score. It is to maximize P(S<sub>2</sub> &gt; S<sub>1</sub>): the probability that their final score exceeds Player 1's.**
+
+Because 15 turns of dice rolls produce many independent random events, final scores are approximately Gaussian. The *difference* S<sub>2</sub> &minus; S<sub>1</sub> is therefore also Gaussian, with mean E<sub>2</sub> &minus; E<sub>1</sub> and variance V<sub>1</sub> + V<sub>2</sub> (a standard result: variances add when subtracting independent random variables).
 
 Player 2 wins when this difference is positive. For a Gaussian, the probability of exceeding zero is entirely determined by the ::concept[Z-score]{z-score}: Z = (E<sub>2</sub> &minus; E<sub>1</sub>) / &radic;(V<sub>1</sub> + V<sub>2</sub>). A higher Z-score means the center of the bell curve is further from the losing side, which means a larger probability of winning. Maximizing the Z-score is therefore identical to maximizing win probability.
 
 Player 2 controls their own expected score and variance by choosing a &theta; table. Taking more risk (higher &theta;) increases variance but reduces expected score. There is a tension: increasing E<sub>2</sub> pushes the numerator up, but if it comes at the cost of inflating V<sub>2</sub>, the denominator grows and the Z-score can actually drop.
 
-The calculus (detailed in the math section below) resolves this tension exactly. By differentiating the Z-score with respect to V<sub>2</sub> and equating the result with the tables' built-in exchange rate between mean and variance (&part;E/&part;V = &minus;&theta;/2), we get:
+The calculus (detailed in the math section below) resolves this. By differentiating the Z-score with respect to V<sub>2</sub> and equating the result with the tables' built-in exchange rate between mean and variance (&part;E/&part;V = &minus;&theta;/2), we get:
 
 :::equation
 \theta^* = \frac{E_1 - E_2}{V_1 + V_2}
 :::
 
-This formula dictates exactly how much risk to take. It is positive when trailing (seek risk), negative when leading (protect), and vanishes when scores are even. Crucially, it scales inversely with remaining uncertainty. Early in the game V<sub>1</sub> + V<sub>2</sub> exceeds 3000, suppressing &theta;* even for large deficits. Late in the game it drops below 500, amplifying small deficits into decisive risk adjustments. If the opponent is on the bubble for the 50-point upper bonus, their remaining variance V<sub>1</sub> is large; the formula commands patience. The moment the opponent locks or fails the bonus, V<sub>1</sub> collapses, &theta;* spikes, and the policy pivots.
+This formula describes exactly how much risk to take. It is positive when trailing (seek risk), negative when leading (protect), and vanishes when scores are even. Crucially, it scales inversely with remaining uncertainty. Early in the game V<sub>1</sub> + V<sub>2</sub> exceeds 3000, suppressing &theta;* even for large deficits. Late in the game it drops below 500, amplifying small deficits into decisive risk adjustments. If the opponent is on the bubble for the 50-point upper bonus, their remaining variance V<sub>1</sub> is large; the formula commands patience. The moment the opponent locks or fails the bonus, V<sub>1</sub> collapses, &theta;* spikes, and the policy pivots.
 
-In contrast, a simple linear policy that ignores variance (setting &theta; proportional to the deficit alone) applies the same risk at turn 2 and turn 14. This is structurally horizon-blind and leaves performance on the table, as the results below confirm.
-
-Use the slider below to see how the same deficit produces different &theta; at different turns. The variance-scaled policy (solid) is conservative early and aggressive late. The linear policy (dashed) applies the same &theta; regardless of turn. The faded line shows unclamped &theta;*, which shoots into the degeneration zone in the final turns.
+Use the slider below to see how the same deficit produces different &theta; at different turns. The variance-scaled policy (solid) is conservative early and aggressive late. The linear policy (dashed) applies the same &theta; regardless of turn. The faded line shows unclamped &theta;*, which becomes completely degenerate towards the later turns.
 
 :::html
 <div class="chart-container" id="chart-risk-horizon">

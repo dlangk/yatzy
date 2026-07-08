@@ -4,11 +4,11 @@
 
 A Yatzy game is a sequence of rolls, keeps, and scoring decisions across fifteen rounds. The total number of possible games is roughly 10<sup>197</sup>. That vastly exceeds the number of atoms in the observable universe, estimated at "only" about 10<sup>80</sup>! 🤯
 
-**How do you solve something that big? You don't.** You find ways to make it smaller. This section walks through five simplifications that shrink the problem from impossibly large to something a laptop can handle in about a second.
+**How do you solve something that big? You don't.** You find ways to make it smaller. This section walks through five simplifications that shrink the problem from impossibly large to something a laptop can handle in an instant.
 
 ### Step 1: Order Doesn't Matter
 
-When you roll five dice, their "order" don't change anything. A roll of ⚂⚄⚁⚅⚃ is the same as ⚁⚂⚃⚄⚅. This immediately means the 7,776 ways to roll five six-sided dice can be collapsed into just 252 unique combinations. These 252 unique rolls can then be grouped into seven patterns. Finally, there are up to 32 ways to choose which dice to keep, depending on the dice pattern. Roll the dice below to explore these patterns:
+When you roll five dice, their "order" doesn't change anything. A roll of ⚂⚄⚁⚅⚃ is the same as ⚁⚂⚃⚄⚅. This immediately means the 7,776 ways to roll five six-sided dice can be collapsed into just 252 unique combinations. These 252 unique rolls can then be grouped into seven patterns. Finally, there are up to 32 ways to choose which dice to keep, depending on the dice pattern. Roll the dice below to explore these patterns:
 
 :::html
 <div class="chart-container" id="chart-dice-symmetry">
@@ -18,7 +18,7 @@ When you roll five dice, their "order" don't change anything. A roll of ⚂⚄�
 
 ### Step 2: Forget the Past
 
-The second big insight is: that (most of) the past doesn't matter. Suppose two games took completely different paths; you scored different categories in different orders, but ended up with the same upper-section total and the same categories remaining. As long as upper-section total and scored categories are the same, the best strategy for the rest of the game is **identical**. All history beyond that is irrelevant. It doesn't matter if you scored a good One Pair or a bad one.
+The second big insight is: (most of) the past doesn't matter. Suppose two games took completely different paths; you scored different categories in different orders, but ended up with the same upper-section total and the same categories remaining. As long as upper-section total and scored categories are the same, the best strategy for the rest of the game is **identical**. All history beyond that is irrelevant. It doesn't matter if you scored a good One Pair or a bad one.
 
 **It doesn't even matter what your total score is.**
 

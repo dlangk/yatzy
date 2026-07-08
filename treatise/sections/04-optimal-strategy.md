@@ -27,11 +27,13 @@ Let's start by looking at the big picture: The score distribution.
 </div>
 :::
 
-It's clearly not a normal distribution. The shape has bumps and shoulders that a single bell curve cannot explain. The reason: four categories in Yatzy are binary. You either score them or you don't, and each one shifts your total by a fixed amount. The upper-section bonus adds 50 points (hit ~90% of the time). Yatzy adds 50 points (~39%). Large Straight adds 20 points (~49%). Small Straight adds 15 points (~26%).
+That's clearly not a normal distribution. The shape has bumps and shoulders that a single bell curve cannot explain. The reason: four categories in Yatzy are binary. You either score them or you don't, and each one shifts your total by a fixed amount. The upper-section bonus adds 50 points (hit ~90% of the time). Yatzy adds 50 points (~39%). Large Straight adds 20 points (~49%). Small Straight adds 15 points (~26%).
 
 These four yes/no events create 16 sub-populations. Each sub-population is roughly Gaussian in its "residual" score (the non-binary categories), centered around 154 to 177 points, then shifted upward by whichever binary events fired. The peaks in the overall distribution appear where multiple sub-populations pile up at similar total scores. For example, the shoulder near 254 is where "Bonus + Large Straight + no Yatzy" (mean 244) overlaps with "Bonus + Small Straight + Large Straight" (mean 262) and "Bonus + Yatzy only" (mean 270). Use the toggles above to isolate each event and see how it splits the distribution.
 
 ### Understanding the Patterns
+
+Inspired by the excellent Hans Rosling, this chart provides a way to understand how different variables are correlated. There are four preconfigured insights, but you can also select whichever combination of variables you want to probe the game dynamics.
 
 :::html
 <div class="chart-container" id="chart-category-landscape">
