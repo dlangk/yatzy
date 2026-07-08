@@ -41,7 +41,14 @@
 
 html {
   font-size: 18px;
-  /* scroll-behavior set dynamically: instant on load, smooth after settling */
+  /* Scrolling stays instant. Anchor jumps (TOC, section headings) are native;
+     a smooth animation drifts because charts lazy-load as it travels the page. */
+}
+
+/* Native offset so anchor jumps clear the fixed top nav (36px) with a little
+   breathing room. Replaces the old JS scroll handler. */
+section[id] {
+  scroll-margin-top: 44px;
 }
 
 body {

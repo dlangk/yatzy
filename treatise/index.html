@@ -113,8 +113,12 @@
     setTimeout(scrollToHash, 300);
     setTimeout(scrollToHash, 800);
   }
-  // Enable smooth scrolling after the page has settled
-  setTimeout(() => { document.documentElement.style.scrollBehavior = 'smooth'; }, 1500);
+  // Scrolling stays instant (scroll-behavior: auto). Anchor jumps to sections
+  // are handled natively: an instant jump teleports without scrolling the
+  // intervening lazy-loaded charts into view, so nothing expands mid-jump and
+  // the target keeps its position. (A smooth animation would drift, because it
+  // travels through the page and triggers those chart loads on the way down.)
+  // The fixed-nav offset is handled by `scroll-margin-top` on sections in CSS.
 
   // Initialize systems
   initReferences();

@@ -17,6 +17,80 @@
   display: block;
 }
 
+/* ───────────────────────────────────────────────────────────────────────────
+   Space reservation for lazy-rendered charts.
+
+   Charts initialize lazily (IntersectionObserver in index.html), so a container
+   starts empty and jumps to full height the moment D3 renders into it. That
+   layout shift is what broke anchor scrolling (targets slid down as charts above
+   them expanded) and made the scrollbar dishonest. Reserving each chart's
+   eventual height up front keeps the page from reflowing, so native anchor jumps
+   land correctly and the scrollbar is honest, with no custom scroll JS.
+
+   SVG charts (createChart): rendered height = width x aspectRatio, so CSS
+   `aspect-ratio` on the SVG-holding element reserves the exact height
+   RESPONSIVELY (no fixed px). The number after the slash is the chart's
+   aspectRatio from its init module. We deliberately do NOT use
+   `content-visibility: auto` here: it forces paint containment that would clip
+   the hover tooltips and popups appended inside these containers.
+
+   Non-SVG charts (canvas, fixed-pixel grids, interactive/backend widgets) have
+   no width x ratio relationship, so they get a min-height instead (measured at
+   the ~705px content width).
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* SVG charts rendering into a dedicated sub-div */
+#chart-utility-curves-svg { aspect-ratio: 1 / 0.4; }
+#chart-mixture-svg { aspect-ratio: 1 / 0.5; }
+#chart-backward-wave-svg { aspect-ratio: 1 / 0.55; }
+#chart-risk-reward-svg { aspect-ratio: 1 / 0.55; }
+#chart-risk-theta-distribution { aspect-ratio: 1 / 0.5; }
+#chart-risk-theta-frontier { aspect-ratio: 1 / 0.45; }
+#chart-tail-survival-svg,
+#chart-tail-games-needed-svg,
+#chart-tail-bars-svg,
+#chart-tail-heatmap-svg { aspect-ratio: 1 / 0.55; }
+#chart-adaptive-winrate-svg { aspect-ratio: 1 / 0.5; }
+#chart-game-replay-svg { aspect-ratio: 1 / 0.52; }
+#chart-risk-horizon-svg { aspect-ratio: 1 / 0.42; }
+#chart-surrogate-pareto-svg { aspect-ratio: 1 / 0.55; }
+#chart-compression-long-tail-svg { aspect-ratio: 1 / 0.7; }
+
+/* SVG charts rendering directly into their container */
+#chart-reduction-funnel { aspect-ratio: 1 / 0.45; }
+#chart-reachability-grid { aspect-ratio: 1 / 0.5; }
+#chart-widget-structure { aspect-ratio: 1 / 0.55; }
+#chart-memory-lifecycle { aspect-ratio: 1 / 0.5; }
+#chart-bonus-dependency { aspect-ratio: 1 / 0.8; }
+#chart-bonus-covariance { aspect-ratio: 1 / 0.3; }
+#chart-race-to-63 { aspect-ratio: 1 / 0.6; }
+#chart-category-stream { aspect-ratio: 1 / 0.65; }
+#chart-ev-ridgeline { aspect-ratio: 1 / 0.9; }
+#chart-exponential-utility { aspect-ratio: 1 / 0.55; }
+#chart-free-energy-phase { aspect-ratio: 1 / 0.55; }
+#chart-rl-barrier-diagram { aspect-ratio: 1 / 0.5; }
+#chart-rosetta-rules { aspect-ratio: 1 / 0.75; }
+#chart-filter-grammar { aspect-ratio: 1 / 0.65; }
+#chart-umap-manifold { aspect-ratio: 1 / 0.7; }
+#chart-oracle-winrate { aspect-ratio: 1 / 0.52; }
+
+/* Non-SVG charts: min-height (canvas, fixed-pixel grids, interactive widgets).
+   Estimates; tuned against rendered heights during validation. */
+#chart-score-spray { min-height: 460px; }
+#chart-dice-symmetry { min-height: 540px; }
+#chart-keep-funnel { min-height: 480px; }
+#chart-keep-equivalence { min-height: 320px; }
+#chart-backward-cascade { min-height: 380px; }
+#chart-transition-matrix { min-height: 640px; }
+#chart-path-probability { min-height: 240px; }
+#chart-widget-interactive { min-height: 520px; }
+#chart-category-landscape { min-height: 560px; }
+#chart-category-correlations { min-height: 600px; }
+#chart-fill-turn-heatmap { min-height: 580px; }
+#chart-category-pmf-grid { min-height: 480px; }
+#chart-position-explorer { min-height: 560px; }
+#chart-threshold-policy { min-height: 440px; }
+
 .chart-title {
   font-size: 0.9rem;
   font-weight: 600;
