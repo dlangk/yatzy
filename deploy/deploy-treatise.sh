@@ -42,7 +42,7 @@ echo "✓ Synced (including shared/)"
 # Health check
 echo "── Health check"
 ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_HOST" \
-  'docker exec yatzy-frontend wget -q --spider http://localhost:8090/ && echo "✓ Treatise OK" || echo "✗ FAIL"'
+  'docker exec yatzy-frontend wget -q --spider http://127.0.0.1:8090/ && echo "✓ Treatise OK" || echo "✗ FAIL"'
 
 # Purge Cloudflare cache
 echo "── Purging Cloudflare cache"
