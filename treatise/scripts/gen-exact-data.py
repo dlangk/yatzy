@@ -31,10 +31,13 @@ def load_density(theta: float) -> dict | None:
     else:
         fname = DENSITY_DIR / f"density_{theta}.json"
     if not fname.exists():
-        # Try alternate formats
-        for fmt in [f"{theta:g}", f"{theta:.1f}", f"{theta:.2f}", f"{theta:.3f}"]:
+        # Try alternate filename formats, but ONLY ones that represent the exact
+        # same theta value. A lossy format like f"{0.06:.1f}" == "0.1" would load
+        # a DIFFERENT theta's density (0.06 silently became 0.1), putting that
+        # point off the frontier curve. Guard every candidate with a value check.
+        for fmt in [f"{theta:g}", f"{theta:.2f}", f"{theta:.3f}", f"{theta:.4f}"]:
             alt = DENSITY_DIR / f"density_{fmt}.json"
-            if alt.exists():
+            if alt.exists() and abs(float(fmt) - theta) < 1e-9:
                 fname = alt
                 break
     if not fname.exists():
@@ -95,53 +98,47 @@ def pmf_to_tail(theta: float, pmf_data: list, mean: float) -> dict:
     return {"theta": theta, "mean": mean, "tail": tail}
 
 
+def require(theta: float) -> dict:
+    """Load exact density for theta, or fail loudly. We never fall back to a
+    nearby theta or silently skip: emitting a chart point for a theta we did not
+    actually compute is how a wrong value (e.g. theta=0.06 showing 0.1's data)
+    ends up on the frontier. If a file is missing, compute it, don't approximate."""
+    d = load_density(theta)
+    if d is None:
+        raise SystemExit(
+            f"ERROR: no exact density for theta={theta} "
+            f"(expected {DENSITY_DIR}/density_{theta}.json). "
+            f"Compute it first:  yatzy-density --thetas {theta}\n"
+            f"Refusing to emit incomplete/approximate chart data."
+        )
+    return d
+
+
 def main():
+    # Every theta below is REQUIRED; require() raises if its density is missing,
+    # so we can never ship a chart point that was faked from another theta.
+
     # --- KDE curves (exact PMFs) ---
-    kde_curves = []
-    missing_kde = []
-    for theta in SLIDER_THETAS:
-        d = load_density(theta)
-        if d is None:
-            missing_kde.append(theta)
-            continue
-        kde_curves.append(pmf_to_kde_entry(theta, d["pmf"]))
-    kde_curves.sort(key=lambda x: x["theta"])
+    kde_curves = sorted(
+        (pmf_to_kde_entry(t, require(t)["pmf"]) for t in SLIDER_THETAS),
+        key=lambda x: x["theta"],
+    )
+    json.dump(kde_curves, open(TREATISE_DATA / "kde_curves.json", "w"))
+    print(f"KDE curves: {len(kde_curves)} thetas (all exact)")
 
-    if missing_kde:
-        print(f"WARNING: Missing density for KDE: {missing_kde}")
-    else:
-        print(f"KDE curves: {len(kde_curves)} thetas (all exact)")
-
-    out = TREATISE_DATA / "kde_curves.json"
-    json.dump(kde_curves, open(out, "w"))
-    print(f"  → {out}")
-
-    # --- Sweep summary (exact stats) ---
-    # Keep existing entries for thetas outside slider range, update slider range.
-    # On a fresh checkout there is no seed file yet; start empty and build purely
-    # from the exact density (every theta the charts need is a slider theta).
-    sweep_path = TREATISE_DATA / "sweep_summary.json"
-    existing = json.load(open(sweep_path)) if sweep_path.exists() else []
-    existing_map = {round(d["theta"], 4): d for d in existing}
-
-    for theta in SLIDER_THETAS:
-        d = load_density(theta)
-        if d is None:
-            continue
-        existing_map[round(theta, 4)] = pmf_to_summary(theta, d)
-
-    summary = sorted(existing_map.values(), key=lambda x: x["theta"])
-    out = TREATISE_DATA / "sweep_summary.json"
-    json.dump(summary, open(out, "w"), indent=2)
-    print(f"Sweep summary: {len(summary)} thetas → {out}")
+    # --- Sweep summary (exact stats) --- built purely from computed density,
+    # never seeded from an existing file (that preserved stale/wrong entries).
+    summary = sorted(
+        (pmf_to_summary(t, require(t)) for t in SLIDER_THETAS),
+        key=lambda x: x["theta"],
+    )
+    json.dump(summary, open(TREATISE_DATA / "sweep_summary.json", "w"), indent=2)
+    print(f"Sweep summary: {len(summary)} thetas")
 
     # --- Tail probabilities ---
     tail_data = []
     for theta in TAIL_THETAS + TAIL_EXTRA:
-        d = load_density(theta)
-        if d is None:
-            print(f"  WARNING: Missing density for tail theta={theta}")
-            continue
+        d = require(theta)
         tail_data.append(pmf_to_tail(theta, d["pmf"], d["mean"]))
 
     out = TREATISE_DATA / "tail_exact.json"
