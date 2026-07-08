@@ -46,7 +46,11 @@ function injectStyles() {
     .site-nav a {
       text-decoration: none;
       color: var(--text-muted, #555);
-      padding: 0 12px;
+      /* top 4px: the serif labels have no descenders, so the font's empty
+         descender reserve otherwise makes the text look high in the pill.
+         With border-box + fixed height, flex re-centers, so the net downward
+         shift is ~half the padding; 4px lands the ink on the pill's center. */
+      padding: 4px 12px 0;
       border-radius: 5px;
       font-size: 15px;
       display: inline-flex;
@@ -66,7 +70,7 @@ function injectStyles() {
       width: auto;
       font-size: 13px;
       font-weight: 400;
-      padding: 0 10px;
+      padding: 4px 10px 0;
     }
 
     .site-nav a:hover {
