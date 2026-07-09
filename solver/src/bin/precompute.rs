@@ -1,14 +1,17 @@
 use yatzy::phase0_tables;
-use yatzy::state_computation::{compute_all_state_values, compute_all_state_values_with_oracle};
+use yatzy::state_computation::{
+    compute_all_state_values, compute_all_state_values_force, compute_all_state_values_with_oracle,
+};
 use yatzy::storage::{save_oracle, ORACLE_FILE_PATH};
 use yatzy::types::YatzyContext;
 
-fn parse_args() -> (f32, bool, bool, bool) {
+fn parse_args() -> (f32, bool, bool, bool, bool) {
     let args: Vec<String> = std::env::args().collect();
     let mut theta = 0.0f32;
     let mut max_policy = false;
     let mut build_oracle = false;
     let mut build_percentiles = false;
+    let mut force = false;
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
@@ -30,9 +33,12 @@ fn parse_args() -> (f32, bool, bool, bool) {
             "--percentiles" => {
                 build_percentiles = true;
             }
+            "--force" => {
+                force = true;
+            }
             "--help" | "-h" => {
                 println!(
-                    "Usage: yatzy-precompute [--theta FLOAT] [--max-policy] [--oracle] [--percentiles]"
+                    "Usage: yatzy-precompute [--theta FLOAT] [--max-policy] [--oracle] [--percentiles] [--force]"
                 );
                 println!();
                 println!("Options:");
@@ -41,6 +47,10 @@ fn parse_args() -> (f32, bool, bool, bool) {
                 println!("  --oracle        Build policy oracle (~3.17 GB, θ=0 only)");
                 println!(
                     "  --percentiles   Build percentile table for turns 0-4 (requires oracle)"
+                );
+                println!("  --force         Recompute and overwrite even if a table file exists");
+                println!(
+                    "                  (without it, an existing table is LOADED, not recomputed)"
                 );
                 std::process::exit(0);
             }
@@ -63,12 +73,12 @@ fn parse_args() -> (f32, bool, bool, bool) {
         eprintln!("Error: --percentiles only works with θ=0 EV mode");
         std::process::exit(1);
     }
-    (theta, max_policy, build_oracle, build_percentiles)
+    (theta, max_policy, build_oracle, build_percentiles, force)
 }
 
 fn main() {
     let _base = yatzy::env_config::init_base_path();
-    let (theta, max_policy, build_oracle, build_percentiles) = parse_args();
+    let (theta, max_policy, build_oracle, build_percentiles, force) = parse_args();
 
     println!("Yatzy precomputation tool (Rust)");
     if max_policy {
@@ -100,6 +110,8 @@ fn main() {
         if let Some(ref orc) = oracle {
             save_oracle(orc, ORACLE_FILE_PATH);
         }
+    } else if force {
+        compute_all_state_values_force(&mut ctx);
     } else {
         compute_all_state_values(&mut ctx);
     }

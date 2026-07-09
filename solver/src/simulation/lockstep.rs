@@ -279,7 +279,7 @@ fn find_best_category_final(
 /// Compute Group 6: best category EV for each dice set.
 // PERF: intentional duplication of widget_solver Group 6 for lockstep self-containment
 #[inline(always)]
-fn compute_group6(
+pub(crate) fn compute_group6(
     ctx: &YatzyContext,
     sv: &[f32],
     up_score: i32,
@@ -697,5 +697,49 @@ mod tests {
             "Mean {} out of reasonable range",
             result.mean
         );
+    }
+
+    /// T7: engine.rs and lockstep.rs carry INTENTIONALLY DUPLICATED copies of
+    /// compute_group6 (hot-path rule: no shared helper). The two copies must
+    /// stay bit-identical in behavior or the engines silently diverge. This
+    /// differential runs both on synthetic state values (no data files) over
+    /// random states and requires bitwise-equal outputs.
+    #[test]
+    fn test_group6_matches_engine_copy() {
+        let mut ctx = crate::types::YatzyContext::new_boxed();
+        crate::phase0_tables::precompute_lookup_tables(&mut ctx);
+
+        // Synthetic sv: deterministic pseudo-random values; the comparison is
+        // a pure function of sv, so reachability does not matter.
+        let mut seed = 0x5EEDu64;
+        let mut next = move || {
+            seed = seed.wrapping_add(0x9E3779B97F4A7C15);
+            let mut z = seed;
+            z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+            z ^= z >> 31;
+            (z >> 40) as f32 / 65536.0 // ~[0, 256)
+        };
+        let sv: Vec<f32> = (0..crate::constants::NUM_STATES).map(|_| next()).collect();
+
+        let mut state_rng = SplitMix64::new(77);
+        for _ in 0..500 {
+            let scored = (state_rng.next_u64() % ((1 << 15) - 1)) as i32; // not terminal
+            let up_score = (state_rng.next_u64() % 64) as i32;
+
+            let mut a = [0.0f32; 252];
+            let mut b = [0.0f32; 252];
+            compute_group6(&ctx, &sv, up_score, scored, &mut a);
+            crate::simulation::engine::compute_group6(&ctx, &sv, up_score, scored, &mut b);
+            for ds in 0..252 {
+                assert!(
+                    a[ds].to_bits() == b[ds].to_bits(),
+                    "group6 copies diverge at (up={up_score}, scored={scored:#x}, \
+                     ds={ds}): lockstep {} vs engine {}",
+                    a[ds],
+                    b[ds]
+                );
+            }
+        }
     }
 }

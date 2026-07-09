@@ -134,6 +134,149 @@ pub fn update_upper_score(upper_score: i32, category: usize, score: i32) -> i32 
 mod tests {
     use super::*;
 
+    /// T6: independent, definition-based scorer written directly from the
+    /// Scandinavian Yatzy rules — shares no code with the production scorer.
+    /// The existing full-domain check compared the score TABLE against the
+    /// same function that filled it (tautological); this one is a second
+    /// implementation.
+    fn reference_score(dice: &[i32; 5], category: usize) -> i32 {
+        let mut count = [0i32; 7]; // count[face], faces 1..=6
+        for &d in dice {
+            count[d as usize] += 1;
+        }
+        let sum_all: i32 = dice.iter().sum();
+        match category {
+            // Upper section: sum of the matching face.
+            0..=5 => {
+                let face = category as i32 + 1;
+                face * count[face as usize]
+            }
+            // One pair: highest face with at least two.
+            CATEGORY_ONE_PAIR => (1..=6)
+                .rev()
+                .find(|&f| count[f as usize] >= 2)
+                .map_or(0, |f| 2 * f),
+            // Two pairs: two DISTINCT faces each with at least two.
+            CATEGORY_TWO_PAIRS => {
+                let pairs: Vec<i32> = (1..=6).rev().filter(|&f| count[f as usize] >= 2).collect();
+                if pairs.len() >= 2 {
+                    2 * pairs[0] + 2 * pairs[1]
+                } else {
+                    0
+                }
+            }
+            // Three / four of a kind: highest qualifying face.
+            CATEGORY_THREE_OF_A_KIND => (1..=6)
+                .rev()
+                .find(|&f| count[f as usize] >= 3)
+                .map_or(0, |f| 3 * f),
+            CATEGORY_FOUR_OF_A_KIND => (1..=6)
+                .rev()
+                .find(|&f| count[f as usize] >= 4)
+                .map_or(0, |f| 4 * f),
+            // Straights: exact multisets.
+            CATEGORY_SMALL_STRAIGHT => {
+                if (1..=5).all(|f| count[f as usize] == 1) {
+                    15
+                } else {
+                    0
+                }
+            }
+            CATEGORY_LARGE_STRAIGHT => {
+                if (2..=6).all(|f| count[f as usize] == 1) {
+                    20
+                } else {
+                    0
+                }
+            }
+            // Full house: exactly 3 of one face and 2 of a DIFFERENT face.
+            CATEGORY_FULL_HOUSE => {
+                let three = (1..=6).find(|&f| count[f as usize] == 3);
+                let two = (1..=6).find(|&f| count[f as usize] == 2);
+                match (three, two) {
+                    (Some(_), Some(_)) => sum_all,
+                    _ => 0,
+                }
+            }
+            CATEGORY_CHANCE => sum_all,
+            // Yatzy: five of a kind.
+            CATEGORY_YATZY => {
+                if (1..=6).any(|f| count[f as usize] == 5) {
+                    50
+                } else {
+                    0
+                }
+            }
+            _ => panic!("unknown category {category}"),
+        }
+    }
+
+    /// Full-domain differential: every sorted 5-dice multiset (252) × every
+    /// category (15) against the independent reference scorer.
+    #[test]
+    fn test_scoring_vs_independent_reference() {
+        for d1 in 1..=6i32 {
+            for d2 in d1..=6 {
+                for d3 in d2..=6 {
+                    for d4 in d3..=6 {
+                        for d5 in d4..=6 {
+                            let dice = [d1, d2, d3, d4, d5];
+                            for cat in 0..CATEGORY_COUNT {
+                                let got = calculate_category_score(&dice, cat);
+                                let want = reference_score(&dice, cat);
+                                assert_eq!(
+                                    got, want,
+                                    "dice {dice:?} category {cat} ({}): \
+                                     production {got} vs reference {want}",
+                                    CATEGORY_NAMES[cat]
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Edge-case pins that a systematically wrong rule would miss.
+    #[test]
+    fn test_scoring_edge_pins() {
+        // Four of a kind is NOT two pairs (distinct faces required).
+        assert_eq!(
+            calculate_category_score(&[5, 6, 6, 6, 6], CATEGORY_TWO_PAIRS),
+            0
+        );
+        // A full house DOES count as two pairs (3+2 gives two distinct pairs).
+        assert_eq!(
+            calculate_category_score(&[2, 2, 3, 3, 3], CATEGORY_TWO_PAIRS),
+            10
+        );
+        // Five of a kind is NOT a full house (needs exactly 3 + exactly 2).
+        assert_eq!(
+            calculate_category_score(&[5, 5, 5, 5, 5], CATEGORY_FULL_HOUSE),
+            0
+        );
+        // Five sixes DO score three/four of a kind (count >= n).
+        assert_eq!(
+            calculate_category_score(&[6, 6, 6, 6, 6], CATEGORY_THREE_OF_A_KIND),
+            18
+        );
+        assert_eq!(
+            calculate_category_score(&[6, 6, 6, 6, 6], CATEGORY_FOUR_OF_A_KIND),
+            24
+        );
+        // Small straight is exactly 1-5; 2-6 is not.
+        assert_eq!(
+            calculate_category_score(&[2, 3, 4, 5, 6], CATEGORY_SMALL_STRAIGHT),
+            0
+        );
+        // One pair takes the HIGHEST pair.
+        assert_eq!(
+            calculate_category_score(&[2, 2, 5, 5, 6], CATEGORY_ONE_PAIR),
+            10
+        );
+    }
+
     #[test]
     fn test_upper_section() {
         assert_eq!(calculate_category_score(&[1, 1, 1, 1, 1], CATEGORY_ONES), 5);

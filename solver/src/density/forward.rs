@@ -464,6 +464,14 @@ mod tests {
     }
 
     /// Verify PMF sums to 1.0.
+    ///
+    /// Mass propagation reads `KeepTable.vals_f64` (the exact multinomial
+    /// probabilities), so each keep row sums to 1 in f64 and conservation
+    /// holds to ~1e-13 over the 15-turn evolution. Before that fix the density
+    /// cast the f32 `vals` up, and per-row ~1e-7 error compounded to a
+    /// ~3e-7 total-mass drift (accuracy-review-2026-07 §6.5;
+    /// theory/lab-reports/fast-exp-lse-bias.md §8).
+    ///
     /// Run with: cargo test density::forward -- --ignored --nocapture
     #[test]
     #[ignore] // ~6 min: full 15-turn density evolution
@@ -474,7 +482,7 @@ mod tests {
         let total: f64 = result.pmf.iter().map(|&(_, p)| p).sum();
         assert!(
             (total - 1.0).abs() < 1e-10,
-            "PMF should sum to 1.0, got {}",
+            "PMF total {} deviates from 1.0 by more than 1e-10 — a real mass leak",
             total
         );
     }

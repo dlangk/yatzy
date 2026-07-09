@@ -7,7 +7,8 @@ Rust HPC engine: backward-induction DP, Monte Carlo simulation, REST API.
 ```bash
 cargo build --release                  # Build (~30s with LTO)
 cargo build --features timing          # Build with per-level timing output enabled
-cargo test                             # 189 tests (139 unit + 14 API + 8 property + 28 integration, 2 ignored)
+cargo test                             # 217 tests (209 run, 8 audit-tier ignored)
+just audit                             # From repo root: everything incl. ignored + data-gated (YATZY_REQUIRE_DATA=1)
 cargo fmt --check                      # Formatting
 cargo clippy                           # Lints
 
@@ -105,7 +106,7 @@ Server: axum on port 9000, stateless, `Arc<YatzyContext>` shared state.
 - θ grid: 37 values from -3.0 to +3.0 in `configs/theta_grid.toml`
 - Math: `theory/foundations/risk-parameter-theta.md`
 - Strategy analysis: `theory/strategy/risk-sensitive-strategy.md`
-- **CRITICAL**: Delete `data/strategy_tables/all_states_theta_*.bin` AND `data/strategy_tables/oracle.bin` after changing solver code! A stale oracle silently plays an old policy (`just simulate` mtime-checks it against the θ=0 table as a backstop).
+- **CRITICAL**: Delete `data/strategy_tables/all_states_theta_*.bin` AND `data/strategy_tables/oracle.bin` after changing solver code, or recompute with `yatzy-precompute --force --theta θ`. Without `--force`, precompute LOADS an existing table instead of computing (it prints a loud banner when it does). A stale oracle silently plays an old policy (`just simulate` mtime-checks it against the θ=0 table as a backstop). The loader refuses wrong-θ and zero-filled tables (`storage.rs` θ guard + content sanity), but it cannot detect a stale same-θ table.
 
 ## Storage Format
 

@@ -178,6 +178,8 @@ tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 # Why: property-based testing (state invariants, score bounds)
 proptest = "1"
+# Why: audit tests pin DP determinism across thread counts (local pools)
+rayon = "1.10"
 
 [features]
 default = ["full"]

@@ -123,13 +123,14 @@ fn main() {
             continue;
         }
 
-        // Load strategy table
+        // Load strategy table (ctx.theta must be set BEFORE the load: the
+        // storage θ guard verifies the file's header θ against ctx.theta)
+        ctx.theta = theta;
         let file = state_file_path(theta);
         if !load_all_state_values(&mut ctx, &file) {
             eprintln!("Failed to load strategy table: {}", file);
             continue;
         }
-        ctx.theta = theta;
 
         // Run density evolution
         let result = if use_oracle && theta == 0.0 {

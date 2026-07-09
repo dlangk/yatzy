@@ -45,6 +45,16 @@ pub const STATE_FILE_VERSION: u32 = 6;
 /// Storage format version v7: scored*128+up with θ (risk parameter) in header.
 pub const STATE_FILE_VERSION_THETA: u32 = 7;
 
+/// Maximum |θ| for the utility-domain solver. Beyond this, f32 mantissa
+/// erasure causes precision loss (e^(θ×100) > 2^24 when θ > 0.166); the
+/// solver falls back to the log-domain (LSE) path.
+///
+/// SINGLE SOURCE OF TRUTH: both the DP mode dispatch (state_computation.rs)
+/// and the terminal-state initialization (phase0_tables.rs) must use this
+/// constant. If the two ever diverge, terminal states are initialized in a
+/// different domain than the DP loop consumes — a silent-corruption bug.
+pub const UTILITY_THETA_LIMIT: f32 = 0.15;
+
 /// Scandinavian Yatzy upper bonus: 50 points if upper score >= 63.
 pub const UPPER_BONUS: f64 = 50.0;
 

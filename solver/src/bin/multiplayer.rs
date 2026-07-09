@@ -91,7 +91,9 @@ fn parse_args() -> Args {
                 println!("  mp:protect:0.03:50 Custom protect:scale");
                 println!("  mp:symmetric     Symmetric: risk-seeking when trailing, risk-averse when leading");
                 println!("  mp:symmetric:0.05:0.03:40 Custom seek:protect:scale");
-                println!("  mp:hailmary      Late Hail Mary: aggressive θ in last turns when trailing");
+                println!(
+                    "  mp:hailmary      Late Hail Mary: aggressive θ in last turns when trailing"
+                );
                 println!("  mp:hailmary:0.20:12:5 Custom theta:activate_turn:deficit_threshold");
                 println!("  mp:hailmary-sym  Combined: symmetric early + Hail Mary late");
                 println!("  mp:hailmary-sym:0.20:12:5 Custom theta:activate_turn:threshold");

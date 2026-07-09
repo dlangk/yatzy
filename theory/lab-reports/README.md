@@ -7,6 +7,7 @@ Performance experiments with measured results on Apple M1 Max hardware.
 | `batched-soa-solver.md` | 260 | Batched struct-of-arrays solver design and benchmarks |
 | `cache-hierarchy-targeting.md` | 308 | L1/L2/SLC targeting: state layout, working set, false sharing |
 | `density-condensation.md` | 354 | Forward density evolution: prob-array propagation, 126× oracle speedup |
+| `fast-exp-lse-bias.md` | 222 | The θ = 0.15/0.16 seam bug: fast-exp base-2/natural-log mismatch biased all LSE solves low; root cause, fix, blast radius |
 | `hardware-and-hot-path.md` | 412 | Optimization history (M1 Max + M5 Max round 2), microarchitecture reference, measured dead ends |
 | `neon-intrinsics.md` | 244 | NEON SIMD kernels: FMA, argmax, fast exp, measured speedups |
 | `optimization-log.md` | 288 | Chronological optimization log with before/after timings |

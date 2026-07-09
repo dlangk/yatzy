@@ -114,6 +114,7 @@ pub fn precompute_keep_table(ctx: &mut YatzyContext) {
     let pow6: [i32; 6] = [1, 6, 36, 216, 1296, 7776];
 
     kt.vals.clear();
+    kt.vals_f64.clear();
     kt.cols.clear();
 
     for ki in 0..num_keeps {
@@ -134,6 +135,7 @@ pub fn precompute_keep_table(ctx: &mut YatzyContext) {
                 let ti = ctx.index_lookup[(dice[0] - 1) as usize][(dice[1] - 1) as usize]
                     [(dice[2] - 1) as usize][(dice[3] - 1) as usize][(dice[4] - 1) as usize];
                 kt.vals.push(1.0f32);
+                kt.vals_f64.push(1.0f64);
                 kt.cols.push(ti);
             }
             continue;
@@ -164,8 +166,11 @@ pub fn precompute_keep_table(ctx: &mut YatzyContext) {
                 continue;
             }
 
-            kt.vals
-                .push((fact_n as f64 / denom as f64 * inv_pow6n) as f32);
+            // Exact multinomial P(K→T) = n! / (∏ dᵢ!) / 6ⁿ. Keep both the
+            // f32 (hot path) and the exact f64 (density mass propagation).
+            let p_exact = fact_n as f64 / denom as f64 * inv_pow6n;
+            kt.vals.push(p_exact as f32);
+            kt.vals_f64.push(p_exact);
             kt.cols.push(ti as i32);
         }
     }
@@ -312,7 +317,7 @@ pub fn precompute_dice_set_probabilities(ctx: &mut YatzyContext) {
 pub fn initialize_final_states(ctx: &mut YatzyContext) {
     let all_scored_mask = (1 << CATEGORY_COUNT) - 1;
     let theta = ctx.theta;
-    let use_utility = theta != 0.0 && theta.abs() <= 0.15;
+    let use_utility = theta != 0.0 && theta.abs() <= UTILITY_THETA_LIMIT;
     let state_values = ctx.state_values.as_mut_slice();
     for up in 0..=63usize {
         let bonus = if up >= 63 { 50.0f32 } else { 0.0f32 };
@@ -538,6 +543,35 @@ mod tests {
         }
     }
 
+    /// The exact f64 mirror used by the density mass propagation: same layout
+    /// as `vals`, its f32 cast equals `vals` bit-for-bit, and every keep row
+    /// sums to 1.0 in f64 to ~1e-13 (this exactness is what restores density
+    /// probability conservation; see fast-exp-lse-bias.md §8).
+    #[test]
+    fn test_keep_table_vals_f64_exact() {
+        let ctx = make_ctx();
+        let kt = &ctx.keep_table;
+        assert_eq!(kt.vals_f64.len(), kt.vals.len());
+        for k in 0..kt.vals.len() {
+            assert_eq!(
+                kt.vals_f64[k] as f32, kt.vals[k],
+                "vals_f64[{k}] f32-cast must equal vals[{k}]"
+            );
+        }
+        for ki in 0..NUM_KEEP_MULTISETS {
+            let start = kt.row_start[ki] as usize;
+            let end = kt.row_start[ki + 1] as usize;
+            if start == end {
+                continue;
+            }
+            let sum: f64 = (start..end).map(|k| kt.vals_f64[k]).sum();
+            assert!(
+                (sum - 1.0).abs() < 1e-12,
+                "vals_f64 row {ki} sums to {sum} (want 1.0 ± 1e-12)"
+            );
+        }
+    }
+
     #[test]
     fn test_keep_table_enumeration() {
         let ctx = make_ctx();
@@ -626,5 +660,227 @@ mod tests {
         assert!(!ctx.reachable[0x20][1]);
         assert!(!ctx.reachable[0x20][7]);
         assert!(ctx.reachable[0x3F][63]);
+    }
+
+    /// Rebuild the keep-index → face-frequency map using the same nested
+    /// iteration order as construction (trivially auditable), so the
+    /// PROBABILITIES and COLUMNS can be validated independently below.
+    fn keep_freqs_in_index_order() -> Vec<[i32; 6]> {
+        let mut freqs = Vec::new();
+        for f1 in 0..=5i32 {
+            for f2 in 0..=(5 - f1) {
+                for f3 in 0..=(5 - f1 - f2) {
+                    for f4 in 0..=(5 - f1 - f2 - f3) {
+                        for f5 in 0..=(5 - f1 - f2 - f3 - f4) {
+                            for f6 in 0..=(5 - f1 - f2 - f3 - f4 - f5) {
+                                freqs.push([f1, f2, f3, f4, f5, f6]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        freqs
+    }
+
+    /// T4: brute-force enumeration of every keep row. Row sums to 1 is a WEAK
+    /// property (a shifted/transposed cols array passes it); this asserts the
+    /// full (column, probability) content of the CSR against an exhaustive
+    /// 6^n enumeration of reroll outcomes in f64, with an independent
+    /// dice-set index derived by sorting (not via index_lookup).
+    #[test]
+    fn test_keep_table_full_content_vs_enumeration() {
+        let ctx = make_ctx();
+        let kt = &ctx.keep_table;
+        let freqs = keep_freqs_in_index_order();
+        assert_eq!(freqs.len(), NUM_KEEP_MULTISETS);
+
+        // Independent dice-set index: sorted 5-dice tuple -> position in
+        // all_dice_sets (linear search; 252 entries).
+        let ds_index = |sorted: &[i32; 5]| -> usize {
+            (0..252)
+                .find(|&i| &ctx.all_dice_sets[i] == sorted)
+                .expect("multiset not found in all_dice_sets")
+        };
+
+        for (ki, kf) in freqs.iter().enumerate() {
+            let k: i32 = kf.iter().sum();
+            let n = (5 - k) as usize; // dice rerolled
+
+            // Exhaustive enumeration: all 6^n ordered outcomes.
+            let mut expected = [0.0f64; 252];
+            let total = 6usize.pow(n as u32);
+            for code in 0..total {
+                let mut c = code;
+                let mut faces = *kf;
+                for _ in 0..n {
+                    faces[c % 6] += 1;
+                    c /= 6;
+                }
+                // Build the sorted 5-dice tuple from the frequency vector.
+                let mut dice = [0i32; 5];
+                let mut d = 0;
+                for f in 0..6 {
+                    for _ in 0..faces[f] {
+                        dice[d] = f as i32 + 1;
+                        d += 1;
+                    }
+                }
+                expected[ds_index(&dice)] += 1.0 / total as f64;
+            }
+
+            // Compare against the CSR row: identical column SET and per-column
+            // probability (f32 cast tolerance).
+            let start = kt.row_start[ki] as usize;
+            let end = kt.row_start[ki + 1] as usize;
+            let mut seen_cols = vec![false; 252];
+            let mut row_sum = 0.0f64;
+            for j in start..end {
+                let col = kt.cols[j] as usize;
+                let p = kt.vals[j] as f64;
+                assert!(
+                    expected[col] > 0.0,
+                    "keep {ki} (freq {kf:?}): CSR column {col} has probability {p} \
+                     but enumeration says this outcome is impossible"
+                );
+                assert!(
+                    (p - expected[col]).abs() < 1e-6,
+                    "keep {ki} col {col}: CSR prob {p} vs enumerated {}",
+                    expected[col]
+                );
+                seen_cols[col] = true;
+                row_sum += p;
+            }
+            for (col, &e) in expected.iter().enumerate() {
+                assert!(
+                    e == 0.0 || seen_cols[col],
+                    "keep {ki} (freq {kf:?}): enumeration reaches column {col} \
+                     with p={e} but the CSR row omits it"
+                );
+            }
+            assert!(
+                (row_sum - 1.0).abs() < 5e-7,
+                "keep {ki}: row sum {row_sum} (f32-realistic bound 5e-7)"
+            );
+        }
+    }
+
+    /// T4: keep_to_mask / mask_to_keep / unique_keep_ids round-trip, and the
+    /// bits-set-means-REROLL convention verified independently.
+    #[test]
+    fn test_keep_mask_round_trip_and_convention() {
+        let ctx = make_ctx();
+        let kt = &ctx.keep_table;
+        let freqs = keep_freqs_in_index_order();
+
+        for ds in 0..252usize {
+            let dice = &ctx.all_dice_sets[ds];
+            for j in 0..kt.unique_count[ds] as usize {
+                let kid = kt.unique_keep_ids[ds][j] as usize;
+                let mask = kt.keep_to_mask[ds * 32 + j];
+                // Round-trip through mask_to_keep.
+                assert_eq!(
+                    kt.mask_to_keep[ds * 32 + mask as usize] as usize,
+                    kid,
+                    "ds {ds} unique-keep {j}: keep_to_mask/mask_to_keep disagree"
+                );
+                // Convention: kept dice are the bits NOT set in mask.
+                let mut kept = [0i32; 6];
+                for i in 0..5 {
+                    if (mask & (1 << i)) == 0 {
+                        kept[(dice[i] - 1) as usize] += 1;
+                    }
+                }
+                assert_eq!(
+                    kept, freqs[kid],
+                    "ds {ds} mask {mask:#07b}: kept-dice freq mismatch for keep {kid}"
+                );
+            }
+            // mask = 0 keeps everything: must map to the full multiset.
+            let kid0 = kt.mask_to_keep[ds * 32] as usize;
+            let mut full = [0i32; 6];
+            for i in 0..5 {
+                full[(dice[i] - 1) as usize] += 1;
+            }
+            assert_eq!(
+                full, freqs[kid0],
+                "ds {ds}: mask-0 keep is not the full multiset"
+            );
+        }
+    }
+
+    /// T4: lattice invariants the batched Step 2 in-place pass relies on:
+    /// children appear BEFORE parents in used_kids (positional, not just
+    /// size-sorted), and kid/ds children are exactly the minus-one-die
+    /// sub-multisets.
+    #[test]
+    fn test_keep_lattice_invariants() {
+        let ctx = make_ctx();
+        let kt = &ctx.keep_table;
+        let freqs = keep_freqs_in_index_order();
+
+        let mut pos = vec![usize::MAX; NUM_KEEP_MULTISETS];
+        for (p, &ki) in kt.used_kids.iter().enumerate() {
+            pos[ki as usize] = p;
+        }
+
+        for &ki16 in kt.used_kids.iter() {
+            let ki = ki16 as usize;
+            let sz: i32 = freqs[ki].iter().sum();
+            assert!(sz <= 4, "used_kids contains size-5 keep {ki}");
+
+            // Children: exactly one instance of one present face removed.
+            let cnt = kt.kid_child_count[ki] as usize;
+            let expected_children: Vec<[i32; 6]> = (0..6)
+                .filter(|&f| freqs[ki][f] > 0)
+                .map(|f| {
+                    let mut c = freqs[ki];
+                    c[f] -= 1;
+                    c
+                })
+                .collect();
+            assert_eq!(cnt, expected_children.len(), "keep {ki}: child count");
+            for j in 0..cnt {
+                let child = kt.kid_children[ki][j] as usize;
+                assert!(
+                    expected_children.contains(&freqs[child]),
+                    "keep {ki}: child {child} is not a minus-one-die sub-multiset"
+                );
+                // The in-place subset-max pass requires finalized children.
+                assert!(
+                    pos[child] < pos[ki],
+                    "used_kids order violation: child {child} (pos {}) after \
+                     parent {ki} (pos {})",
+                    pos[child],
+                    pos[ki]
+                );
+            }
+        }
+
+        // ds_children: the size-4 sub-multisets of each 5-dice set.
+        for ds in 0..252usize {
+            let dice = &ctx.all_dice_sets[ds];
+            let mut df = [0i32; 6];
+            for i in 0..5 {
+                df[(dice[i] - 1) as usize] += 1;
+            }
+            let cnt = kt.ds_child_count[ds] as usize;
+            let expected: Vec<[i32; 6]> = (0..6)
+                .filter(|&f| df[f] > 0)
+                .map(|f| {
+                    let mut c = df;
+                    c[f] -= 1;
+                    c
+                })
+                .collect();
+            assert_eq!(cnt, expected.len(), "ds {ds}: child count");
+            for j in 0..cnt {
+                let child = kt.ds_children[ds][j] as usize;
+                assert!(
+                    expected.contains(&freqs[child]),
+                    "ds {ds}: child {child} is not a minus-one-die sub-multiset"
+                );
+            }
+        }
     }
 }

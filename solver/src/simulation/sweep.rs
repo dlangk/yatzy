@@ -98,6 +98,12 @@ fn read_scores_header(path: &str) -> Option<ScoresHeader> {
 /// Ensure a θ strategy table exists, precomputing if necessary.
 /// Returns true on success.
 pub fn ensure_strategy_table(ctx: &mut Box<YatzyContext>, theta: f32) -> bool {
+    // Always stamp θ on the context, even when the file already exists:
+    // callers follow this with load_all_state_values, whose θ guard compares
+    // header.theta_bits against ctx.theta. Leaving a stale θ here made the
+    // subsequent load refuse (or, before the guard existed, silently pair a
+    // table with the wrong ctx.theta).
+    ctx.theta = theta;
     let file = state_file_path(theta);
     if Path::new(&file).exists() {
         return true;
@@ -105,7 +111,6 @@ pub fn ensure_strategy_table(ctx: &mut Box<YatzyContext>, theta: f32) -> bool {
 
     println!("    Precomputing strategy table for θ={:.4}...", theta);
     let t0 = Instant::now();
-    ctx.theta = theta;
 
     // Reset state values to owned for computation
     ctx.state_values = StateValues::Owned(vec![0.0f32; NUM_STATES]);

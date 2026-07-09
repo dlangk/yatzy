@@ -26,7 +26,15 @@ fn setup() -> Option<Box<YatzyContext>> {
     } else {
         let parent = format!("../{}", state_file);
         if !file_exists(&parent) {
-            eprintln!("Skipping test: no strategy table on disk");
+            // Skip-visibility contract: `just audit` sets YATZY_REQUIRE_DATA=1
+            // so a missing table fails loudly instead of skipping green.
+            if std::env::var("YATZY_REQUIRE_DATA").is_ok() {
+                panic!(
+                    "YATZY_REQUIRE_DATA is set but {state_file} is missing — \
+                     run `just precompute` first"
+                );
+            }
+            eprintln!("SKIPPED (no data): {state_file} not found");
             return None;
         }
         parent
@@ -101,5 +109,40 @@ fn test_engines_agree_with_each_other() {
         "std dev mismatch: lockstep {:.2} vs vertical {:.2}",
         lockstep.std_dev,
         vertical.std_dev
+    );
+}
+
+/// T15 (audit tier): the 1M-game variant. SE shrinks √10× vs the 100k test,
+/// so the mean cross-check tightens from ~0.2% to ~0.06% sensitivity —
+/// enough to catch sub-point systematic bias between the engines.
+#[test]
+#[ignore]
+fn test_engines_agree_1m_games() {
+    const N: usize = 1_000_000;
+    let ctx = match setup() {
+        Some(c) => c,
+        None => return,
+    };
+    let ev = ctx.state_values.as_slice()[state_index(0, 0)] as f64;
+    let lockstep = simulate_batch_lockstep(&ctx, N, 42);
+    let vertical = simulate_batch(&ctx, N, 42);
+
+    for (name, r) in [("lockstep", &lockstep), ("vertical", &vertical)] {
+        let se = r.std_dev / (N as f64).sqrt();
+        let z = (r.mean - ev) / se;
+        assert!(
+            z.abs() < 4.5,
+            "{name} (1M): mean {:.3} deviates from EV {ev:.3} by {z:.1} SE",
+            r.mean
+        );
+    }
+    let pooled_std = (lockstep.std_dev + vertical.std_dev) / 2.0;
+    let se = pooled_std * (2.0 / N as f64).sqrt();
+    let z = (lockstep.mean - vertical.mean) / se;
+    assert!(
+        z.abs() < 4.5,
+        "engines disagree at 1M games: lockstep {:.3} vs vertical {:.3} (z = {z:.1})",
+        lockstep.mean,
+        vertical.mean
     );
 }

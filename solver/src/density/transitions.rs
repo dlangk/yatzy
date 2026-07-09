@@ -297,7 +297,7 @@ pub fn compute_transitions(
                 let end1 = kt.row_start[kid1 as usize + 1] as usize;
 
                 for k1 in start1..end1 {
-                    let p_reroll1 = kt.vals[k1] as f64;
+                    let p_reroll1 = kt.vals_f64[k1];
                     let ds_final = kt.cols[k1] as usize;
 
                     let cat = best_cat[ds_final] as usize;
@@ -319,7 +319,7 @@ pub fn compute_transitions(
             let end2 = kt.row_start[kid2 as usize + 1] as usize;
 
             for k2 in start2..end2 {
-                let p_reroll2 = kt.vals[k2] as f64;
+                let p_reroll2 = kt.vals_f64[k2];
                 let ds_mid = kt.cols[k2] as usize;
 
                 // Decision: keep1 for ds_mid
@@ -344,7 +344,7 @@ pub fn compute_transitions(
                     let end1 = kt.row_start[kid1 as usize + 1] as usize;
 
                     for k1 in start1..end1 {
-                        let p_reroll1 = kt.vals[k1] as f64;
+                        let p_reroll1 = kt.vals_f64[k1];
                         let ds_final = kt.cols[k1] as usize;
 
                         let cat = best_cat[ds_final] as usize;
@@ -421,7 +421,7 @@ pub fn compute_transitions_oracle(
             let start = kt.row_start[kid] as usize;
             let end = kt.row_start[kid + 1] as usize;
             for k in start..end {
-                nxt_probs[kt.cols[k] as usize] += p * kt.vals[k] as f64;
+                nxt_probs[kt.cols[k] as usize] += p * kt.vals_f64[k];
             }
         }
     }
@@ -445,7 +445,7 @@ pub fn compute_transitions_oracle(
             let start = kt.row_start[kid] as usize;
             let end = kt.row_start[kid + 1] as usize;
             for k in start..end {
-                nxt_probs[kt.cols[k] as usize] += p * kt.vals[k] as f64;
+                nxt_probs[kt.cols[k] as usize] += p * kt.vals_f64[k];
             }
         }
     }

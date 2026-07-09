@@ -101,8 +101,8 @@ const UNDERDOG_THETAS: &[f32] = &[0.0, 0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.0
 
 /// Available θ values for the symmetric policy (positive + negative).
 const SYMMETRIC_THETAS: &[f32] = &[
-    -0.07, -0.06, -0.05, -0.04, -0.03, -0.02, -0.015, -0.01, -0.005, 0.0, 0.005, 0.01, 0.015,
-    0.02, 0.03, 0.04, 0.05, 0.06, 0.07,
+    -0.07, -0.06, -0.05, -0.04, -0.03, -0.02, -0.015, -0.01, -0.005, 0.0, 0.005, 0.01, 0.015, 0.02,
+    0.03, 0.04, 0.05, 0.06, 0.07,
 ];
 
 /// Available θ values for the Hail Mary policy (aggressive late-game).
@@ -110,8 +110,8 @@ const HAILMARY_THETAS: &[f32] = &[0.0, 0.10, 0.15, 0.20, 0.25, 0.30, 0.50];
 
 /// Combined symmetric + Hail Mary θ values.
 const HAILMARY_SYM_THETAS: &[f32] = &[
-    -0.07, -0.06, -0.05, -0.04, -0.03, -0.02, -0.015, -0.01, -0.005, 0.0, 0.005, 0.01, 0.015,
-    0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.10, 0.15, 0.20, 0.25, 0.30, 0.50,
+    -0.07, -0.06, -0.05, -0.04, -0.03, -0.02, -0.015, -0.01, -0.005, 0.0, 0.005, 0.01, 0.015, 0.02,
+    0.03, 0.04, 0.05, 0.06, 0.07, 0.10, 0.15, 0.20, 0.25, 0.30, 0.50,
 ];
 
 /// Opponent-aware adaptive strategy with continuous θ ramp.
@@ -325,7 +325,10 @@ impl MultiplayerPolicy for VarianceScaledPolicy {
         let my_e = my.total_score as f32
             + ev_sv[state_index(my.upper_score as usize, my.scored_categories as usize)];
         let my_v = Self::remaining_variance(
-            ev_sv, var_sv, my.upper_score as usize, my.scored_categories as usize,
+            ev_sv,
+            var_sv,
+            my.upper_score as usize,
+            my.scored_categories as usize,
         );
 
         let (best_opp_e, opp_v) = view
@@ -334,7 +337,10 @@ impl MultiplayerPolicy for VarianceScaledPolicy {
                 let e = p.total_score as f32
                     + ev_sv[state_index(p.upper_score as usize, p.scored_categories as usize)];
                 let v = Self::remaining_variance(
-                    ev_sv, var_sv, p.upper_score as usize, p.scored_categories as usize,
+                    ev_sv,
+                    var_sv,
+                    p.upper_score as usize,
+                    p.scored_categories as usize,
                 );
                 (e, v)
             })
@@ -758,61 +764,92 @@ impl Strategy {
                 "hailmary" => {
                     // mp:hailmary[:theta[:activate_turn[:threshold]]]
                     let theta_hail: f32 = if parts.len() > 1 {
-                        parts[1].parse().map_err(|_| format!("Invalid theta: {}", parts[1]))?
+                        parts[1]
+                            .parse()
+                            .map_err(|_| format!("Invalid theta: {}", parts[1]))?
                     } else {
                         0.20
                     };
                     let activate_turn: usize = if parts.len() > 2 {
-                        parts[2].parse().map_err(|_| format!("Invalid turn: {}", parts[2]))?
+                        parts[2]
+                            .parse()
+                            .map_err(|_| format!("Invalid turn: {}", parts[2]))?
                     } else {
                         12
                     };
                     let deficit_threshold: f32 = if parts.len() > 3 {
-                        parts[3].parse().map_err(|_| format!("Invalid threshold: {}", parts[3]))?
+                        parts[3]
+                            .parse()
+                            .map_err(|_| format!("Invalid threshold: {}", parts[3]))?
                     } else {
                         5.0
                     };
 
                     let thetas: Vec<f32> = HAILMARY_THETAS
-                        .iter().copied().filter(|&t| t <= theta_hail + 1e-6).collect();
+                        .iter()
+                        .copied()
+                        .filter(|&t| t <= theta_hail + 1e-6)
+                        .collect();
                     let tables = load_theta_tables(&thetas, base_path)?;
-                    let ev_idx = tables.iter().position(|t| t.theta == 0.0).expect("θ=0 missing");
+                    let ev_idx = tables
+                        .iter()
+                        .position(|t| t.theta == 0.0)
+                        .expect("θ=0 missing");
 
                     let policy = Box::new(HailMaryPolicy {
-                        ev_idx, theta_hail, activate_turn, deficit_threshold,
+                        ev_idx,
+                        theta_hail,
+                        activate_turn,
+                        deficit_threshold,
                     });
                     let name = if parts.len() == 1 {
                         "mp:hailmary".to_string()
                     } else {
-                        format!("mp:hailmary:{}:{}:{}", theta_hail, activate_turn, deficit_threshold)
+                        format!(
+                            "mp:hailmary:{}:{}:{}",
+                            theta_hail, activate_turn, deficit_threshold
+                        )
                     };
                     return Ok(Strategy {
-                        name, kind: StrategyKind::MultiplayerAdaptive { tables, policy },
+                        name,
+                        kind: StrategyKind::MultiplayerAdaptive { tables, policy },
                     });
                 }
                 "hailmary-sym" => {
                     // mp:hailmary-sym[:theta_hail[:activate_turn[:threshold]]]
                     let theta_hail: f32 = if parts.len() > 1 {
-                        parts[1].parse().map_err(|_| format!("Invalid theta: {}", parts[1]))?
+                        parts[1]
+                            .parse()
+                            .map_err(|_| format!("Invalid theta: {}", parts[1]))?
                     } else {
                         0.20
                     };
                     let activate_turn: usize = if parts.len() > 2 {
-                        parts[2].parse().map_err(|_| format!("Invalid turn: {}", parts[2]))?
+                        parts[2]
+                            .parse()
+                            .map_err(|_| format!("Invalid turn: {}", parts[2]))?
                     } else {
                         12
                     };
                     let deficit_threshold: f32 = if parts.len() > 3 {
-                        parts[3].parse().map_err(|_| format!("Invalid threshold: {}", parts[3]))?
+                        parts[3]
+                            .parse()
+                            .map_err(|_| format!("Invalid threshold: {}", parts[3]))?
                     } else {
                         5.0
                     };
 
                     // Load all tables needed: symmetric range + hail mary range
                     let thetas: Vec<f32> = HAILMARY_SYM_THETAS
-                        .iter().copied().filter(|&t| t <= theta_hail + 1e-6).collect();
+                        .iter()
+                        .copied()
+                        .filter(|&t| t <= theta_hail + 1e-6)
+                        .collect();
                     let tables = load_theta_tables(&thetas, base_path)?;
-                    let ev_idx = tables.iter().position(|t| t.theta == 0.0).expect("θ=0 missing");
+                    let ev_idx = tables
+                        .iter()
+                        .position(|t| t.theta == 0.0)
+                        .expect("θ=0 missing");
 
                     let policy = Box::new(HailMarySymmetricPolicy {
                         ev_idx,
@@ -826,28 +863,37 @@ impl Strategy {
                     let name = if parts.len() == 1 {
                         "mp:hailmary-sym".to_string()
                     } else {
-                        format!("mp:hailmary-sym:{}:{}:{}", theta_hail, activate_turn, deficit_threshold)
+                        format!(
+                            "mp:hailmary-sym:{}:{}:{}",
+                            theta_hail, activate_turn, deficit_threshold
+                        )
                     };
                     return Ok(Strategy {
-                        name, kind: StrategyKind::MultiplayerAdaptive { tables, policy },
+                        name,
+                        kind: StrategyKind::MultiplayerAdaptive { tables, policy },
                     });
                 }
                 "varscaled" => {
                     // mp:varscaled[:pos_clamp[:neg_clamp]]
                     let theta_clamp_pos: f32 = if parts.len() > 1 {
-                        parts[1].parse().map_err(|_| format!("Invalid pos_clamp: {}", parts[1]))?
+                        parts[1]
+                            .parse()
+                            .map_err(|_| format!("Invalid pos_clamp: {}", parts[1]))?
                     } else {
                         0.05
                     };
                     let theta_clamp_neg: f32 = if parts.len() > 2 {
-                        parts[2].parse().map_err(|_| format!("Invalid neg_clamp: {}", parts[2]))?
+                        parts[2]
+                            .parse()
+                            .map_err(|_| format!("Invalid neg_clamp: {}", parts[2]))?
                     } else {
                         0.03
                     };
 
                     // Load symmetric range tables (covers [-neg..+pos]) plus θ=0.01 for variance
                     let mut thetas: Vec<f32> = SYMMETRIC_THETAS
-                        .iter().copied()
+                        .iter()
+                        .copied()
                         .filter(|&t| t >= -theta_clamp_neg - 1e-6 && t <= theta_clamp_pos + 1e-6)
                         .collect();
                     // Ensure θ=0.01 is present for variance extraction
@@ -857,11 +903,20 @@ impl Strategy {
                     }
                     let tables = load_theta_tables(&thetas, base_path)?;
 
-                    let ev_idx = tables.iter().position(|t| t.theta == 0.0).expect("θ=0 missing");
-                    let var_idx = tables.iter().position(|t| (t.theta - 0.01).abs() < 1e-6).expect("θ=0.01 missing");
+                    let ev_idx = tables
+                        .iter()
+                        .position(|t| t.theta == 0.0)
+                        .expect("θ=0 missing");
+                    let var_idx = tables
+                        .iter()
+                        .position(|t| (t.theta - 0.01).abs() < 1e-6)
+                        .expect("θ=0.01 missing");
 
                     let policy = Box::new(VarianceScaledPolicy {
-                        ev_idx, var_idx, theta_clamp_pos, theta_clamp_neg,
+                        ev_idx,
+                        var_idx,
+                        theta_clamp_pos,
+                        theta_clamp_neg,
                     });
                     let name = if parts.len() == 1 {
                         "mp:varscaled".to_string()
@@ -869,7 +924,8 @@ impl Strategy {
                         format!("mp:varscaled:{}:{}", theta_clamp_pos, theta_clamp_neg)
                     };
                     return Ok(Strategy {
-                        name, kind: StrategyKind::MultiplayerAdaptive { tables, policy },
+                        name,
+                        kind: StrategyKind::MultiplayerAdaptive { tables, policy },
                     });
                 }
                 other => return Err(format!("Unknown multiplayer policy: {}", other)),
@@ -972,31 +1028,74 @@ mod tests {
 
         // Turn 0 → always ev
         let players = vec![
-            PlayerState { total_score: 100, ..Default::default() },
-            PlayerState { total_score: 150, ..Default::default() },
+            PlayerState {
+                total_score: 100,
+                ..Default::default()
+            },
+            PlayerState {
+                total_score: 150,
+                ..Default::default()
+            },
         ];
-        let view = GameView { my_index: 1, players: &players, turn: 0 };
+        let view = GameView {
+            my_index: 1,
+            players: &players,
+            turn: 0,
+        };
         assert_eq!(tables[policy.select_theta_index(&view, &tables)].theta, 0.0);
 
         // Trailing → θ=0 (protect-only doesn't seek)
         let players_trail = vec![
-            PlayerState { total_score: 150, ..Default::default() },
-            PlayerState { total_score: 100, ..Default::default() },
+            PlayerState {
+                total_score: 150,
+                ..Default::default()
+            },
+            PlayerState {
+                total_score: 100,
+                ..Default::default()
+            },
         ];
-        let view_trail = GameView { my_index: 1, players: &players_trail, turn: 7 };
-        assert_eq!(tables[policy.select_theta_index(&view_trail, &tables)].theta, 0.0);
+        let view_trail = GameView {
+            my_index: 1,
+            players: &players_trail,
+            turn: 7,
+        };
+        assert_eq!(
+            tables[policy.select_theta_index(&view_trail, &tables)].theta,
+            0.0
+        );
 
         // Leading by 50 → max protect θ = -0.03
-        let view_lead = GameView { my_index: 1, players: &players, turn: 7 };
-        assert_eq!(tables[policy.select_theta_index(&view_lead, &tables)].theta, -0.03);
+        let view_lead = GameView {
+            my_index: 1,
+            players: &players,
+            turn: 7,
+        };
+        assert_eq!(
+            tables[policy.select_theta_index(&view_lead, &tables)].theta,
+            -0.03
+        );
 
         // Even → θ=0
         let players_even = vec![
-            PlayerState { total_score: 100, ..Default::default() },
-            PlayerState { total_score: 100, ..Default::default() },
+            PlayerState {
+                total_score: 100,
+                ..Default::default()
+            },
+            PlayerState {
+                total_score: 100,
+                ..Default::default()
+            },
         ];
-        let view_even = GameView { my_index: 1, players: &players_even, turn: 7 };
-        assert_eq!(tables[policy.select_theta_index(&view_even, &tables)].theta, 0.0);
+        let view_even = GameView {
+            my_index: 1,
+            players: &players_even,
+            turn: 7,
+        };
+        assert_eq!(
+            tables[policy.select_theta_index(&view_even, &tables)].theta,
+            0.0
+        );
     }
 
     #[test]

@@ -83,7 +83,7 @@ pub fn load_all_state_values(ctx: &mut YatzyContext, filename: &str) -> bool {
         }
     };
 
-    // Validate header (accept v4 or v5)
+    // Validate header (accept v6 or v7)
     let header_ptr = mmap.as_ptr() as *const StateFileHeader;
     let header = unsafe { &*header_ptr };
     if header.magic != STATE_FILE_MAGIC
@@ -92,6 +92,46 @@ pub fn load_all_state_values(ctx: &mut YatzyContext, filename: &str) -> bool {
         println!(
             "Invalid file format (magic=0x{:08x} version={})",
             header.magic, header.version
+        );
+        return false;
+    }
+
+    // θ guard: a table saved for one θ must never load as another θ's.
+    // (Without this, the load-instead-of-recompute cache silently serves a
+    // wrong-θ table — see theory/lab-reports/fast-exp-lse-bias.md §6.)
+    let file_theta = if header.version == STATE_FILE_VERSION_THETA {
+        f32::from_bits(header.theta_bits)
+    } else {
+        0.0
+    };
+    if (file_theta - ctx.theta).abs() > 1e-6 {
+        println!(
+            "REFUSING TO LOAD {}: file θ = {} but requested θ = {}",
+            filename, file_theta, ctx.theta
+        );
+        return false;
+    }
+
+    // Content sanity on the game-start slot (cheap corruption/zero-fill check).
+    // EV mode: E[start] ~ 248.44, band (200, 300). θ≠0: CE = L0/θ must lie
+    // between the game's min and max scores — at extreme θ the CE approaches
+    // those bounds (θ = −3 has CE ≈ 70; θ → +∞ approaches 374), so the band
+    // is the physical score range with margin, NOT a near-EV band.
+    let start_val =
+        unsafe { *(mmap.as_ptr().add(std::mem::size_of::<StateFileHeader>()) as *const f32) };
+    let sane = if ctx.max_policy {
+        start_val.is_finite()
+    } else if ctx.theta == 0.0 {
+        (200.0..300.0).contains(&start_val)
+    } else {
+        let ce = start_val / ctx.theta;
+        start_val.is_finite() && (5.0..380.0).contains(&ce)
+    };
+    if !sane {
+        println!(
+            "REFUSING TO LOAD {}: game-start value {} fails sanity for θ = {} \
+             (corrupt or wrong-mode table?)",
+            filename, start_val, ctx.theta
         );
         return false;
     }
@@ -479,6 +519,50 @@ mod tests {
     }
 
     #[test]
+    fn test_theta_guard_refuses_wrong_theta() {
+        // A table saved for θ=0.05 must not load into a θ=0.10 context.
+        let test_file = "/tmp/yatzy_test_theta_guard.bin";
+
+        let mut ctx1 = YatzyContext::new_boxed();
+        phase0_tables::precompute_lookup_tables(&mut ctx1);
+        ctx1.theta = 0.05;
+        ctx1.state_values.as_mut_slice()[state_index(0, 0)] = 0.05 * 250.0; // plausible L0
+        save_all_state_values(&ctx1, test_file);
+
+        let mut ctx2 = YatzyContext::new_boxed();
+        ctx2.theta = 0.10;
+        assert!(
+            !load_all_state_values(&mut ctx2, test_file),
+            "wrong-theta table must be refused"
+        );
+
+        // Same θ loads fine.
+        let mut ctx3 = YatzyContext::new_boxed();
+        ctx3.theta = 0.05;
+        assert!(load_all_state_values(&mut ctx3, test_file));
+
+        let _ = fs::remove_file(test_file);
+    }
+
+    #[test]
+    fn test_content_sanity_refuses_zero_filled() {
+        // A zero-filled file of the correct size (e.g. torn write) must be
+        // refused: the θ=0 game-start value must sit in (200, 300).
+        let test_file = "/tmp/yatzy_test_zero_filled.bin";
+
+        let ctx1 = YatzyContext::new_boxed(); // state values all 0.0
+        save_all_state_values(&ctx1, test_file);
+
+        let mut ctx2 = YatzyContext::new_boxed();
+        assert!(
+            !load_all_state_values(&mut ctx2, test_file),
+            "zero-filled table must be refused"
+        );
+
+        let _ = fs::remove_file(test_file);
+    }
+
+    #[test]
     fn test_v4_round_trip() {
         let test_file = "/tmp/yatzy_test_all_states_v4_rust.bin";
 
@@ -492,7 +576,8 @@ mod tests {
             for up in 0..=63usize {
                 sv[state_index(up, all_scored)] = if up >= 63 { 50.0 } else { 0.0 };
             }
-            sv[state_index(0, 0)] = 123.5;
+            // Game-start value must sit in the loader's EV sanity band (200, 300)
+            sv[state_index(0, 0)] = 250.5;
             sv[state_index(63, 1)] = 789.0;
         }
 
@@ -516,7 +601,7 @@ mod tests {
         }
 
         // Spot-check
-        assert!((sv2[state_index(0, 0)] - 123.5).abs() < 1e-6);
+        assert!((sv2[state_index(0, 0)] - 250.5).abs() < 1e-6);
         assert!((sv2[state_index(63, 1)] - 789.0).abs() < 1e-6);
         assert!((sv2[state_index(63, all_scored)] - 50.0).abs() < 1e-9);
 

@@ -36,8 +36,15 @@ struct ValueTable {
 impl ValueTable {
     fn new() -> Self {
         let n = NUM_STATES * T_SIZE;
-        println!("Allocating value table: {:.1} GB ({} × {} entries)", n as f64 * 4.0 / 1e9, NUM_STATES, T_SIZE);
-        ValueTable { data: vec![0.0f32; n] }
+        println!(
+            "Allocating value table: {:.1} GB ({} × {} entries)",
+            n as f64 * 4.0 / 1e9,
+            NUM_STATES,
+            T_SIZE
+        );
+        ValueTable {
+            data: vec![0.0f32; n],
+        }
     }
 
     #[inline]
@@ -234,7 +241,10 @@ fn main() {
             }
         }
     }
-    println!("Terminal init: {:.1} ms", t2.elapsed().as_secs_f64() * 1000.0);
+    println!(
+        "Terminal init: {:.1} ms",
+        t2.elapsed().as_secs_f64() * 1000.0
+    );
 
     // Backward induction: popcount 14 down to 0
     let total_start = Instant::now();
@@ -256,9 +266,9 @@ fn main() {
         let vt_write_ptr = std::sync::atomic::AtomicPtr::new(vt.data.as_mut_ptr());
         let ctx_ref = &*ctx;
 
-        scored_masks
-            .par_iter()
-            .for_each_init(|| Buffers3D::new(), |bufs, &scored| {
+        scored_masks.par_iter().for_each_init(
+            || Buffers3D::new(),
+            |bufs, &scored| {
                 let rp = vt_read_ptr.load(std::sync::atomic::Ordering::Relaxed) as *const f32;
                 solve_3d_for_mask(ctx_ref, rp, scored, bufs);
 
@@ -284,14 +294,11 @@ fn main() {
                     let si = base + pad;
                     let start = si * T_SIZE;
                     unsafe {
-                        std::ptr::copy_nonoverlapping(
-                            capped.as_ptr(),
-                            ptr.add(start),
-                            T_SIZE,
-                        );
+                        std::ptr::copy_nonoverlapping(capped.as_ptr(), ptr.add(start), T_SIZE);
                     }
                 }
-            });
+            },
+        );
 
         let elapsed = level_start.elapsed().as_secs_f64();
         println!(
@@ -334,15 +341,24 @@ fn main() {
         // V[start][T] = P(remaining > T), which means total > T (since accumulated=0)
         // But we want P(total > T), and V stores P(remaining > t).
         // At start state, remaining = total, so V[start][T] = P(total > T). Correct.
-        let p_win = if score < T_SIZE { win_probs[score] as f64 } else { 0.0 };
+        let p_win = if score < T_SIZE {
+            win_probs[score] as f64
+        } else {
+            0.0
+        };
         clairvoyant_win += prob * p_win;
 
         // For reference: P(P2 > T) under theta=0 (from the same density)
-        let p_baseline: f64 = pmf.iter()
+        let p_baseline: f64 = pmf
+            .iter()
             .filter_map(|e| {
                 let s = e[0].as_f64().unwrap() as usize;
                 let p = e[1].as_f64().unwrap();
-                if s > score { Some(p) } else { None }
+                if s > score {
+                    Some(p)
+                } else {
+                    None
+                }
             })
             .sum();
         baseline_win += prob * p_baseline;
@@ -351,21 +367,34 @@ fn main() {
     println!("\n=== Clairvoyant Upper Bound (Unconstrained) ===");
     println!("Baseline (θ=0 vs θ=0):      {:.4}%", baseline_win * 100.0);
     println!("Constant-θ clairvoyant:      50.218%  (from exact PMF optimization)");
-    println!("Unconstrained clairvoyant:   {:.4}%", clairvoyant_win * 100.0);
-    println!("Advantage over baseline:     +{:.3}pp", (clairvoyant_win - baseline_win) * 100.0);
+    println!(
+        "Unconstrained clairvoyant:   {:.4}%",
+        clairvoyant_win * 100.0
+    );
+    println!(
+        "Advantage over baseline:     +{:.3}pp",
+        (clairvoyant_win - baseline_win) * 100.0
+    );
     println!("Our best policy (varscaled): +0.86pp");
     println!("Total PMF weight:            {:.6}", total_weight);
 
     // Print win probability for selected targets
     println!("\nWin probability by target score:");
     println!("{:>6} {:>10} {:>12}", "Target", "P(P1=T)", "P(P2>T|opt)");
-    for &t in &[100, 150, 200, 220, 240, 248, 250, 260, 270, 280, 300, 320, 340, 360] {
+    for &t in &[
+        100, 150, 200, 220, 240, 248, 250, 260, 270, 280, 300, 320, 340, 360,
+    ] {
         if t < T_SIZE {
-            let p1_prob: f64 = pmf.iter()
+            let p1_prob: f64 = pmf
+                .iter()
                 .filter_map(|e| {
                     let s = e[0].as_f64().unwrap() as usize;
                     let p = e[1].as_f64().unwrap();
-                    if s == t { Some(p) } else { None }
+                    if s == t {
+                        Some(p)
+                    } else {
+                        None
+                    }
                 })
                 .sum();
             println!("{:6} {:10.6} {:12.6}", t, p1_prob, win_probs[t]);

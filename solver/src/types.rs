@@ -23,8 +23,17 @@ use crate::constants::*;
 /// - `mask_to_keep[ds*32 + mask]` — reroll mask → keep index (API input translation)
 /// - `keep_to_mask[ds*32 + j]` — unique keep j → representative mask (API output)
 pub struct KeepTable {
-    /// Sparse probability values for each keep row (f32 — 7 sig digits, sufficient for transition weights).
+    /// Sparse probability values for each keep row (f32, 7 sig digits,
+    /// sufficient for the DP hot path where the f32 accumulator makes higher
+    /// precision moot and a 1e-7 weight error cannot flip an argmax).
     pub vals: Vec<f32>,
+    /// Exact f64 mirror of `vals`, in the same CSR layout. Used ONLY by the
+    /// offline density forward-DP for probability-mass propagation: f32 row
+    /// sums drift ~1e-7/row and compound to a ~3e-7 total-mass error over 15
+    /// turns (see theory/lab-reports/fast-exp-lse-bias.md §8). The hot-path
+    /// solver never reads this. ~34 KB; the exact value is computed at build
+    /// time anyway, so this just retains what the f32 cast would discard.
+    pub vals_f64: Vec<f64>,
     /// Column indices corresponding to vals entries.
     pub cols: Vec<i32>,
     /// Row boundaries: row_start[ki]..row_start[ki+1] gives range in vals/cols.
@@ -61,6 +70,7 @@ impl KeepTable {
     pub fn new() -> Self {
         Self {
             vals: Vec::with_capacity(MAX_KEEP_NNZ_TOTAL),
+            vals_f64: Vec::with_capacity(MAX_KEEP_NNZ_TOTAL),
             cols: Vec::with_capacity(MAX_KEEP_NNZ_TOTAL),
             row_start: [0; NUM_KEEP_MULTISETS + 1],
             unique_count: [0; NUM_DICE_SETS],

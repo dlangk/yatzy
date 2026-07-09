@@ -97,7 +97,7 @@ fn apply_reroll(dice: &mut [i32; 5], mask: i32, rng: &mut SmallRng) {
 
 /// Compute Group 6 (e_ds_0): best category EV for each of the 252 dice sets.
 #[inline(always)]
-fn compute_group6(
+pub(crate) fn compute_group6(
     ctx: &YatzyContext,
     sv: &[f32],
     up_score: i32,

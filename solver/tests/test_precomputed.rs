@@ -24,6 +24,10 @@ fn ev(ctx: &YatzyContext, up: i32, scored: i32) -> f64 {
 
 /// `cargo test` runs from solver/ with the data directory at the repo
 /// root, so fall back to the parent directory if needed.
+///
+/// Skip-visibility contract: without data these tests skip, but a skip must
+/// never be silent-green in a run that expects data. `just audit` sets
+/// YATZY_REQUIRE_DATA=1, turning a missing table into a hard failure.
 fn resolve_state_file() -> Option<String> {
     let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
     let _ = std::env::set_current_dir(&base_path);
@@ -36,6 +40,13 @@ fn resolve_state_file() -> Option<String> {
     if file_exists(&parent) {
         return Some(parent);
     }
+    if std::env::var("YATZY_REQUIRE_DATA").is_ok() {
+        panic!(
+            "YATZY_REQUIRE_DATA is set but {state_file} is missing — \
+             run `just precompute` first"
+        );
+    }
+    eprintln!("SKIPPED (no data): {state_file} not found");
     None
 }
 

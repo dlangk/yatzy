@@ -28,11 +28,6 @@ use crate::constants::*;
 use crate::storage::{load_all_state_values, save_all_state_values, state_file_path};
 use crate::types::{PolicyOracle, YatzyContext};
 
-/// Maximum |θ| for utility-domain solver. Beyond this, f32 mantissa erasure
-/// causes precision loss (e^(θ×100) > 2^24 when θ > 0.166).
-/// For |θ| > 0.15, fall back to the log-domain (LSE) solver.
-const UTILITY_THETA_LIMIT: f32 = 0.15;
-
 /// Progress tracker for the Phase 2 computation loop.
 struct ComputeProgress {
     total_states: i32,
@@ -128,17 +123,16 @@ pub fn compute_all_state_values(ctx: &mut YatzyContext) {
     compute_all_state_values_inner(ctx, &mut None);
 }
 
-/// Like `compute_all_state_values` but always recomputes (skips cache check).
-/// Used by benchmarks to measure actual computation time.
+/// Like `compute_all_state_values` but always recomputes (skips cache check)
+/// and does NOT save. Used by benchmarks to measure actual computation time.
 pub fn compute_all_state_values_nocache(ctx: &mut YatzyContext) {
-    compute_all_state_values_nocache_inner(ctx, &mut None);
+    compute_all_state_values_impl(ctx, &mut None, true, false);
 }
 
-fn compute_all_state_values_nocache_inner(
-    ctx: &mut YatzyContext,
-    oracle: &mut Option<PolicyOracle>,
-) {
-    compute_all_state_values_impl(ctx, oracle, true);
+/// Like `compute_all_state_values` but always recomputes AND saves,
+/// overwriting any existing table. Used by `yatzy-precompute --force`.
+pub fn compute_all_state_values_force(ctx: &mut YatzyContext) {
+    compute_all_state_values_impl(ctx, &mut None, true, true);
 }
 
 fn compute_all_state_values_inner(ctx: &mut YatzyContext, oracle: &mut Option<PolicyOracle>) {
@@ -146,13 +140,14 @@ fn compute_all_state_values_inner(ctx: &mut YatzyContext, oracle: &mut Option<Po
     // cached state values exist on disk, because the oracle arrays need to be
     // populated from the argmax decisions computed during the sweep.
     let skip_cache = oracle.is_some();
-    compute_all_state_values_impl(ctx, oracle, skip_cache);
+    compute_all_state_values_impl(ctx, oracle, skip_cache, !skip_cache);
 }
 
 fn compute_all_state_values_impl(
     ctx: &mut YatzyContext,
     oracle: &mut Option<PolicyOracle>,
     skip_cache: bool,
+    save_result: bool,
 ) {
     let mut progress = ComputeProgress::new(ctx);
 
@@ -177,7 +172,13 @@ fn compute_all_state_values_impl(
             state_file_path(ctx.theta)
         };
         if load_all_state_values(ctx, &consolidated_file) {
-            println!("Loaded pre-computed states from consolidated file");
+            println!();
+            println!("╔══════════════════════════════════════════════════════════════════╗");
+            println!("║  LOADED CACHED TABLE — NO COMPUTATION WAS PERFORMED               ║");
+            println!("║  {:<66}║", consolidated_file);
+            println!("║  If solver code changed since this file was written, it is STALE. ║");
+            println!("║  Recompute with:  yatzy-precompute --force [--theta θ]            ║");
+            println!("╚══════════════════════════════════════════════════════════════════╝");
             return;
         }
     }
@@ -397,7 +398,7 @@ fn compute_all_state_values_impl(
         );
     }
 
-    if !skip_cache {
+    if save_result {
         let save_file = if ctx.max_policy {
             "data/all_states_max.bin".to_string()
         } else {

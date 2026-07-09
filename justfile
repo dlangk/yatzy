@@ -254,6 +254,12 @@ bench:
 test:
     cd solver && cargo test
 
+# Audit tier: heavy invariant tests + data-gated cross-checks.
+# YATZY_REQUIRE_DATA turns silent data-skips into hard failures.
+# Runs release mode (the DP-differential tests are too slow in debug).
+audit:
+    cd solver && YATZY_REQUIRE_DATA=1 cargo test --release -- --include-ignored
+
 # Check formatting and lints
 lint:
     cd solver && cargo fmt --check && cargo clippy
