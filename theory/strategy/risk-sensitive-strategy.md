@@ -1,5 +1,14 @@
 # Risk-Sensitive Strategy
 
+> **Data note (2026-07-09):** a fast-exp bug biased all |θ| > 0.15 solves low
+> (see `lab-reports/fast-exp-lse-bias.md`). Strategy tables, exact densities,
+> and the score-distribution MC rows in §2/§3/§5 have been regenerated from
+> fixed tables (largest shift: θ = −0.20 mean 223.6 → 227.5; |θ| ≥ 0.5 rows
+> were unchanged — frozen policies were immune). Still pre-fix: the §7
+> disagreement rates at θ = 0.50/3.00 and the per-category/timing analyses in
+> §7.4-7.5, which need full-recording reruns. |θ| ≤ 0.15 rows were never
+> affected.
+
 ## 1. The θ Parameter
 
 We generalize the solver to optimize exponential utility rather than expected value:
@@ -18,14 +27,14 @@ We solved the full DP for 37 θ values from −3.0 to +3.0 with progressive spac
 
 | θ | Mean | Std | p5 | p50 | p95 | p99 |
 |---:|---:|---:|---:|---:|---:|---:|
-| −1.00 | 198.2 | 37.9 | 148 | 191 | 269 | 300 |
+| −1.00 | 198.4 | 37.8 | 148 | 191 | 269 | 300 |
 | −0.10 | 239.2 | 35.8 | 172 | 241 | 300 | 319 |
 | −0.05 | 245.1 | 35.7 | 179 | 245 | 305 | 322 |
 | **0.00** | **248.4** | **38.5** | **179** | **249** | **309** | **325** |
 | +0.05 | 244.5 | 43.2 | 164 | 244 | 312 | 327 |
 | +0.07 | 240.9 | 45.3 | 159 | 241 | 313 | 328 |
 | +0.10 | 235.9 | 46.9 | 155 | 237 | 312 | 329 |
-| +0.20 | 225.3 | 48.3 | 148 | 228 | 308 | 329 |
+| +0.20 | 223.8 | 48.4 | 148 | 225 | 308 | 329 |
 | +1.00 | 194.5 | 46.3 | 128 | 188 | 276 | 309 |
 
 **Best θ per quantile:**
@@ -44,8 +53,8 @@ The optimal θ shifts from negative (risk-averse) for lower quantiles to positiv
 
 The (mean, σ) curve is not a single curve. It traces two distinct branches:
 
-- **Risk-averse branch** (θ < 0): σ stays nearly flat at 35–40 as mean drops from 248.4 to 188.5 (θ = −3). Variance compresses without moving much.
-- **Risk-seeking branch** (θ > 0): σ rises to 48.3 (at θ ≈ 0.2), then falls back to 44 as mean drops from 248 to 186.
+- **Risk-averse branch** (θ < 0): σ stays nearly flat at 35–40 as mean drops from 248.4 to 188.7 (θ = −3). Variance compresses without moving much.
+- **Risk-seeking branch** (θ > 0): σ rises to 48.4 (at θ ≈ 0.2), then falls back to 44 as mean drops from 248 to 186.
 
 At the same mean (~190), the risk-seeking branch (θ ≈ 1) has σ ≈ 46 vs σ ≈ 37 for the risk-averse branch (θ ≈ −1.5). A quadratic fit across all 37 sweep points gives R² = 0.21 — confirming these are two distinct branches, not a single frontier.
 
@@ -66,7 +75,7 @@ For p95 specifically: the Gaussian approximation p95 ≈ μ + 1.645σ predicts t
 
 **The two directions are asymmetric.** At θ = −0.05, σ drops 2.8 for a mean cost of 3.3. At θ = +0.05, σ rises 4.7 for a mean cost of 3.9. Risk-seeking buys more σ per mean point (1.21 vs 0.85) but also costs more mean in absolute terms. The asymmetry is further visible in the branch structure (Section 3): the risk-averse branch compresses σ into a narrow band (35–38) regardless of mean, while the risk-seeking branch first expands σ (peaking at 48.4) then slowly contracts it.
 
-**Both extremes degenerate symmetrically.** At θ = −3 (mean 188.5) and θ = +3 (mean 186.5), strategies are comparably poor. Refusing all variance is as costly as embracing all variance.
+**Both extremes degenerate symmetrically.** At θ = −3 (mean 188.7) and θ = +3 (mean 186.5), strategies are comparably poor. Refusing all variance is as costly as embracing all variance.
 
 **Regime boundaries:**
 

@@ -1,5 +1,11 @@
 # Applications and Appendices
 
+> **Data note (2026-07-09):** Appendix C's |θ| > 0.15 rows were refreshed
+> from post-fix strategy tables (see `lab-reports/fast-exp-lse-bias.md`).
+> Changed rows: −3, −2, −1.5, −1 (≤0.2-pt drifts), −0.20 (mean 223.6 → 227.5),
+> +0.200 (225.3 → 223.8), +0.300 (217.0 → 215.7). Rows at |θ| ≥ 0.5 came out
+> identical: fully-degenerate policies were immune to the bias.
+
 ## 1. Player Card: Simulation-Backed Profile Analytics
 
 After quiz completion, the player's estimated (θ, β, γ, d) parameters are translated into tangible gameplay metrics via pre-computed Monte Carlo simulations. The Player Card shows the player's expected score distribution and pinpoints where each cognitive imperfection costs them the most points.
@@ -121,14 +127,14 @@ Each state in the filtered set is annotated with: optimal action and EV, second-
 
 | θ | Mean | Std | p5 | p50 | p95 | p99 | Max |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| −3.00 | 188.5 | 37.0 | 139 | 181 | 257 | 293 | 344 |
-| −2.00 | 190.6 | 36.9 | 142 | 183 | 259 | 295 | 343 |
-| −1.50 | 192.5 | 37.0 | 143 | 185 | 261 | 296 | 343 |
-| −1.00 | 198.2 | 37.9 | 148 | 191 | 269 | 300 | 344 |
+| −3.00 | 188.7 | 37.0 | 139 | 181 | 257 | 293 | 344 |
+| −2.00 | 190.8 | 36.8 | 142 | 183 | 259 | 295 | 343 |
+| −1.50 | 192.7 | 37.0 | 143 | 185 | 261 | 296 | 343 |
+| −1.00 | 198.4 | 37.8 | 148 | 191 | 269 | 300 | 344 |
 | −0.75 | 203.2 | 38.6 | 151 | 196 | 275 | 303 | 341 |
 | −0.50 | 211.6 | 39.5 | 156 | 209 | 283 | 308 | 345 |
 | −0.30 | 221.7 | 39.8 | 161 | 226 | 290 | 313 | 356 |
-| −0.20 | 223.6 | 39.4 | 163 | 229 | 290 | 314 | 349 |
+| −0.20 | 227.5 | 39.3 | 165 | 233 | 294 | 315 | 353 |
 | −0.15 | 231.8 | 38.9 | 167 | 237 | 298 | 317 | 354 |
 | −0.10 | 239.2 | 35.8 | 172 | 241 | 300 | 319 | 355 |
 | −0.07 | 242.4 | 35.0 | 175 | 243 | 302 | 320 | 355 |
@@ -150,8 +156,8 @@ Each state in the filtered set is annotated with: optimal action and EV, second-
 | +0.070 | 240.9 | 45.3 | 159 | 241 | 313 | 328 | 362 |
 | +0.100 | 235.9 | 46.9 | 155 | 237 | 312 | 329 | 362 |
 | +0.150 | 229.2 | 47.9 | 152 | 231 | 311 | 329 | 362 |
-| +0.200 | 225.3 | 48.3 | 148 | 228 | 308 | 329 | 358 |
-| +0.300 | 217.0 | 48.4 | 143 | 217 | 301 | 326 | 360 |
+| +0.200 | 223.8 | 48.4 | 148 | 225 | 308 | 329 | 358 |
+| +0.300 | 215.7 | 48.5 | 142 | 215 | 301 | 327 | 358 |
 | +0.500 | 204.7 | 47.6 | 135 | 200 | 287 | 319 | 361 |
 | +0.750 | 198.1 | 47.0 | 130 | 192 | 280 | 313 | 360 |
 | +1.000 | 194.5 | 46.3 | 128 | 188 | 276 | 309 | 359 |
