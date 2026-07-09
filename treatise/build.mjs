@@ -7,6 +7,12 @@ import { inlineDieSVG } from "../shared/dice.js";
 const SECTIONS_DIR = join(import.meta.dirname, "sections");
 const md = new MarkdownIt({ html: true });
 
+// Sections hidden from the treatise for now (unfinished). Excluded from the
+// TOC and from section numbering (so remaining sections stay contiguous).
+// Their content is also commented out of index.html's `sectionFiles`.
+// To restore: drop the filename here and uncomment it in index.html.
+const HIDDEN_SECTIONS = new Set(["07-compression.md", "08-profiling.md"]);
+
 // Block shortcodes: :::type{#id} ... :::
 // Supports: section, math, code, equation, insight, part-title, html
 const BLOCK_RE = /^:::(\w[\w-]*)(\{#([\w-]+)\})?\s*$/;
@@ -127,6 +133,7 @@ const fileSectionMap = new Map(); // file -> { number, id }
 let sectionNum = 0;
 for (const file of files) {
   if (!/^\d/.test(file) || file === "header.md" || file.startsWith("00-")) continue;
+  if (HIDDEN_SECTIONS.has(file)) continue;
   const src = readFileSync(join(SECTIONS_DIR, file), "utf-8");
   const idMatch = src.match(SECTION_ID_RE);
   const h2Match = src.match(FIRST_H2_RE);

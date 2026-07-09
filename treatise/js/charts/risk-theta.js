@@ -153,13 +153,16 @@ export async function initRiskTheta() {
       .attr('stroke', color)
       .attr('stroke-width', 2.5);
 
-    // ±1σ, ±2σ, ±3σ lines. Same dashed style as the mean line so the spread
-    // reads clearly; higher sigma is progressively fainter to keep the mean
-    // dominant while still showing how far the upper tail reaches at higher θ.
+    // ±1σ…±4σ lines. Same dashed style as the mean line so the spread reads
+    // clearly; higher sigma is progressively fainter to keep the mean dominant
+    // while still showing how far the tail reaches at higher θ. (±4σ often
+    // falls past the 400 domain and is clipped; that itself signals the tail
+    // running off the achievable score range.)
     const sigmaLevels = [
       { k: 1, opacity: 0.7 },
       { k: 2, opacity: 0.52 },
       { k: 3, opacity: 0.36 },
+      { k: 4, opacity: 0.24 },
     ];
     for (const { k, opacity } of sigmaLevels) {
       for (const sign of [-1, 1]) {
@@ -195,26 +198,6 @@ export async function initRiskTheta() {
       .attr('fill', color)
       .style('font-size', '11px')
       .text(`mean = ${cur.mean.toFixed(1)}`);
-
-    // Threshold lines at 100 and 360
-    for (const { val, label, anchor, dx } of [
-      { val: 100, label: '100', anchor: 'start', dx: 4 },
-      { val: 360, label: '360', anchor: 'end', dx: -4 },
-    ]) {
-      g.append('line')
-        .attr('x1', x(val)).attr('x2', x(val))
-        .attr('y1', 0).attr('y2', height)
-        .attr('stroke', getMutedColor())
-        .attr('stroke-width', 1)
-        .attr('stroke-dasharray', '2,3')
-        .attr('opacity', 0.6);
-      g.append('text')
-        .attr('x', x(val) + dx).attr('y', 26)
-        .attr('text-anchor', anchor)
-        .attr('fill', getMutedColor())
-        .style('font-size', '9px')
-        .text(label);
-    }
 
     // Axes
     drawAxis(g.append('g').attr('transform', `translate(0,${height})`), x, 'bottom', 'Score');

@@ -1,6 +1,6 @@
 :::section{#multiplayer}
 
-## Multiplayer and Adaptive Strategies
+## The Follower Advantage
 
 I think very few people play Yatzy by themselves 😅 It's possible I have during the course of this porject, but let's not talk about that.
 

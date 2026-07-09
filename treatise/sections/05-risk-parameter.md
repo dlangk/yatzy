@@ -1,6 +1,6 @@
 :::section{#risk-parameter}
 
-## Taking Risk
+## The Risk Parameter
 
 We defined the optimal strategy as "maximize the expected score." Such a strategy will get the highest possible *average* score. But, reality is, most people don't play Yatzy to get a good average. We like to play to win! 😜 We all remember that one time when all stars aligned and we got 322 points, and want to experience it again! So, in that spirit, let's see if we can design a solver that takes more risk.
 
