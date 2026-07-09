@@ -153,27 +153,41 @@ export async function initRiskTheta() {
       .attr('stroke', color)
       .attr('stroke-width', 2.5);
 
-    // ±1σ lines
-    const loSigma = cur.mean - cur.std;
-    const hiSigma = cur.mean + cur.std;
-    for (const sx of [loSigma, hiSigma]) {
-      if (sx > 0 && sx < 400) {
+    // ±1σ, ±2σ, ±3σ lines. Same dashed style as the mean line so the spread
+    // reads clearly; higher sigma is progressively fainter to keep the mean
+    // dominant while still showing how far the upper tail reaches at higher θ.
+    const sigmaLevels = [
+      { k: 1, opacity: 0.7 },
+      { k: 2, opacity: 0.52 },
+      { k: 3, opacity: 0.36 },
+    ];
+    for (const { k, opacity } of sigmaLevels) {
+      for (const sign of [-1, 1]) {
+        const sx = cur.mean + sign * k * cur.std;
+        if (sx <= 0 || sx >= 400) continue;
         g.append('line')
           .attr('x1', x(sx)).attr('x2', x(sx))
           .attr('y1', 0).attr('y2', height)
           .attr('stroke', color)
-          .attr('stroke-width', 1)
-          .attr('stroke-dasharray', '3,4')
-          .attr('opacity', 0.4);
+          .attr('stroke-width', 1.5)
+          .attr('stroke-dasharray', '5,3')
+          .attr('opacity', opacity);
+        g.append('text')
+          .attr('x', x(sx) + (sign > 0 ? 4 : -4)).attr('y', height - 6)
+          .attr('text-anchor', sign > 0 ? 'start' : 'end')
+          .attr('fill', color)
+          .attr('opacity', Math.min(opacity + 0.2, 0.95))
+          .style('font-size', '9px')
+          .text(`${sign > 0 ? '+' : '−'}${k}σ`);
       }
     }
 
-    // Mean line
+    // Mean line (heaviest, so it stays dominant over the sigma lines)
     g.append('line')
       .attr('x1', x(cur.mean)).attr('x2', x(cur.mean))
       .attr('y1', 0).attr('y2', height)
       .attr('stroke', color)
-      .attr('stroke-width', 1.5)
+      .attr('stroke-width', 2.25)
       .attr('stroke-dasharray', '5,3');
 
     g.append('text')
@@ -181,24 +195,6 @@ export async function initRiskTheta() {
       .attr('fill', color)
       .style('font-size', '11px')
       .text(`mean = ${cur.mean.toFixed(1)}`);
-
-    // σ labels
-    if (loSigma > 20) {
-      g.append('text')
-        .attr('x', x(loSigma) + 4).attr('y', height - 6)
-        .attr('fill', color)
-        .attr('opacity', 0.5)
-        .style('font-size', '9px')
-        .text('\u22121\u03c3');
-    }
-    if (hiSigma < 390) {
-      g.append('text')
-        .attr('x', x(hiSigma) + 4).attr('y', height - 6)
-        .attr('fill', color)
-        .attr('opacity', 0.5)
-        .style('font-size', '9px')
-        .text('+1\u03c3');
-    }
 
     // Threshold lines at 100 and 360
     for (const { val, label, anchor, dx } of [

@@ -92,12 +92,12 @@ With the theoretical bounds established, we can now evaluate practical strategie
 | Strategy | H2H Win Rate | Net Advantage |
 |----------|-------------|---------------|
 | EV-optimal baseline | 50.04% | 0.00pp |
-| Seek-only (linear) | 50.44% | +0.41pp |
 | Protect-only (linear) | 50.20% | +0.16pp |
+| Seek-only (linear) | 50.44% | +0.41pp |
 | Symmetric (linear) | 50.57% | +0.53pp |
-| Constant-&theta; oracle | 50.6% | +0.60pp |
-| **Variance-scaled [&minus;0.05, +0.07]** | **50.9%** | **+0.86pp** |
-| Unconstrained clairvoyant | 55.3% | +5.3pp |
+| Constant-&theta; oracle | 50.60% | +0.60pp |
+| **Variance-scaled [&minus;0.05, +0.07]** | **50.90%** | **+0.86pp** |
+| Unconstrained clairvoyant | 55.30% | +5.30pp |
 
 The linear policies scale &theta; proportionally with the EV deficit but ignore remaining variance. Risk-seeking when trailing contributes roughly 75% of the advantage; protecting when leading adds the remaining 25%. We also tested "Hail Mary" variants that play EV-optimal until the last 2-3 turns then spike &theta;. Every such variant performed worse than the linear policies: under large &theta;, the exponential utility becomes a max-score chaser rather than a target optimizer.
 
