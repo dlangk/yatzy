@@ -29,9 +29,11 @@
 .prob-row {
   display: grid;
   grid-template-columns: 110px 1fr auto;
-  grid-template-areas: "label dice stats";
+  grid-template-areas:
+    "label dice stats"
+    "footer footer footer";
   align-items: center;
-  gap: 1rem;
+  gap: 0.5rem 1rem;
   padding: 0.75rem 1rem;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -64,14 +66,18 @@
 .row-stats .stat b { color: var(--text); }
 .row-stats .stat.best b { color: var(--accent); }
 
-.best-hint {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  font-size: 0.8rem;
-  color: var(--text-muted);
+.row-footer {
+  grid-area: footer;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
+  border-top: 1px dashed var(--border);
+  padding-top: 0.5rem;
+}
+.best-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
 }
 .roll-btn {
   font-family: var(--font-serif);
@@ -89,6 +95,9 @@
 .result.miss { color: var(--color-danger); font-weight: 600; }
 
 @media (max-width: 620px) {
-  .prob-row { grid-template-columns: 1fr; grid-template-areas: "label" "dice" "stats"; }
+  .prob-row {
+    grid-template-columns: 1fr;
+    grid-template-areas: "label" "dice" "stats" "footer";
+  }
   .row-stats { text-align: left; flex-direction: row; gap: 1rem; }
 }

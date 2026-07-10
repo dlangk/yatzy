@@ -1,3 +1,4 @@
-// Entry point — full rendering wired in Task 4.
+import { initProbTool } from './render.js';
+
 const root = document.getElementById('prob-root');
-if (root) root.textContent = 'Loading...';
+if (root) initProbTool(root);

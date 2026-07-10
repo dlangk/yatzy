@@ -9,4 +9,4 @@ your hold vs. optimal (target-maximizing) play.
 - `js/render.js` — three-row live simulation trace.
 - `js/main.js` — entry point.
 
-No build step. Run tests: `node --test js/`.
+No build step. Run tests: `node --test js/*.test.js`.
