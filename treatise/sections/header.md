@@ -9,6 +9,16 @@
     <a href="https://github.com/dlangk/yatzy">Source code</a>
   </p>
 
+  <figure class="hero-cover">
+    <video autoplay muted loop playsinline
+           aria-label="Exact Yatzy score distribution as the solver's risk parameter sweeps from neutral to bold and back">
+      <source src="media/hero-density.webm" type="video/webm">
+      <source src="media/hero-density.mp4" type="video/mp4">
+      <img src="media/hero-density.gif" alt="Animated Yatzy score distribution sweeping the risk parameter">
+    </video>
+    <figcaption>The exact score distribution as the solver's risk-dial &theta; sweeps from neutral to bold.</figcaption>
+  </figure>
+
   <!-- TOC -->
 </header>
 :::
