@@ -80,6 +80,13 @@ cp -r "$PROJECT_ROOT/profiler/css/"* "$FRONTEND_CTX/apps/profile/css/"
 cp -r "$PROJECT_ROOT/profiler/js/"* "$FRONTEND_CTX/apps/profile/js/"
 cp -r "$PROJECT_ROOT/profiler/data/"* "$FRONTEND_CTX/apps/profile/data/"
 
+# Probabilities tool at /prob/
+mkdir -p "$FRONTEND_CTX/apps/prob/css" "$FRONTEND_CTX/apps/prob/js"
+cp "$PROJECT_ROOT/prob/index.html" "$FRONTEND_CTX/apps/prob/index.html"
+cp -r "$PROJECT_ROOT/prob/css/"* "$FRONTEND_CTX/apps/prob/css/"
+cp -r "$PROJECT_ROOT/prob/js/"* "$FRONTEND_CTX/apps/prob/js/"
+rm -f "$FRONTEND_CTX/apps/prob/js/"*.test.js
+
 # Nginx config and entrypoint
 cp "$DEPLOY_DIR/nginx.conf" "$FRONTEND_CTX/nginx.conf"
 cp "$DEPLOY_DIR/entrypoint.sh" "$FRONTEND_CTX/entrypoint.sh"
@@ -162,6 +169,8 @@ echo -n "Game UI:        "
 docker exec yatzy-frontend wget -q --spider http://localhost:8090/play/ && echo "OK" || echo "FAIL"
 echo -n "Profiler:       "
 docker exec yatzy-frontend wget -q --spider http://localhost:8090/profile/ && echo "OK" || echo "FAIL"
+echo -n "Probabilities:  "
+docker exec yatzy-frontend wget -q --spider http://localhost:8090/prob/ && echo "OK" || echo "FAIL"
 echo -n "External:       "
 curl -sk -H "Host: langkilde.se" -o /dev/null -w "%{http_code}" https://localhost/yatzy/ && echo " OK" || echo " FAIL"
 HEALTHCHECK
@@ -193,4 +202,5 @@ echo "=== Deploy complete ==="
 echo "  Treatise:  https://langkilde.se/yatzy/"
 echo "  Game:      https://langkilde.se/yatzy/play/"
 echo "  Profiler:  https://langkilde.se/yatzy/profile/"
+echo "  Prob:      https://langkilde.se/yatzy/prob/"
 echo "  API:       https://langkilde.se/yatzy/api/health"
