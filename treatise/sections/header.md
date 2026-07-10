@@ -1,8 +1,8 @@
 :::html
 <header class="post-header">
-  <h1>More Than You Ever Wanted To Know About Yatzy</h1>
+  <h1>Can You Be Skilled At Playing Yatzy?</h1>
   <p class="post-subtitle">
-    Answering the question: Can you actually be good at playing yatzy?
+    Computing the optimal strategy for Scandinavian yatzy.
   </p>
   <p class="post-meta">
     Daniel Langkilde &middot; 2025 &middot;

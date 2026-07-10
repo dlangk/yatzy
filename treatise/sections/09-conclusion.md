@@ -2,17 +2,21 @@
 
 ## The Conclusions
 
-This project started because one evening, when playing with my family, we got to wondering whether you can actually be good at Yatzy. It turns out the answer is:
+I've always been fascinated by the balance between skill and luck in life. Every game, and even activity, requires some mixture of skill and luck. Some games, like chess, are pure skill. Others, like lotteries, are pure luck. Most of life is somewhere in between. My exploration of Yatzy started because one evening, when playing with my family, we got to wondering whether you can actually be skilled at playing Yatzy. Here are the answers:
 
-**Yes, you can be great at Yatzy.** In fact, there is even a "perfect" policy that can be computed. There is a way to reduce the state space of Yatzy to ~1.43M by ignoring the dice order, forgetting the past, pruning the impossible, breaking each turn into a widget, and always moving forward. As a result, a laptop solves the whole thing in seconds.
+**Yes, you can be skilled at playing Yatzy.** In fact, there is even a "perfect" policy that can be computed. There is a way to reduce the state space of Yatzy to ~1.43M by ignoring the dice order, forgetting the past, pruning the impossible and breaking each turn into a widget. With these simplifications, dynamic programming allows us to solve the game in seconds on a laptop.
 
-**An optimal Scandinavian Yatzy player scores 248.4 on average, with a standard deviation of 38.5.**
+**Conclusion**: An optimal Scandinavian Yatzy player scores **248.4 on average**, with a **standard deviation of 38.5**. This means that in about two out of every three games, even when playing perfectly, your score will land somewhere between roughly 210 and 287. You will frequently have rough games below 180, but also brilliant ones above 310. So, even if you can be skilled, there is significant luck involved.
 
-**There is a predictable reward for taking risk.** Most of us don't play for a good average, we play to win. We have added a risk-dial &theta; that lets the solver reach for tail outcomes. We carefully mapped the mean-variance frontier, learning that a small amount of extra risk buys a decent bump in the top percentiles of outcomes. But, if you push it too far, the policy collapses into a max-score gambler whose best game shows up with a probability around 10<sup>&minus;19</sup>.
+**There is a predictable reward for taking risk.** Most of us don't play for a good average, we play to win. We have added a risk-dial &theta; that lets the solver reach for tail outcomes. We carefully mapped the mean-variance frontier, learning that a small amount of extra risk buys a decent bump in the top percentiles of outcomes. But, if you push it too far, the policy collapses into a degenerate max-score gambler. While it might capture an incredibly rare tail outcome, they show up with probabilities as low as 10<sup>&minus;19</sup>.
 
-**There is a way to win slightly more than 50% of games if you get to play after your opponent.** If the objective is to beat another player in a specific game, instead of maximizing e.g. your average score, it turns out the player who gets to go second has a small advantage. If they adapt their risk-taking turn by turn, the very best they can squeeze out is about 9 extra wins per 1000 games. Even a clairvoyant player, who somehow knew your final score before the game started, would win only 55.3% of the time.
+**There is a way to win slightly more than 50% of games if you get to play after your opponent.** If the objective is to beat another player in a specific game, instead of maximizing your score, it turns out the player who gets to go second has a small advantage. If the second player adapts their risk-taking turn by turn, they can squeeze out about 9 extra wins per 1000 games. Even a clairvoyant player, who somehow knows their opponents final score before the game starts, would win only 55.3% of the time.
 
-**This is why Yatzy is such a good family game!** There is enough skill that the optimal strategy gives a significant bump in average score. But there is enough luck involved that, even playing perfectly, a seasoned veteran will regularly lose to a novice. Across a lifetime of games, you will likely see a handful of scores above 330. So, Yatzy has room for skill, but it is mostly luck. When you win, you feel skilled. When you lose, you were unlucky. This is the balance a great family game needs. 😊
+**This is why Yatzy is such a good family game!** There is enough skill that the optimal strategy gives a significant bump in average score, and randomly play is clearly terrible. But there is enough luck involved that, even playing perfectly, a seasoned veteran will regularly lose to a novice. Across a lifetime of games, you will likely see a handful of scores above 330. So, Yatzy has room for skill, but it is mostly luck. When you win, you feel skilled. When you lose, you were unlucky.
+
+**This is the balance a great family game needs. 😊**
+
+Now, go [play some Yatzy](/yatzy/play/)!
 
 :::math
 
