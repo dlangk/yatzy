@@ -68,7 +68,9 @@ def main():
     scores, dens, mean, std = load_curve(THETA)
     color = theta_color(THETA)
 
-    fig = plt.figure(figsize=(12, 6.3), dpi=100)
+    # 2x pixel density (2400x1260) so serif text stays crisp on Retina and on
+    # larger card renders; platforms downscale to the 1200x630 they display.
+    fig = plt.figure(figsize=(12, 6.3), dpi=200)
     fig.patch.set_facecolor(BG)
 
     # Chart fills the lower ~70% of the card, like the live widget, with
