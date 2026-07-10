@@ -11,7 +11,9 @@ Run:
 Output: treatise/og-cover.png
 """
 
+import glob
 import json
+import re
 from pathlib import Path
 
 import numpy as np
@@ -22,10 +24,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.colors import to_rgb
 
-BG = "#14110d"       # deep warm near-black, makes the orange pop
+BG = "#161311"       # matches the treatise dark chart background
 TEXT = "#f3efe7"     # cream (matches treatise --text on dark)
 MUTED = "#9a9488"
+GRID = "#333333"
 THETA = 0.04
+SMOOTH = 1.5         # emulates the chart's D3 curveBasis
+Y_MAX = 0.015        # fixed y-domain, same as the live risk-theta chart
 
 THETA_STOPS = [
     (-0.30, "#3b4cc0"), (-0.15, "#8db0fe"), (0.00, "#F37021"),
@@ -43,43 +48,83 @@ def theta_color(t):
     return to_rgb(THETA_STOPS[-1][1])
 
 
-def main():
-    d = json.load(open(f"outputs/density/density_{THETA:g}.json"))
+def load_curve(theta):
+    d = json.load(open(f"outputs/density/density_{theta:g}.json"))
     scores = np.array([p[0] for p in d["pmf"]], dtype=float)
-    dens = gaussian_filter1d(np.array([p[1] for p in d["pmf"]], dtype=float), 1.5)
-    mean = d["mean"]
+    dens = gaussian_filter1d(np.array([p[1] for p in d["pmf"]], dtype=float), SMOOTH)
+    return scores, dens, d["mean"], d["std_dev"]
+
+
+def main():
+    # The full curve family (|theta| <= 0.4), same range the live chart shows.
+    family = []
+    for p in glob.glob("outputs/density/density_*.json"):
+        m = re.search(r"density_(-?[\d.]+)\.json", p)
+        t = float(m.group(1))
+        if -0.401 <= t <= 0.401:
+            family.append(t)
+    family.sort()
+
+    scores, dens, mean, std = load_curve(THETA)
     color = theta_color(THETA)
 
     fig = plt.figure(figsize=(12, 6.3), dpi=100)
     fig.patch.set_facecolor(BG)
 
-    # Chart occupies the lower ~62% of the card, full-bleed, as a backdrop.
-    # Zoom the x-range to where the mass lives so the curve fills and centers.
-    ax = fig.add_axes([0.0, 0.0, 1.0, 0.62])
+    # Chart fills the lower ~70% of the card, like the live widget, with
+    # equal left/right margins. The x-window is centered on the mean so the
+    # distribution's mass sits in the middle of the card (a 0-400 axis would
+    # push it right-of-center).
+    ax = fig.add_axes([0.035, 0.06, 0.93, 0.68])
     ax.set_facecolor(BG)
-    ax.set_xlim(80, 380)
-    ax.set_ylim(0, dens.max() * 1.18)
-    ax.fill_between(scores, dens, color=color, alpha=0.26, zorder=1)
-    ax.plot(scores, dens, color=color, lw=4.5, zorder=3, solid_capstyle="round")
-    ax.axvline(mean, color=color, lw=2.0, dashes=(5, 3), alpha=0.55, zorder=2)
-    ax.text(mean + 5, dens.max() * 1.08, f"mean {mean:.0f}", color=color,
-            fontsize=15, ha="left", va="top", family="serif")
+    x_lo, x_hi = mean - 145.0, mean + 145.0
+    ax.set_xlim(x_lo, x_hi)
+    ax.set_ylim(0, Y_MAX)
+
+    # Faint dashed grid (as in the chart).
+    for gy in np.linspace(0, Y_MAX, 6):
+        ax.axhline(gy, color=GRID, lw=0.7, dashes=(2, 3), zorder=0)
+    for gx in range(0, 401, 50):
+        if x_lo < gx < x_hi:
+            ax.axvline(gx, color=GRID, lw=0.7, dashes=(2, 3), zorder=0)
+
+    # Ghost family: every computed curve, faint, coloured by its theta.
+    for t in family:
+        sc, de, _, _ = load_curve(t)
+        ax.plot(sc, de, color=theta_color(t), lw=1.0, alpha=0.16, zorder=1)
+
+    # Featured theta=0.04 curve: filled + bold.
+    ax.fill_between(scores, dens, color=color, alpha=0.18, zorder=2)
+    ax.plot(scores, dens, color=color, lw=4.0, zorder=5, solid_capstyle="round")
+
+    # +-1..4 sigma lines (graded), matching the distribution chart.
+    for k, alpha in [(1, 0.7), (2, 0.5), (3, 0.34), (4, 0.22)]:
+        for sign in (-1, 1):
+            sx = mean + sign * k * std
+            if sx <= x_lo or sx >= x_hi:
+                continue
+            ax.axvline(sx, color=color, lw=1.4, dashes=(5, 3), alpha=alpha, zorder=4)
+            ax.text(sx + (4 if sign > 0 else -4), Y_MAX * 0.03,
+                    f"{'+' if sign > 0 else '−'}{k}σ", color=color,
+                    alpha=min(alpha + 0.2, 0.95), fontsize=12,
+                    ha="left" if sign > 0 else "right", va="bottom", zorder=6)
+
+    # Mean line (heaviest).
+    ax.axvline(mean, color=color, lw=2.4, dashes=(5, 3), zorder=6)
+    ax.text(mean + 6, Y_MAX * 0.95, f"mean = {mean:.1f}", color=color,
+            fontsize=15, ha="left", va="top", zorder=7)
     ax.axis("off")
 
-    # Headline (kept centered, inside the safe zone; sized to fit the width).
-    fig.text(0.5, 0.92, "Can You Be Skilled At Playing Yatzy?",
-             ha="center", va="top", color=TEXT, fontsize=36,
+    # Headline strip on top (share cards need a legible title).
+    fig.text(0.5, 0.955, "Can You Be Skilled At Playing Yatzy?",
+             ha="center", va="top", color=TEXT, fontsize=34,
              family="serif", fontweight="bold")
-    fig.text(0.5, 0.76, "Computing the optimal strategy for Scandinavian Yatzy",
-             ha="center", va="top", color=MUTED, fontsize=20, family="serif")
-
-    # Brand mark.
-    fig.text(0.984, 0.035, "langkilde.se/yatzy", ha="right", va="bottom",
-             color=MUTED, fontsize=15, family="serif")
+    fig.text(0.5, 0.825, "Computing the optimal strategy for Scandinavian Yatzy",
+             ha="center", va="top", color=MUTED, fontsize=18, family="serif")
 
     out = Path("treatise/og-cover.png")
     fig.savefig(out, facecolor=BG)
-    print(f"Wrote {out} ({out.stat().st_size / 1024:.0f} KB)")
+    print(f"Wrote {out} ({out.stat().st_size / 1024:.0f} KB), family={len(family)} curves")
 
 
 if __name__ == "__main__":
