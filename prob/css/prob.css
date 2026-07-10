@@ -1,0 +1,94 @@
+.prob-tool { margin-top: 1rem; }
+
+.target-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 0 1.25rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.25rem;
+}
+
+.mode-select, .cat-select {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  padding: 0.3rem 0.5rem;
+  background: var(--bg-alt);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+.exact-wrap { display: flex; align-items: center; gap: 0.5rem; }
+.exact-label { color: var(--text-muted); }
+.exact-dice { display: flex; gap: 4px; }
+
+.rows { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.prob-row {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  grid-template-areas: "label dice stats";
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-alt);
+}
+
+.prob-row.empty { opacity: 0.55; }
+
+.row-label { grid-area: label; color: var(--text-muted); font-size: 0.95rem; }
+
+.row-dice { grid-area: dice; display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap; }
+.die-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+
+.hold-btn {
+  font-family: var(--font-serif);
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.hold-btn.held { border-color: var(--accent); color: var(--accent); }
+
+.row-placeholder { color: var(--text-muted); font-style: italic; }
+
+.row-stats { grid-area: stats; display: flex; flex-direction: column; gap: 2px; text-align: right; }
+.row-stats .stat { font-size: 0.95rem; color: var(--text-muted); }
+.row-stats .stat b { color: var(--text); }
+.row-stats .stat.best b { color: var(--accent); }
+
+.best-hint {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.roll-btn {
+  font-family: var(--font-serif);
+  font-size: 0.85rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+.roll-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.result.hit { color: var(--color-success); font-weight: 600; }
+.result.miss { color: var(--color-danger); font-weight: 600; }
+
+@media (max-width: 620px) {
+  .prob-row { grid-template-columns: 1fr; grid-template-areas: "label" "dice" "stats"; }
+  .row-stats { text-align: left; flex-direction: row; gap: 1rem; }
+}

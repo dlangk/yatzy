@@ -8,12 +8,14 @@ const PAGES = [
   { id: 'treatise', label: 'Treatise', href: '/yatzy/', tooltip: 'The math behind optimal Yatzy play' },
   { id: 'play',     label: 'Play',     href: '/yatzy/play/', tooltip: 'Play Yatzy with real-time optimal hints' },
   { id: 'profile',  label: 'Profile',  href: '/yatzy/profile/', tooltip: 'Discover your strategic personality' },
+  { id: 'prob',     label: 'Probabilities', href: '/yatzy/prob/', tooltip: 'Dice probabilities across two rerolls' },
 ];
 
 function detectActive() {
   const path = location.pathname;
   if (path.includes('/play')) return 'play';
   if (path.includes('/profile')) return 'profile';
+  if (path.includes('/prob')) return 'prob';
   return 'treatise';
 }
 
@@ -59,7 +61,7 @@ function injectStyles() {
       box-sizing: border-box;
       transition: background 0.15s, color 0.15s, box-shadow 0.15s, border-color 0.15s;
       position: relative;
-      width: 80px;
+      min-width: 80px;
       justify-content: center;
       font-weight: 600;
       border: 1px solid var(--border, #d4d3cd);
