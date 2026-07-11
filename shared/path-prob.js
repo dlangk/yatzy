@@ -69,6 +69,28 @@ export function transitionProb(row, next, keptSet) {
 }
 
 /**
+ * Probability of a one-reroll transition from a kept multiset to an outcome
+ * multiset (order-independent, matching the treatise transition matrix). You
+ * keep `keptValues` (0..5 dice) and reroll the rest; this is the chance the
+ * five-die `outcome` results. Impossible (0) if a kept value is not present in
+ * the outcome.
+ * @param {number[]} keptValues values of the dice you hold (length 0..5)
+ * @param {number[]} outcome the five-die outcome multiset
+ * @returns {number}
+ */
+export function outcomeProbability(keptValues, outcome) {
+  const kf = frequencies(keptValues);
+  const of = frequencies(outcome);
+  const free = [];
+  for (let v = 0; v < 6; v++) {
+    const d = of[v] - kf[v];
+    if (d < 0) return 0; // kept a die the outcome does not contain
+    for (let i = 0; i < d; i++) free.push(v + 1);
+  }
+  return rollProbability(free);
+}
+
+/**
  * Reduced fraction {num, den} for the probability of rerolling into `dice`.
  * @param {number[]} dice
  * @returns {{num:string, den:string}}

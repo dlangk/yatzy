@@ -1,12 +1,14 @@
 /**
- * Probabilities tab: three always-visible dice rows (first roll, second roll,
- * target) with per-die up/down arrows and keep toggles. Shows the transition
- * probability first -> second, second -> target, and the overall product.
- * A kept die whose value changes in the next row makes that step impossible (0%).
+ * Roll-transition calculator: dice set 1 -> dice set 2.
+ * You set your dice (set 1) and keep some, set the outcome (set 2), and see the
+ * one-reroll transition probability. This mirrors the treatise transition
+ * matrix (keep -> outcome), using order-independent multiset semantics: keeping
+ * a value means the outcome must contain it somewhere, else the step is
+ * impossible (0%).
  * @module render
  */
 import { createDieSVG } from '/yatzy/shared/dice.js';
-import { transitionProb, formatOneInN } from '/yatzy/shared/path-prob.js';
+import { outcomeProbability, formatOneInN } from '/yatzy/shared/path-prob.js';
 
 const pct = (p) => (p * 100).toFixed(1) + '%';
 
@@ -38,21 +40,18 @@ function makeDie(value, { kept, showKeep, onToggle, onInc, onDec }) {
 
 export function initProbTool(root) {
   const state = {
-    // row 0 = first roll, row 1 = second roll, row 2 = target
+    // row 0 = dice set 1 (you keep some), row 1 = dice set 2 (the outcome)
     rows: [
       [1, 2, 3, 4, 6],
       [1, 2, 3, 4, 5],
-      [1, 2, 3, 4, 5],
     ],
-    // keeps for row 0 and row 1 (target has no keeps)
-    kept: [new Set([0, 1, 2, 3]), new Set([0, 1, 2, 3])],
+    kept: new Set([0, 1, 2, 3]), // which of set 1's dice you hold
   };
 
-  const ROW_LABELS = ['First roll', 'Second roll', 'Target'];
+  const ROW_LABELS = ['Dice set 1', 'Dice set 2'];
   const ROW_SUBS = [
-    'Set your opening dice. Click a die to keep it.',
-    'Set the second roll. Click a die to keep it.',
-    'Set the outcome you are aiming for.',
+    'Your dice. Click a die to keep it; the rest are rerolled.',
+    'The outcome you want after the reroll.',
   ];
 
   root.innerHTML = '';
@@ -61,30 +60,28 @@ export function initProbTool(root) {
   flow.className = 'prob-flow';
   root.appendChild(flow);
 
-  // Build fixed skeleton: row, transition, row, transition, row.
-  const rowEls = [];
-  const transEls = [];
-  for (let r = 0; r < 3; r++) {
-    const rowEl = document.createElement('div');
-    rowEl.className = 'prob-row' + (r === 2 ? ' target' : '');
-    flow.appendChild(rowEl);
-    rowEls.push(rowEl);
+  const row0El = document.createElement('div');
+  row0El.className = 'prob-row';
+  flow.appendChild(row0El);
 
-    if (r < 2) {
-      const t = document.createElement('div');
-      t.className = 'prob-transition';
-      flow.appendChild(t);
-      transEls.push(t);
-    }
+  const transEl = document.createElement('div');
+  transEl.className = 'prob-transition';
+  flow.appendChild(transEl);
+
+  const row1El = document.createElement('div');
+  row1El.className = 'prob-row';
+  flow.appendChild(row1El);
+
+  const rowEls = [row0El, row1El];
+
+  function keptValues() {
+    const out = [];
+    for (let i = 0; i < 5; i++) if (state.kept.has(i)) out.push(state.rows[0][i]);
+    return out;
   }
 
-  const overallEl = document.createElement('div');
-  overallEl.className = 'prob-overall';
-  root.appendChild(overallEl);
-
   function render() {
-    // Rows
-    for (let r = 0; r < 3; r++) {
+    for (let r = 0; r < 2; r++) {
       const rowEl = rowEls[r];
       rowEl.innerHTML = '';
 
@@ -99,14 +96,14 @@ export function initProbTool(root) {
       diceEl.className = 'prob-row-dice';
       rowEl.appendChild(diceEl);
 
-      const showKeep = r < 2;
+      const showKeep = r === 0;
       for (let i = 0; i < 5; i++) {
         const die = makeDie(state.rows[r][i], {
-          kept: showKeep && state.kept[r].has(i),
+          kept: showKeep && state.kept.has(i),
           showKeep,
           onToggle: () => {
-            if (state.kept[r].has(i)) state.kept[r].delete(i);
-            else state.kept[r].add(i);
+            if (state.kept.has(i)) state.kept.delete(i);
+            else state.kept.add(i);
             render();
           },
           onInc: () => {
@@ -124,41 +121,21 @@ export function initProbTool(root) {
       if (showKeep) {
         const info = document.createElement('div');
         info.className = 'prob-keep-info';
-        const k = state.kept[r].size;
+        const k = state.kept.size;
         info.textContent = k > 0 ? `keeping ${k}, rerolling ${5 - k}` : 'click a die to keep it';
         rowEl.appendChild(info);
       }
     }
 
-    // Transitions
-    const t0 = transitionProb(state.rows[0], state.rows[1], state.kept[0]);
-    const t1 = transitionProb(state.rows[1], state.rows[2], state.kept[1]);
-    renderTransition(transEls[0], 'first → second', t0);
-    renderTransition(transEls[1], 'second → target', t1);
-
-    // Overall
-    const overall = t0 * t1;
-    overallEl.innerHTML =
-      `<div class="prob-overall-label">Overall: first → second → target</div>` +
-      `<div class="prob-overall-eq">` +
-      `<span class="prob-term">${pct(t0)}</span>` +
-      `<span class="prob-op">×</span>` +
-      `<span class="prob-term">${pct(t1)}</span>` +
-      `<span class="prob-op">=</span>` +
-      `<span class="prob-term prob-total">${pct(overall)}</span>` +
-      `</div>` +
-      `<div class="prob-overall-onein">${formatOneInN(overall)}</div>`;
-  }
-
-  function renderTransition(el, label, p) {
+    const p = outcomeProbability(keptValues(), state.rows[1]);
     const impossible = p === 0;
-    el.classList.toggle('impossible', impossible);
-    el.innerHTML =
+    transEl.classList.toggle('impossible', impossible);
+    transEl.innerHTML =
       `<span class="prob-trans-arrow">↓</span>` +
-      `<span class="prob-trans-label">P(${label})</span>` +
+      `<span class="prob-trans-label">P(set 1 → set 2)</span>` +
       `<span class="prob-trans-value">${pct(p)}</span>` +
       (impossible
-        ? `<span class="prob-trans-note">impossible: a kept die changes value</span>`
+        ? `<span class="prob-trans-note">impossible: you kept a die the outcome does not contain</span>`
         : `<span class="prob-trans-onein">${formatOneInN(p)}</span>`);
   }
 

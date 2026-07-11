@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   rollProbability,
   transitionProb,
+  outcomeProbability,
   formatFraction,
   formatOneInN,
 } from '../../shared/path-prob.js';
@@ -59,6 +60,23 @@ test('transitionProb: free-position multiset probability ignores which free slot
   const keep = new Set([0]);
   // 4 distinct free dice: 4! = 24 arrangements / 6^4 = 1296 -> 24/1296.
   assert.ok(Math.abs(transitionProb(row, next, keep) - 24 / 1296) < 1e-12);
+});
+
+test('outcomeProbability: keep 1,2,3,4 reroll one into a 5 -> 1/6', () => {
+  assert.ok(Math.abs(outcomeProbability([1, 2, 3, 4], [1, 2, 3, 4, 5]) - 1 / 6) < 1e-12);
+});
+
+test('outcomeProbability: order-independent (kept 6 lands anywhere in outcome)', () => {
+  // Keep a single 6, reroll four dice into {1,2,3,4}: 4!/6^4 = 24/1296.
+  assert.ok(Math.abs(outcomeProbability([6], [1, 2, 3, 4, 6]) - 24 / 1296) < 1e-12);
+});
+
+test('outcomeProbability: impossible when a kept value is absent from outcome', () => {
+  assert.equal(outcomeProbability([6], [1, 2, 3, 4, 5]), 0);
+});
+
+test('outcomeProbability: keep all five (matching) is certain', () => {
+  assert.equal(outcomeProbability([2, 3, 4, 5, 6], [2, 3, 4, 5, 6]), 1);
 });
 
 test('formatFraction reduces to lowest terms', () => {
