@@ -107,6 +107,16 @@ export async function initScoreTool(root) {
   let currentCur = curves[state.idx];
   let chartRefs = null;
 
+  /** Percentage with precision that scales to the magnitude, so rare targets
+   *  (e.g. 340+) show real digits instead of collapsing to "0.0%". */
+  function fmtPct(p) {
+    const pc = p * 100;
+    if (pc <= 0) return '0%';
+    if (pc >= 10) return pc.toFixed(1) + '%';
+    if (pc >= 1) return pc.toFixed(2) + '%';
+    return pc.toPrecision(2) + '%'; // 0.030%, 0.0012%, 3.0e-7% for the deep tail
+  }
+
   /** ~1 in N games needed to reach the target on average at this theta. */
   function oneInGames(p) {
     if (p <= 0) return 'unreachable';
@@ -130,13 +140,13 @@ export async function initScoreTool(root) {
     const atBest = Math.abs(best.theta - currentCur.theta) < 1e-9;
     readout.innerHTML =
       `<span class="score-readout-label">P(score ≥ ${state.target})</span>` +
-      `<span class="score-readout-value">${(p * 100).toFixed(1)}%</span>` +
+      `<span class="score-readout-value">${fmtPct(p)}</span>` +
       `<span class="score-readout-onein">${oneInGames(p)}</span>` +
       `<span class="score-readout-sub">at θ = ${currentCur.theta.toFixed(2)}</span>` +
       `<span class="score-readout-best">` +
         (atBest
           ? `✓ this θ maximizes the chance`
-          : `best at θ = ${best.theta > 0 ? '+' : ''}${best.theta.toFixed(2)} (${(bestP * 100).toFixed(1)}%)`) +
+          : `best at θ = ${best.theta > 0 ? '+' : ''}${best.theta.toFixed(2)} (${fmtPct(bestP)})`) +
       `</span>`;
   }
 
