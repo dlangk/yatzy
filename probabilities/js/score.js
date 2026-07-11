@@ -101,31 +101,62 @@ export async function initScoreTool(root) {
   root.appendChild(readout);
 
   // ── Render ──
-  function render() {
-    const cur = curves[state.idx];
-    thetaValEl.textContent = fmtTheta(cur.theta);
+  // currentCur is the active theta curve; chartRefs holds the mutable chart
+  // elements so a target drag can update in place without rebuilding the SVG
+  // (a rebuild mid-gesture would destroy the element being dragged).
+  let currentCur = curves[state.idx];
+  let chartRefs = null;
 
-    const p = pAtLeast(cur.points, state.target);
+  /** ~1 in N games needed to reach the target on average at this theta. */
+  function oneInGames(p) {
+    if (p <= 0) return 'unreachable';
+    const n = 1 / p;
+    const nStr = n < 10 ? n.toFixed(1) : Math.round(n).toLocaleString();
+    return `~1 in ${nStr} games`;
+  }
 
-    // Which theta maximizes the chance of reaching this target?
+  function bestThetaFor(target) {
     let best = curves[0], bestP = -1;
     for (const c of curves) {
-      const cp = pAtLeast(c.points, state.target);
+      const cp = pAtLeast(c.points, target);
       if (cp > bestP) { bestP = cp; best = c; }
     }
-    const atBest = Math.abs(best.theta - cur.theta) < 1e-9;
+    return { best, bestP };
+  }
 
+  function updateReadout() {
+    const p = pAtLeast(currentCur.points, state.target);
+    const { best, bestP } = bestThetaFor(state.target);
+    const atBest = Math.abs(best.theta - currentCur.theta) < 1e-9;
     readout.innerHTML =
       `<span class="score-readout-label">P(score ≥ ${state.target})</span>` +
       `<span class="score-readout-value">${(p * 100).toFixed(1)}%</span>` +
-      `<span class="score-readout-sub">at θ = ${cur.theta.toFixed(2)}</span>` +
+      `<span class="score-readout-onein">${oneInGames(p)}</span>` +
+      `<span class="score-readout-sub">at θ = ${currentCur.theta.toFixed(2)}</span>` +
       `<span class="score-readout-best">` +
         (atBest
           ? `✓ this θ maximizes the chance`
           : `best at θ = ${best.theta > 0 ? '+' : ''}${best.theta.toFixed(2)} (${(bestP * 100).toFixed(1)}%)`) +
       `</span>`;
+  }
 
-    renderChart(cur);
+  /** Move the target line, handle, tail shade, and label in place. */
+  function updateTargetVisuals() {
+    if (!chartRefs) return;
+    const { x, iw, targetLine, targetLabel, handle, tailRect } = chartRefs;
+    const tx = x(Math.min(state.target, X_DOMAIN[1]));
+    targetLine.attr('x1', tx).attr('x2', tx);
+    targetLabel.attr('x', tx + 5).text(`target = ${state.target}`);
+    handle.attr('cx', tx);
+    tailRect.attr('x', tx).attr('width', Math.max(0, iw - tx));
+    updateReadout();
+  }
+
+  function render() {
+    currentCur = curves[state.idx];
+    thetaValEl.textContent = fmtTheta(currentCur.theta);
+    renderChart(currentCur);
+    updateReadout();
   }
 
   function renderChart(cur) {
@@ -164,7 +195,7 @@ export async function initScoreTool(root) {
 
     // Shaded tail (score >= target) via clip
     const clipId = 'score-tail-clip';
-    svg.append('defs').append('clipPath').attr('id', clipId)
+    const tailRect = svg.append('defs').append('clipPath').attr('id', clipId)
       .append('rect')
       .attr('x', x(state.target)).attr('y', 0)
       .attr('width', Math.max(0, iw - x(state.target))).attr('height', ih);
@@ -176,12 +207,14 @@ export async function initScoreTool(root) {
     g.append('path').datum(cur.points).attr('d', line)
       .attr('fill', 'none').attr('stroke', accent).attr('stroke-width', 2.5);
 
-    // Target vertical line
+    // Target vertical line + draggable handle
     const tx = x(Math.min(state.target, X_DOMAIN[1]));
-    g.append('line').attr('x1', tx).attr('x2', tx).attr('y1', 0).attr('y2', ih)
+    const targetLine = g.append('line').attr('x1', tx).attr('x2', tx).attr('y1', 0).attr('y2', ih)
       .attr('stroke', text).attr('stroke-width', 2);
-    g.append('text').attr('x', tx + 5).attr('y', 12)
+    const targetLabel = g.append('text').attr('x', tx + 5).attr('y', 12)
       .attr('fill', text).style('font-size', '11px').text(`target = ${state.target}`);
+    const handle = g.append('circle').attr('cx', tx).attr('cy', 0).attr('r', 6)
+      .attr('fill', accent).attr('stroke', text).attr('stroke-width', 1).style('cursor', 'ew-resize');
 
     // Axes
     const xAxis = g.append('g').attr('transform', `translate(0,${ih})`)
@@ -197,6 +230,23 @@ export async function initScoreTool(root) {
     g.append('text').attr('transform', 'rotate(-90)')
       .attr('x', -ih / 2).attr('y', -28)
       .attr('text-anchor', 'middle').attr('fill', muted).style('font-size', '11px').text('Density');
+
+    // Drag anywhere on the plot to move the target line (desktop + touch).
+    const overlay = g.append('rect').attr('width', iw).attr('height', ih)
+      .attr('fill', 'none').attr('pointer-events', 'all').style('cursor', 'ew-resize');
+    const overlayNode = overlay.node();
+    function applyDrag(event) {
+      const [mx] = d3.pointer(event, overlayNode);
+      let s = Math.round(x.invert(Math.max(0, Math.min(iw, mx))));
+      s = Math.max(0, Math.min(MAX_SCORE, s));
+      if (s === state.target) return;
+      state.target = s;
+      scoreInput.value = String(s);
+      updateTargetVisuals();
+    }
+    overlay.call(d3.drag().on('start drag', applyDrag));
+
+    chartRefs = { x, iw, targetLine, targetLabel, handle, tailRect };
   }
 
   // ── Events ──
@@ -205,7 +255,7 @@ export async function initScoreTool(root) {
     if (Number.isNaN(v)) return;
     v = Math.max(0, Math.min(MAX_SCORE, v));
     state.target = v;
-    render();
+    updateTargetVisuals();
   });
   scoreInput.addEventListener('blur', () => {
     let v = parseInt(scoreInput.value, 10);
@@ -213,7 +263,7 @@ export async function initScoreTool(root) {
     v = Math.max(0, Math.min(MAX_SCORE, v));
     scoreInput.value = String(v);
     state.target = v;
-    render();
+    updateTargetVisuals();
   });
   thetaSlider.addEventListener('input', () => {
     state.idx = parseInt(thetaSlider.value, 10);

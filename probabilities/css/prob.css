@@ -54,6 +54,7 @@
 }
 .score-readout-label { font-size: 1rem; color: var(--text); }
 .score-readout-value { font-size: 1.8rem; font-weight: 700; color: var(--accent); font-family: var(--font-mono); }
+.score-readout-onein { font-size: 0.9rem; color: var(--text-muted); font-family: var(--font-mono); }
 .score-readout-sub { font-size: 0.8rem; color: var(--text-muted); }
 .score-readout-best {
   flex-basis: 100%;
