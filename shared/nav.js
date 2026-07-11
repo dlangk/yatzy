@@ -55,6 +55,12 @@ function injectStyles() {
       padding: 4px 12px 0;
       border-radius: 5px;
       font-size: 15px;
+      /* Explicit line-height so the text's vertical position does NOT inherit
+         each page's body line-height (treatise/profiler 1.65, probabilities 1.6,
+         etc.). Without this the line box height differs per page, so the ink
+         lands a fraction of a pixel higher or lower on each tab and the label
+         appears to jump as you navigate. A fixed value pins it everywhere. */
+      line-height: 1;
       display: inline-flex;
       align-items: center;
       height: 24px;
