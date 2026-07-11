@@ -106,10 +106,24 @@ export async function initScoreTool(root) {
     thetaValEl.textContent = fmtTheta(cur.theta);
 
     const p = pAtLeast(cur.points, state.target);
+
+    // Which theta maximizes the chance of reaching this target?
+    let best = curves[0], bestP = -1;
+    for (const c of curves) {
+      const cp = pAtLeast(c.points, state.target);
+      if (cp > bestP) { bestP = cp; best = c; }
+    }
+    const atBest = Math.abs(best.theta - cur.theta) < 1e-9;
+
     readout.innerHTML =
       `<span class="score-readout-label">P(score ≥ ${state.target})</span>` +
       `<span class="score-readout-value">${(p * 100).toFixed(1)}%</span>` +
-      `<span class="score-readout-sub">at θ = ${cur.theta.toFixed(2)}</span>`;
+      `<span class="score-readout-sub">at θ = ${cur.theta.toFixed(2)}</span>` +
+      `<span class="score-readout-best">` +
+        (atBest
+          ? `✓ this θ maximizes the chance`
+          : `best at θ = ${best.theta > 0 ? '+' : ''}${best.theta.toFixed(2)} (${(bestP * 100).toFixed(1)}%)`) +
+      `</span>`;
 
     renderChart(cur);
   }

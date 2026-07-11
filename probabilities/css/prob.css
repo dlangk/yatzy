@@ -55,6 +55,14 @@
 .score-readout-label { font-size: 1rem; color: var(--text); }
 .score-readout-value { font-size: 1.8rem; font-weight: 700; color: var(--accent); font-family: var(--font-mono); }
 .score-readout-sub { font-size: 0.8rem; color: var(--text-muted); }
+.score-readout-best {
+  flex-basis: 100%;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  padding-top: 0.35rem;
+  border-top: 1px dashed var(--border);
+  margin-top: 0.1rem;
+}
 
 .prob-flow {
   display: flex;
