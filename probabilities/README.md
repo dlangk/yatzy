@@ -11,9 +11,18 @@ die to keep it, and read the transition probabilities:
 A die kept in one row that shows a different value in the next row makes that
 transition impossible (0%).
 
-- `js/render.js` — the three-row UI and interaction.
-- `js/main.js` — entry point.
-- Math lives in `/yatzy/shared/path-prob.js` (shared with the treatise
-  path-probability chart so the two cannot drift). Unit-tested.
+The tab has two modules:
 
-No build step. Run the math tests: `node --test js/path-prob.test.js`.
+1. **Roll transitions** (`js/render.js`) — three-row UI (first roll, second
+   roll, target) with per-die arrows and keep toggles; shows the transition
+   probabilities and their product. Math: `/yatzy/shared/path-prob.js`.
+2. **Score probability** (`js/score.js`) — "how likely was my score?" A target
+   score input and a θ (risk) slider drive a distribution chart (vendored d3)
+   with the target marked, and P(score ≥ target). Data:
+   `/yatzy/data/kde_curves.json` (same file the treatise risk-theta chart uses).
+   Math: `/yatzy/shared/score-prob.js`.
+
+`js/main.js` initializes both. All math lives in shared modules (shared with the
+treatise charts so the two cannot drift) and is unit-tested.
+
+No build step. Run the math tests: `node --test js/*.test.js`.

@@ -14,29 +14,9 @@ import {
   createChart, tooltip, drawAxis, thetaColor, formatTheta,
   getTextColor, getMutedColor, getGridColor, COLORS,
 } from '../yatzy-viz.js';
-
-/** Integrate KDE density above/below a score threshold via trapezoidal rule. */
-function integrateTail(points, threshold, above) {
-  let sum = 0;
-  for (let i = 0; i < points.length - 1; i++) {
-    const x0 = points[i].x, x1 = points[i + 1].x;
-    const y0 = points[i].y, y1 = points[i + 1].y;
-    if (above) {
-      if (x1 <= threshold) continue;
-      const lo = Math.max(x0, threshold);
-      const frac = (x1 === x0) ? 1 : (x1 - lo) / (x1 - x0);
-      const yLo = y0 + (y1 - y0) * (1 - frac);
-      sum += (yLo + y1) / 2 * (x1 - lo);
-    } else {
-      if (x0 >= threshold) continue;
-      const hi = Math.min(x1, threshold);
-      const frac = (x1 === x0) ? 1 : (hi - x0) / (x1 - x0);
-      const yHi = y0 + (y1 - y0) * frac;
-      sum += (y0 + yHi) / 2 * (hi - x0);
-    }
-  }
-  return sum;
-}
+// Tail integration lives in /yatzy/shared/score-prob.js so the treatise chart
+// and the standalone Probabilities tab share one implementation.
+import { integrateTail } from '/yatzy/shared/score-prob.js';
 
 export async function initRiskTheta() {
   const [kdeCurves, summaryData] = await Promise.all([
