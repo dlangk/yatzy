@@ -242,8 +242,11 @@ export async function initScoreTool(root) {
       .attr('text-anchor', 'middle').attr('fill', muted).style('font-size', '11px').text('Density');
 
     // Drag anywhere on the plot to move the target line (desktop + touch).
+    // touch-action: pan-y lets a vertical swipe still scroll the page while a
+    // horizontal drag moves the target, so the slider works on phones.
     const overlay = g.append('rect').attr('width', iw).attr('height', ih)
-      .attr('fill', 'none').attr('pointer-events', 'all').style('cursor', 'ew-resize');
+      .attr('fill', 'none').attr('pointer-events', 'all')
+      .style('cursor', 'ew-resize').style('touch-action', 'pan-y');
     const overlayNode = overlay.node();
     function applyDrag(event) {
       const [mx] = d3.pointer(event, overlayNode);
