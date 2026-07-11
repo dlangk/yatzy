@@ -77,12 +77,11 @@
   /* nothing special — normal flow determines quiz-area height */
 }
 
-/* Question list sidebar */
+/* Question list sidebar. No inner scrollbar: show every row and let the whole
+   window scroll. Sticky keeps it in view as the page scrolls. */
 .profile-question-list {
   position: sticky;
   top: 12px;
-  max-height: calc(100vh - 24px);
-  overflow-y: auto;
   background: var(--bg-alt);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -189,9 +188,9 @@
   margin: 0;
 }
 .profile-scenario-left .profile-actions {
-  height: 120px; /* fits up to 3 rows of action buttons */
+  min-height: 120px; /* baseline height for layout stability; grows to fit all
+                        action buttons rather than showing an inner scrollbar */
   align-content: center;
-  overflow-y: auto;
 }
 .profile-scenario-left .profile-feedback {
   height: 32px;
