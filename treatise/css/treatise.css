@@ -1656,3 +1656,35 @@ h2 .section-link:hover {
   margin-top: 0.5rem;
   line-height: 1.4;
 }
+
+/* Journal-style abstract: below the hero video, above the table of contents.
+   Hairline rules top and bottom, a letter-spaced accent label, and a slightly
+   narrower justified measure so it reads as a paper's abstract. */
+.abstract {
+  max-width: 90%;
+  margin: 2rem auto 2.5rem;
+  padding: 1.1rem 0 1.25rem;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.abstract-label {
+  margin: 0 0 0.7rem;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.abstract p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--text);
+  text-align: justify;
+  hyphens: auto;
+}
+@media (max-width: 720px) {
+  .abstract { max-width: 100%; }
+  .abstract p { text-align: left; hyphens: manual; }
+}
