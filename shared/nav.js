@@ -136,6 +136,30 @@ function injectStyles() {
 
     /* Push page content below the fixed nav */
     body { padding-top: 36px !important; }
+
+    /* Mobile: four tabs plus the home link and theme toggle overflow a phone
+       width, so shrink paddings, drop the tab min-width, and collapse the
+       "back to langkilde.se" link to a bare arrow. */
+    @media (max-width: 560px) {
+      .site-nav { padding: 0 8px; }
+      .site-nav-links { gap: 3px; }
+      .site-nav a {
+        min-width: 0;
+        width: auto;
+        padding: 4px 8px 0;
+        font-size: 13px;
+      }
+      .site-nav a.site-nav-home {
+        font-size: 0;
+        padding: 4px 6px 0;
+      }
+      .site-nav a.site-nav-home::before {
+        content: '\\2190';
+        font-size: 16px;
+        font-weight: 400;
+      }
+      .site-nav-theme { width: 26px; height: 26px; flex-shrink: 0; }
+    }
   `;
   document.head.appendChild(style);
 }

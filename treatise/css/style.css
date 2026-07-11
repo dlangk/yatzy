@@ -501,6 +501,10 @@ blockquote p:last-child {
   table { font-size: 0.8rem; }
   thead th, tbody td { padding: 0.3rem 0.5rem; }
 
+  /* Contain wide code lines so they scroll inside the card instead of
+     pushing the whole page sideways. */
+  .code-card { overflow-x: auto; }
+
   .concept-drawer {
     width: 100%;
   }
