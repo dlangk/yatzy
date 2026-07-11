@@ -1,0 +1,102 @@
+.prob-tool { margin-top: 1rem; }
+
+.prob-flow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+
+.prob-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-alt);
+}
+
+.prob-row.target {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.prob-row-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  text-align: center;
+}
+.prob-row-label { font-weight: 700; }
+.prob-row-sub { font-size: 0.72rem; color: var(--text-muted); }
+
+.prob-row-dice { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
+
+.prob-die {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.prob-die-arrow {
+  width: 44px;
+  height: 15px;
+  font-size: 9px;
+  line-height: 12px;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.prob-die-arrow:hover { background: var(--accent-light); border-color: var(--accent); }
+
+.prob-keep-info { font-size: 0.72rem; color: var(--text-muted); }
+
+/* Transition between rows */
+.prob-transition {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.5rem 1rem;
+  margin: 0 auto;
+}
+.prob-trans-arrow { font-size: 1.1rem; color: var(--text-muted); }
+.prob-trans-label { font-size: 0.85rem; color: var(--text-muted); }
+.prob-trans-value { font-weight: 700; font-size: 1.05rem; color: var(--accent); }
+.prob-trans-onein { font-size: 0.75rem; color: var(--text-muted); }
+.prob-trans-note { font-size: 0.75rem; color: var(--color-danger); }
+.prob-transition.impossible .prob-trans-value { color: var(--color-danger); }
+
+/* Overall */
+.prob-overall {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: center;
+}
+.prob-overall-label { font-size: 0.85rem; color: var(--text-muted); }
+.prob-overall-eq {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+}
+.prob-term { font-size: 1.05rem; color: var(--text); }
+.prob-op { color: var(--text-muted); }
+.prob-total { font-weight: 700; font-size: 1.4rem; color: var(--accent); }
+.prob-overall-onein { font-size: 0.8rem; color: var(--text-muted); }
+
+@media (max-width: 620px) {
+  .prob-overall-eq { flex-wrap: wrap; justify-content: center; }
+}

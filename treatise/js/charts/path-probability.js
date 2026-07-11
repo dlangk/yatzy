@@ -1,58 +1,18 @@
 /**
  * Path Probability Visualizer: interactive three-roll Yatzy path builder
  * with a live probability chain showing multiplicative compounding.
+ *
+ * Math lives in /yatzy/shared/path-prob.js so the treatise chart and the
+ * standalone Probabilities tab share one implementation.
  */
 
-// ── Math helpers ────────────────────────────────────────────────
-
-function factorial(n) {
-  let r = 1;
-  for (let i = 2; i <= n; i++) r *= i;
-  return r;
-}
-
-function frequencies(dice) {
-  const freq = [0, 0, 0, 0, 0, 0];
-  for (const d of dice) freq[d - 1]++;
-  return freq;
-}
-
-function multinomial(n, freqs) {
-  let denom = 1;
-  for (const f of freqs) denom *= factorial(f);
-  return factorial(n) / denom;
-}
-
-function rollProbability(dice) {
-  if (dice.length === 0) return 1;
-  const freqs = frequencies(dice);
-  return multinomial(dice.length, freqs) / Math.pow(6, dice.length);
-}
-
-function formatFraction(dice) {
-  if (dice.length === 0) return { num: '1', den: '1' };
-  const freqs = frequencies(dice);
-  const num = multinomial(dice.length, freqs);
-  const den = Math.pow(6, dice.length);
-  const g = gcd(num, den);
-  return { num: String(num / g), den: String(den / g) };
-}
-
-function gcd(a, b) {
-  a = Math.abs(a);
-  b = Math.abs(b);
-  while (b) { [a, b] = [b, a % b]; }
-  return a;
-}
-
-function formatOneInN(p) {
-  if (p >= 1) return '1 in 1';
-  if (p <= 0) return 'impossible';
-  const n = Math.round(1 / p);
-  return `1 in ${n.toLocaleString()}`;
-}
-
 import { createDieSVG } from '/yatzy/shared/dice.js';
+import {
+  rollProbability,
+  formatFraction,
+  formatOneInN,
+  gcd,
+} from '/yatzy/shared/path-prob.js';
 
 // ── Die component (matches Play UI pattern: ▲ [die] ▼) ────────
 

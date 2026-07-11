@@ -27,7 +27,7 @@ Server: ssh -i ~/.ssh/id_ed25519 daniel.langkilde@35.217.49.95
 
 9. Assemble build contexts in `deploy/build/`:
    - `deploy/build/backend/`: copy cross-compiled binary + Dockerfile.backend + data/strategy_tables/all_states.bin
-   - `deploy/build/frontend/`: copy frontend/dist/* to apps/play/, profiler assets to apps/profile/ (sed "Back to article" link to /yatzy/), prob assets to apps/prob/, copy nginx.conf + entrypoint.sh + Dockerfile.frontend
+   - `deploy/build/frontend/`: copy frontend/dist/* to apps/play/, profiler assets to apps/profile/ (sed "Back to article" link to /yatzy/), probabilities assets to apps/probabilities/, copy nginx.conf + entrypoint.sh + Dockerfile.frontend
 10. Build Docker images: `docker build --platform linux/amd64 -t yatzy-backend deploy/build/backend` and same for frontend.
 11. Save images: `docker save yatzy-backend yatzy-frontend | gzip > deploy/build/yatzy-images.tar.gz`
 
@@ -54,7 +54,7 @@ Server: ssh -i ~/.ssh/id_ed25519 daniel.langkilde@35.217.49.95
     - `docker exec yatzy-frontend wget -q --spider http://localhost:8090/` (treatise HTML)
     - `docker exec yatzy-frontend wget -q --spider http://localhost:8090/play/` (game UI HTML)
     - `docker exec yatzy-frontend wget -q --spider http://localhost:8090/profile/` (profiler HTML)
-    - `docker exec yatzy-frontend wget -q --spider http://localhost:8090/prob/` (probabilities HTML)
+    - `docker exec yatzy-frontend wget -q --spider http://localhost:8090/probabilities/` (probabilities HTML)
 17. External checks:
     - `curl -sf https://langkilde.se/yatzy/ | head -5` (treatise loads through nginx)
     - `curl -sf https://langkilde.se/yatzy/api/health` (API responds through nginx)

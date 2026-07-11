@@ -78,7 +78,7 @@ export default defineConfig({
   plugins: [
     serveDir('/yatzy/shared/', path.join(root, 'shared')),
     serveDir('/yatzy/profile/', path.join(root, 'profiler')),
-    serveDir('/yatzy/prob/', path.join(root, 'prob')),
+    serveDir('/yatzy/probabilities/', path.join(root, 'probabilities')),
     serveDir('/yatzy/', path.join(root, 'treatise')),
   ],
 })

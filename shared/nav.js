@@ -7,15 +7,15 @@
 const PAGES = [
   { id: 'treatise', label: 'Treatise', href: '/yatzy/', tooltip: 'The math behind optimal Yatzy play' },
   { id: 'play',     label: 'Play',     href: '/yatzy/play/', tooltip: 'Play Yatzy with real-time optimal hints' },
+  { id: 'prob',     label: 'Probabilities', href: '/yatzy/probabilities/', tooltip: 'Dice probabilities across two rerolls' },
   { id: 'profile',  label: 'Profile',  href: '/yatzy/profile/', tooltip: 'Discover your strategic personality' },
-  { id: 'prob',     label: 'Probabilities', href: '/yatzy/prob/', tooltip: 'Dice probabilities across two rerolls' },
 ];
 
 function detectActive() {
   const path = location.pathname;
   if (path.includes('/play')) return 'play';
   if (path.includes('/profile')) return 'profile';
-  if (path.includes('/prob')) return 'prob';
+  if (path.includes('/probabilities')) return 'prob';
   return 'treatise';
 }
 
