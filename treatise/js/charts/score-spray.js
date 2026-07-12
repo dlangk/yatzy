@@ -49,12 +49,17 @@ export async function initScoreSpray() {
   // Population filter state
   const popVisible = [true, true, true, true];
 
-  // Layout
-  const margin = { top: 20, right: 20, bottom: 45, left: 55 };
+  // Layout. On phones a 2:1 chart is too short and the fixed desktop margins eat
+  // the narrow width, leaving the plot cramped inside the reserved min-height.
+  // Below 560px use a taller aspect and tighter margins; desktop is unchanged.
+  const narrow = (wrap.clientWidth || 700) < 560;
+  const margin = narrow
+    ? { top: 16, right: 14, bottom: 40, left: 42 }
+    : { top: 20, right: 20, bottom: 45, left: 55 };
 
   function getSize() {
     const w = wrap.clientWidth || 700;
-    const h = Math.round(w * 0.5);
+    const h = Math.round(w * (narrow ? 0.85 : 0.5));
     return {
       totalW: w, totalH: h,
       width: w - margin.left - margin.right,
