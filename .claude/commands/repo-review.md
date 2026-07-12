@@ -1,6 +1,6 @@
-# Repo Review — Yatzy Project
+# Repo Review: Yatzy Project
 
-A systematic audit skill for the yatzy polyglot monorepo. Designed to catch the kinds of decay that no single linter or test suite will find — stale files left behind after migrations, endpoints serving content nobody visits, convention drift between sub-projects, and the slow accumulation of things that once mattered but no longer do.
+A systematic audit skill for the yatzy polyglot monorepo. Designed to catch the kinds of decay that no single linter or test suite will find: stale files left behind after migrations, endpoints serving content nobody visits, convention drift between sub-projects, and the slow accumulation of things that once mattered but no longer do.
 
 ## Philosophy
 
@@ -32,13 +32,13 @@ The most common form of decay. Something gets moved or replaced, but the origina
 
 **What to check:**
 
-1. **Stale web assets after route migrations.** Look for HTML, CSS, JS files at paths that were superseded by newer routes. Classic pattern in this repo: content lived at `/blog/yatzy/`, then moved to `/yatzy/`, `/yatzy/play/`, `/yatzy/profile/` — but `blog/yatzy/index.html` still exists and may still be served. For every current route, check whether an older path variant still has files.
+1. **Stale web assets after route migrations.** Look for HTML, CSS, JS files at paths that were superseded by newer routes. The live routes are `/yatzy/` (treatise), `/yatzy/play/` (game UI), `/yatzy/profile/` (profiler), and `/yatzy/probabilities/` (probabilities tab), plus `/yatzy/shared/` (shared nav, dice, and math modules) and `/yatzy/data/` (chart JSON). For every current route, check whether an older path variant still has files. Note: a `/blog/yatzy/` path was retired long ago and `blog/` is gone, so that specific migration is settled; the remaining ghost is the completed C-to-Rust backend migration (see item 4).
 
-2. **Duplicate implementations.** Search for files with highly similar names or content across different directories. Two copies of `utils.ts` in different sub-projects, an old `scoring.rs` alongside a new `scoring_v2.rs` where nothing imports the original.
+2. **Duplicate implementations.** Search for files with highly similar names or content across different directories. The biggest real case here is the C-to-Rust backend migration: `legacy/` holds the old C implementation and `solver/` is the current Rust one, both described as producing bit-identical output. `legacy/` is documented as intentionally kept for reference (`legacy/README.md`), so confirm that framing still holds rather than assuming it is dead. Otherwise look for two copies of the same module across sub-projects (e.g. a math helper duplicated in `shared/` and inlined in a chart, or a `utils.ts` copied between UIs).
 
 3. **Dead imports and unused modules.** For each sub-project, trace the import/dependency graph from the entry points. Flag any source file that is not reachable from any entry point, test file, or build target.
 
-4. **Abandoned feature branches merged as directories.** Sometimes experimental code gets committed as a directory (`/experimental/`, `/old/`, `/backup/`, `/tmp/`) and never cleaned up.
+4. **Abandoned feature branches merged as directories.** Sometimes experimental code gets committed as a directory (`/experimental/`, `/old/`, `/backup/`, `/tmp/`, `/legacy/`) and never cleaned up. This repo has a `legacy/` directory (the old C backend). It is currently intentional-for-reference per its README; the audit's job is to confirm that is still the intent and that nothing in the live build depends on it, not to assume it is either dead or sacred.
 
 5. **Generated files committed to source.** Build artifacts, compiled outputs, `.pyc` files, `node_modules` fragments, `target/` contents, or lockfiles for tools not actually used.
 
@@ -57,7 +57,7 @@ comm -23 /tmp/all_source.txt /tmp/recently_modified.txt
 find . -type f -name "*.ts" -o -name "*.rs" -o -name "*.py" | xargs -I{} basename {} | sort | uniq -d
 
 # Find directories that look like abandoned experiments
-find . -maxdepth 3 -type d \( -name "old" -o -name "backup" -o -name "tmp" -o -name "deprecated" -o -name "experimental" -o -name "v1" -o -name "v2" \)
+find . -maxdepth 3 -type d \( -name "old" -o -name "backup" -o -name "tmp" -o -name "deprecated" -o -name "experimental" -o -name "legacy" -o -name "v1" -o -name "v2" \) -not -path "*/node_modules/*"
 ```
 
 Combine mechanical scanning with reading. The scripts find candidates; you read the code to determine if they're actually dead.
@@ -70,11 +70,11 @@ Web servers happily serve stale content forever. This phase specifically checks 
 
 **What to check:**
 
-1. **Server configuration vs. actual content.** Read the web server config (nginx conf, Rust router definitions, static file serving setup). Map every configured route to the files or handlers it resolves to. Flag routes pointing at content that hasn't been updated alongside the rest of the project.
+1. **Server configuration vs. actual content.** Read the web server config (`deploy/nginx.conf` for production, `frontend/vite.config.ts` `serveDir` plugins for dev, and the axum router in `solver/`) and map every configured route to the files or handlers it resolves to. The two must agree: a UI added to `vite.config.ts` but not to `nginx.conf` (or vice versa) works locally but 404s in production, or the reverse. Current routes: `/yatzy/` (treatise, volume-mounted), `/yatzy/play/`, `/yatzy/profile/`, `/yatzy/probabilities/` (baked into the frontend image under `apps/`), `/yatzy/shared/` and `/yatzy/data/` (served from the treatise volume root), and `/yatzy/api/` (proxied to the solver). Flag routes pointing at content that has not been updated alongside the rest of the project.
 
-2. **Static file directories.** Identify every directory that gets served as static content. Walk each one and check whether every file in it is referenced by current application code (templates, components, API responses).
+2. **Static file directories.** Identify every directory served as static content: `treatise/`, `frontend/dist/`, `profiler/`, `probabilities/`, and `shared/`. Walk each and check whether every file is referenced by current application code (index.html script/link tags, chart modules, `shared/` imports). Also confirm the three places a new static UI must be wired stay in sync: `shared/nav.js` (the tab), `frontend/vite.config.ts` (dev serving), and `deploy/nginx.conf` + `deploy/deploy.sh` (production).
 
-3. **API endpoints with no consumers.** For every API endpoint defined in the Rust backend, search the frontend and analytics code for references. An endpoint with zero consumers is either used externally (document it) or dead (remove it).
+3. **API endpoints with no consumers.** For every API endpoint defined in the Rust solver (the axum backend under `solver/`), search the consumers for references: `frontend/src/api.ts` is the main client, and `analytics/` may call it too. Note the profiler and probabilities tabs are fully client-side (they read pre-computed JSON, not the API), so absence of a reference there is expected, not a dead endpoint. An endpoint with zero consumers anywhere is either used externally (document it) or dead (remove it).
 
 4. **Redirect chains.** Look for redirects that point to other redirects, or redirects to paths that no longer exist.
 
@@ -83,33 +83,36 @@ Web servers happily serve stale content forever. This phase specifically checks 
 **How to investigate:**
 
 ```bash
-# Extract route definitions from Rust backend
-grep -rn "route\|get(\|post(\|put(\|delete(\|.at(\|.resource(" backend/src/ --include="*.rs"
+# Extract route definitions from the Rust solver (axum backend)
+grep -rn "route\|get(\|post(\|put(\|delete(\|\.at(\|\.route(" solver/src/ --include="*.rs"
 
-# Extract fetch/API calls from frontend
-grep -rn "fetch(\|axios\.\|api\.\|/api/" frontend/src/ --include="*.ts" --include="*.tsx"
+# Extract fetch/API calls from the frontend (and client-side data fetches in the UIs)
+grep -rn "fetch(\|axios\.\|api\.\|/api/\|/yatzy/data/" frontend/src/ profiler/js/ probabilities/js/ --include="*.ts" --include="*.js"
 
-# Find all static files being served
-find . -path "*/static/*" -o -path "*/public/*" -o -path "*/dist/*" -o -path "*/assets/*" | grep -v node_modules | grep -v target
+# Map dev vs prod routing (must agree)
+grep -n "serveDir\|proxy" frontend/vite.config.ts
+grep -nE "location" deploy/nginx.conf
 ```
 
 ---
 
 ### Phase 3: Cross-project coherence
 
-The yatzy repo is polyglot (Rust solver, TypeScript frontend, Python analytics). Each sub-project has its own idioms, but certain things should stay aligned.
+The yatzy repo is polyglot. The surfaces are: the Rust solver (`solver/`), the TypeScript + Vite game UI (`frontend/`), the Python analytics (`analytics/`), and three vanilla-JS static UIs with no build step (`treatise/`, `profiler/`, `probabilities/`) plus a `shared/` directory of plain ES-module JS (nav, dice renderer, and the `path-prob.js` / `score-prob.js` math modules) imported by several of them. Each surface has its own idioms, but certain things should stay aligned.
 
 **What to check:**
 
-1. **Shared data contracts.** The Rust backend defines types that the TypeScript frontend consumes (API response shapes, game state, user profiles). Verify they match. Look for struct definitions in Rust and corresponding TypeScript interfaces or types. Flag any fields present in one but not the other, or type mismatches.
+1. **Shared data contracts.** The Rust solver defines types that the TypeScript frontend consumes (API response shapes, game state). Verify they match `frontend/src/api.ts`. Flag any fields present in one but not the other, or type mismatches.
 
-2. **Naming conventions.** Check whether equivalent concepts use the same names across sub-projects. If the backend calls it `game_session` and the frontend calls it `match`, that's drift. Compile a glossary of key domain terms and check consistency.
+2. **Shared-module drift.** The `shared/` modules are single sources of truth used by more than one UI, so a change on one side that the other does not expect is a real bug. In particular: `shared/path-prob.js` and `shared/score-prob.js` are consumed by BOTH the probabilities tab (`probabilities/js/`) and the treatise charts (`treatise/js/charts/path-probability.js`, `risk-theta.js`); `shared/dice.js` / `dice.css` render dice everywhere; `shared/nav.js` is the nav for every UI. Confirm each shared export still matches every caller, and that the probabilities tab's `kde_curves.json` fetch still matches the file the treatise generates. When a UI is added, `shared/nav.js`'s `PAGES` and `detectActive()` must include it.
 
-3. **Configuration drift.** Compare linter configs, formatting rules, and CI settings across sub-projects. Are they using compatible settings where they should be? Note: some drift is expected — Rust and TypeScript have different norms. Flag only where conventions diverge where they should agree.
+3. **Naming conventions.** Check whether equivalent concepts use the same names across sub-projects. If the solver calls it `game_session` and the frontend calls it `match`, that's drift. Compile a glossary of key domain terms and check consistency.
 
-4. **Dependency version alignment.** For shared concerns (serialization formats, HTTP libraries, test frameworks), check that sub-projects use compatible versions. A Rust backend serializing with serde while the Python analytics expects a different JSON shape is a real bug.
+4. **Configuration drift.** Compare linter and formatting configs across sub-projects (there is no CI to compare; see Phase 4). Are they using compatible settings where they should be? Note: some drift is expected, since Rust, TypeScript, Python, and plain JS have different norms. Flag only where conventions should agree but diverge.
 
-5. **Documentation coherence.** Does the treatise accurately describe the current architecture? Do sub-project CLAUDE.md files agree with each other about interfaces and boundaries? Is the directory structure described anywhere, and does that description match reality?
+5. **Dependency version alignment.** For shared concerns (serialization formats, HTTP libraries, test frameworks), check that sub-projects use compatible versions. A Rust solver serializing with serde while the Python analytics expects a different JSON shape is a real bug.
+
+6. **Documentation coherence.** The repo carries a lot of prose: the root and per-sub-project `CLAUDE.md` files, the `theory/` directory (which has its own `.claude/rules/theory.md` conventions and README index), the `docs/` directory, and the treatise itself. Check that the treatise accurately describes the current architecture, that the `CLAUDE.md` files agree with each other about interfaces and boundaries, and that any place claiming to describe the directory structure (root `CLAUDE.md` "Data Layout" / "Components" tables, `theory/README.md`) still matches reality. New top-level dirs to be aware of: `theory/`, `docs/`, `research/`, `configs/`.
 
 ---
 
@@ -123,16 +126,16 @@ The yatzy repo is polyglot (Rust solver, TypeScript frontend, Python analytics).
 
 3. **Build targets that don't build.** Try building each sub-project independently. Flag any that fail or produce warnings. A sub-project that hasn't been built in months may have silently broken.
 
-4. **CI/CD coverage.** Is every sub-project covered by CI? Are there build steps that run but test code that no longer exists? Are there sub-projects that were added after CI was set up and never got their own pipeline?
+4. **CI/CD coverage.** This project deliberately has NO CI (there is no `.github/workflows`; testing is manual via `cargo test` and `just audit` on the dev machine). Do NOT flag the absence of CI as a finding. Instead, since there is no automated gate, put extra weight on the manual equivalents: does `just check` / `just test-all` still run and pass, do the test counts referenced in the `CLAUDE.md` files still match, and is there test code referencing modules that no longer exist?
 
 5. **Docker and deployment artifacts.** If there are Dockerfiles, docker-compose files, or deployment configs, check they reference current paths, current build commands, and current environment variables.
 
 **How to investigate:**
 
 ```bash
-# Rust: find unused dependencies
-grep -oP 'name = "\K[^"]+' backend/Cargo.toml | while read dep; do
-  grep -rq "$dep" backend/src/ || echo "Possibly unused: $dep"
+# Rust: find unused dependencies (Rust lives in solver/, not backend/)
+grep -oP 'name = "\K[^"]+' solver/Cargo.toml | while read dep; do
+  grep -rq "$dep" solver/src/ || echo "Possibly unused: $dep"
 done
 
 # TypeScript: find unused dependencies
@@ -141,6 +144,10 @@ npx depcheck frontend/ 2>/dev/null || echo "Install depcheck for automated analy
 # Python: find unused dependencies
 pip install pipreqs 2>/dev/null
 pipreqs analytics/ --print 2>/dev/null
+
+# Static JS UIs (treatise, profiler, probabilities) have no build/manifest;
+# check their imports resolve against shared/ and each other instead
+grep -rn "import .* from '/yatzy/shared/" treatise/js probabilities/js profiler/js 2>/dev/null
 ```
 
 ---
@@ -186,7 +193,7 @@ done | sort | head -30
 Produce a structured report in Markdown with:
 
 ```markdown
-# Repo Review — [date]
+# Repo Review: [date]
 
 ## Summary
 [2-3 sentence overview: overall health, number of findings by severity, biggest concern]
