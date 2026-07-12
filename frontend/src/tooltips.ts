@@ -33,6 +33,12 @@ export const TIP = {
   legendOptimal: 'Green outline: the optimal play is to hold this die.',
   legendSuboptimal: 'Red outline: the optimal play is to reroll this die; holding it gives up points.',
 
+  // Delta box (the headline metric)
+  deltaBox:
+    'Delta Yatzy scores skill, not luck. Every decision that is not optimal gives up some ' +
+    'expected points (its delta, always 0 or negative). This is your running total behind ' +
+    'perfect play. It updates on every decision, with or without hints on. The goal is to keep it at zero.',
+
   // Scorecard
   scEfinal:
     'Expected final score if you score this roll in that category now and play on optimally. ' +

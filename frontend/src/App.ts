@@ -21,6 +21,7 @@ import { initScorecard } from './components/Scorecard.ts';
 import { initDebugPanel } from './components/DebugPanel.ts';
 import { initDecisionLog } from './components/DecisionLog.ts';
 import { initHowTo } from './components/HowTo.ts';
+import { initDeltaBox } from './components/DeltaBox.ts';
 
 /** A short, always-on caption describing what a panel shows. */
 function panelCaption(text: string): HTMLDivElement {
@@ -81,6 +82,11 @@ export function initApp(container: HTMLElement): void {
   const scorecardSection = document.createElement('div');
   scorecardSection.className = 'app-section-scorecard';
   columns.appendChild(scorecardSection);
+
+  // Headline Delta-Yatzy metric, centered above the scorecard. Always visible.
+  const deltaBoxEl = document.createElement('div');
+  scorecardSection.appendChild(deltaBoxEl);
+  initDeltaBox(deltaBoxEl);
 
   const scorecardEl = document.createElement('div');
   scorecardSection.appendChild(scorecardEl);
