@@ -74,11 +74,11 @@ export function initActionBar(container: HTMLElement): void {
   // Append children once — update in place on state changes
   container.appendChild(mainBtn);
   container.appendChild(rerollControls);
-  container.appendChild(hintsBtn);
-  container.appendChild(guideBtn);
   container.appendChild(undoBtn);
   container.appendChild(redoBtn);
   container.appendChild(resetBtn);
+  container.appendChild(hintsBtn);
+  container.appendChild(guideBtn);
 
   function render() {
     const s = getState();
@@ -107,7 +107,9 @@ export function initActionBar(container: HTMLElement): void {
     rerollControls.style.opacity = (!isOver && s.turnPhase === 'rolled') ? '1' : '0.3';
 
     hintsBtn.classList.toggle('active', s.prefs.showHints);
-    hintsBtn.disabled = isOver;
+    // Hints stays toggleable even at game over, so you can review the final
+    // board with or without the optimal highlights.
+    hintsBtn.disabled = false;
     guideBtn.classList.toggle('active', s.prefs.guideOpen);
 
     undoBtn.disabled = s.undoStack.length === 0;

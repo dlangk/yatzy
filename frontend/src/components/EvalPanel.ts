@@ -93,11 +93,12 @@ export function initEvalPanel(container: HTMLElement): void {
     const s = getState();
     const hasData = s.turnPhase === 'rolled' && s.lastEvalResponse !== null;
     const rerolls = s.rerollsRemaining;
-    const hints = s.prefs.showHints;
 
     // --- Turn column ---
-    const showKeep = hasData && hints && rerolls > 0;
-    const showScore = hasData && hints;
+    // The analysis panel is always shown during an active roll, independent of
+    // the Hints toggle (which only controls the on-board dice/scorecard hints).
+    const showKeep = hasData && rerolls > 0;
+    const showScore = hasData;
 
     // Best keep (dice values kept by optimal mask — masks are in original dice order)
     if (showKeep && s.lastEvalResponse?.optimal_mask != null) {
@@ -193,7 +194,6 @@ export function initEvalPanel(container: HTMLElement): void {
   subscribe((state, prev) => {
     if (state.lastEvalResponse === prev.lastEvalResponse &&
         state.turnPhase === prev.turnPhase &&
-        state.prefs.showHints === prev.prefs.showHints &&
         state.rerollsRemaining === prev.rerollsRemaining &&
         state.dice === prev.dice &&
         state.trajectory === prev.trajectory &&
