@@ -2,13 +2,21 @@
  * "How to play" intro box shown above the action buttons.
  *
  * Explains how to start a game and what the controls (Show Hints, Auto, New
- * Game) do. Dismissible; the choice is remembered in localStorage so returning
- * players are not nagged. When dismissed it collapses to a small "How to play"
- * button that brings it back.
+ * Game) do. Its open/closed state is remembered in localStorage (independent of
+ * the game state, so it survives New Game). The box is toggled by the "Guide"
+ * button in the action row via the returned controller; the box's own × closes
+ * it too.
  */
 const KEY = 'yatzy_howto_dismissed';
 
-export function initHowTo(container: HTMLElement): void {
+export interface GuideController {
+  toggle(): void;
+  isOpen(): boolean;
+  /** Register a listener; called immediately with the current state. */
+  subscribe(cb: (open: boolean) => void): void;
+}
+
+export function initHowTo(container: HTMLElement): GuideController {
   container.className = 'howto-wrap';
 
   const box = document.createElement('div');
@@ -18,7 +26,7 @@ export function initHowTo(container: HTMLElement): void {
   body.innerHTML =
     '<strong>New here?</strong> Roll the dice, click dice to keep them, and reroll up to ' +
     'twice before scoring a category. Fill all 15 categories to finish. Turn on ' +
-    '<strong>Show Hints</strong> to see the optimal dice to keep (green) and reroll (red) and ' +
+    '<strong>Hints</strong> to see the optimal dice to keep (green) and reroll (red) and ' +
     'the best category to score. <strong>Auto</strong> plays the optimal strategy for you, one ' +
     'step at a time, and <strong>New Game</strong> starts over. Hover any underlined term to see ' +
     'what it means.';
@@ -27,37 +35,41 @@ export function initHowTo(container: HTMLElement): void {
   const dismiss = document.createElement('button');
   dismiss.className = 'howto-dismiss';
   dismiss.textContent = '×';
-  dismiss.setAttribute('aria-label', 'Hide how-to');
+  dismiss.setAttribute('aria-label', 'Close the guide');
   box.appendChild(dismiss);
 
-  const restore = document.createElement('button');
-  restore.className = 'howto-restore';
-  restore.textContent = '? How to play';
-
   container.appendChild(box);
-  container.appendChild(restore);
 
-  function apply(dismissed: boolean): void {
-    box.style.display = dismissed ? 'none' : '';
-    restore.style.display = dismissed ? '' : 'none';
+  const listeners: ((open: boolean) => void)[] = [];
+
+  let open = true;
+  try {
+    open = localStorage.getItem(KEY) !== '1';
+  } catch { /* ignore */ }
+
+  function apply(): void {
+    container.style.display = open ? '' : 'none';
+    for (const l of listeners) l(open);
   }
 
-  dismiss.addEventListener('click', () => {
+  function setOpen(v: boolean): void {
+    open = v;
     try {
-      localStorage.setItem(KEY, '1');
-    } catch { /* ignore storage errors */ }
-    apply(true);
-  });
-  restore.addEventListener('click', () => {
-    try {
-      localStorage.removeItem(KEY);
-    } catch { /* ignore storage errors */ }
-    apply(false);
-  });
+      if (open) localStorage.removeItem(KEY);
+      else localStorage.setItem(KEY, '1');
+    } catch { /* ignore */ }
+    apply();
+  }
 
-  let dismissed = false;
-  try {
-    dismissed = localStorage.getItem(KEY) === '1';
-  } catch { /* ignore */ }
-  apply(dismissed);
+  dismiss.addEventListener('click', () => setOpen(false));
+  apply();
+
+  return {
+    toggle: () => setOpen(!open),
+    isOpen: () => open,
+    subscribe: (cb) => {
+      listeners.push(cb);
+      cb(open);
+    },
+  };
 }

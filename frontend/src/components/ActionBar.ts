@@ -1,7 +1,8 @@
 import { getState, dispatch, subscribe } from '../store.ts';
+import type { GuideController } from './HowTo.ts';
 
-/** Render the action bar: Roll/Reroll button, reroll counter, hints toggle, and reset. */
-export function initActionBar(container: HTMLElement): void {
+/** Render the action bar: Roll/Reroll, reroll counter, Hints/Guide toggles, undo/redo, reset. */
+export function initActionBar(container: HTMLElement, guide: GuideController): void {
   container.className = 'action-bar';
 
   const mainBtn = document.createElement('button');
@@ -28,9 +29,19 @@ export function initActionBar(container: HTMLElement): void {
   rerollControls.appendChild(minusBtn);
   rerollControls.appendChild(plusBtn);
 
+  // Hints: compact toggle. Same "Hints" label in both states; the accent color
+  // (via .active) signals on/off rather than a text change.
   const hintsBtn = document.createElement('button');
-  hintsBtn.className = 'game-btn-secondary';
+  hintsBtn.className = 'game-btn-secondary btn-toggle';
+  hintsBtn.textContent = 'Hints';
   hintsBtn.addEventListener('click', () => dispatch({ type: 'TOGGLE_HINTS' }));
+
+  // Guide: toggles the "how to play" box (lives above the buttons).
+  const guideBtn = document.createElement('button');
+  guideBtn.className = 'game-btn-secondary btn-toggle';
+  guideBtn.textContent = '? Guide';
+  guideBtn.addEventListener('click', () => guide.toggle());
+  guide.subscribe((guideOpen) => guideBtn.classList.toggle('active', guideOpen));
 
   const undoBtn = document.createElement('button');
   undoBtn.className = 'game-btn-secondary';
@@ -66,6 +77,7 @@ export function initActionBar(container: HTMLElement): void {
   container.appendChild(mainBtn);
   container.appendChild(rerollControls);
   container.appendChild(hintsBtn);
+  container.appendChild(guideBtn);
   container.appendChild(undoBtn);
   container.appendChild(redoBtn);
   container.appendChild(resetBtn);
@@ -96,7 +108,7 @@ export function initActionBar(container: HTMLElement): void {
     plusBtn.disabled = isOver || s.turnPhase !== 'rolled' || s.rerollsRemaining >= 2;
     rerollControls.style.opacity = (!isOver && s.turnPhase === 'rolled') ? '1' : '0.3';
 
-    hintsBtn.textContent = s.showHints ? 'Hide Hints' : 'Show Hints';
+    hintsBtn.classList.toggle('active', s.showHints);
     hintsBtn.disabled = isOver;
 
     undoBtn.disabled = s.undoStack.length === 0;

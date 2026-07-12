@@ -54,13 +54,14 @@ export function initApp(container: HTMLElement): void {
   rightSection.appendChild(diceSection);
 
   // How-to intro box, above the action buttons (dismissible, remembered).
+  // Its controller lets the "Guide" button in the action row toggle it.
   const howToEl = document.createElement('div');
   diceSection.appendChild(howToEl);
-  initHowTo(howToEl);
+  const guide = initHowTo(howToEl);
 
   const actionBarEl = document.createElement('div');
   diceSection.appendChild(actionBarEl);
-  initActionBar(actionBarEl);
+  initActionBar(actionBarEl, guide);
 
   const autoplayBarEl = document.createElement('div');
   diceSection.appendChild(autoplayBarEl);
