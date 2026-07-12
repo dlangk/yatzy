@@ -1,33 +1,6 @@
 import type { GameState, GameStateSnapshot, GameAction, CategoryState, TrajectoryPoint } from './types.ts';
 import { CATEGORY_NAMES, CATEGORY_COUNT, TOTAL_DICE, UPPER_SCORE_CAP, UPPER_BONUS, UPPER_CATEGORIES } from './constants.ts';
-
-const STORAGE_KEY = 'yatzy-game-state';
-
-/** Persist game state to localStorage on every dispatch. */
-export function saveState(state: GameState): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch { /* quota exceeded or private browsing — ignore */ }
-}
-
-/**
- * Restore game state from localStorage on startup.
- * Fields added after initial release are defaulted.
- */
-function loadState(): GameState | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return { ...parsed, lastEvalResponse: parsed.lastEvalResponse ?? null, trajectory: parsed.trajectory ?? [], showHints: parsed.showHints ?? true, undoStack: parsed.undoStack ?? [], redoStack: parsed.redoStack ?? [] };
-  } catch {
-    return null;
-  }
-}
-
-export function clearSavedState(): void {
-  try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
-}
+import { loadGame, loadPrefs, clearGame } from './persistence.ts';
 
 function randomDie(): number {
   return Math.floor(Math.random() * 6) + 1;
@@ -45,7 +18,8 @@ function buildInitialCategories(): CategoryState[] {
   }));
 }
 
-function freshState(): GameState {
+/** Just the game-data portion, shared by New Game and the initial fresh state. */
+function freshSnapshot(): GameStateSnapshot {
   return {
     dice: Array.from({ length: TOTAL_DICE }, () => ({ value: 0, kept: false })),
     upperScore: 0,
@@ -56,17 +30,17 @@ function freshState(): GameState {
     bonus: 0,
     rawScoredSum: 0,
     lastEvalResponse: null,
-    showDebug: false,
     turnPhase: 'idle',
     trajectory: [],
-    showHints: true,
-    undoStack: [],
-    redoStack: [],
   };
 }
 
 export function initialState(): GameState {
-  return loadState() ?? freshState();
+  const savedGame = loadGame();
+  const snapshot: GameStateSnapshot = savedGame
+    ? { ...freshSnapshot(), ...savedGame, lastEvalResponse: null }
+    : freshSnapshot();
+  return { ...snapshot, undoStack: [], redoStack: [], prefs: loadPrefs() };
 }
 
 function computeUpperScore(categories: CategoryState[]): number {
@@ -108,15 +82,21 @@ function recomputeDerived(categories: CategoryState[]) {
   return { upperScore, bonus, totalScore, scoredCategories, scoredCount, rawScoredSum };
 }
 
-/** Extract a snapshot (excludes undo/redo stacks). */
+/** Extract a snapshot (excludes undo/redo stacks and prefs — undo must not
+ *  change preferences). */
 function takeSnapshot(state: GameState): GameStateSnapshot {
-  const { undoStack: _, redoStack: __, ...snap } = state;
+  const { undoStack: _, redoStack: __, prefs: ___, ...snap } = state;
   return snap;
 }
 
-/** Restore a snapshot into a full GameState. */
-function restoreSnapshot(snap: GameStateSnapshot, undoStack: GameStateSnapshot[], redoStack: GameStateSnapshot[]): GameState {
-  return { ...snap, undoStack, redoStack };
+/** Restore a snapshot into a full GameState, preserving history and prefs. */
+function restoreSnapshot(
+  snap: GameStateSnapshot,
+  undoStack: GameStateSnapshot[],
+  redoStack: GameStateSnapshot[],
+  prefs: GameState['prefs'],
+): GameState {
+  return { ...snap, undoStack, redoStack, prefs };
 }
 
 export function computeAccumulatedScore(state: GameState): number {
@@ -264,10 +244,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'TOGGLE_DEBUG':
-      return { ...state, showDebug: !state.showDebug };
+      return { ...state, prefs: { ...state.prefs, showDebug: !state.prefs.showDebug } };
 
     case 'TOGGLE_HINTS':
-      return { ...state, showHints: !state.showHints };
+      return { ...state, prefs: { ...state.prefs, showHints: !state.prefs.showHints } };
+
+    case 'TOGGLE_GUIDE':
+      return { ...state, prefs: { ...state.prefs, guideOpen: !state.prefs.guideOpen } };
+
+    case 'SET_AUTOPLAY_DELAY':
+      return { ...state, prefs: { ...state.prefs, autoplayDelay: action.delay } };
 
     case 'SET_DIE_VALUE': {
       const { index, value } = action;
@@ -364,19 +350,20 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (state.undoStack.length === 0) return state;
       const snap = state.undoStack[state.undoStack.length - 1];
       const newUndoStack = state.undoStack.slice(0, -1);
-      return restoreSnapshot(snap, newUndoStack, [...state.redoStack, takeSnapshot(state)]);
+      return restoreSnapshot(snap, newUndoStack, [...state.redoStack, takeSnapshot(state)], state.prefs);
     }
 
     case 'REDO': {
       if (state.redoStack.length === 0) return state;
       const snap = state.redoStack[state.redoStack.length - 1];
       const newRedoStack = state.redoStack.slice(0, -1);
-      return restoreSnapshot(snap, [...state.undoStack, takeSnapshot(state)], newRedoStack);
+      return restoreSnapshot(snap, [...state.undoStack, takeSnapshot(state)], newRedoStack, state.prefs);
     }
 
     case 'RESET_GAME':
-      clearSavedState();
-      return freshState();
+      // Clear the saved game but keep preferences (they live under their own key).
+      clearGame();
+      return { ...freshSnapshot(), undoStack: [], redoStack: [], prefs: state.prefs };
 
     case 'SET_INITIAL_EV': {
       if (state.trajectory.length > 0) return state;

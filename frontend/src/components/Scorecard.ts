@@ -124,7 +124,7 @@ export function initScorecard(container: HTMLElement): void {
     const s = getState();
     const canScore = s.turnPhase === 'rolled';
     const mustScore = canScore && s.rerollsRemaining <= 0;
-    const optimalCategoryId = s.showHints ? (s.lastEvalResponse?.optimal_category ?? null) : null;
+    const optimalCategoryId = s.prefs.showHints ? (s.lastEvalResponse?.optimal_category ?? null) : null;
 
     // Compute normalization ranges
     const scoreValues = s.categories.map(c => c.isScored ? c.score : c.suggestedScore);
@@ -150,7 +150,7 @@ export function initScorecard(container: HTMLElement): void {
         scoreFraction,
         evFraction,
         totalScore: s.rawScoredSum,
-        showHints: s.showHints,
+        showHints: s.prefs.showHints,
         bonusAchieved: s.bonus > 0,
       });
     }
@@ -178,7 +178,7 @@ export function initScorecard(container: HTMLElement): void {
   subscribe((state, prev) => {
     if (state.categories === prev.categories &&
         state.turnPhase === prev.turnPhase &&
-        state.showHints === prev.showHints &&
+        state.prefs.showHints === prev.prefs.showHints &&
         state.lastEvalResponse === prev.lastEvalResponse &&
         state.rerollsRemaining === prev.rerollsRemaining &&
         state.rawScoredSum === prev.rawScoredSum &&

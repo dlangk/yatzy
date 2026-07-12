@@ -29,10 +29,10 @@ export function initDebugPanel(toggleContainer: HTMLElement, panelContainer: HTM
 
   function render() {
     const s = getState();
-    toggleBtn.textContent = s.showDebug ? 'Hide Debug' : 'Show Debug';
-    panelContainer.style.display = s.showDebug ? 'block' : 'none';
+    toggleBtn.textContent = s.prefs.showDebug ? 'Hide Debug' : 'Show Debug';
+    panelContainer.style.display = s.prefs.showDebug ? 'block' : 'none';
 
-    if (s.showDebug) {
+    if (s.prefs.showDebug) {
       stateContent.textContent = JSON.stringify({
         dice: s.dice,
         upperScore: s.upperScore,
@@ -57,7 +57,7 @@ export function initDebugPanel(toggleContainer: HTMLElement, panelContainer: HTM
 
   render();
   subscribe((state, prev) => {
-    if (state.showDebug === prev.showDebug && !state.showDebug) return;
+    if (state.prefs.showDebug === prev.prefs.showDebug && !state.prefs.showDebug) return;
     render();
   });
 }

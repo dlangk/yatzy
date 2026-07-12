@@ -65,15 +65,23 @@ export interface GameStateSnapshot {
    *  the terminal bonus that the solver's state_ev already includes. */
   rawScoredSum: number;
   lastEvalResponse: EvaluateResponse | null;
-  showDebug: boolean;
   turnPhase: TurnPhase;
   trajectory: TrajectoryPoint[];
+}
+
+/** Durable user preferences. Kept separate from game data: persisted under its
+ *  own key and preserved across New Game. Not part of undo/redo snapshots. */
+export interface Prefs {
   showHints: boolean;
+  showDebug: boolean;
+  guideOpen: boolean;
+  autoplayDelay: number;
 }
 
 export interface GameState extends GameStateSnapshot {
   undoStack: GameStateSnapshot[];
   redoStack: GameStateSnapshot[];
+  prefs: Prefs;
 }
 
 export type GameAction =
@@ -91,5 +99,7 @@ export type GameAction =
   | { type: 'SET_INITIAL_EV'; ev: number }
   | { type: 'SET_DENSITY_RESULT'; index: number; percentiles: Record<string, number> }
   | { type: 'TOGGLE_HINTS' }
+  | { type: 'TOGGLE_GUIDE' }
+  | { type: 'SET_AUTOPLAY_DELAY'; delay: number }
   | { type: 'UNDO' }
   | { type: 'REDO' };

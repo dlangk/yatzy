@@ -3,13 +3,19 @@
  *
  * Subscribes to the store and automatically executes optimal moves
  * (roll, reroll with optimal mask, score optimal category) with a
- * configurable delay. Purely a side-effect loop — no reducer state.
+ * configurable delay. The delay is a user preference (state.prefs.autoplayDelay).
  */
 import { getState, dispatch, subscribe } from './store.ts';
 
+const MIN_DELAY = 200;
+const MAX_DELAY = 3000;
+
 let playing = false;
-let delay = 500;
 let pendingTimeout: number | null = null;
+
+function clampDelay(v: number): number {
+  return Math.max(MIN_DELAY, Math.min(MAX_DELAY, v || 500));
+}
 
 function cancelPending(): void {
   if (pendingTimeout !== null) {
@@ -73,7 +79,7 @@ function scheduleNextMove(): void {
     return;
   }
 
-  pendingTimeout = window.setTimeout(executeStep, delay);
+  pendingTimeout = window.setTimeout(executeStep, getState().prefs.autoplayDelay);
 }
 
 let btnEl: HTMLButtonElement | null = null;
@@ -95,31 +101,35 @@ export function initAutoPlay(container: HTMLElement): void {
   const input = document.createElement('input');
   input.type = 'number';
   input.className = 'autoplay-delay-input';
-  input.min = '200';
-  input.max = '3000';
+  input.min = String(MIN_DELAY);
+  input.max = String(MAX_DELAY);
   input.step = '100';
-  input.value = String(delay);
+  input.value = String(getState().prefs.autoplayDelay);
 
   const label = document.createElement('span');
   label.className = 'autoplay-delay-label';
   label.textContent = 'ms';
 
+  function commitDelay(): void {
+    const delay = clampDelay(parseInt(input.value, 10));
+    input.value = String(delay);
+    if (delay !== getState().prefs.autoplayDelay) {
+      dispatch({ type: 'SET_AUTOPLAY_DELAY', delay });
+    }
+  }
+
   btn.addEventListener('click', () => {
     playing = !playing;
     updateButton();
     if (playing) {
-      delay = Math.max(200, Math.min(3000, parseInt(input.value, 10) || 500));
-      input.value = String(delay);
+      commitDelay();
       scheduleNextMove();
     } else {
       cancelPending();
     }
   });
 
-  input.addEventListener('change', () => {
-    delay = Math.max(200, Math.min(3000, parseInt(input.value, 10) || 500));
-    input.value = String(delay);
-  });
+  input.addEventListener('change', commitDelay);
 
   container.appendChild(btn);
   container.appendChild(input);

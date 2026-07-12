@@ -93,7 +93,7 @@ export function initEvalPanel(container: HTMLElement): void {
     const s = getState();
     const hasData = s.turnPhase === 'rolled' && s.lastEvalResponse !== null;
     const rerolls = s.rerollsRemaining;
-    const hints = s.showHints;
+    const hints = s.prefs.showHints;
 
     // --- Turn column ---
     const showKeep = hasData && hints && rerolls > 0;
@@ -193,7 +193,7 @@ export function initEvalPanel(container: HTMLElement): void {
   subscribe((state, prev) => {
     if (state.lastEvalResponse === prev.lastEvalResponse &&
         state.turnPhase === prev.turnPhase &&
-        state.showHints === prev.showHints &&
+        state.prefs.showHints === prev.prefs.showHints &&
         state.rerollsRemaining === prev.rerollsRemaining &&
         state.dice === prev.dice &&
         state.trajectory === prev.trajectory &&

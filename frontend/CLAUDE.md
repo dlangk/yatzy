@@ -29,17 +29,21 @@ npm run lint      # ESLint
 |------|---------|
 | `main.ts` | Entry point, init store, wire side effects |
 | `App.ts` | `initApp()` — creates DOM skeleton, inits components |
-| `store.ts` | Flux store: `dispatch()`, `subscribe()`, `getState()` |
-| `reducer.ts` | Pure game state reducer + localStorage persistence |
-| `types.ts` | TypeScript interfaces for all data contracts |
+| `store.ts` | Flux store: `dispatch()`, `subscribe()`, `getState()`; persists on each dispatch |
+| `reducer.ts` | Pure game state reducer (transitions only; persistence lives in `persistence.ts`) |
+| `persistence.ts` | Versioned localStorage: `yatzy-game-state` (durable game data, cleared by New Game) + `yatzy-prefs` (preferences, survive New Game). Excludes derived/heavy fields (lastEvalResponse, undo/redo) |
+| `types.ts` | TypeScript interfaces for all data contracts. `Prefs` (showHints, showDebug, guideOpen, autoplayDelay) is separate from game data and lives at `state.prefs` |
 | `api.ts` | Backend API client (fetch wrappers) |
-| `autoplay.ts` | Auto-play side-effect loop: executes optimal moves with configurable delay |
+| `autoplay.ts` | Auto-play side-effect loop; delay is `state.prefs.autoplayDelay` |
 | `hoverBus.ts` | Lightweight event bus for cross-component hover coordination |
+| `tooltips.ts` | Centralized copy for the guidance tooltips |
 | `mask.ts` | Dice sort-mapping utilities |
 | `constants.ts` | Colors, category names, game constants |
 | `config.ts` | API base URL configuration |
 | `style.css` | All styles via CSS custom properties |
-| `components/ActionBar.ts` | Roll/reroll buttons and reroll counter |
+| `components/ActionBar.ts` | Roll/reroll, reroll counter, Hints/Guide toggles, undo/redo, reset |
+| `components/HowTo.ts` | Dismissible "how to play" intro box (toggled by the Guide button via `state.prefs.guideOpen`) |
+| `components/Tooltip.ts` | Reusable accessible tooltip util (`attachTooltip` / `attachHoverTooltip`) |
 | `components/DebugPanel.ts` | Collapsible raw state inspector |
 | `components/DecisionLog.ts` | Per-turn reroll/score decision table with delta bars |
 | `components/DiceBar.ts` | Five-die display with keep toggles |

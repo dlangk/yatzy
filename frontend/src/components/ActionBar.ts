@@ -1,8 +1,7 @@
 import { getState, dispatch, subscribe } from '../store.ts';
-import type { GuideController } from './HowTo.ts';
 
 /** Render the action bar: Roll/Reroll, reroll counter, Hints/Guide toggles, undo/redo, reset. */
-export function initActionBar(container: HTMLElement, guide: GuideController): void {
+export function initActionBar(container: HTMLElement): void {
   container.className = 'action-bar';
 
   const mainBtn = document.createElement('button');
@@ -40,8 +39,7 @@ export function initActionBar(container: HTMLElement, guide: GuideController): v
   const guideBtn = document.createElement('button');
   guideBtn.className = 'game-btn-secondary btn-toggle';
   guideBtn.textContent = '? Guide';
-  guideBtn.addEventListener('click', () => guide.toggle());
-  guide.subscribe((guideOpen) => guideBtn.classList.toggle('active', guideOpen));
+  guideBtn.addEventListener('click', () => dispatch({ type: 'TOGGLE_GUIDE' }));
 
   const undoBtn = document.createElement('button');
   undoBtn.className = 'game-btn-secondary';
@@ -108,8 +106,9 @@ export function initActionBar(container: HTMLElement, guide: GuideController): v
     plusBtn.disabled = isOver || s.turnPhase !== 'rolled' || s.rerollsRemaining >= 2;
     rerollControls.style.opacity = (!isOver && s.turnPhase === 'rolled') ? '1' : '0.3';
 
-    hintsBtn.classList.toggle('active', s.showHints);
+    hintsBtn.classList.toggle('active', s.prefs.showHints);
     hintsBtn.disabled = isOver;
+    guideBtn.classList.toggle('active', s.prefs.guideOpen);
 
     undoBtn.disabled = s.undoStack.length === 0;
     redoBtn.disabled = s.redoStack.length === 0;
@@ -120,7 +119,8 @@ export function initActionBar(container: HTMLElement, guide: GuideController): v
   subscribe((state, prev) => {
     if (state.turnPhase === prev.turnPhase &&
         state.rerollsRemaining === prev.rerollsRemaining &&
-        state.showHints === prev.showHints &&
+        state.prefs.showHints === prev.prefs.showHints &&
+        state.prefs.guideOpen === prev.prefs.guideOpen &&
         state.undoStack === prev.undoStack &&
         state.redoStack === prev.redoStack) return;
     render();

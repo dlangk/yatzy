@@ -25,12 +25,11 @@ function freshState(): GameState {
     bonus: 0,
     rawScoredSum: 0,
     lastEvalResponse: null,
-    showDebug: false,
     turnPhase: 'idle',
     trajectory: [],
-    showHints: true,
     undoStack: [],
     redoStack: [],
+    prefs: { showHints: true, showDebug: false, guideOpen: true, autoplayDelay: 500 },
   };
 }
 
@@ -365,6 +364,47 @@ describe('gameReducer', () => {
       const next = gameReducer(state, { type: 'SET_DENSITY_RESULT', index: 1, percentiles });
       expect(next.trajectory[1].percentiles).toEqual(percentiles);
       expect(next.trajectory[0].percentiles).toBeUndefined(); // other points unaffected
+    });
+  });
+
+  describe('preferences', () => {
+    it('RESET_GAME keeps preferences (New Game must not reset hints/debug/guide)', () => {
+      const state: GameState = {
+        ...freshState(),
+        prefs: { showHints: false, showDebug: true, guideOpen: false, autoplayDelay: 800 },
+      };
+      const next = gameReducer(state, { type: 'RESET_GAME' });
+      expect(next.prefs).toEqual({ showHints: false, showDebug: true, guideOpen: false, autoplayDelay: 800 });
+      // ...but the game data is fresh
+      expect(next.turnPhase).toBe('idle');
+      expect(next.trajectory).toEqual([]);
+      expect(next.totalScore).toBe(0);
+    });
+
+    it('toggles flip only their own pref', () => {
+      const s0 = freshState();
+      const s1 = gameReducer(s0, { type: 'TOGGLE_HINTS' });
+      expect(s1.prefs.showHints).toBe(false);
+      expect(s1.prefs.guideOpen).toBe(true);
+      const s2 = gameReducer(s1, { type: 'TOGGLE_GUIDE' });
+      expect(s2.prefs.guideOpen).toBe(false);
+      expect(s2.prefs.showHints).toBe(false);
+    });
+
+    it('SET_AUTOPLAY_DELAY updates only the delay', () => {
+      const next = gameReducer(freshState(), { type: 'SET_AUTOPLAY_DELAY', delay: 1200 });
+      expect(next.prefs.autoplayDelay).toBe(1200);
+      expect(next.prefs.showHints).toBe(true);
+    });
+
+    it('UNDO does not change preferences', () => {
+      // Score a category (pushes an undo snapshot), toggle a pref, then undo.
+      const rolled = rolledState();
+      const scored = gameReducer(rolled, { type: 'SET_CATEGORY_SCORE', categoryId: 0, score: 3 });
+      const toggled = gameReducer(scored, { type: 'TOGGLE_HINTS' });
+      expect(toggled.prefs.showHints).toBe(false);
+      const undone = gameReducer(toggled, { type: 'UNDO' });
+      expect(undone.prefs.showHints).toBe(false); // undo restores game, not prefs
     });
   });
 });

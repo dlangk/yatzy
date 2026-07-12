@@ -1,5 +1,6 @@
 import type { GameState, GameAction } from './types.ts';
-import { gameReducer, initialState, saveState } from './reducer.ts';
+import { gameReducer, initialState } from './reducer.ts';
+import { saveGame, savePrefs } from './persistence.ts';
 
 type Listener = (state: GameState, prev: GameState, action: GameAction) => void;
 
@@ -15,7 +16,8 @@ export function getState(): GameState {
 export function dispatch(action: GameAction): void {
   const prev = state;
   state = gameReducer(state, action);
-  saveState(state);
+  saveGame(state);
+  if (state.prefs !== prev.prefs) savePrefs(state.prefs);
   for (const fn of listeners) {
     fn(state, prev, action);
   }

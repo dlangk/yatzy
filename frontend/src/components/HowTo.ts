@@ -1,22 +1,14 @@
 /**
  * "How to play" intro box shown above the action buttons.
  *
- * Explains how to start a game and what the controls (Show Hints, Auto, New
- * Game) do. Its open/closed state is remembered in localStorage (independent of
- * the game state, so it survives New Game). The box is toggled by the "Guide"
- * button in the action row via the returned controller; the box's own × closes
- * it too.
+ * Explains how to start a game and what the controls (Hints, Auto, New Game) do.
+ * Open/closed lives in prefs (state.prefs.guideOpen), so it is remembered across
+ * sessions and survives New Game, and stays in sync with the "Guide" button in
+ * the action row. The box's own × closes it.
  */
-const KEY = 'yatzy_howto_dismissed';
+import { getState, dispatch, subscribe } from '../store.ts';
 
-export interface GuideController {
-  toggle(): void;
-  isOpen(): boolean;
-  /** Register a listener; called immediately with the current state. */
-  subscribe(cb: (open: boolean) => void): void;
-}
-
-export function initHowTo(container: HTMLElement): GuideController {
+export function initHowTo(container: HTMLElement): void {
   container.className = 'howto-wrap';
 
   const box = document.createElement('div');
@@ -36,40 +28,20 @@ export function initHowTo(container: HTMLElement): GuideController {
   dismiss.className = 'howto-dismiss';
   dismiss.textContent = '×';
   dismiss.setAttribute('aria-label', 'Close the guide');
+  dismiss.addEventListener('click', () => {
+    if (getState().prefs.guideOpen) dispatch({ type: 'TOGGLE_GUIDE' });
+  });
   box.appendChild(dismiss);
 
   container.appendChild(box);
 
-  const listeners: ((open: boolean) => void)[] = [];
-
-  let open = true;
-  try {
-    open = localStorage.getItem(KEY) !== '1';
-  } catch { /* ignore */ }
-
-  function apply(): void {
-    container.style.display = open ? '' : 'none';
-    for (const l of listeners) l(open);
+  function render(): void {
+    container.style.display = getState().prefs.guideOpen ? '' : 'none';
   }
 
-  function setOpen(v: boolean): void {
-    open = v;
-    try {
-      if (open) localStorage.removeItem(KEY);
-      else localStorage.setItem(KEY, '1');
-    } catch { /* ignore */ }
-    apply();
-  }
-
-  dismiss.addEventListener('click', () => setOpen(false));
-  apply();
-
-  return {
-    toggle: () => setOpen(!open),
-    isOpen: () => open,
-    subscribe: (cb) => {
-      listeners.push(cb);
-      cb(open);
-    },
-  };
+  render();
+  subscribe((state, prev) => {
+    if (state.prefs.guideOpen === prev.prefs.guideOpen) return;
+    render();
+  });
 }

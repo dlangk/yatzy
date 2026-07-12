@@ -19,7 +19,7 @@ export function initDiceLegend(container: HTMLElement): void {
   function render() {
     const s = getState();
     const active = s.turnPhase === 'rolled' && s.rerollsRemaining > 0;
-    const showHints = s.showHints && active;
+    const showHints = s.prefs.showHints && active;
 
     // Always show kept/reroll when dice are active
     keptSpan.style.display = active ? '' : 'none';
@@ -30,7 +30,7 @@ export function initDiceLegend(container: HTMLElement): void {
 
   render();
   subscribe((state, prev) => {
-    if (state.showHints === prev.showHints &&
+    if (state.prefs.showHints === prev.prefs.showHints &&
         state.turnPhase === prev.turnPhase &&
         state.rerollsRemaining === prev.rerollsRemaining) return;
     render();

@@ -40,7 +40,7 @@ export function initDiceBar(container: HTMLElement): void {
     const canToggle = active && hasEval && s.rerollsRemaining > 0;
 
     const optimalMask = s.lastEvalResponse?.optimal_mask ?? null;
-    const showMaskHints = s.showHints && active && hasEval && optimalMask !== null && s.rerollsRemaining > 0;
+    const showMaskHints = s.prefs.showHints && active && hasEval && optimalMask !== null && s.rerollsRemaining > 0;
 
     for (let i = 0; i < 5; i++) {
       const v = active ? s.dice[i].value : 0;
@@ -72,7 +72,7 @@ export function initDiceBar(container: HTMLElement): void {
   subscribe((state, prev) => {
     if (state.dice === prev.dice &&
         state.lastEvalResponse === prev.lastEvalResponse &&
-        state.showHints === prev.showHints &&
+        state.prefs.showHints === prev.prefs.showHints &&
         state.rerollsRemaining === prev.rerollsRemaining &&
         state.turnPhase === prev.turnPhase) return;
     render();

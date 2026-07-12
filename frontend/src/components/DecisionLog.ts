@@ -156,7 +156,7 @@ export function initDecisionLog(container: HTMLElement): void {
     const s = getState();
 
     // Skip if nothing relevant changed
-    if (s.trajectory === prevTrajectoryRef && s.showHints === prevShowHints) return;
+    if (s.trajectory === prevTrajectoryRef && s.prefs.showHints === prevShowHints) return;
 
     const decisions = s.trajectory.filter(
       (p: TrajectoryPoint) =>
@@ -184,15 +184,15 @@ export function initDecisionLog(container: HTMLElement): void {
     }
 
     // Update delta cells (needed on new rows or showHints change)
-    if (s.showHints !== prevShowHints || decisions.length !== renderedRows.length) {
-      updateDeltaCells(s.showHints);
+    if (s.prefs.showHints !== prevShowHints || decisions.length !== renderedRows.length) {
+      updateDeltaCells(s.prefs.showHints);
     } else if (decisions.length > 0 && renderedRows.length > 0) {
       // New rows were added — always update deltas for rescaling
-      updateDeltaCells(s.showHints);
+      updateDeltaCells(s.prefs.showHints);
     }
 
     prevTrajectoryRef = s.trajectory;
-    prevShowHints = s.showHints;
+    prevShowHints = s.prefs.showHints;
   }
 
   render();
