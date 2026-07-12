@@ -684,5 +684,6 @@ body {
   font-size: 12px;
   color: var(--text-muted);
   line-height: 1.4;
-  margin: 3px 0 8px;
+  /* Captions sit below their panel: small gap above, more below before the next. */
+  margin: 5px 0 14px;
 }

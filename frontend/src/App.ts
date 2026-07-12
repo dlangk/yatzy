@@ -81,42 +81,42 @@ export function initApp(container: HTMLElement): void {
   scorecardSection.className = 'app-section-scorecard';
   columns.appendChild(scorecardSection);
 
-  scorecardSection.appendChild(panelCaption(
-    'The 15 categories. E[final] is your projected final score for scoring each one now; the best choice is highlighted.',
-  ));
   const scorecardEl = document.createElement('div');
   scorecardSection.appendChild(scorecardEl);
   initScorecard(scorecardEl);
+  scorecardSection.appendChild(panelCaption(
+    'The 15 categories. E[final] is your projected final score for scoring each one now; the best choice is highlighted.',
+  ));
 
   // Analysis — stacked below dice in the right column
   const analysisSection = document.createElement('div');
   rightSection.appendChild(analysisSection);
 
-  analysisSection.appendChild(panelCaption(
-    'Live analysis: the best play this turn, and how your whole game is projected to finish.',
-  ));
   const evalPanelEl = document.createElement('div');
   analysisSection.appendChild(evalPanelEl);
   initEvalPanel(evalPanelEl);
-
   analysisSection.appendChild(panelCaption(
-    'Your projected final score across the game, with the range it will most likely land in.',
+    'Live analysis: the best play this turn, and how your whole game is projected to finish.',
   ));
+
   const chartEl = document.createElement('div');
   analysisSection.appendChild(chartEl);
   initTrajectoryChart(chartEl);
+  analysisSection.appendChild(panelCaption(
+    'Your projected final score across the game, with the range it will most likely land in.',
+  ));
 
   // Section 4: Decision Log — desktop col 1, narrow stacks last
   const logSection = document.createElement('div');
   logSection.className = 'app-section-log';
   columns.appendChild(logSection);
 
-  logSection.appendChild(panelCaption(
-    'Every decision so far and how many points it cost versus optimal play.',
-  ));
   const decisionLogEl = document.createElement('div');
   logSection.appendChild(decisionLogEl);
   initDecisionLog(decisionLogEl);
+  logSection.appendChild(panelCaption(
+    'Every decision so far and how many points it cost versus optimal play.',
+  ));
 
   // Debug below grid
   const debugToggleEl = document.createElement('div');
