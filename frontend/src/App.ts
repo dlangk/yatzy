@@ -20,6 +20,15 @@ import { initTrajectoryChart } from './components/TrajectoryChart.ts';
 import { initScorecard } from './components/Scorecard.ts';
 import { initDebugPanel } from './components/DebugPanel.ts';
 import { initDecisionLog } from './components/DecisionLog.ts';
+import { initHowTo } from './components/HowTo.ts';
+
+/** A short, always-on caption describing what a panel shows. */
+function panelCaption(text: string): HTMLDivElement {
+  const el = document.createElement('div');
+  el.className = 'panel-caption';
+  el.textContent = text;
+  return el;
+}
 
 /** Build the app DOM skeleton and initialize all component modules. */
 export function initApp(container: HTMLElement): void {
@@ -44,6 +53,11 @@ export function initApp(container: HTMLElement): void {
   const diceSection = document.createElement('div');
   rightSection.appendChild(diceSection);
 
+  // How-to intro box, above the action buttons (dismissible, remembered).
+  const howToEl = document.createElement('div');
+  diceSection.appendChild(howToEl);
+  initHowTo(howToEl);
+
   const actionBarEl = document.createElement('div');
   diceSection.appendChild(actionBarEl);
   initActionBar(actionBarEl);
@@ -60,11 +74,16 @@ export function initApp(container: HTMLElement): void {
   diceSection.appendChild(diceLegendEl);
   initDiceLegend(diceLegendEl);
 
+  diceSection.appendChild(panelCaption('Your five dice. Click a die to keep it; the arrows set values.'));
+
   // Section 2: Scorecard — desktop col 2, narrow stacks second
   const scorecardSection = document.createElement('div');
   scorecardSection.className = 'app-section-scorecard';
   columns.appendChild(scorecardSection);
 
+  scorecardSection.appendChild(panelCaption(
+    'The 15 categories. E[final] is your projected final score for scoring each one now; the best choice is highlighted.',
+  ));
   const scorecardEl = document.createElement('div');
   scorecardSection.appendChild(scorecardEl);
   initScorecard(scorecardEl);
@@ -73,10 +92,16 @@ export function initApp(container: HTMLElement): void {
   const analysisSection = document.createElement('div');
   rightSection.appendChild(analysisSection);
 
+  analysisSection.appendChild(panelCaption(
+    'Live analysis: the best play this turn, and how your whole game is projected to finish.',
+  ));
   const evalPanelEl = document.createElement('div');
   analysisSection.appendChild(evalPanelEl);
   initEvalPanel(evalPanelEl);
 
+  analysisSection.appendChild(panelCaption(
+    'Your projected final score across the game, with the range it will most likely land in.',
+  ));
   const chartEl = document.createElement('div');
   analysisSection.appendChild(chartEl);
   initTrajectoryChart(chartEl);
@@ -86,6 +111,9 @@ export function initApp(container: HTMLElement): void {
   logSection.className = 'app-section-log';
   columns.appendChild(logSection);
 
+  logSection.appendChild(panelCaption(
+    'Every decision so far and how many points it cost versus optimal play.',
+  ));
   const decisionLogEl = document.createElement('div');
   logSection.appendChild(decisionLogEl);
   initDecisionLog(decisionLogEl);
