@@ -1,9 +1,14 @@
 import { getState, dispatch, subscribe } from '../store.ts';
 import { createDie, type DieElements } from './Die.ts';
+import { attachHoverTooltip } from './Tooltip.ts';
+import { TIP } from '../tooltips.ts';
 
 /** Render 5 interactive dice with keep/toggle and optimal-keep hints. */
 export function initDiceBar(container: HTMLElement): void {
   container.className = 'dice-bar';
+
+  // Current guidance text per die, refreshed each render and read on hover.
+  const dieTip: string[] = ['', '', '', '', ''];
 
   const dice: DieElements[] = [];
   for (let i = 0; i < 5; i++) {
@@ -24,6 +29,7 @@ export function initDiceBar(container: HTMLElement): void {
       },
     );
     dice.push(die);
+    attachHoverTooltip(die.container, () => dieTip[idx]);
     container.appendChild(die.container);
   }
 
@@ -38,14 +44,27 @@ export function initDiceBar(container: HTMLElement): void {
 
     for (let i = 0; i < 5; i++) {
       const v = active ? s.dice[i].value : 0;
+      const kept = active ? s.dice[i].kept : true;
+      const optimalKeep = showMaskHints ? !(optimalMask! & (1 << i)) : null;
       dice[i].update({
         value: v,
-        kept: active ? s.dice[i].kept : true,
+        kept,
         isOptimalReroll: showMaskHints && !!(optimalMask! & (1 << i)),
         isOptimalKeep: showMaskHints && !(optimalMask! & (1 << i)),
         disabled: !canToggle,
         faded: !active,
       });
+
+      // Guidance text for the hover tooltip (empty when there is nothing to say).
+      if (!active) {
+        dieTip[i] = '';
+      } else if (optimalKeep === null) {
+        dieTip[i] = kept ? TIP.dieKept : TIP.dieReroll;
+      } else if (kept === optimalKeep) {
+        dieTip[i] = (kept ? TIP.dieKept : TIP.dieReroll) + TIP.dieAgree;
+      } else {
+        dieTip[i] = kept ? TIP.dieKeepButReroll : TIP.dieRerollButKeep;
+      }
     }
   }
 

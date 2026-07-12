@@ -1,6 +1,8 @@
 import { getState, dispatch, subscribe } from '../store.ts';
 import { UPPER_CATEGORIES } from '../constants.ts';
 import { createScorecardRow, type RowElements } from './ScorecardRow.ts';
+import { attachTooltip } from './Tooltip.ts';
+import { TIP } from '../tooltips.ts';
 
 function normalize(value: number, min: number, max: number): number {
   if (max <= min) return value > 0 ? 1 : 0;
@@ -26,10 +28,16 @@ export function initScorecard(container: HTMLElement): void {
   const headerRow = document.createElement('tr');
   for (const [text, center] of [['Category', false], ['Score', true], ['E[final]', true], ['', true]] as [string, boolean][]) {
     const th = document.createElement('th');
-    th.textContent = text;
     if (center) th.className = 'center';
     th.style.textAlign = center ? 'center' : 'left';
-    if (text === 'EV') th.style.fontSize = '12px';
+    if (text === 'E[final]') {
+      const span = document.createElement('span');
+      span.textContent = text;
+      attachTooltip(span, TIP.scEfinal);
+      th.appendChild(span);
+    } else {
+      th.textContent = text;
+    }
     headerRow.appendChild(th);
   }
   thead.appendChild(headerRow);

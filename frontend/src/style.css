@@ -596,3 +596,39 @@ body {
   font-size: 11px;
   vertical-align: middle;
 }
+
+/* ── Guidance tooltips ─────────────────────────────────────────────
+   Dotted-underline "defined term" affordance. Uses text-decoration (not a
+   border) so it never changes box size: the layout stays pixel-stable. */
+.has-tooltip {
+  text-decoration: underline dotted var(--text-muted);
+  text-underline-offset: 3px;
+  cursor: help;
+  outline: none;
+}
+.has-tooltip:hover,
+.has-tooltip:focus-visible {
+  text-decoration-color: var(--accent);
+}
+.has-tooltip:focus-visible {
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.ui-tooltip {
+  position: fixed;
+  z-index: 10000;
+  max-width: 280px;
+  padding: 8px 10px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+  font-size: 12.5px;
+  line-height: 1.45;
+  pointer-events: none;
+}
+.dark .ui-tooltip {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}

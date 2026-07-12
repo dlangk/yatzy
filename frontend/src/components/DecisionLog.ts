@@ -1,6 +1,8 @@
 import { getState, subscribe } from '../store.ts';
 import type { TrajectoryPoint } from '../types.ts';
 import { emitHover, onHover } from '../hoverBus.ts';
+import { attachTooltip } from './Tooltip.ts';
+import { TIP } from '../tooltips.ts';
 
 const MAX_BAR_WIDTH = 60;
 
@@ -20,6 +22,7 @@ export function initDecisionLog(container: HTMLElement): void {
   title.textContent = 'Decision Log';
   const totalDelta = document.createElement('span');
   totalDelta.className = 'decision-log-total';
+  attachTooltip(totalDelta, TIP.logTotalDelta);
   header.appendChild(title);
   header.appendChild(totalDelta);
   container.appendChild(header);
@@ -28,9 +31,18 @@ export function initDecisionLog(container: HTMLElement): void {
   table.className = 'decision-log-table';
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
+  const headTips: Record<string, string> = { Delta: TIP.logDelta, 'E[final]': TIP.logEfinal };
   for (const text of ['#', 'Decision', 'Delta', 'E[final]']) {
     const th = document.createElement('th');
-    th.textContent = text;
+    const tip = headTips[text];
+    if (tip) {
+      const span = document.createElement('span');
+      span.textContent = text;
+      attachTooltip(span, tip);
+      th.appendChild(span);
+    } else {
+      th.textContent = text;
+    }
     headRow.appendChild(th);
   }
   thead.appendChild(headRow);

@@ -1,4 +1,6 @@
 import { getState, subscribe } from '../store.ts';
+import { attachTooltip } from './Tooltip.ts';
+import { TIP } from '../tooltips.ts';
 
 const DASH = '\u2014';
 
@@ -25,11 +27,12 @@ function optimalPercentile(ev: number): string {
   return 'p0';
 }
 
-/** Build a label/value grid column with a header. Returns refs to value spans. */
+/** Build a label/value grid column with a header. Returns refs to value spans.
+ *  Each item's label gets a guidance tooltip. */
 function buildColumn(
   parent: HTMLElement,
   header: string,
-  labels: string[],
+  items: { label: string; tip: string }[],
 ): HTMLSpanElement[] {
   const col = document.createElement('div');
   col.className = 'eval-col';
@@ -44,9 +47,10 @@ function buildColumn(
   col.appendChild(grid);
 
   const vals: HTMLSpanElement[] = [];
-  for (const label of labels) {
+  for (const { label, tip } of items) {
     const lbl = document.createElement('span');
     lbl.textContent = label;
+    attachTooltip(lbl, tip);
     const val = document.createElement('span');
     val.className = 'val';
     val.textContent = DASH;
@@ -69,20 +73,20 @@ export function initEvalPanel(container: HTMLElement): void {
 
   // Left column: This Turn
   const turnVals = buildColumn(columns, 'This Turn', [
-    'Best keep',
-    'Keep EV',
-    'Your keep EV',
-    'Best score',
-    'Score EV',
+    { label: 'Best keep', tip: TIP.bestKeep },
+    { label: 'Keep EV', tip: TIP.keepEv },
+    { label: 'Your keep EV', tip: TIP.yourKeepEv },
+    { label: 'Best score', tip: TIP.bestScore },
+    { label: 'Score EV', tip: TIP.scoreEv },
   ]);
 
   // Right column: Game
   const gameVals = buildColumn(columns, 'Game', [
-    'Expected final',
-    '80% Finish range',
-    'Current score',
-    'Optimal percentile',
-    'Turn',
+    { label: 'Expected final', tip: TIP.expectedFinal },
+    { label: '80% Finish range', tip: TIP.finishRange },
+    { label: 'Current score', tip: TIP.currentScore },
+    { label: 'Optimal percentile', tip: TIP.optimalPercentile },
+    { label: 'Turn', tip: TIP.turn },
   ]);
 
   function render() {
