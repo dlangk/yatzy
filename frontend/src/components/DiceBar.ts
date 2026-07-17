@@ -91,9 +91,15 @@ export function initDiceBar(container: HTMLElement): void {
       tickCells[i].classList.toggle('dice-tick--on', vm.ticks[i]);
     }
 
+    // Two decimals, matching DeltaBox and DecisionLog, which report the same
+    // number for the same decision. It is also what COST_EPS assumes: at one
+    // decimal, a cost of -0.006 clears the gate and then prints "0.0 pts".
     costLine.textContent = vm.cost === null
       ? ''
-      : `Costs you ${Math.abs(vm.cost).toFixed(1)} pts vs optimal`;
+      : `Costs you ${Math.abs(vm.cost).toFixed(2)} pts vs optimal`;
+    // Emptied text alone would leave a focusable, help-cursored strip behind,
+    // because attachTooltip adds tabindex. Hide it the way the header hides.
+    costLine.style.visibility = vm.cost === null ? 'hidden' : 'visible';
   }
 
   render(diceBarViewModel(getState()));
