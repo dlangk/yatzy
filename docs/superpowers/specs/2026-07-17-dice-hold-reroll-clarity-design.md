@@ -289,12 +289,24 @@ this is called done:
 - [ ] No double-tap zoom delay on the hold button
 - [ ] Toggling hints on and off shifts nothing on the page (no-layout-shift rule)
 
+### Platform priority
+
+**Desktop browser with a mouse is the prioritized platform.** Keyboard and touch must
+work, and the design serves them from the same markup rather than as bolt-ons, but
+they are not the primary target and carry lighter verification. This is the standing
+justification for the two accepted gaps below and for skipping a DOM test dependency.
+
 ### Known residual risk
 
 The arrows now meet WCAG AA (24px) but remain below Apple HIG (44pt) and Material
 (48dp), and they stay flush against a much larger hold target. A mis-tap on touch can
 still change a die's **value** rather than its held state, which corrupts game state
-rather than merely missing. Accepted for this change; revisit if it shows up in use.
+rather than merely missing.
+
+Accepted, on the platform priority above: the mis-tap requires a finger, and fingers
+are not the primary input. The mouse and keyboard paths have no equivalent hazard,
+since both target the die precisely. Revisit if touch use grows or it shows up in
+practice.
 
 ## Documentation Updates
 
