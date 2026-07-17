@@ -296,22 +296,71 @@ body {
   gap: 2px;
 }
 
+/* 24px, not 16px: WCAG 2.2 SC 2.5.8 target size minimum. */
 .die-arrow {
   width: 56px;
-  height: 16px;
+  height: 24px;
   font-size: 10px;
   padding: 0;
   border: 1px solid var(--border);
   background: var(--bg-alt);
   cursor: pointer;
   border-radius: 3px;
-  line-height: 14px;
+  line-height: 22px;
   color: var(--text);
+  touch-action: manipulation;
+}
+
+.die-arrow:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+/* The die and its label are one control: one focus stop, one 56x74 tap target. */
+.die-hold {
+  width: 56px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border-radius: 4px;
+  touch-action: manipulation;
+}
+
+.die-hold:disabled {
+  cursor: default;
+}
+
+.die-hold:focus-visible {
+  outline: 2px solid var(--color-orange);
+  outline-offset: 2px;
 }
 
 .die-wrap {
   width: 56px;
   height: 56px;
+  display: block;
+}
+
+/* Fixed height so a blank label cannot collapse the row. */
+.die-label {
+  height: 14px;
+  line-height: 14px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
+/* Orange means "in motion", not "wrong". Green/red are reserved for quality. */
+.die-hold--reroll .die-label {
+  color: var(--color-orange);
 }
 
 /* Dice legend */
