@@ -371,25 +371,70 @@ body {
   color: var(--color-orange-text);
 }
 
-/* Dice legend */
-.dice-legend {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  font-size: 11px;
-  color: var(--text-muted);
-  margin: 4px 0 8px;
-  transition: opacity 0.2s;
-  min-height: 16px;
+/* Solver advice, in the same five columns as the dice. */
+.dice-bar-group {
+  margin: 12px 0 8px;
 }
 
-.dice-legend .swatch {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
+.dice-ticks {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  height: 4px;
+  margin-top: 4px;
+}
+
+.dice-tick {
+  width: 56px;
+  height: 4px;
   border-radius: 2px;
-  margin-right: 4px;
-  vertical-align: middle;
+  background: transparent;
+}
+
+/* Red only ever means "giving up points". See mask.ts COST_EPS. */
+.dice-tick--on {
+  background: var(--color-danger);
+}
+
+.dice-advice-header {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  height: 12px;
+  line-height: 12px;
+  margin-top: 2px;
+}
+
+.dice-advice {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  min-height: 14px;
+}
+
+.dice-advice-cell {
+  width: 56px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 14px;
+  color: var(--text);
+}
+
+.dice-advice-cell--reroll {
+  color: var(--color-orange-text);
+}
+
+.dice-cost {
+  text-align: center;
+  min-height: 14px;
+  line-height: 14px;
+  font-size: 11px;
+  color: var(--color-danger);
 }
 
 /* Eval panel */
