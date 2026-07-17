@@ -11,6 +11,10 @@
   --color-blue: #3b4cc0;
   --color-red: #b40426;
   --color-orange: #F37021;
+  /* Orange for text on paper. The brand orange (#F37021) measures 2.69:1 on
+     --bg, under the WCAG AA 4.5:1 floor. This darker ramp measures 4.87:1.
+     Use --color-orange for fills and accents, this for text. */
+  --color-orange-text: #B54A0C;
   --color-green: #2ca02c;
   --color-success: #2ca02c;
   --color-danger: #b40426;
@@ -27,6 +31,8 @@
   --color-blue: #6b8de3;
   --color-red: #e05252;
   --color-orange: #F37021;
+  /* #F37021 measures 5.93:1 on the dark --bg, so it needs no darkening. */
+  --color-orange-text: #F37021;
   --color-green: #4caf50;
   --color-success: #4caf50;
   --color-danger: #e05252;
@@ -360,7 +366,7 @@ body {
 
 /* Orange means "in motion", not "wrong". Green/red are reserved for quality. */
 .die-hold--reroll .die-label {
-  color: var(--color-orange);
+  color: var(--color-orange-text);
 }
 
 /* Dice legend */
