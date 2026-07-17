@@ -9,6 +9,8 @@ import { getState, dispatch, subscribe } from './store.ts';
 import { initApp } from './App.ts';
 import { evaluate, getStateValue, fetchDensity } from './api.ts';
 import { initPlayAnalytics } from './analytics.ts';
+import { rerollMaskFromDice, maskCostVsOptimal } from './mask.ts';
+import type { GameState } from './types.ts';
 
 const root = document.getElementById('root')!;
 initApp(root);
@@ -38,47 +40,52 @@ subscribe((state, prev, action) => {
         : `Kept ${keptValues.join(',')}`;
     // Compute delta from pre-reroll eval
     pendingRerollDelta = undefined;
-    if (prev.lastEvalResponse?.mask_evs) {
-      let playerMask = 0;
-      for (let i = 0; i < prev.dice.length; i++) {
-        if (!prev.dice[i].kept) playerMask |= 1 << i;
-      }
-      const playerMaskEv = prev.lastEvalResponse.mask_evs[playerMask] ?? null;
-      const optimalMaskEv = prev.lastEvalResponse.optimal_mask_ev ?? null;
-      if (playerMaskEv !== null && optimalMaskEv !== null) {
-        pendingRerollDelta = playerMaskEv - optimalMaskEv;
-      }
-    }
+    const cost = maskCostVsOptimal(prev.lastEvalResponse, rerollMaskFromDice(prev.dice));
+    if (cost !== null) pendingRerollDelta = cost;
   }
 
-  // Trigger evaluation when needed
-  if (state.turnPhase === 'rolled' && !state.lastEvalResponse) {
-    const allValid = state.dice.every(d => d.value >= 1 && d.value <= 6);
-    if (allValid) {
-      const trajEvent = pendingTrajectoryEvent;
-      const trajLabel = pendingRerollLabel;
-      const trajDelta = pendingRerollDelta;
-      pendingTrajectoryEvent = undefined;
-      pendingRerollLabel = undefined;
-      pendingRerollDelta = undefined;
-
-      evaluate({
-        dice: state.dice.map(d => d.value),
-        upper_score: state.upperScore,
-        scored_categories: state.scoredCategories,
-        rerolls_remaining: state.rerollsRemaining,
-      })
-        .then(response => dispatch({
-          type: 'SET_EVAL_RESPONSE',
-          response,
-          trajectoryEvent: trajEvent,
-          rerollLabel: trajLabel,
-          rerollDelta: trajDelta,
-        }))
-        .catch(err => console.error('Evaluate failed:', err));
-    }
-  }
+  evaluateIfNeeded(state);
 });
+
+/**
+ * Fetch the eval for a rolled hand that has none yet.
+ *
+ * Called from the store subscription and once at startup. The startup call
+ * matters because lastEvalResponse is deliberately not persisted, so a reload
+ * mid-roll restores a 'rolled' state with no eval. Without hints the dice are
+ * disabled (they need an eval to know the optimal mask), so nothing the player
+ * does to a die can dispatch the action that would fetch one. Mobile browsers
+ * discard and reload backgrounded tabs, which makes that state easy to reach.
+ */
+function evaluateIfNeeded(state: GameState): void {
+  if (state.turnPhase !== 'rolled' || state.lastEvalResponse) return;
+  if (!state.dice.every(d => d.value >= 1 && d.value <= 6)) return;
+
+  const trajEvent = pendingTrajectoryEvent;
+  const trajLabel = pendingRerollLabel;
+  const trajDelta = pendingRerollDelta;
+  pendingTrajectoryEvent = undefined;
+  pendingRerollLabel = undefined;
+  pendingRerollDelta = undefined;
+
+  evaluate({
+    dice: state.dice.map(d => d.value),
+    upper_score: state.upperScore,
+    scored_categories: state.scoredCategories,
+    rerolls_remaining: state.rerollsRemaining,
+  })
+    .then(response => dispatch({
+      type: 'SET_EVAL_RESPONSE',
+      response,
+      trajectoryEvent: trajEvent,
+      rerollLabel: trajLabel,
+      rerollDelta: trajDelta,
+    }))
+    .catch(err => console.error('Evaluate failed:', err));
+}
+
+// Restored mid-roll state needs an eval that no dispatch will ask for.
+evaluateIfNeeded(getState());
 
 // Side effect: fetch initial EV when trajectory is empty (startup + reset)
 subscribe((state) => {

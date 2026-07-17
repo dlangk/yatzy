@@ -11,6 +11,10 @@
   --color-blue: #3b4cc0;
   --color-red: #b40426;
   --color-orange: #F37021;
+  /* Orange for text on paper. The brand orange (#F37021) measures 2.69:1 on
+     --bg, under the WCAG AA 4.5:1 floor. This darker ramp measures 4.87:1.
+     Use --color-orange for fills and accents, this for text. */
+  --color-orange-text: #B54A0C;
   --color-green: #2ca02c;
   --color-success: #2ca02c;
   --color-danger: #b40426;
@@ -27,6 +31,8 @@
   --color-blue: #6b8de3;
   --color-red: #e05252;
   --color-orange: #F37021;
+  /* #F37021 measures 5.93:1 on the dark --bg, so it needs no darkening. */
+  --color-orange-text: #F37021;
   --color-green: #4caf50;
   --color-success: #4caf50;
   --color-danger: #e05252;
@@ -296,43 +302,139 @@ body {
   gap: 2px;
 }
 
+/* 24px, not 16px: WCAG 2.2 SC 2.5.8 target size minimum. */
 .die-arrow {
   width: 56px;
-  height: 16px;
+  height: 24px;
   font-size: 10px;
   padding: 0;
   border: 1px solid var(--border);
   background: var(--bg-alt);
   cursor: pointer;
   border-radius: 3px;
-  line-height: 14px;
+  line-height: 22px;
   color: var(--text);
+  touch-action: manipulation;
+}
+
+.die-arrow:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+/* The die and its label are one control: one focus stop, one 56x74 tap target. */
+.die-hold {
+  width: 56px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border-radius: 4px;
+  touch-action: manipulation;
+}
+
+.die-hold:disabled {
+  cursor: default;
+}
+
+/* Uses the text ramp, not the brand orange: a focus indicator needs 3:1 per
+   WCAG 1.4.11, and #F37021 measures only 2.69:1 on the light background. */
+.die-hold:focus-visible {
+  outline: 2px solid var(--color-orange-text);
+  outline-offset: 2px;
 }
 
 .die-wrap {
   width: 56px;
   height: 56px;
+  display: block;
 }
 
-/* Dice legend */
-.dice-legend {
+/* Fixed height so a blank label cannot collapse the row. */
+.die-label {
+  height: 14px;
+  line-height: 14px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
+/* Orange means "in motion", not "wrong". Green/red are reserved for quality. */
+.die-hold--reroll .die-label {
+  color: var(--color-orange-text);
+}
+
+/* Solver advice, in the same five columns as the dice. */
+.dice-bar-group {
+  margin: 12px 0 8px;
+}
+
+.dice-ticks {
   display: flex;
-  gap: 16px;
+  gap: 8px;
   justify-content: center;
-  font-size: 11px;
-  color: var(--text-muted);
-  margin: 4px 0 8px;
-  transition: opacity 0.2s;
-  min-height: 16px;
+  height: 4px;
+  margin-top: 4px;
 }
 
-.dice-legend .swatch {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
+.dice-tick {
+  width: 56px;
+  height: 4px;
   border-radius: 2px;
-  margin-right: 4px;
-  vertical-align: middle;
+  background: transparent;
+}
+
+/* Red only ever means "giving up points". See mask.ts COST_EPS. */
+.dice-tick--on {
+  background: var(--color-danger);
+}
+
+.dice-advice-header {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  height: 14px;
+  line-height: 14px;
+  margin-top: 6px;
+}
+
+.dice-advice {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  min-height: 14px;
+}
+
+.dice-advice-cell {
+  width: 56px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  line-height: 14px;
+  color: var(--text);
+}
+
+.dice-advice-cell--reroll {
+  color: var(--color-orange-text);
+}
+
+.dice-cost {
+  text-align: center;
+  min-height: 14px;
+  line-height: 14px;
+  font-size: 11px;
+  color: var(--color-danger);
 }
 
 /* Eval panel */

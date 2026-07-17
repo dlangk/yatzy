@@ -20,12 +20,13 @@ export function initHowTo(container: HTMLElement): void {
     'score, you try to play every decision as close to optimal as possible. The box above the ' +
     'scorecard tracks your <strong>delta versus optimal play</strong>; the goal is to keep it at ' +
     'zero. Because it measures decisions rather than dice, luck cancels out.<br><br>' +
-    '<strong>New here?</strong> Roll the dice, click dice to keep them, and reroll up to ' +
-    'twice before scoring a category. Fill all 15 categories to finish. Turn on ' +
-    '<strong>Hints</strong> to see the optimal dice to keep (green) and reroll (red) and ' +
-    'the best category to score. <strong>Auto</strong> plays the optimal strategy for you, one ' +
-    'step at a time, and <strong>New Game</strong> starts over. Hover any underlined term to see ' +
-    'what it means.';
+    '<strong>New here?</strong> Roll the dice, then click a die to hold or release it. Each die ' +
+    'is labelled <strong>HOLD</strong> or <strong>REROLL</strong>, so you can always see what ' +
+    'will happen. Reroll up to twice before scoring a category, and fill all 15 categories to ' +
+    'finish. Turn on <strong>Hints</strong> to show a row beneath the dice with what optimal ' +
+    'play would do, plus the best category to score. <strong>Auto</strong> plays the optimal ' +
+    'strategy for you, one step at a time, and <strong>New Game</strong> starts over. Hover any ' +
+    'underlined term to see what it means.';
   box.appendChild(body);
 
   const dismiss = document.createElement('button');
