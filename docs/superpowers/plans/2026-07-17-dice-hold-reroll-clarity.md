@@ -16,7 +16,8 @@
 - **No layout shifts.** The UI must be pixel-stable. No element may change size, move, or reflow when state changes. Never return `null`; always render containers at fixed size with placeholders. (`.claude/rules/frontend.md`.)
 - **No new npm dependencies.** Specifically no jsdom, happy-dom, or testing-library. Tests run in plain node.
 - **Do NOT modify `shared/dice.js`.** It is shared by the treatise, play UI, and profiler. Its `optimal-keep` and `optimal-reroll` states look dead after this change but are still used by `profiler/js/profile/components/scenario-card.js:99`. Deleting them breaks the profiler.
-- **Green and red never mean hold/reroll.** They mean quality, as in `Scorecard.ts:164-170`. Hold is ink (`--text`), reroll is orange (`--color-orange`), red (`--color-danger`) means "giving up points" only.
+- **Green and red never mean hold/reroll.** They mean quality, as in `Scorecard.ts:164-170`. Hold is ink (`--text`), reroll is orange, red (`--color-danger`) means "giving up points" only.
+- **Orange has two tokens.** `--color-orange` (`#F37021`) is the brand orange, for fills and accents. `--color-orange-text` is for text and focus rings: `#B54A0C` in light (4.87:1), `#F37021` in dark (5.93:1). The brand orange measures 2.69:1 on the light background, under the WCAG AA 4.5:1 text floor and the 1.4.11 3:1 indicator floor. Never use `--color-orange` for small text.
 - **Advice is stable.** The solver advice shown for a die must depend only on `optimal_mask`, never on the player's `kept` flags. This is the bug being fixed; do not reintroduce it.
 - **Masks are in original dice order.** Bit `i` set in `optimal_mask` means "reroll die `i`". Do not sort.
 - **Touch targets:** every interactive element is at least 24x24 CSS px (WCAG 2.2 SC 2.5.8, Level AA).
@@ -685,8 +686,10 @@ In `frontend/src/style.css`, replace the `.die-container`, `.die-arrow`, and `.d
   cursor: default;
 }
 
+/* Uses the text ramp, not the brand orange: a focus indicator needs 3:1 per
+   WCAG 1.4.11, and #F37021 measures only 2.69:1 on the light background. */
 .die-hold:focus-visible {
-  outline: 2px solid var(--color-orange);
+  outline: 2px solid var(--color-orange-text);
   outline-offset: 2px;
 }
 
@@ -707,10 +710,27 @@ In `frontend/src/style.css`, replace the `.die-container`, `.die-arrow`, and `.d
   color: var(--text);
 }
 
-/* Orange means "in motion", not "wrong". Green/red are reserved for quality. */
+/* Orange means "in motion", not "wrong". Green/red are reserved for quality.
+   Uses the text ramp: the brand orange is only 2.69:1 on the light background. */
 .die-hold--reroll .die-label {
-  color: var(--color-orange);
+  color: var(--color-orange-text);
 }
+```
+
+Also add the text-orange token to both theme blocks. In `:root`, after `--color-orange: #F37021;`:
+
+```css
+  /* Orange for text on paper. The brand orange (#F37021) measures 2.69:1 on
+     --bg, under the WCAG AA 4.5:1 floor. This darker ramp measures 4.87:1.
+     Use --color-orange for fills and accents, this for text. */
+  --color-orange-text: #B54A0C;
+```
+
+And in `.dark`, after its `--color-orange: #F37021;`:
+
+```css
+  /* #F37021 measures 5.93:1 on the dark --bg, so it needs no darkening. */
+  --color-orange-text: #F37021;
 ```
 
 - [ ] **Step 3: Verify types and lint**
@@ -921,7 +941,7 @@ In `frontend/src/style.css`, replace the entire `/* Dice legend */` block (curre
 }
 
 .dice-advice-cell--reroll {
-  color: var(--color-orange);
+  color: var(--color-orange-text);
 }
 
 .dice-cost {

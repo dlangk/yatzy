@@ -150,8 +150,14 @@ controls where one suffices.
 | Meaning | Channel | Rationale |
 |---------|---------|-----------|
 | Hold | ink (`--text`), solid | Settled, locked |
-| Reroll | orange (`--accent`), tinted | In motion, about to change. Already the app's accent |
+| Reroll | orange (`--color-orange-text`) | In motion, about to change. Same hue family as the app's accent |
 | Giving up points | red (`--color-danger`) | Matches `Scorecard.ts:170`, where red already means behind par |
+
+Orange has two tokens. `--color-orange` (`#F37021`) is the brand orange, for
+fills and accents. `--color-orange-text` is for text and focus rings: `#B54A0C`
+in light mode (4.87:1) and `#F37021` in dark (5.93:1). The brand orange measures
+only 2.69:1 on the light background, under both the WCAG AA 4.5:1 text floor and
+the SC 1.4.11 3:1 indicator floor. Never use `--color-orange` for small text.
 
 Green and red are **not** used for hold/reroll. They already mean quality in
 `Scorecard.ts:164-170` (upper-bonus par). Reusing them for action would recreate

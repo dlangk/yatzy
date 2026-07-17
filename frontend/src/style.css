@@ -342,8 +342,10 @@ body {
   cursor: default;
 }
 
+/* Uses the text ramp, not the brand orange: a focus indicator needs 3:1 per
+   WCAG 1.4.11, and #F37021 measures only 2.69:1 on the light background. */
 .die-hold:focus-visible {
-  outline: 2px solid var(--color-orange);
+  outline: 2px solid var(--color-orange-text);
   outline-offset: 2px;
 }
 
