@@ -9,6 +9,7 @@ import { getState, dispatch, subscribe } from './store.ts';
 import { initApp } from './App.ts';
 import { evaluate, getStateValue, fetchDensity } from './api.ts';
 import { initPlayAnalytics } from './analytics.ts';
+import { rerollMaskFromDice, maskCostVsOptimal } from './mask.ts';
 
 const root = document.getElementById('root')!;
 initApp(root);
@@ -38,17 +39,8 @@ subscribe((state, prev, action) => {
         : `Kept ${keptValues.join(',')}`;
     // Compute delta from pre-reroll eval
     pendingRerollDelta = undefined;
-    if (prev.lastEvalResponse?.mask_evs) {
-      let playerMask = 0;
-      for (let i = 0; i < prev.dice.length; i++) {
-        if (!prev.dice[i].kept) playerMask |= 1 << i;
-      }
-      const playerMaskEv = prev.lastEvalResponse.mask_evs[playerMask] ?? null;
-      const optimalMaskEv = prev.lastEvalResponse.optimal_mask_ev ?? null;
-      if (playerMaskEv !== null && optimalMaskEv !== null) {
-        pendingRerollDelta = playerMaskEv - optimalMaskEv;
-      }
-    }
+    const cost = maskCostVsOptimal(prev.lastEvalResponse, rerollMaskFromDice(prev.dice));
+    if (cost !== null) pendingRerollDelta = cost;
   }
 
   // Trigger evaluation when needed

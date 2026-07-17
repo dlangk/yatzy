@@ -1,6 +1,7 @@
 import { getState, subscribe } from '../store.ts';
 import { attachTooltip } from './Tooltip.ts';
 import { TIP } from '../tooltips.ts';
+import { rerollMaskFromDice } from '../mask.ts';
 
 const DASH = '\u2014';
 
@@ -119,14 +120,7 @@ export function initEvalPanel(container: HTMLElement): void {
     turnVals[1].textContent = showKeep && optMaskEv !== null ? optMaskEv.toFixed(2) : DASH;
 
     // Your keep EV (masks are in original dice order)
-    let currentMaskEv: number | null = null;
-    if (s.lastEvalResponse?.mask_evs) {
-      let rerollMask = 0;
-      for (let i = 0; i < s.dice.length; i++) {
-        if (!s.dice[i].kept) rerollMask |= 1 << i;
-      }
-      currentMaskEv = s.lastEvalResponse.mask_evs[rerollMask] ?? null;
-    }
+    const currentMaskEv = s.lastEvalResponse?.mask_evs?.[rerollMaskFromDice(s.dice)] ?? null;
     turnVals[2].textContent = showKeep && currentMaskEv !== null ? currentMaskEv.toFixed(2) : DASH;
 
     // Best score (category name + score)
