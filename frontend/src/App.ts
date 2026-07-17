@@ -2,7 +2,7 @@
  * App DOM skeleton.
  *
  * Three grid sections:
- *   1. Right   — Dice (ActionBar + DiceBar + DiceLegend) + Analysis (EvalPanel + TrajectoryChart)
+ *   1. Right:  Dice (ActionBar + DiceBar) + Analysis (EvalPanel + TrajectoryChart)
  *   2. Scorecard — full scoring table
  *   3. Log     — DecisionLog
  *
@@ -14,7 +14,6 @@
 import { initActionBar } from './components/ActionBar.ts';
 import { initAutoPlay } from './autoplay.ts';
 import { initDiceBar } from './components/DiceBar.ts';
-import { initDiceLegend } from './components/DiceLegend.ts';
 import { initEvalPanel } from './components/EvalPanel.ts';
 import { initTrajectoryChart } from './components/TrajectoryChart.ts';
 import { initScorecard } from './components/Scorecard.ts';
@@ -72,11 +71,10 @@ export function initApp(container: HTMLElement): void {
   diceSection.appendChild(diceBarEl);
   initDiceBar(diceBarEl);
 
-  const diceLegendEl = document.createElement('div');
-  diceSection.appendChild(diceLegendEl);
-  initDiceLegend(diceLegendEl);
-
-  diceSection.appendChild(panelCaption('Your five dice. Click a die to keep it; the arrows set values.'));
+  diceSection.appendChild(panelCaption(
+    'Your five dice. Click a die to hold or release it; the arrows set values. '
+    + 'With hints on, the row beneath shows what optimal play would do.',
+  ));
 
   // Section 2: Scorecard — desktop col 2, narrow stacks second
   const scorecardSection = document.createElement('div');

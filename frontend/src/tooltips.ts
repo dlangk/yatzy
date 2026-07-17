@@ -27,12 +27,6 @@ export const TIP = {
     'p50 is the median; p90 beats 90% of optimal games.',
   turn: 'How many of the 15 categories you have filled.',
 
-  // Dice legend
-  legendKept: 'A die you are holding. It will not be rerolled.',
-  legendReroll: 'A die that will be rerolled.',
-  legendOptimal: 'Green outline: the optimal play is to hold this die.',
-  legendSuboptimal: 'Red outline: the optimal play is to reroll this die; holding it gives up points.',
-
   // Delta box (the headline metric)
   deltaBox:
     'Delta Yatzy scores skill, not luck. Every decision that is not optimal gives up some ' +
@@ -51,10 +45,11 @@ export const TIP = {
   logEfinal: 'Your projected final score after that decision.',
   logTotalDelta: 'Total expected points given up across the game versus perfect play.',
 
-  // Dice (composed dynamically from the current state, see DiceBar)
-  dieKept: 'You are holding this die.',
-  dieReroll: 'This die will be rerolled.',
-  dieAgree: ' Optimal play agrees.',
-  dieKeepButReroll: 'You are holding this die, but optimal play is to reroll it.',
-  dieRerollButKeep: 'This die will be rerolled, but optimal play is to hold it.',
+  // Dice bar
+  adviceRow:
+    'What the optimal strategy would do with each die. It does not change as you ' +
+    'hold or release dice, so you can read it straight off a fresh roll.',
+  diceCost:
+    'Expected points given up by your current hold versus the best one. ' +
+    'A hold that ties the best one costs nothing and is not flagged.',
 } as const;

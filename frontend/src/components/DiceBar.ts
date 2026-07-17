@@ -2,6 +2,8 @@ import { getState, dispatch, subscribe } from '../store.ts';
 import { createDie, type DieElements } from './Die.ts';
 import { diceBarViewModel, type DiceBarViewModel } from '../mask.ts';
 import { TOTAL_DICE } from '../constants.ts';
+import { attachTooltip } from './Tooltip.ts';
+import { TIP } from '../tooltips.ts';
 
 /**
  * The five dice, plus the solver's advice row beneath them.
@@ -55,6 +57,7 @@ export function initDiceBar(container: HTMLElement): void {
   const adviceHeader = document.createElement('div');
   adviceHeader.className = 'dice-advice-header';
   adviceHeader.textContent = 'OPTIMAL PLAY';
+  attachTooltip(adviceHeader, TIP.adviceRow);
   container.appendChild(adviceHeader);
 
   const adviceRow = document.createElement('div');
@@ -71,6 +74,7 @@ export function initDiceBar(container: HTMLElement): void {
   const costLine = document.createElement('div');
   costLine.className = 'dice-cost';
   container.appendChild(costLine);
+  attachTooltip(costLine, TIP.diceCost);
 
   function render(vm: DiceBarViewModel) {
     for (let i = 0; i < TOTAL_DICE; i++) {
