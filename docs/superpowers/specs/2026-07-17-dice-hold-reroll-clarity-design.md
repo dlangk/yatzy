@@ -11,10 +11,10 @@ overlapping visual channels. Users cannot tell which dice are being rerolled, an
 cannot read the solver's advice without toggling dice and watching colors move.
 
 This change separates the two meanings into two vertically aligned rows sharing the
-same five columns: a **choice row** of labeled `HOLD` / `REROLL` buttons, and a
-read-only **advice row** stating what the solver would do. Colour stops carrying two
-jobs: hold/reroll becomes ink vs orange, and green/red is reserved for its existing
-meaning of good vs bad.
+same five columns. Each die becomes a single labeled `HOLD` / `REROLL` button stating
+**your** choice, and a read-only **advice row** beneath states what the solver would
+do. Colour stops carrying two jobs: hold/reroll becomes ink vs orange, and green/red
+is reserved for its existing meaning of good vs bad.
 
 `DiceLegend` is deleted. Once the UI states `HOLD` and `REROLL` in words, there is
 nothing left for a legend to decode.
@@ -82,7 +82,10 @@ wrong dice). It is correct: masks are in original dice order, used consistently 
 - A player can read the solver's recommendation from a fresh roll, without toggling.
 - Disagreement with the solver is visible, and its cost is stated once.
 - Each colour means exactly one thing across the whole Play UI.
+- Hold/reroll works under mouse, keyboard, and touch from the same markup, with no
+  input mode treated as a second-class path.
 - Keyboard and screen-reader users can hold and release dice.
+- Every interactive target meets WCAG 2.2 SC 2.5.8 (Target Size Minimum, AA, 24x24).
 
 ## Non-Goals
 
@@ -90,36 +93,57 @@ wrong dice). It is correct: masks are in original dice order, used consistently 
 - No per-die EV attribution. EV is defined per keep-mask (`mask_evs` is indexed by
   the whole 5-bit mask), so "this die costs you 2.3 points" is not a well-defined
   quantity. Cost is reported once per roll.
-- No change to the value arrows (manual dice entry), `EvalPanel`, `DeltaBox`, or
-  `DecisionLog`.
+- No change to `EvalPanel`, `DeltaBox`, or `DecisionLog`.
 - No drag-to-tray interaction. `.claude/rules/frontend.md` forbids elements moving on
   state change.
+- No DOM/component test environment. See Testing for what this leaves uncovered.
+- Value arrows are resized but not otherwise redesigned. They stay always-visible and
+  in tab order.
 
 ## Design
 
 ### Layout
 
 ```
-   ▲      ▲      ▲      ▲      ▲       value arrows (unchanged)
  ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐
- │ ●● │ │ ●  │ │ ●● │ │ ●● │ │ ●  │    die: neutral border always
- │ ●● │ │    │ │ ●  │ │ ●● │ │  ● │    fill + pips echo hold (redundant)
+ │ ▲  │ │ ▲  │ │ ▲  │ │ ▲  │ │ ▲  │    value arrow, 56x24 (was 56x16)
+ ├────┤ ├────┤ ├────┤ ├────┤ ├────┤
+ │ ●● │ │ ●  │ │ ●● │ │ ●● │ │ ●  │    ─┐
+ │ ●● │ │    │ │ ●  │ │ ●● │ │  ● │     │ ONE <button aria-pressed>
+ │HOLD│ │RRLL│ │HOLD│ │RRLL│ │HOLD│    ─┘ 56x74. die + label, one target
+ ├────┤ ├────┤ ├────┤ ├────┤ ├────┤
+ │ ▼  │ │ ▼  │ │ ▼  │ │ ▼  │ │ ▼  │    value arrow, 56x24
  └────┘ └────┘ └────┘ └────┘ └────┘
-   ▼      ▼      ▼      ▼      ▼
- ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐
- │HOLD│ │RRLL│ │HOLD│ │RRLL│ │HOLD│    choice row: <button aria-pressed>
- └────┘ └────┘ └────┘ └────┘ └────┘    ink = hold, orange = reroll
               ▃             ▃          mismatch strip (4px, always reserved)
    HOLD  REROLL REROLL REROLL HOLD     advice row: read-only, never recolors
         Costs you 2.3 pts vs optimal   cost line
 ```
 
 `RRLL` above is an artifact of the 4-character ASCII cell. The real label is
-`REROLL`, spelled out, in both rows.
+`REROLL`, spelled out.
 
 The advice row reuses the dice columns, so the component gains no width. At the
 existing 56px die and 8px gap, five columns occupy 312px and still fit a 390px
 phone viewport.
+
+Vertical cost: the die container grows from 92px to roughly 126px (arrows 16px to
+24px each, plus the ~18px label), and the advice block replaces the 16px legend for
+about +16px. Net roughly +50px.
+
+### One control, three input modes
+
+The die and its `HOLD` / `REROLL` label are a **single `<button>`**, not a die with a
+button beneath it. This is what makes the same markup serve all three input modes:
+
+| Mode | Interaction |
+|------|-------------|
+| Mouse | Click the die, as today |
+| Keyboard | Tab to the die, Space/Enter toggles. This is the only keyboard gap today: the arrows are already real `<button>`s and reachable, but the toggle is a `<div>` (defect #5) |
+| Touch | One 56x74 target, comfortably past the 24x24 minimum and past Apple's 44x44pt |
+
+A separate 56x18 label-button was considered and rejected: 18px tall fails WCAG 2.2
+SC 2.5.8 (Target Size Minimum, Level AA, 24x24 CSS px), and it would put two adjacent
+controls where one suffices.
 
 ### Colour semantics
 
@@ -137,22 +161,22 @@ defect #4 in a new location, and would paint a legitimate reroll as an error.
 
 | Component | Change |
 |-----------|--------|
-| `Die.ts` | Border becomes permanently neutral. Drop `isOptimalKeep` / `isOptimalReroll` from the update options. Keep fill and pip opacity as a redundant echo of hold. Remove the `<div>` click handler |
-| `DiceBar.ts` | Owns the choice row, advice row, mismatch strip, and cost line |
+| `Die.ts` | The `<div>` wrapper becomes a `<button>` containing the die SVG and its label. Border permanently neutral. Drop `isOptimalKeep` / `isOptimalReroll` from the update options. Keep fill and pip opacity as a redundant echo of hold. Arrows grow to 24px |
+| `DiceBar.ts` | Renders `diceBarViewModel(state)`. Owns the advice row, mismatch strip, and cost line |
 | `DiceLegend.ts` | **Deleted** |
 | `tooltips.ts` | Remove `legendKept`, `legendReroll`, `legendOptimal`, `legendSuboptimal`. Rework the four `die*` entries: the labels now state the action, so tooltips explain consequence, not decode colour |
-| `mask.ts` | **Recreated**. Exports `rerollMaskFromDice(dice)` and `maskCostVsOptimal(evalResponse, mask)` |
+| `mask.ts` | **Recreated**. Exports `rerollMaskFromDice(dice)`, `maskCostVsOptimal(evalResponse, mask)`, and `diceBarViewModel(state)` |
 | `App.ts` | Drop the `initDiceLegend` call |
+| `style.css` | `.die-arrow` height 16px to 24px. Remove `.dice-legend` rules. Add advice row, tick strip, cost line |
 
-### Choice row
-
-A real `<button>` per die, 56px wide, matching the die and arrows.
+### The hold button
 
 - Text is spelled out: `HOLD` / `REROLL`. Six characters at 10px mono is ~36px, fits
   in 56px. Icons alone are not unambiguous and the goal is explicitness.
 - `aria-pressed` reflects held state; `aria-label` names the die and its value.
 - Disabled when `turnPhase !== 'rolled'`, when there is no eval response, or when
   `rerollsRemaining === 0`, matching today's `canToggle` in `DiceBar.ts:40`.
+- `touch-action: manipulation` to suppress the 300ms double-tap zoom delay.
 
 ### Advice row
 
@@ -200,29 +224,77 @@ contents, following the existing `DiceLegend` pattern (`style.css:318-327`,
 `min-height: 16px`). Applies when hints are off, when `rerollsRemaining === 0`, and
 when the turn is not in the `rolled` phase.
 
-Net vertical change is approximately +36px: the choice row and advice block are added,
-the 16px legend is removed.
+Net vertical change is roughly +50px. See the Layout section for the breakdown.
 
 ## Testing
 
 Current frontend baseline is **35 tests in 3 files** (`api`, `reducer`, `store`),
-verified by `npx vitest run`.
+verified by `npx vitest run`. There is no DOM environment: `vite.config.ts` has no
+`test` block, and jsdom, happy-dom, and testing-library are all absent. The existing
+tests run in plain node and stub globals (`store.test.ts:3-5`).
 
-New `mask.test.ts` covering:
+**Decision: no new test dependency.** All semantics move into pure functions tested
+in node, matching the existing pattern. The DOM layer stays a dumb projection with no
+logic of its own.
 
-- `rerollMaskFromDice`: all held (0), none held (31), mixed, bit order matches
+### Testability strategy
+
+`diceBarViewModel(state)` is the seam. It is pure, takes store state, and returns
+everything the DOM needs:
+
+```
+{ dice:    [{ value, held, disabled, faded }, ...],
+  advice:  ['HOLD' | 'REROLL', ...] | null,   // null when hidden
+  ticks:   [boolean, ...],
+  cost:    number | null,
+  visible: { advice, ticks, cost } }
+```
+
+`DiceBar.ts` renders this and nothing else. Every rule in this spec then becomes a
+pure assertion.
+
+### `mask.test.ts` (new)
+
+- `rerollMaskFromDice`: all held (0), none held (31), mixed, bit order matches the
   `optimal_mask` convention (bit set = reroll).
-- `maskCostVsOptimal`: returns 0 when the player mask equals the optimal mask;
-  returns a negative number for a genuinely worse mask; returns null when `mask_evs`
-  or `optimal_mask_ev` is absent.
-- Tick gating: a mask that differs from `optimal_mask` but ties it on EV produces
-  **no** ticks and no cost line. This is the costless-tie case and is the one most
-  likely to regress.
-- Regression for defect #1: assert that advice for a die is derived from
-  `optimal_mask` alone and is independent of the die's `kept` flag.
+- `maskCostVsOptimal`: 0 when the player mask equals the optimal mask; negative for a
+  genuinely worse mask; null when `mask_evs` or `optimal_mask_ev` is absent.
+- **Regression for defect #1** (the shipped bug): advice derives from `optimal_mask`
+  alone. Assert the advice array is identical across two states differing only in
+  `kept` flags. This is the test that would have caught the legend/code contradiction.
+- **Regression for defect #3**: toggling any die never mutates `advice`.
+- **Costless tie**: a mask differing from `optimal_mask` but equal in EV yields no
+  ticks and no cost line. Most likely rule to regress.
+- Cost gating at the `EPS = 0.005` boundary: `-0.004` yields no ticks, `-0.006` does.
+- Hidden states: hints off, `rerollsRemaining === 0`, and `turnPhase !== 'rolled'`
+  each yield `visible.advice === false` while the dice array stays fully populated.
 
 `main.ts` and `EvalPanel.ts` must produce identical values after switching to the
-shared helper. Their existing behaviour is covered by `reducer.test.ts`.
+shared helper; their behaviour is covered by `reducer.test.ts`.
+
+### Manual verification (not automated)
+
+Accepted gap: with no DOM environment, the accessibility and touch work below is
+**not covered by any automated test**. This repo has no CI and tests are run by hand,
+so these are checklist items for the implementer, confirmed in a real browser before
+this is called done:
+
+- [ ] Tab reaches every die's hold button; Space and Enter both toggle it
+- [ ] `aria-pressed` flips with held state (inspect the accessibility tree)
+- [ ] A screen reader announces the die's value and its held state
+- [ ] Focus ring is visible on the hold button in light and dark themes
+- [ ] Hold button measures at least 24x24 CSS px; arrows measure 56x24
+- [ ] On a real phone: tapping the die toggles hold, and no arrow mis-tap silently
+      changes a die's value
+- [ ] No double-tap zoom delay on the hold button
+- [ ] Toggling hints on and off shifts nothing on the page (no-layout-shift rule)
+
+### Known residual risk
+
+The arrows now meet WCAG AA (24px) but remain below Apple HIG (44pt) and Material
+(48dp), and they stay flush against a much larger hold target. A mis-tap on touch can
+still change a die's **value** rather than its held state, which corrupts game state
+rather than merely missing. Accepted for this change; revisit if it shows up in use.
 
 ## Documentation Updates
 
