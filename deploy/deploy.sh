@@ -57,6 +57,16 @@ BACKEND_CTX="$BUILD_DIR/backend"
 mkdir -p "$BACKEND_CTX/data/strategy_tables"
 cp "$PROJECT_ROOT/solver/target/$TARGET/release/yatzy" "$BACKEND_CTX/yatzy"
 cp "$STRATEGY_TABLE" "$BACKEND_CTX/data/strategy_tables/all_states.bin"
+# Risk detent tables for the /evaluate slider (theta = -0.08/-0.04/+0.04/+0.08).
+for T in -0.080 -0.040 0.040 0.080; do
+    SRC="$PROJECT_ROOT/data/strategy_tables/all_states_theta_${T}.bin"
+    if [ -f "$SRC" ]; then
+        cp "$SRC" "$BACKEND_CTX/data/strategy_tables/"
+    else
+        echo "WARNING: detent table $SRC missing; that risk level will be unavailable"
+    fi
+done
+echo "✓ Risk detent tables included"
 PERCENTILE_TABLE="$PROJECT_ROOT/data/strategy_tables/percentiles.bin"
 if [ -f "$PERCENTILE_TABLE" ]; then
     cp "$PERCENTILE_TABLE" "$BACKEND_CTX/data/strategy_tables/"

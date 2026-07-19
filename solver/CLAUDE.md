@@ -88,8 +88,10 @@ Server: axum on port 9000, stateless, `Arc<YatzyContext>` shared state.
 |--------|------|---------|---------|---------|
 | GET | `/health` | — | <1ms | Health check |
 | GET | `/state_value` | `?upper_score=N&scored_categories=N` | <1ms | E_table[S] lookup |
-| POST | `/evaluate` | `{dice, upper_score, scored_categories, rerolls_remaining}` | 2-9μs | All keep-mask EVs + category EVs |
+| POST | `/evaluate` | `{dice, upper_score, scored_categories, rerolls_remaining}` | 2-9μs | All keep-mask EVs + category EVs, plus a `detents` array |
 | POST | `/density` | `{upper_score, scored_categories, accumulated_score}` | <10ms (precomputed) / ~50ms (MC) | Score distribution percentiles (hybrid: precomputed turns 0-4, MC turns 5-14) |
+
+`/evaluate` responses include a `detents` array of five entries at θ = -0.08, -0.04, 0, +0.04, +0.08 (index 2 is Neutral), where non-neutral entries hold certainty-equivalent values rather than plain expected values. The flat top-level fields are unchanged and always equal `detents[2]`, so existing callers keep working without modification.
 
 ## Concurrency Model
 
