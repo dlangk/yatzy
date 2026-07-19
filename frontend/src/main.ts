@@ -9,11 +9,13 @@ import { getState, dispatch, subscribe } from './store.ts';
 import { initApp } from './App.ts';
 import { evaluate, getStateValue, fetchDensity } from './api.ts';
 import { initPlayAnalytics } from './analytics.ts';
+import { initKeyboard } from './keyboard.ts';
 import { rerollMaskFromDice, maskCostVsOptimal } from './mask.ts';
 import type { GameState } from './types.ts';
 
 const root = document.getElementById('root')!;
 initApp(root);
+initKeyboard();
 initPlayAnalytics();
 
 // Side effect: auto-evaluate after roll/reroll.
