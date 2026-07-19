@@ -131,15 +131,36 @@ body {
   }
 }
 
-/* Action bar */
+/* Action bar: two rows (play controls, then mode toggles). */
 .action-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0;
+}
+
+.action-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 12px;
   justify-content: center;
   align-items: center;
-  margin: 12px 0;
-  min-height: 40px;
+  min-height: 36px;
+}
+
+/* Manual game-state controls (reroll +/-, undo/redo, and the dice-bar value
+   arrows): hidden until Override mode is on. See ActionBar.ts. */
+.override-only {
+  display: none;
+}
+
+body.override-mode .action-row .override-only {
+  display: inline-flex;
+}
+
+body.override-mode .die-arrow {
+  display: block;
 }
 
 .action-bar .small-btn {
@@ -160,8 +181,10 @@ body {
   cursor: default;
 }
 
+/* No display here: .override-only hides it by default, and the reveal rule
+   below sets inline-flex. Setting display here (specificity 0,2,0) would
+   outrank .override-only and leak the control into non-override mode. */
 .action-bar .reroll-controls {
-  display: inline-flex;
   gap: 4px;
   align-items: center;
 }
@@ -287,42 +310,55 @@ body {
   color: var(--text-muted);
 }
 
-/* Dice bar */
+/* Dice bar. Each column, top to bottom, is:
+   up arrow / your choice / die / optimal advice / down arrow / mismatch line.
+   The die is the anchor, your choice hugs it from above and the advice from
+   below, so a disagreement reads on the die itself. */
 .dice-bar {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   justify-content: center;
-  margin: 12px 0;
+  margin: 8px 0 0;
 }
 
 .die-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
 }
 
-/* 24px, not 16px: WCAG 2.2 SC 2.5.8 target size minimum. */
+/* Light chevron steppers for manual value entry. Hidden by default (they set
+   the die value by hand, an Override-mode "cheat"); body.override-mode reveals
+   them. Stripped of button chrome so they recede, with a background only on
+   hover. 24px tall keeps the WCAG 2.5.8 target size. */
 .die-arrow {
+  display: none;
   width: 56px;
   height: 24px;
-  font-size: 10px;
+  font-size: 11px;
+  line-height: 24px;
   padding: 0;
-  border: 1px solid var(--border);
-  background: var(--bg-alt);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
   cursor: pointer;
-  border-radius: 3px;
-  line-height: 22px;
-  color: var(--text);
+  border-radius: 4px;
   touch-action: manipulation;
+}
+
+.die-arrow:hover {
+  background: var(--bg-alt);
+  color: var(--text);
 }
 
 .die-arrow:disabled {
   cursor: default;
-  opacity: 0.4;
+  opacity: 0.3;
 }
 
-/* The die and its label are one control: one focus stop, one 56x74 tap target. */
+/* Your choice and the die are one control: one focus stop, one target. The
+   choice label renders above the die (appended first in Die.ts). */
 .die-hold {
   width: 56px;
   padding: 0;
@@ -333,7 +369,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   border-radius: 4px;
   touch-action: manipulation;
 }
@@ -355,10 +391,11 @@ body {
   display: block;
 }
 
-/* Fixed height so a blank label cannot collapse the row. */
+/* Your choice: bold, so it reads as the primary thing (you control it). Fixed
+   height so a blank label cannot collapse the column. */
 .die-label {
-  height: 14px;
-  line-height: 14px;
+  height: 15px;
+  line-height: 15px;
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
@@ -371,70 +408,65 @@ body {
   color: var(--color-orange-text);
 }
 
-/* Solver advice, in the same five columns as the dice. */
-.dice-bar-group {
-  margin: 12px 0 8px;
-}
+/* The solver's advice, directly under the die: regular weight so it reads as
+   secondary to your choice. Height is reserved (empty when Hints is off) so the
+   arrows never move when Hints is toggled.
 
-.dice-ticks {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  height: 4px;
-  margin-top: 4px;
-}
-
-.dice-tick {
-  width: 56px;
-  height: 4px;
-  border-radius: 2px;
-  background: transparent;
-}
-
-/* Red only ever means "giving up points". See mask.ts COST_EPS. */
-.dice-tick--on {
-  background: var(--color-danger);
-}
-
-.dice-advice-header {
-  text-align: center;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  color: var(--text-muted);
-  height: 14px;
-  line-height: 14px;
-  margin-top: 6px;
-}
-
-.dice-advice {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  min-height: 14px;
-}
-
-.dice-advice-cell {
-  width: 56px;
-  text-align: center;
+   Muted by default: on a die where you agree with the solver (or the difference
+   is costless), the advice recedes to a quiet confirmation. Only a meaningful
+   disagreement (--mismatch, the same condition as the red line) takes full
+   colour: ink for HOLD, orange for REROLL. */
+.die-advice {
+  height: 15px;
+  line-height: 15px;
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 400;
   letter-spacing: 0.04em;
-  line-height: 14px;
+  color: var(--text-muted);
+}
+
+.die-advice--mismatch {
   color: var(--text);
 }
 
-.dice-advice-cell--reroll {
+.die-advice--mismatch.die-advice--reroll {
   color: var(--color-orange-text);
 }
 
+/* Mismatch line at the base of the column: red only where your choice differs
+   from optimal. Red only ever means "giving up points" (see mask.ts COST_EPS).
+   Height is always reserved. */
+.die-tick {
+  width: 56px;
+  height: 3px;
+  border-radius: 2px;
+  background: transparent;
+}
+
+.die-tick--on {
+  background: var(--color-danger);
+}
+
+.dice-bar-group {
+  margin: 12px 0 8px;
+}
+
+/* The status line below the dice: red when your hold costs points, green when
+   you match optimal. Height is reserved so the layout does not shift when it
+   appears. Its top and bottom margins are set equal so the gap from the colored
+   bars to this line matches the gap from this line to the caption below. */
 .dice-cost {
   text-align: center;
-  min-height: 14px;
-  line-height: 14px;
-  font-size: 11px;
+  min-height: 16px;
+  line-height: 16px;
+  margin: 11px 0;
+  font-size: 12px;
   color: var(--color-danger);
+}
+
+.dice-cost--optimal {
+  color: var(--color-success);
 }
 
 /* Eval panel */

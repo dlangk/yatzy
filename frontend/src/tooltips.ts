@@ -46,9 +46,6 @@ export const TIP = {
   logTotalDelta: 'Total expected points given up across the game versus perfect play.',
 
   // Dice bar
-  adviceRow:
-    'What the optimal strategy would do with each die. It does not change as you ' +
-    'hold or release dice, so you can read it straight off a fresh roll.',
   diceCost:
     'Expected points given up by your current hold versus the best one. ' +
     'A hold that ties the best one costs nothing and is not flagged.',

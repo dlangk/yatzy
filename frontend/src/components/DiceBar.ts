@@ -6,14 +6,17 @@ import { attachTooltip } from './Tooltip.ts';
 import { TIP } from '../tooltips.ts';
 
 /**
- * The five dice, plus the solver's advice row beneath them.
+ * The five dice, plus the one-line cost beneath them.
  *
- * The player's choice and the solver's advice are two separate rows sharing the
- * same columns. They used to be one object: the die's fill carried the choice and
- * its border carried the solver's verdict, which meant the advice was only
- * readable by toggling dice until the border turned green.
+ * Each column carries its own choice, advice, and mismatch line (see Die.ts):
+ * your HOLD/REROLL choice hugs the die from above, the solver's advice from
+ * below, and a red line at the base flags any disagreement. This function maps
+ * the view model onto the columns and renders the cost line.
  *
- * All display logic lives in diceBarViewModel(). This function renders it.
+ * The choice and the advice used to fight over one die: the die's fill carried
+ * the choice and its border carried the solver's verdict, so the advice was
+ * only readable by toggling dice until the border turned green. All display
+ * logic now lives in diceBarViewModel(); this function only renders it.
  */
 export function initDiceBar(container: HTMLElement): void {
   container.className = 'dice-bar-group';
@@ -42,64 +45,39 @@ export function initDiceBar(container: HTMLElement): void {
     diceRow.appendChild(die.container);
   }
 
-  // Mismatch ticks sit between the two rows so the eye lands on the disagreement.
-  const tickRow = document.createElement('div');
-  tickRow.className = 'dice-ticks';
-  container.appendChild(tickRow);
-  const tickCells: HTMLSpanElement[] = [];
-  for (let i = 0; i < TOTAL_DICE; i++) {
-    const cell = document.createElement('span');
-    cell.className = 'dice-tick';
-    tickRow.appendChild(cell);
-    tickCells.push(cell);
-  }
-
-  const adviceHeader = document.createElement('div');
-  adviceHeader.className = 'dice-advice-header';
-  adviceHeader.textContent = 'OPTIMAL PLAY';
-  attachTooltip(adviceHeader, TIP.adviceRow);
-  container.appendChild(adviceHeader);
-
-  const adviceRow = document.createElement('div');
-  adviceRow.className = 'dice-advice';
-  container.appendChild(adviceRow);
-  const adviceCells: HTMLSpanElement[] = [];
-  for (let i = 0; i < TOTAL_DICE; i++) {
-    const cell = document.createElement('span');
-    cell.className = 'dice-advice-cell';
-    adviceRow.appendChild(cell);
-    adviceCells.push(cell);
-  }
-
+  // The one-line cost, set apart below the dice. Its height is reserved and it
+  // is hidden (not merely emptied) when absent, so attachTooltip's tabindex does
+  // not leave a focusable, help-cursored blank strip in the tab order.
   const costLine = document.createElement('div');
   costLine.className = 'dice-cost';
-  container.appendChild(costLine);
   attachTooltip(costLine, TIP.diceCost);
+  container.appendChild(costLine);
 
   function render(vm: DiceBarViewModel) {
     for (let i = 0; i < TOTAL_DICE; i++) {
-      dice[i].update(vm.dice[i]);
+      dice[i].update({
+        ...vm.dice[i],
+        advice: vm.advice?.[i] ?? null,
+        showTick: vm.ticks[i],
+      });
     }
 
-    // Heights stay reserved in every branch below: contents change, nothing moves.
-    const showAdvice = vm.advice !== null;
-    adviceHeader.style.visibility = showAdvice ? 'visible' : 'hidden';
-    for (let i = 0; i < TOTAL_DICE; i++) {
-      const advice = vm.advice?.[i] ?? '';
-      adviceCells[i].textContent = advice;
-      adviceCells[i].classList.toggle('dice-advice-cell--reroll', advice === 'REROLL');
-      tickCells[i].classList.toggle('dice-tick--on', vm.ticks[i]);
-    }
-
-    // Two decimals, matching DeltaBox and DecisionLog, which report the same
-    // number for the same decision. It is also what COST_EPS assumes: at one
-    // decimal, a cost of -0.006 clears the gate and then prints "0.0 pts".
-    costLine.textContent = vm.cost === null
+    // The status line, only while hints are showing (advice !== null):
+    //   - no cost: you match optimal (or a costless tie), shown green.
+    //   - a cost: red, two decimals to match DeltaBox and DecisionLog, which
+    //     report the same number. Two decimals is also what COST_EPS assumes:
+    //     at one decimal, a cost of -0.006 clears the gate and prints "0.0 pts".
+    // Hidden (not merely emptied) when absent, so attachTooltip's tabindex does
+    // not leave a focusable, help-cursored blank strip in the tab order.
+    const showStatus = vm.advice !== null;
+    const optimal = showStatus && vm.cost === null;
+    costLine.textContent = !showStatus
       ? ''
-      : `Costs you ${Math.abs(vm.cost).toFixed(2)} pts vs optimal`;
-    // Emptied text alone would leave a focusable, help-cursored strip behind,
-    // because attachTooltip adds tabindex. Hide it the way the header hides.
-    costLine.style.visibility = vm.cost === null ? 'hidden' : 'visible';
+      : optimal
+        ? 'Optimal choice'
+        : `Costs you ${Math.abs(vm.cost!).toFixed(2)} pts vs optimal`;
+    costLine.style.visibility = showStatus ? 'visible' : 'hidden';
+    costLine.classList.toggle('dice-cost--optimal', optimal);
   }
 
   render(diceBarViewModel(getState()));

@@ -76,6 +76,9 @@ export interface Prefs {
   showDebug: boolean;
   guideOpen: boolean;
   autoplayDelay: number;
+  /** Override mode: reveals the manual game-state controls (die value arrows,
+   *  reroll +/-, undo/redo). Off by default; these are "cheat" tools. */
+  override: boolean;
 }
 
 export interface GameState extends GameStateSnapshot {
@@ -100,6 +103,7 @@ export type GameAction =
   | { type: 'SET_DENSITY_RESULT'; index: number; percentiles: Record<string, number> }
   | { type: 'TOGGLE_HINTS' }
   | { type: 'TOGGLE_GUIDE' }
+  | { type: 'TOGGLE_OVERRIDE' }
   | { type: 'SET_AUTOPLAY_DELAY'; delay: number }
   | { type: 'UNDO' }
   | { type: 'REDO' };

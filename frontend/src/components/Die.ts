@@ -9,22 +9,27 @@ export interface DieElements {
     value: number;
     held: boolean;
     label: DieAdvice | '';
+    advice: DieAdvice | null;
+    showTick: boolean;
     disabled: boolean;
     faded: boolean;
   }) => void;
 }
 
 /**
- * Creates a single die: an up arrow, one hold button containing the die SVG and
- * its HOLD/REROLL label, and a down arrow.
+ * One die column, top to bottom:
+ *   up arrow, your HOLD/REROLL choice, the die, the optimal HOLD/REROLL,
+ *   down arrow, a mismatch line.
  *
- * The die and its label are deliberately ONE button, not a die with a button
- * beneath it. That gives one focus stop, one 56x74 touch target, and one control
- * serving mouse, keyboard, and touch. A separate 56x18 label button would fail
- * WCAG 2.2 SC 2.5.8 (24x24 minimum).
+ * The die is the anchor: your choice sits directly above it and the solver's
+ * advice directly below, so a disagreement reads on the die itself. Your choice
+ * and the die are ONE button (one focus stop, one target); the advice and the
+ * line are display-only. The advice slot and the line reserve their height, so
+ * turning Hints on or off never moves the arrows.
  *
- * This component carries no hint logic. The solver's advice lives in DiceBar's
- * advice row, so that it stays readable without toggling dice.
+ * Colour: your choice is bold (you control it), advice is regular (secondary).
+ * Both use ink for HOLD and orange for REROLL. The red line, not the advice
+ * text, carries disagreement, so the advice row reads as calm guidance.
  *
  * Callbacks: onToggle (hold/reroll), onIncrement (+1), onDecrement (-1).
  */
@@ -43,18 +48,24 @@ export function createDie(
   upBtn.setAttribute('aria-label', 'Increase die value');
   upBtn.addEventListener('click', onIncrement);
 
+  // Your choice and the die are one button. The choice label is appended first,
+  // so it renders above the die.
   const holdBtn = document.createElement('button');
   holdBtn.type = 'button';
   holdBtn.className = 'die-hold';
   holdBtn.addEventListener('click', onToggle);
 
+  const labelEl = document.createElement('span');
+  labelEl.className = 'die-label';
+  holdBtn.appendChild(labelEl);
+
   const dieWrap = document.createElement('span');
   dieWrap.className = 'die-wrap';
   holdBtn.appendChild(dieWrap);
 
-  const labelEl = document.createElement('span');
-  labelEl.className = 'die-label';
-  holdBtn.appendChild(labelEl);
+  // The solver's advice: display-only, directly below the die.
+  const adviceEl = document.createElement('span');
+  adviceEl.className = 'die-advice';
 
   const downBtn = document.createElement('button');
   downBtn.type = 'button';
@@ -63,14 +74,22 @@ export function createDie(
   downBtn.setAttribute('aria-label', 'Decrease die value');
   downBtn.addEventListener('click', onDecrement);
 
+  // Mismatch line at the base of the column.
+  const tickEl = document.createElement('span');
+  tickEl.className = 'die-tick';
+
   container.appendChild(upBtn);
   container.appendChild(holdBtn);
+  container.appendChild(adviceEl);
   container.appendChild(downBtn);
+  container.appendChild(tickEl);
 
   function update(opts: {
     value: number;
     held: boolean;
     label: DieAdvice | '';
+    advice: DieAdvice | null;
+    showTick: boolean;
     disabled: boolean;
     faded: boolean;
   }) {
@@ -112,6 +131,22 @@ export function createDie(
         ? 'Die, not yet rolled'
         : `Die showing ${opts.value}, ${opts.held ? 'held' : 'will be rerolled'}`,
     );
+
+    // Advice slot: reserved even when empty, so the arrows never move. The full
+    // plan is always shown, but agreeing (or costless) advice is muted so only a
+    // meaningful disagreement takes colour. showTick marks that disagreement.
+    adviceEl.textContent = opts.advice ?? '';
+    adviceEl.classList.toggle('die-advice--reroll', opts.advice === 'REROLL');
+    adviceEl.classList.toggle('die-advice--mismatch', opts.showTick);
+    if (opts.advice) {
+      adviceEl.setAttribute('aria-label', `Optimal play, ${opts.advice.toLowerCase()}`);
+      adviceEl.removeAttribute('aria-hidden');
+    } else {
+      adviceEl.removeAttribute('aria-label');
+      adviceEl.setAttribute('aria-hidden', 'true');
+    }
+
+    tickEl.classList.toggle('die-tick--on', opts.showTick);
   }
 
   return { container, update };

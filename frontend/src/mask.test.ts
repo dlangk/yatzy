@@ -37,7 +37,7 @@ function state(over: Partial<GameState> = {}): GameState {
     trajectory: [],
     undoStack: [],
     redoStack: [],
-    prefs: { showHints: true, showDebug: false, guideOpen: false, autoplayDelay: 300 },
+    prefs: { showHints: true, showDebug: false, guideOpen: false, autoplayDelay: 300, override: false },
     ...over,
   } as GameState;
 }
@@ -159,7 +159,7 @@ describe('diceBarViewModel ticks and cost', () => {
 describe('diceBarViewModel hidden states', () => {
   it('hides advice when hints are off but still populates the dice', () => {
     const vm = diceBarViewModel(state({
-      prefs: { showHints: false, showDebug: false, guideOpen: false, autoplayDelay: 300 },
+      prefs: { showHints: false, showDebug: false, guideOpen: false, autoplayDelay: 300, override: false },
     }));
     expect(vm.advice).toBeNull();
     expect(vm.cost).toBeNull();

@@ -22,6 +22,7 @@ export const DEFAULT_PREFS: Prefs = {
   showDebug: false,
   guideOpen: true,
   autoplayDelay: 500,
+  override: false,
 };
 
 /** The persisted game shape: the game snapshot minus the re-derivable eval response. */

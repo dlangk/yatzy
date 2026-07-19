@@ -252,6 +252,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'TOGGLE_GUIDE':
       return { ...state, prefs: { ...state.prefs, guideOpen: !state.prefs.guideOpen } };
 
+    case 'TOGGLE_OVERRIDE':
+      return { ...state, prefs: { ...state.prefs, override: !state.prefs.override } };
+
     case 'SET_AUTOPLAY_DELAY':
       return { ...state, prefs: { ...state.prefs, autoplayDelay: action.delay } };
 

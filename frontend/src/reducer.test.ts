@@ -29,7 +29,7 @@ function freshState(): GameState {
     trajectory: [],
     undoStack: [],
     redoStack: [],
-    prefs: { showHints: true, showDebug: false, guideOpen: true, autoplayDelay: 500 },
+    prefs: { showHints: true, showDebug: false, guideOpen: true, autoplayDelay: 500, override: false },
   };
 }
 
@@ -371,10 +371,10 @@ describe('gameReducer', () => {
     it('RESET_GAME keeps preferences (New Game must not reset hints/debug/guide)', () => {
       const state: GameState = {
         ...freshState(),
-        prefs: { showHints: false, showDebug: true, guideOpen: false, autoplayDelay: 800 },
+        prefs: { showHints: false, showDebug: true, guideOpen: false, autoplayDelay: 800, override: true },
       };
       const next = gameReducer(state, { type: 'RESET_GAME' });
-      expect(next.prefs).toEqual({ showHints: false, showDebug: true, guideOpen: false, autoplayDelay: 800 });
+      expect(next.prefs).toEqual({ showHints: false, showDebug: true, guideOpen: false, autoplayDelay: 800, override: true });
       // ...but the game data is fresh
       expect(next.turnPhase).toBe('idle');
       expect(next.trajectory).toEqual([]);
@@ -389,6 +389,10 @@ describe('gameReducer', () => {
       const s2 = gameReducer(s1, { type: 'TOGGLE_GUIDE' });
       expect(s2.prefs.guideOpen).toBe(false);
       expect(s2.prefs.showHints).toBe(false);
+      const s3 = gameReducer(s2, { type: 'TOGGLE_OVERRIDE' });
+      expect(s3.prefs.override).toBe(true);
+      expect(s3.prefs.guideOpen).toBe(false);
+      expect(s3.prefs.showHints).toBe(false);
     });
 
     it('SET_AUTOPLAY_DELAY updates only the delay', () => {

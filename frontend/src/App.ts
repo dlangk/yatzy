@@ -54,7 +54,7 @@ export function initApp(container: HTMLElement): void {
   rightSection.appendChild(diceSection);
 
   // How-to intro box, above the action buttons. Open/closed lives in prefs, so
-  // the "Guide" button in the action row toggles it via the store.
+  // the "Intro guide" button in the action row toggles it via the store.
   const howToEl = document.createElement('div');
   diceSection.appendChild(howToEl);
   initHowTo(howToEl);
@@ -63,18 +63,21 @@ export function initApp(container: HTMLElement): void {
   diceSection.appendChild(actionBarEl);
   initActionBar(actionBarEl);
 
-  const autoplayBarEl = document.createElement('div');
-  diceSection.appendChild(autoplayBarEl);
-  initAutoPlay(autoplayBarEl);
+  // Instruction above the dice: a lead-in you read before interacting. (The
+  // value arrows are Override-mode only, so they are not mentioned here.)
+  diceSection.appendChild(panelCaption(
+    'Click a die to hold or release it; your choice shows above it. '
+    + 'With Optimal hints on, the optimal play appears below each die, with a red mark where it differs from you.',
+  ));
 
   const diceBarEl = document.createElement('div');
   diceSection.appendChild(diceBarEl);
   initDiceBar(diceBarEl);
 
-  diceSection.appendChild(panelCaption(
-    'Your five dice. Click a die to hold or release it; the arrows set values. '
-    + 'With hints on, the row beneath shows what optimal play would do.',
-  ));
+  // Auto-play control below the dice, out of the primary interaction flow.
+  const autoplayBarEl = document.createElement('div');
+  diceSection.appendChild(autoplayBarEl);
+  initAutoPlay(autoplayBarEl);
 
   // Section 2: Scorecard — desktop col 2, narrow stacks second
   const scorecardSection = document.createElement('div');

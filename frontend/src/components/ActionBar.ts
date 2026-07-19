@@ -1,13 +1,32 @@
 import { getState, dispatch, subscribe } from '../store.ts';
 
-/** Render the action bar: Roll/Reroll, reroll counter, Hints/Guide toggles, undo/redo, reset. */
+/**
+ * Render the action bar as two rows:
+ *   Row 1 (play): Roll/Reroll/New Game, and Reset. When Override mode is on it
+ *     also shows the manual controls: reroll +/- and undo/redo.
+ *   Row 2 (modes): Optimal hints, Intro guide, Override mode.
+ *
+ * Override mode is a "cheat" toggle: it reveals the controls that let you edit
+ * the game state by hand (die values, reroll count, undo/redo). Those controls,
+ * and the die value arrows in the dice bar, are hidden until it is on. Rather
+ * than thread the flag through each component, we toggle a `override-mode` class
+ * on <body> and let CSS reveal the `.override-only` controls.
+ */
 export function initActionBar(container: HTMLElement): void {
   container.className = 'action-bar';
 
+  const playRow = document.createElement('div');
+  playRow.className = 'action-row';
+  const modeRow = document.createElement('div');
+  modeRow.className = 'action-row';
+  container.appendChild(playRow);
+  container.appendChild(modeRow);
+
   const mainBtn = document.createElement('button');
 
+  // Reroll counter +/- : manual override, hidden unless Override mode is on.
   const rerollControls = document.createElement('span');
-  rerollControls.className = 'reroll-controls';
+  rerollControls.className = 'reroll-controls override-only';
 
   const minusBtn = document.createElement('button');
   minusBtn.className = 'small-btn';
@@ -28,26 +47,13 @@ export function initActionBar(container: HTMLElement): void {
   rerollControls.appendChild(minusBtn);
   rerollControls.appendChild(plusBtn);
 
-  // Hints: compact toggle. Same "Hints" label in both states; the accent color
-  // (via .active) signals on/off rather than a text change.
-  const hintsBtn = document.createElement('button');
-  hintsBtn.className = 'game-btn-secondary btn-toggle';
-  hintsBtn.textContent = 'Hints';
-  hintsBtn.addEventListener('click', () => dispatch({ type: 'TOGGLE_HINTS' }));
-
-  // Guide: toggles the "how to play" box (lives above the buttons).
-  const guideBtn = document.createElement('button');
-  guideBtn.className = 'game-btn-secondary btn-toggle';
-  guideBtn.textContent = '? Guide';
-  guideBtn.addEventListener('click', () => dispatch({ type: 'TOGGLE_GUIDE' }));
-
   const undoBtn = document.createElement('button');
-  undoBtn.className = 'game-btn-secondary';
+  undoBtn.className = 'game-btn-secondary override-only';
   undoBtn.textContent = 'Undo';
   undoBtn.addEventListener('click', () => dispatch({ type: 'UNDO' }));
 
   const redoBtn = document.createElement('button');
-  redoBtn.className = 'game-btn-secondary';
+  redoBtn.className = 'game-btn-secondary override-only';
   redoBtn.textContent = 'Redo';
   redoBtn.addEventListener('click', () => dispatch({ type: 'REDO' }));
 
@@ -60,6 +66,25 @@ export function initActionBar(container: HTMLElement): void {
     }
   });
 
+  // Optimal hints: compact toggle. Same label in both states; the accent colour
+  // (via .active) signals on/off rather than a text change.
+  const hintsBtn = document.createElement('button');
+  hintsBtn.className = 'game-btn-secondary btn-toggle';
+  hintsBtn.textContent = 'Optimal hints';
+  hintsBtn.addEventListener('click', () => dispatch({ type: 'TOGGLE_HINTS' }));
+
+  // Intro guide: toggles the "how to play" box (lives above the buttons).
+  const guideBtn = document.createElement('button');
+  guideBtn.className = 'game-btn-secondary btn-toggle';
+  guideBtn.textContent = 'Intro guide';
+  guideBtn.addEventListener('click', () => dispatch({ type: 'TOGGLE_GUIDE' }));
+
+  // Override mode: reveals the manual game-state controls.
+  const overrideBtn = document.createElement('button');
+  overrideBtn.className = 'game-btn-secondary btn-toggle';
+  overrideBtn.textContent = 'Override mode';
+  overrideBtn.addEventListener('click', () => dispatch({ type: 'TOGGLE_OVERRIDE' }));
+
   mainBtn.addEventListener('click', () => {
     const s = getState();
     if (s.turnPhase === 'game_over') {
@@ -71,14 +96,17 @@ export function initActionBar(container: HTMLElement): void {
     }
   });
 
-  // Append children once — update in place on state changes
-  container.appendChild(mainBtn);
-  container.appendChild(rerollControls);
-  container.appendChild(undoBtn);
-  container.appendChild(redoBtn);
-  container.appendChild(resetBtn);
-  container.appendChild(hintsBtn);
-  container.appendChild(guideBtn);
+  // Row 1: play + (override) manual controls; Reset stays at the end.
+  playRow.appendChild(mainBtn);
+  playRow.appendChild(rerollControls);
+  playRow.appendChild(undoBtn);
+  playRow.appendChild(redoBtn);
+  playRow.appendChild(resetBtn);
+
+  // Row 2: mode toggles.
+  modeRow.appendChild(hintsBtn);
+  modeRow.appendChild(guideBtn);
+  modeRow.appendChild(overrideBtn);
 
   function render() {
     const s = getState();
@@ -111,6 +139,10 @@ export function initActionBar(container: HTMLElement): void {
     // board with or without the optimal highlights.
     hintsBtn.disabled = false;
     guideBtn.classList.toggle('active', s.prefs.guideOpen);
+    overrideBtn.classList.toggle('active', s.prefs.override);
+
+    // CSS reveals .override-only controls (here and the dice-bar arrows) off this.
+    document.body.classList.toggle('override-mode', s.prefs.override);
 
     undoBtn.disabled = s.undoStack.length === 0;
     redoBtn.disabled = s.redoStack.length === 0;
@@ -123,6 +155,7 @@ export function initActionBar(container: HTMLElement): void {
         state.rerollsRemaining === prev.rerollsRemaining &&
         state.prefs.showHints === prev.prefs.showHints &&
         state.prefs.guideOpen === prev.prefs.guideOpen &&
+        state.prefs.override === prev.prefs.override &&
         state.undoStack === prev.undoStack &&
         state.redoStack === prev.redoStack) return;
     render();
