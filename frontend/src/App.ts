@@ -21,6 +21,7 @@ import { initDebugPanel } from './components/DebugPanel.ts';
 import { initDecisionLog } from './components/DecisionLog.ts';
 import { initHowTo } from './components/HowTo.ts';
 import { initDeltaBox } from './components/DeltaBox.ts';
+import { initRiskSlider } from './components/RiskSlider.ts';
 
 /** A short, always-on caption describing what a panel shows. */
 function panelCaption(text: string): HTMLDivElement {
@@ -62,6 +63,10 @@ export function initApp(container: HTMLElement): void {
   const actionBarEl = document.createElement('div');
   diceSection.appendChild(actionBarEl);
   initActionBar(actionBarEl);
+
+  const riskSliderEl = document.createElement('div');
+  diceSection.appendChild(riskSliderEl);
+  initRiskSlider(riskSliderEl);
 
   // Instruction above the dice: a lead-in you read before interacting. (The
   // value arrows are Override-mode only, so they are not mentioned here.)
