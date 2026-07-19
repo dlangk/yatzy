@@ -21,7 +21,8 @@ npm run lint      # ESLint
 - **API**: All backend calls through `api.ts` (solver on port 9000)
 - **Chart**: D3.js SVG trajectory visualization
 - **Styles**: CSS custom properties in `style.css`
-- **Tests**: vitest, node environment, no DOM. `mask.test.ts` (23), `reducer.test.ts` (25), `store.test.ts` (6), `api.test.ts` (4)
+- **Tests**: vitest, node environment, no DOM. `mask.test.ts` (23), `reducer.test.ts` (30), `store.test.ts` (6), `api.test.ts` (4)
+- **Risk slider**: `/evaluate` returns a `detents` array (5 entries, theta -0.08..+0.08, index 2 = Neutral). The store caches it and derives `lastEvalResponse = detents[prefs.riskLevel]`; the `RiskSlider` re-selects client-side with no refetch. Each decision's cost is recorded per detent (`TrajectoryPoint.deltas`), so the Delta total re-totals from cache. The trajectory projection stays pinned to the Neutral detent; off-neutral, value labels read "value" (certainty-equivalent), not "EV".
 
 ## Source Layout
 
@@ -47,6 +48,7 @@ npm run lint      # ESLint
 | `components/DebugPanel.ts` | Collapsible raw state inspector |
 | `components/DecisionLog.ts` | Per-turn reroll/score decision table with delta bars |
 | `components/DiceBar.ts` | Renders `diceBarViewModel()`: five dice, the solver advice row, mismatch ticks, cost line |
+| `components/RiskSlider.ts` | Five-detent risk-appetite slider; dispatches `SET_RISK_LEVEL` (client-side re-center, no refetch) |
 | `components/Die.ts` | Single die: value arrows plus one button wrapping the die SVG and its HOLD/REROLL label |
 | `components/EvalPanel.ts` | State value and optimal action summary |
 | `components/Scorecard.ts` | 15-category scoring table with EV column |
