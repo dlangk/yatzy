@@ -50,7 +50,7 @@ export function initDeltaBox(container: HTMLElement): void {
     const neutral = state.prefs.riskLevel === 2;
     if (neutral) {
       sub.textContent = perfect
-        ? 'perfect play so far — keep the delta at zero'
+        ? 'perfect play so far: keep the delta at zero'
         : 'expected points behind perfect play';
     } else {
       const label = LABELS[state.prefs.riskLevel].toLowerCase();

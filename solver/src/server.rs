@@ -238,6 +238,7 @@ async fn handle_evaluate(
     }
 
     // Serialize one RollResponse into the flat JSON object shape.
+    // Off-neutral detents, these _ev-named fields hold certainty-equivalent values, not EVs.
     let to_obj = |resp: &crate::api_computations::RollResponse, theta: f32| -> serde_json::Value {
         let categories: Vec<serde_json::Value> = resp
             .categories

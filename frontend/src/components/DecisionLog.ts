@@ -199,7 +199,7 @@ export function initDecisionLog(container: HTMLElement): void {
     ) {
       updateDeltaCells(s.prefs.showHints, s.prefs.riskLevel);
     } else if (decisions.length > 0 && renderedRows.length > 0) {
-      // New rows were added — always update deltas for rescaling
+      // New rows were added, always update deltas for rescaling
       updateDeltaCells(s.prefs.showHints, s.prefs.riskLevel);
     }
 
