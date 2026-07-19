@@ -207,9 +207,11 @@ function injectNav() {
     themeBtn.textContent = document.documentElement.classList.contains('dark') ? '\u2600' : '\u263E';
   }
 
-  // Apply saved theme immediately
+  // Apply saved theme immediately. Light is the default: only an explicit saved
+  // choice switches to dark, so a dark OS preference does not force dark on a
+  // first visit. (Applies site-wide: treatise, play, and profiler share this nav.)
   const saved = localStorage.getItem('theme');
-  if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+  if (saved === 'dark') {
     document.documentElement.classList.add('dark');
   }
   updateIcon();

@@ -17,8 +17,10 @@ const GAME_KEY = 'yatzy-game-state';
 const PREFS_KEY = 'yatzy-prefs';
 const VERSION = 2;
 
+// First-visit defaults (no persisted prefs yet): hints off, intro guide on,
+// override off. Theme defaults to light, set separately in shared/nav.js.
 export const DEFAULT_PREFS: Prefs = {
-  showHints: true,
+  showHints: false,
   showDebug: false,
   guideOpen: true,
   autoplayDelay: 500,
