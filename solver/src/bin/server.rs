@@ -39,8 +39,12 @@ async fn main() {
         println!("Percentile table not found — /density will use MC for all turns");
     }
 
+    // Load the four non-neutral risk detent tables for the /evaluate slider.
+    let detents = yatzy::server::load_detents(&ctx);
+    println!("{} of 4 risk detents loaded", detents.len());
+
     let ctx = Arc::new(*ctx);
-    let app = create_router_full(ctx, oracle, percentile_table);
+    let app = create_router_full(ctx, oracle, percentile_table, detents);
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port))
         .await

@@ -43,7 +43,7 @@ fn app() -> axum::Router {
 fn app_with_density() -> axum::Router {
     // Create router with state_values loaded (no oracle, no percentile table)
     // — density endpoint will use real-time MC simulation for turns 5+
-    create_router_full(get_ctx(), None, None)
+    create_router_full(get_ctx(), None, None, Vec::new())
 }
 
 // ── GET /health ──────────────────────────────────────────────────────
