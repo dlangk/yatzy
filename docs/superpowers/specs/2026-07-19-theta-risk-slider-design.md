@@ -67,11 +67,11 @@ the existing EV path and looks exactly like today; only off-center detents diver
 
    | Index | Label | θ | table |
    |------|-------|---:|-------|
-   | 0 | Very safe | −0.10 | `all_states_theta_-0.100.bin` |
-   | 1 | Safe | −0.05 | `all_states_theta_-0.050.bin` |
+   | 0 | Very safe | −0.08 | `all_states_theta_-0.080.bin` |
+   | 1 | Safe | −0.04 | `all_states_theta_-0.040.bin` |
    | 2 | Neutral | 0.00 | `all_states.bin` |
-   | 3 | Aggressive | +0.05 | `all_states_theta_0.050.bin` |
-   | 4 | Very aggressive | +0.10 | `all_states_theta_0.100.bin` |
+   | 3 | Aggressive | +0.04 | `all_states_theta_0.040.bin` |
+   | 4 | Very aggressive | +0.08 | `all_states_theta_0.080.bin` |
 
 4. **Slider UI:** a detented horizontal slider with all five labels, a handle on the
    current stop, the current level named above, draggable and click-to-jump. Placed
@@ -215,7 +215,7 @@ dominates as before).
 - **θ < 0 sign conventions.** The theory accuracy review flagged sign-convention
   wording for θ<0. The argmin-for-θ<0 rule above must be verified against the
   precomputed policy before shipping (the backend cross-check test is the gate).
-- **CE interpretability at the extremes.** −0.10 / +0.10 are well inside the utility
+- **CE interpretability at the extremes.** −0.08 / +0.08 are well inside the utility
   domain, but confirm the CE numbers read sensibly (monotone, non-negative cost) in
   the browser pass.
 - **Two-language change.** Backend (Rust) + frontend (TS) + deploy. Decompose into
