@@ -204,19 +204,19 @@ pub fn compute_roll_response(
 /// equivalent, which is max utility for theta > 0 and min utility for theta < 0.
 fn propagate_reroll_level_utility(
     ctx: &YatzyContext,
-    e_prev: &[f32; 252],
-    e_current: &mut [f32; 252],
+    e_prev: &[f64; 252],
+    e_current: &mut [f64; 252],
     minimize: bool,
 ) {
     let kt = &ctx.keep_table;
     // Expected utility for each unique keep-multiset (linear weighted sum).
-    let mut keep_u = [0.0f32; NUM_KEEP_MULTISETS];
+    let mut keep_u = [0.0f64; NUM_KEEP_MULTISETS];
     for kid in 0..NUM_KEEP_MULTISETS {
         let start = kt.row_start[kid] as usize;
         let end = kt.row_start[kid + 1] as usize;
-        let mut u = 0.0f32;
+        let mut u = 0.0f64;
         for k in start..end {
-            u += kt.vals[k] * e_prev[kt.cols[k] as usize];
+            u += kt.vals[k] as f64 * e_prev[kt.cols[k] as usize];
         }
         keep_u[kid] = u;
     }
@@ -233,6 +233,28 @@ fn propagate_reroll_level_utility(
         }
         e_current[ds_i] = best;
     }
+}
+
+/// f64 utility of a single reroll mask (pure linear weighted sum). The CE path
+/// needs f64: for theta<0 the utilities are tiny and f32 rounding corrupts the argmin.
+fn expected_utility_for_reroll_mask_f64(
+    ctx: &YatzyContext,
+    ds_index: usize,
+    e_ds: &[f64; 252],
+    mask: i32,
+) -> f64 {
+    if mask == 0 {
+        return e_ds[ds_index];
+    }
+    let kt = &ctx.keep_table;
+    let kid = kt.mask_to_keep[ds_index * 32 + mask as usize] as usize;
+    let start = kt.row_start[kid] as usize;
+    let end = kt.row_start[kid + 1] as usize;
+    let mut u = 0.0f64;
+    for k in start..end {
+        u += kt.vals[k] as f64 * e_ds[kt.cols[k] as usize];
+    }
+    u
 }
 
 /// Certainty-equivalent variant of `compute_roll_response` for a nonzero theta.
@@ -256,9 +278,9 @@ pub fn compute_roll_response_theta(
     let inv_theta = 1.0f64 / theta as f64;
     let minimize = theta < 0.0;
     let worst = if minimize {
-        f32::INFINITY
+        f64::INFINITY
     } else {
-        f32::NEG_INFINITY
+        f64::NEG_INFINITY
     };
 
     // Sort dice and track original indices for mask remapping (same as EV path).
@@ -330,7 +352,7 @@ pub fn compute_roll_response_theta(
         let mut best = worst;
         for c in 0..CATEGORY_COUNT {
             if !is_category_scored(scored_categories, c) {
-                let u = util_of_score(ds_i, c) as f32;
+                let u = util_of_score(ds_i, c);
                 let better = if minimize { u < best } else { u > best };
                 if better {
                     best = u;
@@ -349,11 +371,12 @@ pub fn compute_roll_response_theta(
             e_ds_1
         };
 
-        // 32 mask utilities (pure weighted sum; helper reused unchanged), in sorted order.
+        // 32 mask utilities (pure weighted sum, f64 to avoid f32 argmin corruption
+        // on the tiny theta<0 utilities), in sorted order.
         let mut sorted_mask_util = [0.0f64; 32];
         for mask in 0..32 {
             sorted_mask_util[mask] =
-                compute_expected_value_for_reroll_mask(ctx, ds_index, &e_ds_for_masks, mask as i32);
+                expected_utility_for_reroll_mask_f64(ctx, ds_index, &e_ds_for_masks, mask as i32);
         }
 
         // Remap sorted -> original dice order, converting utility to CE.
