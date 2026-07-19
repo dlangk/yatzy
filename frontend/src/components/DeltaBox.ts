@@ -9,12 +9,16 @@
  */
 import { getState, subscribe } from '../store.ts';
 import type { TrajectoryPoint } from '../types.ts';
+import { pointDelta } from '../types.ts';
 import { attachTooltip } from './Tooltip.ts';
 import { TIP } from '../tooltips.ts';
 
-function cumulativeDelta(trajectory: TrajectoryPoint[]): number {
+function cumulativeDelta(trajectory: TrajectoryPoint[], level: number): number {
   let sum = 0;
-  for (const p of trajectory) if (p.delta != null) sum += p.delta;
+  for (const p of trajectory) {
+    const d = pointDelta(p, level);
+    if (d != null) sum += d;
+  }
   return sum;
 }
 
@@ -37,7 +41,8 @@ export function initDeltaBox(container: HTMLElement): void {
   container.appendChild(sub);
 
   function render(): void {
-    const d = cumulativeDelta(getState().trajectory);
+    const state = getState();
+    const d = cumulativeDelta(state.trajectory, state.prefs.riskLevel);
     const perfect = d > -0.005;
     value.textContent = perfect ? '0.00' : d.toFixed(2);
     container.classList.toggle('perfect', perfect);
@@ -48,7 +53,7 @@ export function initDeltaBox(container: HTMLElement): void {
 
   render();
   subscribe((state, prev) => {
-    if (state.trajectory === prev.trajectory) return;
+    if (state.trajectory === prev.trajectory && state.prefs.riskLevel === prev.prefs.riskLevel) return;
     render();
   });
 }
