@@ -212,13 +212,18 @@ pub fn compute_policy_mean_table(ctx: &YatzyContext, sv_theta: &[f32], theta: f3
             }
         }
 
+        // Mirror state_computation.rs's aliasing pattern EXACTLY: take the raw write
+        // pointer first (mutable borrow ends immediately), then hold ONE immutable
+        // read slice over the whole array for the readers. Do NOT reconstruct a
+        // slice from the write pointer inside the closure.
         let ptr = AtomicPtr::new(mean.as_mut_ptr());
+        let mean_slice: &[f32] = &mean;
         // SAFETY of reads: expected_score_under_policy only reads mean at successor
         // states (level num_scored+1), already written. Writes go to distinct
-        // (up, scored) indices per mask; each mask handled by one worker.
+        // (up, scored) indices per mask; each mask handled by one worker, so no two
+        // workers write the same index and no write overlaps another worker's reads.
         scored_masks.par_iter().for_each(|&scored| {
             let upper_mask = (scored & 0x3F) as usize;
-            let mean_slice = unsafe { std::slice::from_raw_parts(ptr.load(Ordering::Relaxed), NUM_STATES) };
             let base = state_index(0, scored as usize);
             let p = ptr.load(Ordering::Relaxed);
             let mut capped = 0.0f32;
