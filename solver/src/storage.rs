@@ -41,6 +41,16 @@ pub fn state_file_path(theta: f32) -> String {
     }
 }
 
+/// Return the mean-table file path for a given θ value (companion to `state_file_path`).
+/// θ=0.0 has no mean table (Neutral reuses `all_states.bin` directly; `V_π0 = V*`).
+/// Other θ values use `data/strategy_tables/all_states_mean_theta_{theta:.3}.bin`.
+pub fn mean_state_file_path(theta: f32) -> String {
+    format!(
+        "data/strategy_tables/all_states_mean_theta_{:.3}.bin",
+        theta
+    )
+}
+
 /// Check if a file exists on disk.
 pub fn file_exists(filename: &str) -> bool {
     Path::new(filename).exists()
@@ -226,6 +236,63 @@ pub fn save_all_state_values(ctx: &YatzyContext, filename: &str) {
     let data_bytes = unsafe {
         std::slice::from_raw_parts(
             state_slice.as_ptr() as *const u8,
+            NUM_STATES * std::mem::size_of::<f32>(),
+        )
+    };
+    f.write_all(data_bytes).unwrap();
+
+    let elapsed = start_time.elapsed().as_secs_f64() * 1000.0;
+    println!("Saved {} states in {:.2} ms", NUM_STATES, elapsed);
+}
+
+/// Save a standalone state-value slice as a flat dump in STATE_INDEX order.
+///
+/// Unlike `save_all_state_values`, this does not require a `YatzyContext` — it
+/// takes the θ and slice directly. Used for companion tables (e.g. the
+/// V_πθ mean tables) that are not the context's own `state_values`. Writes the
+/// identical header format (magic `0x59545A53`, θ-bits version) as
+/// `save_all_state_values`.
+pub fn save_state_values_standalone(sv: &[f32], theta: f32, filename: &str) {
+    let start_time = Instant::now();
+    println!("Saving state values to {}...", filename);
+
+    // Ensure parent directory exists
+    if let Some(parent) = Path::new(filename).parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+
+    let mut f = match File::create(filename) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("Error creating file: {}", e);
+            return;
+        }
+    };
+
+    let header = StateFileHeader {
+        magic: STATE_FILE_MAGIC,
+        version: if theta == 0.0 {
+            STATE_FILE_VERSION
+        } else {
+            STATE_FILE_VERSION_THETA
+        },
+        total_states: NUM_STATES as u32,
+        theta_bits: theta.to_bits(),
+    };
+
+    // Write header
+    let header_bytes = unsafe {
+        std::slice::from_raw_parts(
+            &header as *const StateFileHeader as *const u8,
+            std::mem::size_of::<StateFileHeader>(),
+        )
+    };
+    f.write_all(header_bytes).unwrap();
+
+    // Write state values
+    let data_bytes = unsafe {
+        std::slice::from_raw_parts(
+            sv.as_ptr() as *const u8,
             NUM_STATES * std::mem::size_of::<f32>(),
         )
     };

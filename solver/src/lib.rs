@@ -63,6 +63,8 @@ pub mod env_config;
 #[cfg(feature = "full")]
 pub mod forward_pass;
 #[cfg(feature = "full")]
+pub mod policy_mean;
+#[cfg(feature = "full")]
 pub mod profiling;
 #[cfg(feature = "full")]
 pub mod rosetta;

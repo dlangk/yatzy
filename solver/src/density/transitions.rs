@@ -495,10 +495,6 @@ pub fn compute_transitions_oracle(
 /// Reuses `compute_transitions`, which already encodes the theta-policy's within-turn
 /// decisions and returns deduplicated (next_state, points, prob) with sum(prob)=1.
 /// Then folds the mean: V_pi_theta(S) = sum_t prob_t * (points_t + mean_sv[next_t]).
-///
-/// Not yet called outside tests: the backward mean-induction table that drives this
-/// (`policy_mean.rs`) is a later task in the theta-slider-true-mean plan.
-#[allow(dead_code)]
 pub(crate) fn expected_score_under_policy(
     ctx: &YatzyContext,
     sv: &[f32],
