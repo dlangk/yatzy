@@ -601,25 +601,30 @@ In `solver/src/server.rs`, refactor `handle_evaluate`. Extract the "response obj
         req.rerolls_remaining,
     );
 
-    // Build all five detents in theta order: -0.08, -0.04, 0, +0.04, +0.08.
-    // state.detents holds the four non-neutral ones in the order they were loaded
-    // (-0.08, -0.04, +0.04, +0.08); splice neutral into the middle.
-    let mut detent_objs: Vec<serde_json::Value> = Vec::with_capacity(5);
-    for d in state.detents.iter().filter(|d| d.theta < 0.0) {
-        let r = crate::api_computations::compute_roll_response_theta(
-            &state.ctx, d.sv.as_slice(), &d.exp_scores, d.theta,
-            req.upper_score, req.scored_categories, &req.dice, req.rerolls_remaining,
-        );
-        detent_objs.push(to_obj(&r, d.theta));
-    }
-    detent_objs.push(to_obj(&neutral, 0.0));
-    for d in state.detents.iter().filter(|d| d.theta > 0.0) {
-        let r = crate::api_computations::compute_roll_response_theta(
-            &state.ctx, d.sv.as_slice(), &d.exp_scores, d.theta,
-            req.upper_score, req.scored_categories, &req.dice, req.rerolls_remaining,
-        );
-        detent_objs.push(to_obj(&r, d.theta));
-    }
+    // Build EXACTLY five detents in fixed theta order. A missing detent table
+    // falls back to the neutral response (that risk level then behaves as
+    // Neutral), so the array is always length 5. The frontend relies on that.
+    const DETENT_THETAS: [f32; 5] = [-0.08, -0.04, 0.0, 0.04, 0.08];
+    let detent_objs: Vec<serde_json::Value> = DETENT_THETAS
+        .iter()
+        .map(|&theta| {
+            if theta == 0.0 {
+                return to_obj(&neutral, 0.0);
+            }
+            match state.detents.iter().find(|d| (d.theta - theta).abs() < 1e-6) {
+                Some(d) => {
+                    let r = crate::api_computations::compute_roll_response_theta(
+                        &state.ctx, d.sv.as_slice(), &d.exp_scores, d.theta,
+                        req.upper_score, req.scored_categories, &req.dice, req.rerolls_remaining,
+                    );
+                    to_obj(&r, d.theta)
+                }
+                // Missing table: emit neutral values under this detent's theta,
+                // so the array stays length 5 and the level degrades to Neutral.
+                None => to_obj(&neutral, theta),
+            }
+        })
+        .collect();
 
     // Flat fields = neutral (backward compatible), plus the detents array.
     let mut result = to_obj(&neutral, 0.0);
@@ -708,6 +713,10 @@ git commit -m "Ship risk detent tables in the backend image; document detents re
 - [ ] `solver/CLAUDE.md` API Reference documents the `detents` array.
 - [ ] The Neutral detent's numbers are unchanged from before this plan (the live frontend keeps working).
 
-## Notes for the frontend plan (next)
+## Contract with the frontend plan
 
-The response is backward compatible (flat fields = neutral), so the frontend can adopt the `detents` array in a follow-up without a coordinated deploy. Field mapping: the frontend's `mask_evs`/`optimal_mask_ev`/`ev_if_scored` map to each detent's same-named fields (now CE at non-neutral detents). The frontend selects `detents[riskLevel]` client-side; see `docs/superpowers/specs/2026-07-19-theta-risk-slider-design.md`.
+The frontend plan (`docs/superpowers/plans/2026-07-19-theta-risk-slider-frontend.md`) consumes this exact shape:
+
+- Response is backward compatible: the flat top-level fields equal the Neutral detent, so the currently-live frontend keeps working and the new frontend can ship independently.
+- `detents` is **always length 5**, fixed index order θ = −0.08, −0.04, 0, +0.04, +0.08 (index 2 = Neutral). A missing table degrades that level to Neutral values but keeps the array length 5.
+- Each detent entry has the same field names as the flat response (`mask_evs`, `optimal_mask`, `optimal_mask_ev`, `categories[].ev_if_scored`, `optimal_category`, `optimal_category_ev`, `state_ev`) plus `theta`. At non-neutral detents these numbers are certainty-equivalent points. So a detent entry is structurally an `EvaluateResponse`, and the frontend selects `detents[riskLevel]` as `lastEvalResponse` with no field remapping.
