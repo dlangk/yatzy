@@ -454,6 +454,34 @@ describe('gameReducer', () => {
       expect(gameReducer(withEval, { type: 'SET_RISK_LEVEL', level: -3 }).prefs.riskLevel).toBe(0);
     });
 
+    it('SCORE_CATEGORY records the cost at all five detents', () => {
+      // Build a rolled state with a 5-detent eval where scoring category 0 is
+      // suboptimal by a different amount at each detent.
+      const mk = (chosenEv: number, bestEv: number): EvaluateResponse => ({
+        categories: [
+          { id: 0, name: 'Ones', score: 3, available: true, ev_if_scored: chosenEv },
+          { id: 1, name: 'Twos', score: 0, available: true, ev_if_scored: bestEv },
+        ],
+        optimal_category: 1,
+        optimal_category_ev: bestEv,
+        state_ev: bestEv,
+      });
+      // detent d: chosen - best = -(d+1), so deltas should be [-1,-2,-3,-4,-5].
+      const detents = [mk(99, 100), mk(98, 100), mk(97, 100), mk(96, 100), mk(95, 100)];
+      const rolled = {
+        ...rolledState(),
+        detents,
+        lastEvalResponse: detents[2],
+        categories: freshState().categories.map((c) =>
+          c.id === 0 ? { ...c, evIfScored: 97, available: true, suggestedScore: 3 } : c,
+        ),
+      };
+      const scored = gameReducer(rolled, { type: 'SCORE_CATEGORY', categoryId: 0 });
+      const pt = scored.trajectory[scored.trajectory.length - 1];
+      expect(pt.deltas).toEqual([-1, -2, -3, -4, -5]);
+      expect(pt.delta).toBe(-3); // neutral (index 2)
+    });
+
     it('a backend response without detents falls back to the flat response', () => {
       const flat: EvaluateResponse = {
         categories: [{ id: 0, name: 'Ones', score: 3, available: true, ev_if_scored: 199 }],

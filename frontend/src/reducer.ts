@@ -189,15 +189,24 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const accScore = derived.totalScore;
       const trajectory = state.trajectory;
       const scoreLabel = `${cat.name} (${cat.suggestedScore})`;
-      const optimalCatEv = state.lastEvalResponse?.optimal_category_ev ?? null;
-      let scoreDelta: number | undefined;
-      if (optimalCatEv !== null) {
-        scoreDelta = evIfScored - optimalCatEv;
-      }
-      // The solver's ev_if_scored = category_score + V(successor_state).
-      // V(successor) already accounts for the terminal bonus (50 pts if upper >= 63).
-      // Use rawScoredSum (no bonus) + V(successor) to avoid double-counting.
-      const successorEv = evIfScored - cat.suggestedScore;
+      // Per-detent cost of scoring this category: at each detent d, the chosen
+      // category's CE minus that detent's best category CE.
+      const perDetentScoreDeltas = (state.detents ?? []).map((d) => {
+        const chosen = d.categories.find((c) => c.id === catId);
+        if (!chosen) return 0;
+        return chosen.ev_if_scored - d.optimal_category_ev;
+      });
+      const scoreDeltas = perDetentScoreDeltas.length === 5 ? perDetentScoreDeltas : undefined;
+      // Neutral (index 2) single delta fallback, also used for old readers.
+      const neutralOptEv = state.detents?.[2]?.optimal_category_ev
+        ?? state.lastEvalResponse?.optimal_category_ev ?? null;
+      const neutralChosenEv = state.detents?.[2]?.categories.find((c) => c.id === catId)?.ev_if_scored
+        ?? evIfScored;
+      const scoreDelta = neutralOptEv !== null ? neutralChosenEv - neutralOptEv : undefined;
+      // Projection stays neutral: use the Neutral detent's ev_if_scored.
+      const neutralEvIfScored = state.detents?.[2]?.categories.find((c) => c.id === catId)?.ev_if_scored
+        ?? evIfScored;
+      const successorEv = neutralEvIfScored - cat.suggestedScore;
       const point: TrajectoryPoint = {
         index: trajectory.length,
         turn: derived.scoredCount,
@@ -209,6 +218,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         scoredCategories: derived.scoredCategories,
         label: scoreLabel,
         delta: scoreDelta,
+        deltas: scoreDeltas,
       };
 
       return {

@@ -23,14 +23,14 @@ initPlayAnalytics();
 // then passes it along with the SET_EVAL_RESPONSE action.
 let pendingTrajectoryEvent: 'roll' | 'reroll' | undefined;
 let pendingRerollLabel: string | undefined;
-let pendingRerollDelta: number | undefined;
+let pendingRerollDeltas: number[] | undefined;
 
 subscribe((state, prev, action) => {
   // Capture trajectory context when a roll/reroll occurs
   if (action.type === 'ROLL') {
     pendingTrajectoryEvent = 'roll';
     pendingRerollLabel = undefined;
-    pendingRerollDelta = undefined;
+    pendingRerollDeltas = undefined;
   } else if (action.type === 'REROLL') {
     pendingTrajectoryEvent = 'reroll';
     // Compute label from pre-reroll state
@@ -40,10 +40,15 @@ subscribe((state, prev, action) => {
       : keptValues.length === 0
         ? 'Rerolled all'
         : `Kept ${keptValues.join(',')}`;
-    // Compute delta from pre-reroll eval
-    pendingRerollDelta = undefined;
-    const cost = maskCostVsOptimal(prev.lastEvalResponse, rerollMaskFromDice(prev.dice));
-    if (cost !== null) pendingRerollDelta = cost;
+    // Compute cost at each detent from the pre-reroll eval
+    pendingRerollDeltas = undefined;
+    const mask = rerollMaskFromDice(prev.dice);
+    if (prev.detents && prev.detents.length === 5) {
+      pendingRerollDeltas = prev.detents.map((d) => maskCostVsOptimal(d, mask) ?? 0);
+    } else {
+      const cost = maskCostVsOptimal(prev.lastEvalResponse, mask);
+      if (cost !== null) pendingRerollDeltas = Array(5).fill(cost);
+    }
   }
 
   evaluateIfNeeded(state);
@@ -65,10 +70,10 @@ function evaluateIfNeeded(state: GameState): void {
 
   const trajEvent = pendingTrajectoryEvent;
   const trajLabel = pendingRerollLabel;
-  const trajDelta = pendingRerollDelta;
+  const trajDeltas = pendingRerollDeltas;
   pendingTrajectoryEvent = undefined;
   pendingRerollLabel = undefined;
-  pendingRerollDelta = undefined;
+  pendingRerollDeltas = undefined;
 
   evaluate({
     dice: state.dice.map(d => d.value),
@@ -81,9 +86,7 @@ function evaluateIfNeeded(state: GameState): void {
       response,
       trajectoryEvent: trajEvent,
       rerollLabel: trajLabel,
-      // Real per-detent costs land in a later task; until then every detent
-      // shares the single neutral-response cost so index 2 (Neutral) matches today.
-      rerollDeltas: trajDelta !== undefined ? [trajDelta, trajDelta, trajDelta, trajDelta, trajDelta] : undefined,
+      rerollDeltas: trajDeltas,
     }))
     .catch(err => console.error('Evaluate failed:', err));
 }
