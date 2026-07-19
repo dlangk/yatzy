@@ -22,7 +22,7 @@ pub struct StateTransition {
 }
 
 /// Sentinel: keep all dice (mask=0), encoded as keep_id.
-const KEEP_ALL: u16 = 0xFFFF;
+pub(crate) const KEEP_ALL: u16 = 0xFFFF;
 
 /// Compute the optimal category for each dice set (Group 6 with decision tracking).
 ///
@@ -31,7 +31,7 @@ const KEEP_ALL: u16 = 0xFFFF;
 /// Returns (e_ds_0[252], best_cat[252]) where:
 /// - e_ds_0[ds] = best EV achievable by scoring dice set ds
 /// - best_cat[ds] = category index that achieves it
-fn compute_group6_with_category(
+pub(crate) fn compute_group6_with_category(
     ctx: &YatzyContext,
     sv: &[f32],
     up_score: i32,
@@ -129,7 +129,7 @@ fn compute_group6_with_category(
 /// Returns (e_ds_current[252], best_keep[252]) where:
 /// - e_ds_current[ds] = best EV after optimal keep decision
 /// - best_keep[ds] = keep_id of the optimal keep, or KEEP_ALL if keeping all dice
-fn compute_reroll_with_decisions(
+pub(crate) fn compute_reroll_with_decisions(
     ctx: &YatzyContext,
     e_ds_prev: &[f32; 252],
     theta: f32,
@@ -488,6 +488,33 @@ pub fn compute_transitions_oracle(
     result
 }
 
+/// Expected final score from (up_score, scored) under the theta-policy defined by
+/// `sv` (log-utility L(S) for theta!=0, EV table V*(S) for theta==0), reading
+/// continuation means from `mean_sv` (the V_pi_theta table being built).
+///
+/// Reuses `compute_transitions`, which already encodes the theta-policy's within-turn
+/// decisions and returns deduplicated (next_state, points, prob) with sum(prob)=1.
+/// Then folds the mean: V_pi_theta(S) = sum_t prob_t * (points_t + mean_sv[next_t]).
+///
+/// Not yet called outside tests: the backward mean-induction table that drives this
+/// (`policy_mean.rs`) is a later task in the theta-slider-true-mean plan.
+#[allow(dead_code)]
+pub(crate) fn expected_score_under_policy(
+    ctx: &YatzyContext,
+    sv: &[f32],
+    mean_sv: &[f32],
+    up_score: i32,
+    scored: i32,
+    theta: f32,
+) -> f32 {
+    let trans = compute_transitions(ctx, sv, up_score, scored, theta);
+    let mut ev = 0.0f64;
+    for t in &trans {
+        ev += t.prob * (t.points as f64 + mean_sv[t.next_state as usize] as f64);
+    }
+    ev as f32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -542,5 +569,35 @@ mod tests {
             let next_scored = (t.next_state as usize) / STATE_STRIDE;
             assert_eq!(next_scored, all_scored);
         }
+    }
+
+    #[test]
+    fn test_expected_score_under_policy_terminal_adjacent() {
+        // With one category left (Yatzy) and a zero continuation implied by terminal,
+        // the EV-policy (theta=0) expected score from a state equals sv[state] (V*),
+        // because V_pi0 == V*. We build a tiny mean_sv covering only the terminal level.
+        let mut ctx = YatzyContext::new_boxed();
+        crate::phase0_tables::precompute_lookup_tables(&mut ctx);
+        crate::state_computation::compute_all_state_values(&mut ctx);
+        let sv = ctx.state_values.as_slice();
+
+        // mean_sv: terminal states = bonus(up), everything else 0 (only terminal is read
+        // as a successor when exactly one category remains).
+        let mut mean_sv = vec![0.0f32; NUM_STATES];
+        let all_scored = (1u32 << CATEGORY_COUNT) - 1;
+        for up in 0..=63usize {
+            mean_sv[state_index(up, all_scored as usize)] = if up >= 63 { 50.0 } else { 0.0 };
+        }
+
+        // State with only Yatzy remaining, up=0.
+        let scored = (all_scored ^ (1 << CATEGORY_YATZY)) as i32;
+        let got = expected_score_under_policy(&ctx, sv, &mean_sv, 0, scored, 0.0);
+        let want = sv[state_index(0, scored as usize)];
+        assert!(
+            (got - want).abs() < 0.05,
+            "policy-eval mean {} vs V* {}",
+            got,
+            want
+        );
     }
 }
