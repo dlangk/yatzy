@@ -1,9 +1,26 @@
-import type { GameState, GameStateSnapshot, GameAction, CategoryState, TrajectoryPoint } from './types.ts';
+import type { GameState, GameStateSnapshot, GameAction, CategoryState, TrajectoryPoint, EvaluateResponse } from './types.ts';
 import { CATEGORY_NAMES, CATEGORY_COUNT, TOTAL_DICE, UPPER_SCORE_CAP, UPPER_BONUS, UPPER_CATEGORIES } from './constants.ts';
 import { loadGame, loadPrefs, clearGame } from './persistence.ts';
 
 function randomDie(): number {
   return Math.floor(Math.random() * 6) + 1;
+}
+
+/** Apply a detent slice's per-category scores/EVs to the scorecard categories. */
+function applyEvalToCategories(
+  categories: GameState['categories'],
+  response: EvaluateResponse,
+): GameState['categories'] {
+  return categories.map((cat) => {
+    const apiCat = response.categories.find((c) => c.id === cat.id);
+    if (!apiCat) return cat;
+    return { ...cat, suggestedScore: apiCat.score, evIfScored: apiCat.ev_if_scored, available: apiCat.available };
+  });
+}
+
+/** Clamp a slider index into [0, 4]. */
+function clampLevel(level: number): number {
+  return Math.max(0, Math.min(4, Math.round(level)));
 }
 
 function buildInitialCategories(): CategoryState[] {
@@ -30,6 +47,7 @@ function freshSnapshot(): GameStateSnapshot {
     bonus: 0,
     rawScoredSum: 0,
     lastEvalResponse: null,
+    detents: null,
     turnPhase: 'idle',
     trajectory: [],
   };
@@ -38,7 +56,7 @@ function freshSnapshot(): GameStateSnapshot {
 export function initialState(): GameState {
   const savedGame = loadGame();
   const snapshot: GameStateSnapshot = savedGame
-    ? { ...freshSnapshot(), ...savedGame, lastEvalResponse: null }
+    ? { ...freshSnapshot(), ...savedGame, lastEvalResponse: null, detents: null }
     : freshSnapshot();
   return { ...snapshot, undoStack: [], redoStack: [], prefs: loadPrefs() };
 }
@@ -122,6 +140,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         dice,
         rerollsRemaining: 2,
         lastEvalResponse: null,
+        detents: null,
         turnPhase: 'rolled',
         redoStack: [],
       };
@@ -144,6 +163,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         dice,
         rerollsRemaining: state.rerollsRemaining - 1,
         lastEvalResponse: null,
+        detents: null,
       };
     }
 
@@ -200,6 +220,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         rawScoredSum: derived.rawScoredSum,
         scoredCategories: derived.scoredCategories,
         lastEvalResponse: null,
+        detents: null,
         turnPhase,
         rerollsRemaining: 0,
         trajectory: [...trajectory, point],
@@ -209,37 +230,44 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'SET_EVAL_RESPONSE': {
-      const categories = state.categories.map((cat) => {
-        const apiCat = action.response.categories.find((c) => c.id === cat.id);
-        if (!apiCat) return cat;
-        return {
-          ...cat,
-          suggestedScore: apiCat.score,
-          evIfScored: apiCat.ev_if_scored,
-          available: apiCat.available,
-        };
-      });
+      const level = state.prefs.riskLevel;
+      const detents = action.response.detents ?? null;
+      const selected = detents?.[level] ?? action.response;
+      const neutral = detents?.[2] ?? action.response; // projection stays neutral
+      const categories = applyEvalToCategories(state.categories, selected);
+
       let trajectory = state.trajectory;
       if (action.trajectoryEvent) {
         const accScore = computeAccumulatedScore(state);
         const turn = state.categories.filter((c) => c.isScored).length;
+        const deltas = action.rerollDeltas;
         const point: TrajectoryPoint = {
           index: trajectory.length,
           turn,
           event: action.trajectoryEvent,
-          expectedFinal: state.rawScoredSum + action.response.state_ev,
+          expectedFinal: state.rawScoredSum + neutral.state_ev, // neutral projection
           accumulatedScore: accScore,
-          stateEv: action.response.state_ev,
+          stateEv: neutral.state_ev,
           label: action.rerollLabel,
-          delta: action.rerollDelta,
+          delta: deltas ? deltas[2] : undefined,
+          deltas,
         };
         trajectory = [...trajectory, point];
       }
+      return { ...state, categories, detents, lastEvalResponse: selected, trajectory };
+    }
+
+    case 'SET_RISK_LEVEL': {
+      const level = clampLevel(action.level);
+      const selected = state.detents?.[level] ?? state.lastEvalResponse;
+      const categories = selected
+        ? applyEvalToCategories(state.categories, selected)
+        : state.categories;
       return {
         ...state,
+        prefs: { ...state.prefs, riskLevel: level },
+        lastEvalResponse: selected,
         categories,
-        lastEvalResponse: action.response,
-        trajectory,
       };
     }
 
@@ -281,6 +309,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         turnPhase,
         rerollsRemaining,
         lastEvalResponse: null,
+        detents: null,
       };
     }
 
@@ -291,6 +320,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         rerollsRemaining,
         lastEvalResponse: null,
+        detents: null,
       };
     }
 
@@ -317,6 +347,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         rawScoredSum: derived.rawScoredSum,
         scoredCategories: derived.scoredCategories,
         lastEvalResponse: null,
+        detents: null,
         turnPhase,
         rerollsRemaining: 0,
       };
@@ -345,6 +376,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         rawScoredSum: derived.rawScoredSum,
         scoredCategories: derived.scoredCategories,
         lastEvalResponse: null,
+        detents: null,
         turnPhase,
       };
     }

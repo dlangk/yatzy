@@ -81,7 +81,9 @@ function evaluateIfNeeded(state: GameState): void {
       response,
       trajectoryEvent: trajEvent,
       rerollLabel: trajLabel,
-      rerollDelta: trajDelta,
+      // Real per-detent costs land in a later task; until then every detent
+      // shares the single neutral-response cost so index 2 (Neutral) matches today.
+      rerollDeltas: trajDelta !== undefined ? [trajDelta, trajDelta, trajDelta, trajDelta, trajDelta] : undefined,
     }))
     .catch(err => console.error('Evaluate failed:', err));
 }
