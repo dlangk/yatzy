@@ -1,6 +1,21 @@
+# Multi-stage build: compile the yatzy server inside a linux/amd64 Rust container.
+#
+# This avoids cross-compiling on the host. On an Apple Silicon Mac, building with
+# `docker build --platform linux/amd64` runs this build under QEMU emulation, which
+# is slow but reliable and needs no host toolchain (host `cross` cannot install an
+# x86_64 host toolchain on ARM). The crate's default features include "full" (mmap),
+# so a plain release build produces the server the runtime stage needs.
+FROM rust:1-bookworm AS builder
+WORKDIR /build
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+RUN cargo build --release --bin yatzy
+
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
-COPY yatzy /usr/local/bin/yatzy
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /build/target/release/yatzy /usr/local/bin/yatzy
 COPY data/ /app/data/
 WORKDIR /app
 ENV YATZY_BASE_PATH=/app
