@@ -552,4 +552,22 @@ mod tests {
             chance.ev_if_scored
         );
     }
+
+    #[test]
+    fn test_ce_negative_theta_with_rerolls_runs_minimize_path() {
+        // theta<0 with rerolls exercises propagate_reroll_level_utility's
+        // minimize branch and the Group-6 min selection. Zero table means U=1,
+        // so this confirms the minimize path runs without NaN or Inf and argmax holds.
+        let ctx = make_ctx();
+        let exp_scores = crate::batched_solver::precompute_exp_scores(&ctx, -0.08);
+        let sv = ctx.state_values.as_slice();
+        let dice = [3, 3, 4, 5, 6];
+        let resp = compute_roll_response_theta(&ctx, sv, &exp_scores, -0.08, 0, 0, &dice, 2);
+        let mask_evs = resp.mask_evs.expect("rerolls remain");
+        for m in mask_evs.iter() {
+            assert!(m.is_finite());
+        }
+        assert!(resp.optimal_mask.is_some());
+        assert!(resp.optimal_mask_ev.unwrap() >= mask_evs[0] - 1e-6);
+    }
 }
