@@ -26,15 +26,26 @@ use tokio::sync::Semaphore;
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::api_computations::compute_roll_response;
+use crate::batched_solver::{precompute_exp_scores, ExpScores};
 use crate::constants::state_index;
 use crate::simulation::engine::{extract_percentiles_i32, PERCENTILE_KEYS};
-use crate::types::{PercentileEntry, PolicyOracle, YatzyContext};
+use crate::types::{PercentileEntry, PolicyOracle, StateValues, YatzyContext};
+
+/// A non-neutral risk detent: its table (log-domain L(S)) plus precomputed
+/// exp(theta*score). Neutral (theta=0) is served from the shared context.
+pub struct Detent {
+    pub theta: f32,
+    pub sv: StateValues,
+    pub exp_scores: Box<ExpScores>,
+}
 
 /// Shared server state: context + optional oracle + optional percentile table.
 pub struct ServerState {
     pub ctx: Arc<YatzyContext>,
     pub oracle: Option<Arc<PolicyOracle>>,
     pub percentile_table: Option<HashMap<u32, PercentileEntry>>,
+    /// The four non-neutral risk detents (theta = -0.08, -0.04, +0.04, +0.08).
+    pub detents: Vec<Detent>,
     /// Limits concurrent MC density simulations to 1 at a time.
     pub density_semaphore: Arc<Semaphore>,
 }
@@ -46,6 +57,7 @@ pub fn create_router(ctx: Arc<YatzyContext>) -> Router {
         ctx,
         oracle: None,
         percentile_table: None,
+        detents: Vec::new(),
         density_semaphore: Arc::new(Semaphore::new(1)),
     });
     create_router_with_state(state)
@@ -55,14 +67,67 @@ pub fn create_router_full(
     ctx: Arc<YatzyContext>,
     oracle: Option<PolicyOracle>,
     percentile_table: Option<HashMap<u32, PercentileEntry>>,
+    detents: Vec<Detent>,
 ) -> Router {
     let state = Arc::new(ServerState {
         ctx,
         oracle: oracle.map(Arc::new),
         percentile_table,
+        detents,
         density_semaphore: Arc::new(Semaphore::new(1)),
     });
     create_router_with_state(state)
+}
+
+/// Load the four non-neutral detent tables from disk. Missing files are logged
+/// and skipped (the endpoint then returns fewer detents). Neutral is not here.
+pub fn load_detents(ctx: &YatzyContext) -> Vec<Detent> {
+    const NON_NEUTRAL_THETAS: [f32; 4] = [-0.08, -0.04, 0.04, 0.08];
+    let mut detents = Vec::new();
+    for &theta in &NON_NEUTRAL_THETAS {
+        let path = crate::storage::state_file_path(theta);
+        match crate::storage::load_state_values_standalone(&path) {
+            Some(sv) => {
+                let exp_scores = precompute_exp_scores(ctx, theta);
+                detents.push(Detent {
+                    theta,
+                    sv,
+                    exp_scores,
+                });
+                println!("Loaded risk detent theta={} from {}", theta, path);
+            }
+            None => {
+                eprintln!("Risk detent theta={} not loaded (missing {})", theta, path);
+            }
+        }
+    }
+    detents
+}
+
+#[cfg(test)]
+mod detent_tests {
+    use super::*;
+    use crate::phase0_tables;
+
+    #[test]
+    #[ignore] // needs data/strategy_tables/all_states_theta_*.bin
+    fn test_load_detents_finds_all_four() {
+        // `cargo test` runs with cwd = the package root (solver/), but the
+        // theta tables live in the repo root's data/strategy_tables/ (same
+        // fallback pattern as test_precomputed.rs::resolve_state_file()).
+        let base_path = std::env::var("YATZY_BASE_PATH").unwrap_or_else(|_| ".".to_string());
+        let _ = std::env::set_current_dir(&base_path);
+        if !crate::storage::file_exists(&crate::storage::state_file_path(-0.08)) {
+            let _ = std::env::set_current_dir("..");
+        }
+
+        let mut ctx = YatzyContext::new_boxed();
+        phase0_tables::precompute_lookup_tables(&mut ctx);
+        let detents = load_detents(&ctx);
+        assert_eq!(detents.len(), 4, "expected all four detent tables present");
+        let thetas: Vec<f32> = detents.iter().map(|d| d.theta).collect();
+        assert_eq!(thetas, vec![-0.08, -0.04, 0.04, 0.08]);
+    }
 }
 
 fn create_router_with_state(state: AppState) -> Router {
@@ -172,7 +237,39 @@ async fn handle_evaluate(
         }
     }
 
-    let resp = compute_roll_response(
+    // Serialize one RollResponse into the flat JSON object shape.
+    // Off-neutral detents, these _ev-named fields hold certainty-equivalent values, not EVs.
+    let to_obj = |resp: &crate::api_computations::RollResponse, theta: f32| -> serde_json::Value {
+        let categories: Vec<serde_json::Value> = resp
+            .categories
+            .iter()
+            .map(|cat| {
+                serde_json::json!({
+                    "id": cat.id,
+                    "name": cat.name,
+                    "score": cat.score,
+                    "available": cat.available,
+                    "ev_if_scored": if cat.ev_if_scored.is_finite() { cat.ev_if_scored } else { 0.0 },
+                })
+            })
+            .collect();
+        let mut obj = serde_json::json!({
+            "theta": theta,
+            "categories": categories,
+            "optimal_category": resp.optimal_category,
+            "optimal_category_ev": resp.optimal_category_ev,
+            "state_ev": resp.state_ev,
+        });
+        if let Some(mask_evs) = resp.mask_evs {
+            obj["mask_evs"] = serde_json::json!(mask_evs);
+            obj["optimal_mask"] = serde_json::json!(resp.optimal_mask.unwrap());
+            obj["optimal_mask_ev"] = serde_json::json!(resp.optimal_mask_ev.unwrap());
+        }
+        obj
+    };
+
+    // Neutral (theta = 0): the existing EV path, unchanged.
+    let neutral = compute_roll_response(
         &state.ctx,
         req.upper_score,
         req.scored_categories,
@@ -180,32 +277,44 @@ async fn handle_evaluate(
         req.rerolls_remaining,
     );
 
-    let categories: Vec<serde_json::Value> = resp
-        .categories
+    // Build EXACTLY five detents in fixed theta order. A missing detent table
+    // falls back to the neutral response (that risk level then behaves as
+    // Neutral), so the array is always length 5. The frontend relies on that.
+    const DETENT_THETAS: [f32; 5] = [-0.08, -0.04, 0.0, 0.04, 0.08];
+    let detent_objs: Vec<serde_json::Value> = DETENT_THETAS
         .iter()
-        .map(|cat| {
-            serde_json::json!({
-                "id": cat.id,
-                "name": cat.name,
-                "score": cat.score,
-                "available": cat.available,
-                "ev_if_scored": if cat.ev_if_scored.is_finite() { cat.ev_if_scored } else { 0.0 },
-            })
+        .map(|&theta| {
+            if theta == 0.0 {
+                return to_obj(&neutral, 0.0);
+            }
+            match state
+                .detents
+                .iter()
+                .find(|d| (d.theta - theta).abs() < 1e-6)
+            {
+                Some(d) => {
+                    let r = crate::api_computations::compute_roll_response_theta(
+                        &state.ctx,
+                        d.sv.as_slice(),
+                        &d.exp_scores,
+                        d.theta,
+                        req.upper_score,
+                        req.scored_categories,
+                        &req.dice,
+                        req.rerolls_remaining,
+                    );
+                    to_obj(&r, d.theta)
+                }
+                // Missing table: emit neutral values under this detent's theta,
+                // so the array stays length 5 and the level degrades to Neutral.
+                None => to_obj(&neutral, theta),
+            }
         })
         .collect();
 
-    let mut result = serde_json::json!({
-        "categories": categories,
-        "optimal_category": resp.optimal_category,
-        "optimal_category_ev": resp.optimal_category_ev,
-        "state_ev": resp.state_ev,
-    });
-
-    if let Some(mask_evs) = resp.mask_evs {
-        result["mask_evs"] = serde_json::json!(mask_evs);
-        result["optimal_mask"] = serde_json::json!(resp.optimal_mask.unwrap());
-        result["optimal_mask_ev"] = serde_json::json!(resp.optimal_mask_ev.unwrap());
-    }
+    // Flat fields = neutral (backward compatible), plus the detents array.
+    let mut result = to_obj(&neutral, 0.0);
+    result["detents"] = serde_json::Value::Array(detent_objs);
 
     Ok(Json(result))
 }

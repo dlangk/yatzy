@@ -25,11 +25,12 @@ function freshState(): GameState {
     bonus: 0,
     rawScoredSum: 0,
     lastEvalResponse: null,
+    detents: null,
     turnPhase: 'idle',
     trajectory: [],
     undoStack: [],
     redoStack: [],
-    prefs: { showHints: true, showDebug: false, guideOpen: true, autoplayDelay: 500, override: false },
+    prefs: { showHints: true, showDebug: false, guideOpen: true, autoplayDelay: 500, override: false, riskLevel: 2 },
   };
 }
 
@@ -371,10 +372,10 @@ describe('gameReducer', () => {
     it('RESET_GAME keeps preferences (New Game must not reset hints/debug/guide)', () => {
       const state: GameState = {
         ...freshState(),
-        prefs: { showHints: false, showDebug: true, guideOpen: false, autoplayDelay: 800, override: true },
+        prefs: { showHints: false, showDebug: true, guideOpen: false, autoplayDelay: 800, override: true, riskLevel: 2 },
       };
       const next = gameReducer(state, { type: 'RESET_GAME' });
-      expect(next.prefs).toEqual({ showHints: false, showDebug: true, guideOpen: false, autoplayDelay: 800, override: true });
+      expect(next.prefs).toEqual({ showHints: false, showDebug: true, guideOpen: false, autoplayDelay: 800, override: true, riskLevel: 2 });
       // ...but the game data is fresh
       expect(next.turnPhase).toBe('idle');
       expect(next.trajectory).toEqual([]);
@@ -409,6 +410,87 @@ describe('gameReducer', () => {
       expect(toggled.prefs.showHints).toBe(false);
       const undone = gameReducer(toggled, { type: 'UNDO' });
       expect(undone.prefs.showHints).toBe(false); // undo restores game, not prefs
+    });
+  });
+
+  describe('risk detents', () => {
+    function detentResponse(): EvaluateResponse {
+      // Five detents; category 0's ev_if_scored increases with index so the
+      // selected slice is observable. Flat fields equal detents[2] (Neutral).
+      const mk = (ev: number): EvaluateResponse => ({
+        categories: [{ id: 0, name: 'Ones', score: 3, available: true, ev_if_scored: ev }],
+        optimal_category: 0,
+        optimal_category_ev: ev,
+        state_ev: ev,
+      });
+      const detents = [mk(200), mk(210), mk(220), mk(230), mk(240)];
+      return { ...detents[2], detents };
+    }
+
+    it('SET_EVAL_RESPONSE selects the slice at the current riskLevel', () => {
+      const s0 = { ...freshState(), prefs: { ...freshState().prefs, riskLevel: 4 } };
+      const s1 = gameReducer(s0, { type: 'SET_EVAL_RESPONSE', response: detentResponse() });
+      expect(s1.lastEvalResponse?.optimal_category_ev).toBe(240); // detent 4
+      expect(s1.detents).not.toBeNull();
+      expect(s1.categories[0].evIfScored).toBe(240); // scorecard re-centered
+    });
+
+    it('SET_RISK_LEVEL re-selects the slice and re-maps categories, no refetch', () => {
+      const withEval = gameReducer(freshState(), {
+        type: 'SET_EVAL_RESPONSE', response: detentResponse(),
+      });
+      expect(withEval.lastEvalResponse?.optimal_category_ev).toBe(220); // neutral default
+      const safe = gameReducer(withEval, { type: 'SET_RISK_LEVEL', level: 0 });
+      expect(safe.prefs.riskLevel).toBe(0);
+      expect(safe.lastEvalResponse?.optimal_category_ev).toBe(200); // detent 0
+      expect(safe.categories[0].evIfScored).toBe(200);
+    });
+
+    it('SET_RISK_LEVEL clamps out-of-range levels', () => {
+      const withEval = gameReducer(freshState(), {
+        type: 'SET_EVAL_RESPONSE', response: detentResponse(),
+      });
+      expect(gameReducer(withEval, { type: 'SET_RISK_LEVEL', level: 9 }).prefs.riskLevel).toBe(4);
+      expect(gameReducer(withEval, { type: 'SET_RISK_LEVEL', level: -3 }).prefs.riskLevel).toBe(0);
+    });
+
+    it('SCORE_CATEGORY records the cost at all five detents', () => {
+      // Build a rolled state with a 5-detent eval where scoring category 0 is
+      // suboptimal by a different amount at each detent.
+      const mk = (chosenEv: number, bestEv: number): EvaluateResponse => ({
+        categories: [
+          { id: 0, name: 'Ones', score: 3, available: true, ev_if_scored: chosenEv },
+          { id: 1, name: 'Twos', score: 0, available: true, ev_if_scored: bestEv },
+        ],
+        optimal_category: 1,
+        optimal_category_ev: bestEv,
+        state_ev: bestEv,
+      });
+      // detent d: chosen - best = -(d+1), so deltas should be [-1,-2,-3,-4,-5].
+      const detents = [mk(99, 100), mk(98, 100), mk(97, 100), mk(96, 100), mk(95, 100)];
+      const rolled = {
+        ...rolledState(),
+        detents,
+        lastEvalResponse: detents[2],
+        categories: freshState().categories.map((c) =>
+          c.id === 0 ? { ...c, evIfScored: 97, available: true, suggestedScore: 3 } : c,
+        ),
+      };
+      const scored = gameReducer(rolled, { type: 'SCORE_CATEGORY', categoryId: 0 });
+      const pt = scored.trajectory[scored.trajectory.length - 1];
+      expect(pt.deltas).toEqual([-1, -2, -3, -4, -5]);
+      expect(pt.delta).toBe(-3); // neutral (index 2)
+    });
+
+    it('a backend response without detents falls back to the flat response', () => {
+      const flat: EvaluateResponse = {
+        categories: [{ id: 0, name: 'Ones', score: 3, available: true, ev_if_scored: 199 }],
+        optimal_category: 0, optimal_category_ev: 199, state_ev: 199,
+      };
+      const s = gameReducer({ ...freshState(), prefs: { ...freshState().prefs, riskLevel: 3 } },
+        { type: 'SET_EVAL_RESPONSE', response: flat });
+      expect(s.lastEvalResponse?.optimal_category_ev).toBe(199);
+      expect(s.detents).toBeNull();
     });
   });
 });

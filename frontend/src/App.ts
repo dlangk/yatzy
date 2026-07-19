@@ -21,6 +21,7 @@ import { initDebugPanel } from './components/DebugPanel.ts';
 import { initDecisionLog } from './components/DecisionLog.ts';
 import { initHowTo } from './components/HowTo.ts';
 import { initDeltaBox } from './components/DeltaBox.ts';
+import { initRiskSlider } from './components/RiskSlider.ts';
 
 /** A short, always-on caption describing what a panel shows. */
 function panelCaption(text: string): HTMLDivElement {
@@ -62,6 +63,10 @@ export function initApp(container: HTMLElement): void {
   const actionBarEl = document.createElement('div');
   diceSection.appendChild(actionBarEl);
   initActionBar(actionBarEl);
+
+  const riskSliderEl = document.createElement('div');
+  diceSection.appendChild(riskSliderEl);
+  initRiskSlider(riskSliderEl);
 
   // Instruction above the dice: a lead-in you read before interacting. (The
   // value arrows are Override-mode only, so they are not mentioned here.)
@@ -111,7 +116,8 @@ export function initApp(container: HTMLElement): void {
   analysisSection.appendChild(chartEl);
   initTrajectoryChart(chartEl);
   analysisSection.appendChild(panelCaption(
-    'Your projected final score across the game, with the range it will most likely land in.',
+    'Your projected final score across the game, with the range it will most likely land in. '
+    + 'This projection assumes neutral (EV-optimal) play.',
   ));
 
   // Section 4: Decision Log — desktop col 1, narrow stacks last

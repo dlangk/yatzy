@@ -6,6 +6,7 @@
 //!
 //! All internal computation uses f32; return types are f64 for JSON compatibility.
 
+use crate::batched_solver::ExpScores;
 use crate::constants::*;
 use crate::dice_mechanics::find_dice_set_index;
 use crate::game_mechanics::update_upper_score;
@@ -197,6 +198,233 @@ pub fn compute_roll_response(
     }
 }
 
+/// Utility analog of `compute_expected_values_for_n_rerolls`: propagate one
+/// reroll level over utilities. Stochastic node is a plain weighted sum (same as
+/// EV); the keep-decision node takes the extremum that maximizes the certainty
+/// equivalent, which is max utility for theta > 0 and min utility for theta < 0.
+fn propagate_reroll_level_utility(
+    ctx: &YatzyContext,
+    e_prev: &[f64; 252],
+    e_current: &mut [f64; 252],
+    minimize: bool,
+) {
+    let kt = &ctx.keep_table;
+    // Expected utility for each unique keep-multiset (linear weighted sum).
+    let mut keep_u = [0.0f64; NUM_KEEP_MULTISETS];
+    for kid in 0..NUM_KEEP_MULTISETS {
+        let start = kt.row_start[kid] as usize;
+        let end = kt.row_start[kid + 1] as usize;
+        let mut u = 0.0f64;
+        for k in start..end {
+            u += kt.vals[k] as f64 * e_prev[kt.cols[k] as usize];
+        }
+        keep_u[kid] = u;
+    }
+    // For each dice set, take the sign-correct extremum over its keeps.
+    for ds_i in 0..252 {
+        let mut best = e_prev[ds_i]; // mask 0 = keep all
+        for j in 0..kt.unique_count[ds_i] as usize {
+            let kid = kt.unique_keep_ids[ds_i][j] as usize;
+            let u = keep_u[kid];
+            let better = if minimize { u < best } else { u > best };
+            if better {
+                best = u;
+            }
+        }
+        e_current[ds_i] = best;
+    }
+}
+
+/// f64 utility of a single reroll mask (pure linear weighted sum). The CE path
+/// needs f64: for theta<0 the utilities are tiny and f32 rounding corrupts the argmin.
+fn expected_utility_for_reroll_mask_f64(
+    ctx: &YatzyContext,
+    ds_index: usize,
+    e_ds: &[f64; 252],
+    mask: i32,
+) -> f64 {
+    if mask == 0 {
+        return e_ds[ds_index];
+    }
+    let kt = &ctx.keep_table;
+    let kid = kt.mask_to_keep[ds_index * 32 + mask as usize] as usize;
+    let start = kt.row_start[kid] as usize;
+    let end = kt.row_start[kid + 1] as usize;
+    let mut u = 0.0f64;
+    for k in start..end {
+        u += kt.vals[k] as f64 * e_ds[kt.cols[k] as usize];
+    }
+    u
+}
+
+/// Certainty-equivalent variant of `compute_roll_response` for a nonzero theta.
+///
+/// `sv_theta` is this detent's log-domain table (stores L(S) = ln U(S)).
+/// `exp_scores[ds][c] = e^{theta*score(ds,c)}`. All value fields in the returned
+/// `RollResponse` are certainty equivalents CE = (1/theta) ln U, in points.
+/// Optimal actions are argmax CE (max utility for theta > 0, min for theta < 0).
+// Mirrors compute_roll_response's argument list plus the per-detent table and theta.
+#[allow(clippy::too_many_arguments)]
+pub fn compute_roll_response_theta(
+    ctx: &YatzyContext,
+    sv_theta: &[f32],
+    exp_scores: &ExpScores,
+    theta: f32,
+    upper_score: i32,
+    scored_categories: i32,
+    dice: &[i32; 5],
+    rerolls_remaining: i32,
+) -> RollResponse {
+    let inv_theta = 1.0f64 / theta as f64;
+    let minimize = theta < 0.0;
+    let worst = if minimize {
+        f64::INFINITY
+    } else {
+        f64::NEG_INFINITY
+    };
+
+    // Sort dice and track original indices for mask remapping (same as EV path).
+    let mut indexed: [(i32, usize); 5] = [
+        (dice[0], 0),
+        (dice[1], 1),
+        (dice[2], 2),
+        (dice[3], 3),
+        (dice[4], 4),
+    ];
+    indexed.sort_by_key(|&(v, _)| v);
+    let sort_map: [usize; 5] = [
+        indexed[0].1,
+        indexed[1].1,
+        indexed[2].1,
+        indexed[3].1,
+        indexed[4].1,
+    ];
+    let sorted_dice: [i32; 5] = [
+        indexed[0].0,
+        indexed[1].0,
+        indexed[2].0,
+        indexed[3].0,
+        indexed[4].0,
+    ];
+    let ds_index = find_dice_set_index(ctx, &sorted_dice);
+
+    // Utility of scoring category c from a dice set = exp(theta*score) * U(succ),
+    // where U(succ) = exp(L(succ)). CE = (1/theta) ln(utility).
+    let util_of_score = |ds_i: usize, c: usize| -> f64 {
+        let scr = ctx.precomputed_scores[ds_i][c];
+        let new_up = update_upper_score(upper_score, c, scr);
+        let new_scored = scored_categories | (1 << c);
+        let l_succ = sv_theta[state_index(new_up as usize, new_scored as usize)] as f64;
+        exp_scores[ds_i][c] as f64 * l_succ.exp()
+    };
+
+    // --- Categories: CE of scoring each available category now ---
+    let categories: [CategoryInfo; CATEGORY_COUNT] = std::array::from_fn(|c| {
+        let scr = ctx.precomputed_scores[ds_index][c];
+        let available = !is_category_scored(scored_categories, c);
+        let ev_if_scored = if available {
+            inv_theta * util_of_score(ds_index, c).ln()
+        } else {
+            f64::NEG_INFINITY
+        };
+        CategoryInfo {
+            id: c,
+            name: CATEGORY_NAMES[c],
+            score: scr,
+            available,
+            ev_if_scored,
+        }
+    });
+
+    // optimal_category = argmax CE among available (CE is already sign-correct).
+    let mut optimal_category = -1i32;
+    let mut optimal_category_ev = f64::NEG_INFINITY;
+    for cat in &categories {
+        if cat.available && cat.ev_if_scored > optimal_category_ev {
+            optimal_category_ev = cat.ev_if_scored;
+            optimal_category = cat.id as i32;
+        }
+    }
+
+    // --- Group 6 base: utility of the best "score now" action per dice set ---
+    let mut e_ds_0 = [worst; 252];
+    for ds_i in 0..252 {
+        let mut best = worst;
+        for c in 0..CATEGORY_COUNT {
+            if !is_category_scored(scored_categories, c) {
+                let u = util_of_score(ds_i, c);
+                let better = if minimize { u < best } else { u > best };
+                if better {
+                    best = u;
+                }
+            }
+        }
+        e_ds_0[ds_i] = best;
+    }
+
+    if rerolls_remaining > 0 {
+        let e_ds_for_masks = if rerolls_remaining == 1 {
+            e_ds_0
+        } else {
+            let mut e_ds_1 = [worst; 252];
+            propagate_reroll_level_utility(ctx, &e_ds_0, &mut e_ds_1, minimize);
+            e_ds_1
+        };
+
+        // 32 mask utilities (pure weighted sum, f64 to avoid f32 argmin corruption
+        // on the tiny theta<0 utilities), in sorted order.
+        let mut sorted_mask_util = [0.0f64; 32];
+        for mask in 0..32 {
+            sorted_mask_util[mask] =
+                expected_utility_for_reroll_mask_f64(ctx, ds_index, &e_ds_for_masks, mask as i32);
+        }
+
+        // Remap sorted -> original dice order, converting utility to CE.
+        let mut mask_evs = [0.0f64; 32];
+        for orig_mask in 0u32..32 {
+            let mut sorted_mask = 0u32;
+            for si in 0..5 {
+                if orig_mask & (1 << sort_map[si]) != 0 {
+                    sorted_mask |= 1 << si;
+                }
+            }
+            mask_evs[orig_mask as usize] = inv_theta * sorted_mask_util[sorted_mask as usize].ln();
+        }
+
+        // optimal_mask = argmax CE (already sign-correct after the (1/theta) factor).
+        let mut best_mask = 0i32;
+        let mut best_mask_ev = mask_evs[0];
+        for mask in 1..32 {
+            if mask_evs[mask] > best_mask_ev {
+                best_mask_ev = mask_evs[mask];
+                best_mask = mask as i32;
+            }
+        }
+
+        let effective_state_ev = best_mask_ev.max(optimal_category_ev);
+
+        RollResponse {
+            mask_evs: Some(mask_evs),
+            optimal_mask: Some(best_mask),
+            optimal_mask_ev: Some(best_mask_ev),
+            categories,
+            optimal_category,
+            optimal_category_ev,
+            state_ev: effective_state_ev,
+        }
+    } else {
+        RollResponse {
+            mask_evs: None,
+            optimal_mask: None,
+            optimal_mask_ev: None,
+            categories,
+            optimal_category,
+            optimal_category_ev,
+            state_ev: optimal_category_ev,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292,5 +520,77 @@ mod tests {
         let resp = compute_roll_response(&ctx, 0, scored, &dice, 0);
 
         assert_eq!(resp.optimal_category, CATEGORY_YATZY as i32);
+    }
+
+    #[test]
+    fn test_ce_zero_table_reduces_to_scores() {
+        // With a zero state table (L=0 -> U=1), CE of scoring category c is its
+        // immediate score, exactly like the EV path with a zero table.
+        let ctx = make_ctx();
+        let exp_scores = crate::batched_solver::precompute_exp_scores(&ctx, 0.04);
+        let sv = ctx.state_values.as_slice();
+        let dice = [1, 2, 3, 4, 5];
+        let resp = compute_roll_response_theta(&ctx, sv, &exp_scores, 0.04, 0, 0, &dice, 0);
+
+        // Small Straight scores 15; with U=1 successors its CE equals 15.
+        let ss = &resp.categories[CATEGORY_SMALL_STRAIGHT];
+        assert!(ss.available);
+        assert!(
+            (ss.ev_if_scored - 15.0).abs() < 1e-3,
+            "CE was {}",
+            ss.ev_if_scored
+        );
+        assert_eq!(resp.optimal_category, CATEGORY_SMALL_STRAIGHT as i32);
+    }
+
+    #[test]
+    fn test_ce_positive_theta_argmax_is_finite() {
+        // Structural: with rerolls, all 32 mask CEs are finite and the optimal
+        // mask CE is >= keep-all (mask 0) CE.
+        let ctx = make_ctx();
+        let exp_scores = crate::batched_solver::precompute_exp_scores(&ctx, 0.08);
+        let sv = ctx.state_values.as_slice();
+        let dice = [3, 3, 4, 5, 6];
+        let resp = compute_roll_response_theta(&ctx, sv, &exp_scores, 0.08, 0, 0, &dice, 2);
+        let mask_evs = resp.mask_evs.expect("rerolls remain");
+        for m in mask_evs.iter() {
+            assert!(m.is_finite());
+        }
+        assert!(resp.optimal_mask_ev.unwrap() >= mask_evs[0] - 1e-6);
+    }
+
+    #[test]
+    fn test_ce_negative_theta_reduces_to_scores() {
+        // Same zero-table reduction must hold for theta < 0 (exercises the
+        // minimize path and the (1/theta) sign).
+        let ctx = make_ctx();
+        let exp_scores = crate::batched_solver::precompute_exp_scores(&ctx, -0.08);
+        let sv = ctx.state_values.as_slice();
+        let dice = [1, 2, 3, 4, 5];
+        let resp = compute_roll_response_theta(&ctx, sv, &exp_scores, -0.08, 0, 0, &dice, 0);
+        let chance = &resp.categories[CATEGORY_CHANCE];
+        assert!(
+            (chance.ev_if_scored - 15.0).abs() < 1e-3,
+            "CE was {}",
+            chance.ev_if_scored
+        );
+    }
+
+    #[test]
+    fn test_ce_negative_theta_with_rerolls_runs_minimize_path() {
+        // theta<0 with rerolls exercises propagate_reroll_level_utility's
+        // minimize branch and the Group-6 min selection. Zero table means U=1,
+        // so this confirms the minimize path runs without NaN or Inf and argmax holds.
+        let ctx = make_ctx();
+        let exp_scores = crate::batched_solver::precompute_exp_scores(&ctx, -0.08);
+        let sv = ctx.state_values.as_slice();
+        let dice = [3, 3, 4, 5, 6];
+        let resp = compute_roll_response_theta(&ctx, sv, &exp_scores, -0.08, 0, 0, &dice, 2);
+        let mask_evs = resp.mask_evs.expect("rerolls remain");
+        for m in mask_evs.iter() {
+            assert!(m.is_finite());
+        }
+        assert!(resp.optimal_mask.is_some());
+        assert!(resp.optimal_mask_ev.unwrap() >= mask_evs[0] - 1e-6);
     }
 }

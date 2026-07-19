@@ -1,5 +1,6 @@
 import { getState, subscribe } from '../store.ts';
 import type { TrajectoryPoint } from '../types.ts';
+import { pointDelta } from '../types.ts';
 import { emitHover, onHover } from '../hoverBus.ts';
 import { attachTooltip } from './Tooltip.ts';
 import { TIP } from '../tooltips.ts';
@@ -59,6 +60,7 @@ export function initDecisionLog(container: HTMLElement): void {
   // Track rendered state to avoid unnecessary work
   let renderedDecisionCount = 0;
   let prevShowHints: boolean | null = null;
+  let prevRiskLevel: number | null = null;
   let prevTrajectoryRef: TrajectoryPoint[] | null = null;
 
   // Keep references to delta cells for showHints updates
@@ -101,27 +103,29 @@ export function initDecisionLog(container: HTMLElement): void {
     return { tr, deltaTd, d };
   }
 
-  function updateDeltaCells(showHints: boolean) {
+  function updateDeltaCells(showHints: boolean, level: number) {
     let maxAbsDelta = 0;
     for (const { d } of renderedRows) {
-      if (d.delta != null) maxAbsDelta = Math.max(maxAbsDelta, Math.abs(d.delta));
+      const dv = pointDelta(d, level);
+      if (dv != null) maxAbsDelta = Math.max(maxAbsDelta, Math.abs(dv));
     }
     if (maxAbsDelta === 0) maxAbsDelta = 1;
 
     let runningDelta = 0;
     for (const { deltaTd, d } of renderedRows) {
       deltaTd.innerHTML = '';
-      if (showHints && d.delta != null) {
-        runningDelta += d.delta;
+      const dv = pointDelta(d, level);
+      if (showHints && dv != null) {
+        runningDelta += dv;
         const bar = document.createElement('span');
         bar.className = 'spark-bar';
-        const pct = Math.abs(d.delta) / maxAbsDelta;
+        const pct = Math.abs(dv) / maxAbsDelta;
         const barWidth = Math.max(2, pct * MAX_BAR_WIDTH);
-        if (Math.abs(d.delta) < 0.01) {
+        if (Math.abs(dv) < 0.01) {
           bar.style.background = 'var(--color-success)';
           bar.style.width = `${barWidth}px`;
           bar.style.marginLeft = `${MAX_BAR_WIDTH}px`;
-        } else if (d.delta < 0) {
+        } else if (dv < 0) {
           bar.style.background = 'var(--color-danger)';
           bar.style.width = `${barWidth}px`;
           bar.style.marginLeft = `${MAX_BAR_WIDTH - barWidth}px`;
@@ -132,7 +136,7 @@ export function initDecisionLog(container: HTMLElement): void {
         }
         const value = document.createElement('span');
         value.className = 'spark-value';
-        value.textContent = d.delta.toFixed(2);
+        value.textContent = dv.toFixed(2);
         deltaTd.appendChild(bar);
         deltaTd.appendChild(value);
       } else {
@@ -156,7 +160,11 @@ export function initDecisionLog(container: HTMLElement): void {
     const s = getState();
 
     // Skip if nothing relevant changed
-    if (s.trajectory === prevTrajectoryRef && s.prefs.showHints === prevShowHints) return;
+    if (
+      s.trajectory === prevTrajectoryRef &&
+      s.prefs.showHints === prevShowHints &&
+      s.prefs.riskLevel === prevRiskLevel
+    ) return;
 
     const decisions = s.trajectory.filter(
       (p: TrajectoryPoint) =>
@@ -183,16 +191,21 @@ export function initDecisionLog(container: HTMLElement): void {
       renderedDecisionCount = decisions.length;
     }
 
-    // Update delta cells (needed on new rows or showHints change)
-    if (s.prefs.showHints !== prevShowHints || decisions.length !== renderedRows.length) {
-      updateDeltaCells(s.prefs.showHints);
+    // Update delta cells (needed on new rows, showHints change, or riskLevel change)
+    if (
+      s.prefs.showHints !== prevShowHints ||
+      s.prefs.riskLevel !== prevRiskLevel ||
+      decisions.length !== renderedRows.length
+    ) {
+      updateDeltaCells(s.prefs.showHints, s.prefs.riskLevel);
     } else if (decisions.length > 0 && renderedRows.length > 0) {
-      // New rows were added — always update deltas for rescaling
-      updateDeltaCells(s.prefs.showHints);
+      // New rows were added, always update deltas for rescaling
+      updateDeltaCells(s.prefs.showHints, s.prefs.riskLevel);
     }
 
     prevTrajectoryRef = s.trajectory;
     prevShowHints = s.prefs.showHints;
+    prevRiskLevel = s.prefs.riskLevel;
   }
 
   render();

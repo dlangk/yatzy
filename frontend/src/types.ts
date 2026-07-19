@@ -15,6 +15,9 @@ export interface TrajectoryPoint {
   percentiles?: Record<string, number>;
   label?: string;
   delta?: number;
+  /** Per-detent cost of this decision (index 0-4). deltas[riskLevel] is shown;
+   *  delta above stays as the neutral fallback for points saved before the slider. */
+  deltas?: number[];
 }
 
 export interface CategoryState {
@@ -48,6 +51,11 @@ export interface EvaluateResponse {
   optimal_category: number;
   optimal_category_ev: number;
   state_ev: number;
+  /** Risk parameter for this response (0 = neutral). Present per detent. */
+  theta?: number;
+  /** All five risk detents (index order theta -0.08..+0.08). Flat fields above
+   *  equal detents[2] (Neutral). Absent if the backend predates the slider. */
+  detents?: EvaluateResponse[];
 }
 
 export type TurnPhase = 'idle' | 'rolled' | 'game_over';
@@ -65,6 +73,9 @@ export interface GameStateSnapshot {
    *  the terminal bonus that the solver's state_ev already includes. */
   rawScoredSum: number;
   lastEvalResponse: EvaluateResponse | null;
+  /** Cached five-detent eval for the current roll (null between rolls). Derived,
+   *  excluded from persistence like lastEvalResponse. */
+  detents: EvaluateResponse[] | null;
   turnPhase: TurnPhase;
   trajectory: TrajectoryPoint[];
 }
@@ -79,6 +90,9 @@ export interface Prefs {
   /** Override mode: reveals the manual game-state controls (die value arrows,
    *  reroll +/-, undo/redo). Off by default; these are "cheat" tools. */
   override: boolean;
+  /** Selected risk detent, index 0-4 (2 = Neutral). Drives which detent slice
+   *  the whole turn-by-turn feedback re-centers on. */
+  riskLevel: number;
 }
 
 export interface GameState extends GameStateSnapshot {
@@ -92,7 +106,8 @@ export type GameAction =
   | { type: 'TOGGLE_DIE'; index: number }
   | { type: 'REROLL' }
   | { type: 'SCORE_CATEGORY'; categoryId: number }
-  | { type: 'SET_EVAL_RESPONSE'; response: EvaluateResponse; trajectoryEvent?: 'roll' | 'reroll'; rerollLabel?: string; rerollDelta?: number }
+  | { type: 'SET_EVAL_RESPONSE'; response: EvaluateResponse; trajectoryEvent?: 'roll' | 'reroll'; rerollLabel?: string; rerollDeltas?: number[] }
+  | { type: 'SET_RISK_LEVEL'; level: number }
   | { type: 'TOGGLE_DEBUG' }
   | { type: 'RESET_GAME' }
   | { type: 'SET_DIE_VALUE'; index: number; value: number }
@@ -107,3 +122,9 @@ export type GameAction =
   | { type: 'SET_AUTOPLAY_DELAY'; delay: number }
   | { type: 'UNDO' }
   | { type: 'REDO' };
+
+/** Read a trajectory point's cost at a given detent, falling back to the single
+ *  neutral delta for points saved before per-detent deltas existed. */
+export function pointDelta(p: TrajectoryPoint, level: number): number | null {
+  return p.deltas?.[level] ?? p.delta ?? null;
+}

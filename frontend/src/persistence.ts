@@ -25,10 +25,11 @@ export const DEFAULT_PREFS: Prefs = {
   guideOpen: true,
   autoplayDelay: 500,
   override: false,
+  riskLevel: 2,
 };
 
 /** The persisted game shape: the game snapshot minus the re-derivable eval response. */
-export type PersistedGame = Omit<GameStateSnapshot, 'lastEvalResponse'>;
+export type PersistedGame = Omit<GameStateSnapshot, 'lastEvalResponse' | 'detents'>;
 
 function read(key: string): unknown {
   try {
@@ -54,12 +55,13 @@ function write(key: string, data: unknown): void {
 export function saveGame(state: GameState): void {
   const {
     lastEvalResponse: _l,
+    detents: _d,
     undoStack: _u,
     redoStack: _r,
     prefs: _p,
     ...game
   } = state;
-  void _l; void _u; void _r; void _p;
+  void _l; void _d; void _u; void _r; void _p;
   write(GAME_KEY, game);
 }
 
@@ -81,5 +83,7 @@ export function savePrefs(prefs: Prefs): void {
 
 export function loadPrefs(): Prefs {
   const p = read(PREFS_KEY) as Partial<Prefs> | null;
-  return { ...DEFAULT_PREFS, ...(p ?? {}) };
+  const merged = { ...DEFAULT_PREFS, ...(p ?? {}) };
+  merged.riskLevel = Math.max(0, Math.min(4, Math.round(merged.riskLevel)));
+  return merged;
 }
