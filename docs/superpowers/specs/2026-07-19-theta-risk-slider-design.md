@@ -1,6 +1,64 @@
 # Theta Risk Slider (Play UI): Design
 
 **Date:** 2026-07-19
+**Status:** Shipped (CE version), superseded by the Revision below
+
+---
+
+## Revision 2026-07-19: certainty-equivalent → true mean (supersedes the CE approach)
+
+**Why.** The shipped CE version displays the certainty-equivalent as "Projected
+value". For a risk-seeker (θ>0), `CE = mean + (θ/2)σ² > mean`, so the number
+*rises* with θ, past the mathematically maximal mean (Neutral is the EV-optimal
+policy, so no policy's mean can exceed it). A player reads "Very aggressive
+projects 290" when the true mean at +0.08 is ~242, below Neutral's ~247. The CE
+math is correct but presenting CE as a score projection contradicts the theory
+(`theory/strategy/risk-sensitive-strategy.md`: `mean(θ) ≈ 247.0 − 9.9θ − 602θ²`
+peaks at 0; `std(θ) ≈ 39.5 + 53.5θ` rises with θ). Risk-seeking *lowers* the
+mean and *widens* the tail; it never lifts the mean.
+
+**The corrected feature has two parts, shipped in sequence:**
+
+### Part A (this plan): true mean everywhere
+
+Replace every displayed value (state value, per keep-mask, per category, the
+Delta total) with the **mean under the selected detent's policy**, `V_πθ(S)` =
+expected final score if you follow the θ-optimal policy from S. Properties:
+
+- `V_πθ(S) ≤ V*(S)` at *every* state, so "Projected value" peaks at Neutral and
+  dips both ways, at every point in the game. This is the user's exact claim
+  made visible.
+- The θ-policy's **decisions** (advice, optimal mask/category, mismatch marks)
+  are unchanged: still the utility argmax/argmin from the θ-table, exactly as
+  the CE version computes them. Only the value *numbers* change (CE → mean).
+- `state_ev` is the mean of the action the θ-policy *chooses by utility*, not a
+  max over means (a non-recommended action can have higher mean — that is the
+  point). Mismatch "cost" becomes a signed mean-difference; the frontend renders
+  a non-positive "cost vs recommendation" sanely.
+- At θ=0 the mean path is byte-identical to today's EV path (`V_π0 = V*`), so
+  Neutral is unchanged and needs no new table.
+
+Mechanism: a new precompute builds a companion `V_πθ` table per non-neutral
+detent (`all_states_mean_theta_{θ}.bin`, 16 MB each) by backward induction that
+follows the θ-policy's decisions (reusing `density::transitions`' decision
+logic) while accumulating expected score. `/evaluate` loads these into each
+`Detent` and returns means. Still one cached `/evaluate` per roll; the slider
+stays instant.
+
+### Part B (later plan): risk-shaped finish range
+
+Make `/density` θ-aware (per-detent precomputed early-turn percentile tables +
+live MC under the θ-policy mid-game, mirroring today's `/density` structure).
+The trajectory chart / finish-range fetch the selected detent's distribution and
+re-fetch when the slider settles; aggressive widens p10–p90 and lifts p90/p99.
+This is where "lower mean, fatter upside tail" becomes visible. Deferred to its
+own plan; **the sections below (CE approach) are retained only as history.**
+
+---
+
+## Original design (CE approach — HISTORICAL, superseded above)
+
+**Date:** 2026-07-19
 **Status:** Approved (design), pending implementation plan
 
 ## Summary
