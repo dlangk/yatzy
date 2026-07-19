@@ -116,7 +116,8 @@ export function initApp(container: HTMLElement): void {
   analysisSection.appendChild(chartEl);
   initTrajectoryChart(chartEl);
   analysisSection.appendChild(panelCaption(
-    'Your projected final score across the game, with the range it will most likely land in.',
+    'Your projected final score across the game, with the range it will most likely land in. '
+    + 'This projection assumes neutral (EV-optimal) play.',
   ));
 
   // Section 4: Decision Log — desktop col 1, narrow stacks last

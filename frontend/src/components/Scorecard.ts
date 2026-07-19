@@ -26,6 +26,7 @@ export function initScorecard(container: HTMLElement): void {
   // Header
   const thead = document.createElement('thead');
   const headerRow = document.createElement('tr');
+  let efinalHeaderSpan: HTMLSpanElement | null = null;
   for (const [text, center] of [['Category', false], ['Score', true], ['E[final]', true], ['', true]] as [string, boolean][]) {
     const th = document.createElement('th');
     if (center) th.className = 'center';
@@ -35,6 +36,7 @@ export function initScorecard(container: HTMLElement): void {
       span.textContent = text;
       attachTooltip(span, TIP.scEfinal);
       th.appendChild(span);
+      efinalHeaderSpan = span;
     } else {
       th.textContent = text;
     }
@@ -126,6 +128,11 @@ export function initScorecard(container: HTMLElement): void {
     const mustScore = canScore && s.rerollsRemaining <= 0;
     const optimalCategoryId = s.prefs.showHints ? (s.lastEvalResponse?.optimal_category ?? null) : null;
 
+    // Off-neutral, the E[final] column shows risk-adjusted values, not EV.
+    if (efinalHeaderSpan) {
+      efinalHeaderSpan.textContent = s.prefs.riskLevel === 2 ? 'E[final]' : 'Value';
+    }
+
     // Compute normalization ranges
     const scoreValues = s.categories.map(c => c.isScored ? c.score : c.suggestedScore);
     const scoreMin = Math.min(...scoreValues);
@@ -184,7 +191,8 @@ export function initScorecard(container: HTMLElement): void {
         state.rawScoredSum === prev.rawScoredSum &&
         state.upperScore === prev.upperScore &&
         state.bonus === prev.bonus &&
-        state.totalScore === prev.totalScore) return;
+        state.totalScore === prev.totalScore &&
+        state.prefs.riskLevel === prev.prefs.riskLevel) return;
     render();
   });
 }

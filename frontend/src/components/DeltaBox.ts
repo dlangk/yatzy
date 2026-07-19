@@ -12,6 +12,7 @@ import type { TrajectoryPoint } from '../types.ts';
 import { pointDelta } from '../types.ts';
 import { attachTooltip } from './Tooltip.ts';
 import { TIP } from '../tooltips.ts';
+import { LABELS } from './RiskSlider.ts';
 
 function cumulativeDelta(trajectory: TrajectoryPoint[], level: number): number {
   let sum = 0;
@@ -46,9 +47,17 @@ export function initDeltaBox(container: HTMLElement): void {
     const perfect = d > -0.005;
     value.textContent = perfect ? '0.00' : d.toFixed(2);
     container.classList.toggle('perfect', perfect);
-    sub.textContent = perfect
-      ? 'perfect play so far — keep the delta at zero'
-      : 'expected points behind perfect play';
+    const neutral = state.prefs.riskLevel === 2;
+    if (neutral) {
+      sub.textContent = perfect
+        ? 'perfect play so far — keep the delta at zero'
+        : 'expected points behind perfect play';
+    } else {
+      const label = LABELS[state.prefs.riskLevel].toLowerCase();
+      sub.textContent = perfect
+        ? `optimal for ${label} play so far`
+        : `expected points behind ${label}-optimal play`;
+    }
   }
 
   render();

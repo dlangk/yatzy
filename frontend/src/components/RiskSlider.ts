@@ -1,6 +1,6 @@
 import { getState, dispatch, subscribe } from '../store.ts';
 
-const LABELS = ['Very safe', 'Safe', 'Neutral', 'Aggressive', 'Very aggressive'];
+export const LABELS = ['Very safe', 'Safe', 'Neutral', 'Aggressive', 'Very aggressive'];
 
 /**
  * Five-detent risk slider. A native range input (min 0, max 4, step 1) so

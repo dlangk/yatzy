@@ -28,13 +28,13 @@ function optimalPercentile(ev: number): string {
   return 'p0';
 }
 
-/** Build a label/value grid column with a header. Returns refs to value spans.
+/** Build a label/value grid column with a header. Returns refs to label and value spans.
  *  Each item's label gets a guidance tooltip. */
 function buildColumn(
   parent: HTMLElement,
   header: string,
   items: { label: string; tip: string }[],
-): HTMLSpanElement[] {
+): { labels: HTMLSpanElement[]; vals: HTMLSpanElement[] } {
   const col = document.createElement('div');
   col.className = 'eval-col';
 
@@ -47,6 +47,7 @@ function buildColumn(
   grid.className = 'eval-col-grid';
   col.appendChild(grid);
 
+  const labels: HTMLSpanElement[] = [];
   const vals: HTMLSpanElement[] = [];
   for (const { label, tip } of items) {
     const lbl = document.createElement('span');
@@ -57,11 +58,12 @@ function buildColumn(
     val.textContent = DASH;
     grid.appendChild(lbl);
     grid.appendChild(val);
+    labels.push(lbl);
     vals.push(val);
   }
 
   parent.appendChild(col);
-  return vals;
+  return { labels, vals };
 }
 
 /** Render the two-column evaluation panel: turn-specific + game-level stats. */
@@ -73,7 +75,7 @@ export function initEvalPanel(container: HTMLElement): void {
   container.appendChild(columns);
 
   // Left column: This Turn
-  const turnVals = buildColumn(columns, 'This Turn', [
+  const { labels: turnLabels, vals: turnVals } = buildColumn(columns, 'This Turn', [
     { label: 'Best keep', tip: TIP.bestKeep },
     { label: 'Keep EV', tip: TIP.keepEv },
     { label: 'Your keep EV', tip: TIP.yourKeepEv },
@@ -82,7 +84,7 @@ export function initEvalPanel(container: HTMLElement): void {
   ]);
 
   // Right column: Game
-  const gameVals = buildColumn(columns, 'Game', [
+  const { labels: gameLabels, vals: gameVals } = buildColumn(columns, 'Game', [
     { label: 'Expected final', tip: TIP.expectedFinal },
     { label: '80% Finish range', tip: TIP.finishRange },
     { label: 'Current score', tip: TIP.currentScore },
@@ -90,10 +92,25 @@ export function initEvalPanel(container: HTMLElement): void {
     { label: 'Turn', tip: TIP.turn },
   ]);
 
+  // Labels that claim "expected"/"EV" are only accurate at Neutral risk; off-neutral
+  // the values are risk-adjusted (certainty-equivalent), so relabel them.
+  const EV_LABEL_SWAPS: [HTMLSpanElement, string, string][] = [
+    [turnLabels[1], 'Keep EV', 'Keep value'],
+    [turnLabels[2], 'Your keep EV', 'Your keep value'],
+    [turnLabels[4], 'Score EV', 'Score value'],
+    [gameLabels[0], 'Expected final', 'Projected value'],
+  ];
+
   function render() {
     const s = getState();
     const hasData = s.turnPhase === 'rolled' && s.lastEvalResponse !== null;
     const rerolls = s.rerollsRemaining;
+
+    // Off-neutral, the numbers are risk-adjusted (certainty-equivalent), not EV.
+    const neutral = s.prefs.riskLevel === 2;
+    for (const [span, neutralText, offNeutralText] of EV_LABEL_SWAPS) {
+      span.textContent = neutral ? neutralText : offNeutralText;
+    }
 
     // --- Turn column ---
     // The analysis panel is always shown during an active roll, independent of
@@ -193,7 +210,8 @@ export function initEvalPanel(container: HTMLElement): void {
         state.trajectory === prev.trajectory &&
         state.totalScore === prev.totalScore &&
         state.rawScoredSum === prev.rawScoredSum &&
-        state.categories === prev.categories) return;
+        state.categories === prev.categories &&
+        state.prefs.riskLevel === prev.prefs.riskLevel) return;
     render();
   });
 }
