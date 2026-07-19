@@ -315,3 +315,65 @@ async fn category_fields_present() {
         assert!(cat.get("ev_if_scored").is_some());
     }
 }
+
+// ── POST /evaluate: five risk detents ──────────────────────────────────
+
+#[tokio::test]
+#[ignore] // needs data/strategy_tables detent files (all_states_theta_*.bin)
+async fn evaluate_returns_five_detents_neutral_matches_flat() {
+    let ctx = get_ctx(); // neutral table computed inline by setup_ctx
+    let detents = yatzy::server::load_detents(&ctx);
+    assert_eq!(detents.len(), 4, "all four detent tables must be present");
+    let app = create_router_full(ctx, None, None, detents);
+
+    let body = serde_json::json!({
+        "dice": [3, 3, 4, 5, 6],
+        "upper_score": 0,
+        "scored_categories": 0,
+        "rerolls_remaining": 2,
+    });
+    let resp = app.oneshot(evaluate_request(body)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let json = body_json(resp.into_body()).await;
+
+    // Five detents in theta order. Compare at f32 precision: theta is stored
+    // as f32 server-side and serde_json widens f32 -> f64 by zero-extending
+    // the bit pattern (not by re-parsing decimal text), so e.g. -0.08f32 as
+    // f64 is -0.07999999821186066, not the f64 literal -0.08. Casting the
+    // JSON value back down to f32 recovers bit-exact equality against the
+    // same f32 literals the server used.
+    let ds = json["detents"].as_array().expect("detents array");
+    assert_eq!(ds.len(), 5);
+    let thetas: Vec<f32> = ds
+        .iter()
+        .map(|d| d["theta"].as_f64().unwrap() as f32)
+        .collect();
+    assert_eq!(thetas, vec![-0.08f32, -0.04f32, 0.0f32, 0.04f32, 0.08f32]);
+
+    // Neutral detent (index 2) equals the flat top-level fields (backward compat).
+    assert_eq!(ds[2]["optimal_mask"], json["optimal_mask"]);
+    assert_eq!(ds[2]["optimal_category"], json["optimal_category"]);
+
+    // Documented decision flip for [3,3,4,5,6]: neutral keeps a pair of 3s;
+    // aggressive (+0.04, index 3) keeps 5,6 for the large straight. Decode the
+    // reroll mask (bit set = reroll) into the kept dice values.
+    let kept = |mask: u64| -> std::collections::BTreeSet<i32> {
+        let d = [3, 3, 4, 5, 6];
+        (0..5usize)
+            .filter(|i| mask & (1 << i) == 0)
+            .map(|i| d[i])
+            .collect()
+    };
+    let neutral_kept = kept(ds[2]["optimal_mask"].as_u64().unwrap());
+    let aggr_kept = kept(ds[3]["optimal_mask"].as_u64().unwrap());
+    assert_ne!(neutral_kept, aggr_kept, "risk should change the kept dice");
+    assert!(
+        aggr_kept.contains(&5) && aggr_kept.contains(&6),
+        "aggressive keeps 5,6 for the straight; got {:?}",
+        aggr_kept
+    );
+
+    // Safety: real-table coverage of theta<0 (Safe detent, index 1).
+    assert!(ds[1]["optimal_mask_ev"].as_f64().unwrap().is_finite());
+    assert!(ds[1]["optimal_mask"].is_u64());
+}

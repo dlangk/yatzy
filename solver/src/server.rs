@@ -237,7 +237,38 @@ async fn handle_evaluate(
         }
     }
 
-    let resp = compute_roll_response(
+    // Serialize one RollResponse into the flat JSON object shape.
+    let to_obj = |resp: &crate::api_computations::RollResponse, theta: f32| -> serde_json::Value {
+        let categories: Vec<serde_json::Value> = resp
+            .categories
+            .iter()
+            .map(|cat| {
+                serde_json::json!({
+                    "id": cat.id,
+                    "name": cat.name,
+                    "score": cat.score,
+                    "available": cat.available,
+                    "ev_if_scored": if cat.ev_if_scored.is_finite() { cat.ev_if_scored } else { 0.0 },
+                })
+            })
+            .collect();
+        let mut obj = serde_json::json!({
+            "theta": theta,
+            "categories": categories,
+            "optimal_category": resp.optimal_category,
+            "optimal_category_ev": resp.optimal_category_ev,
+            "state_ev": resp.state_ev,
+        });
+        if let Some(mask_evs) = resp.mask_evs {
+            obj["mask_evs"] = serde_json::json!(mask_evs);
+            obj["optimal_mask"] = serde_json::json!(resp.optimal_mask.unwrap());
+            obj["optimal_mask_ev"] = serde_json::json!(resp.optimal_mask_ev.unwrap());
+        }
+        obj
+    };
+
+    // Neutral (theta = 0): the existing EV path, unchanged.
+    let neutral = compute_roll_response(
         &state.ctx,
         req.upper_score,
         req.scored_categories,
@@ -245,32 +276,44 @@ async fn handle_evaluate(
         req.rerolls_remaining,
     );
 
-    let categories: Vec<serde_json::Value> = resp
-        .categories
+    // Build EXACTLY five detents in fixed theta order. A missing detent table
+    // falls back to the neutral response (that risk level then behaves as
+    // Neutral), so the array is always length 5. The frontend relies on that.
+    const DETENT_THETAS: [f32; 5] = [-0.08, -0.04, 0.0, 0.04, 0.08];
+    let detent_objs: Vec<serde_json::Value> = DETENT_THETAS
         .iter()
-        .map(|cat| {
-            serde_json::json!({
-                "id": cat.id,
-                "name": cat.name,
-                "score": cat.score,
-                "available": cat.available,
-                "ev_if_scored": if cat.ev_if_scored.is_finite() { cat.ev_if_scored } else { 0.0 },
-            })
+        .map(|&theta| {
+            if theta == 0.0 {
+                return to_obj(&neutral, 0.0);
+            }
+            match state
+                .detents
+                .iter()
+                .find(|d| (d.theta - theta).abs() < 1e-6)
+            {
+                Some(d) => {
+                    let r = crate::api_computations::compute_roll_response_theta(
+                        &state.ctx,
+                        d.sv.as_slice(),
+                        &d.exp_scores,
+                        d.theta,
+                        req.upper_score,
+                        req.scored_categories,
+                        &req.dice,
+                        req.rerolls_remaining,
+                    );
+                    to_obj(&r, d.theta)
+                }
+                // Missing table: emit neutral values under this detent's theta,
+                // so the array stays length 5 and the level degrades to Neutral.
+                None => to_obj(&neutral, theta),
+            }
         })
         .collect();
 
-    let mut result = serde_json::json!({
-        "categories": categories,
-        "optimal_category": resp.optimal_category,
-        "optimal_category_ev": resp.optimal_category_ev,
-        "state_ev": resp.state_ev,
-    });
-
-    if let Some(mask_evs) = resp.mask_evs {
-        result["mask_evs"] = serde_json::json!(mask_evs);
-        result["optimal_mask"] = serde_json::json!(resp.optimal_mask.unwrap());
-        result["optimal_mask_ev"] = serde_json::json!(resp.optimal_mask_ev.unwrap());
-    }
+    // Flat fields = neutral (backward compatible), plus the detents array.
+    let mut result = to_obj(&neutral, 0.0);
+    result["detents"] = serde_json::Value::Array(detent_objs);
 
     Ok(Json(result))
 }
