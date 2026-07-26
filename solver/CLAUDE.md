@@ -123,7 +123,17 @@ just bench-baseline # Record new baseline
 just bench          # Print only
 ```
 
-Baseline: `.benchmarks/performance-baseline.json`. Threshold: `max(mean + 3σ, mean × 1.10)`.
+Baseline: `.benchmarks/performance-baseline.json`. Threshold: `max(mean + 4σ, mean × 1.25, mean + 5μs)`.
+
+The threshold is recomputed from the baseline's mean and σ at check time, not read
+from the stored `threshold_ms`, so changing the formula applies to an existing
+baseline without re-recording. The 5μs absolute floor exists because the
+`api_evaluate_*` benchmarks measure 1-7μs, where a relative margin alone is
+smaller than timer jitter and flips PASS/FAIL at random.
+
+Run benchmarks on an otherwise idle machine. Right after a heavy job (a full θ
+sweep, an oracle build) `simulate_vertical_100k` reads ~12% high purely from
+thermal state.
 
 ### Reference Numbers
 

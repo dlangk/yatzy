@@ -6,7 +6,10 @@
 //!   yatzy-bench              # Run benchmarks, print results only
 //!
 //! Baseline is saved to .benchmarks/performance-baseline.json.
-//! Failure threshold: max(mean + 3σ, mean × 1.10).
+//! Failure threshold: max(mean + 4σ, mean × 1.25, mean + 5μs). See
+//! `regression_threshold`. The threshold is recomputed from the baseline's mean
+//! and σ at check time, so widening it here applies to an existing baseline
+//! without re-recording (which would bake current timings in as the new normal).
 
 use std::path::Path;
 use std::time::Instant;
@@ -46,6 +49,24 @@ struct BaselineEntry {
     threshold_ms: f64,
 }
 
+/// Absolute margin floor. Below this, a benchmark's timing is decided by timer
+/// granularity and scheduler jitter rather than by the code under test.
+const ABS_FLOOR_MS: f64 = 0.005; // 5 μs
+
+/// Regression threshold for one benchmark, given its baseline mean and σ.
+///
+/// Widest of three terms wins:
+/// - `mean + 4σ` — headroom scaled to the benchmark's own measured variance
+/// - `mean × 1.25` — relative headroom for thermal state and background load
+/// - `mean + 5μs` — absolute floor. A μs-scale benchmark measuring 5 μs gets a
+///   0.5 μs margin from the relative term alone, which is below the noise, so a
+///   single microsecond of jitter flips PASS/FAIL.
+fn regression_threshold(mean_ms: f64, std_ms: f64) -> f64 {
+    (mean_ms + 4.0 * std_ms)
+        .max(mean_ms * 1.25)
+        .max(mean_ms + ABS_FLOOR_MS)
+}
+
 #[derive(PartialEq)]
 enum Mode {
     Run,
@@ -77,8 +98,7 @@ fn run_bench<F: FnMut()>(name: &str, iterations: usize, mut f: F) -> BenchResult
     let p95_idx = ((n * 0.95) as usize).min(sorted.len() - 1);
     let p95 = sorted[p95_idx];
 
-    // Threshold: max(mean + 3σ, mean × 1.10)
-    let threshold = (mean + 3.0 * std).max(mean * 1.10);
+    let threshold = regression_threshold(mean, std);
 
     let result = BenchResult {
         name: name.to_string(),
@@ -253,7 +273,10 @@ fn check_baseline(results: &[BenchResult], baseline: &Baseline) -> bool {
     let mut all_pass = true;
     for result in results {
         if let Some(entry) = baseline.entries.iter().find(|e| e.name == result.name) {
-            let pass = result.mean_ms <= entry.threshold_ms;
+            // Recomputed from the baseline's mean/σ rather than read from the
+            // file, so the current margin applies to older baselines too.
+            let threshold = regression_threshold(entry.mean_ms, entry.std_ms);
+            let pass = result.mean_ms <= threshold;
             let status = if pass { "PASS" } else { "FAIL" };
             if !pass {
                 all_pass = false;
@@ -261,14 +284,14 @@ fn check_baseline(results: &[BenchResult], baseline: &Baseline) -> bool {
             if entry.mean_ms >= 1.0 {
                 println!(
                     "  {:<32} {:>8.1} ms {:>8.1} ms {:>8.1} ms  {}",
-                    result.name, result.mean_ms, entry.threshold_ms, entry.mean_ms, status
+                    result.name, result.mean_ms, threshold, entry.mean_ms, status
                 );
             } else {
                 println!(
                     "  {:<32} {:>7.0} μs  {:>7.0} μs  {:>7.0} μs   {}",
                     result.name,
                     result.mean_ms * 1000.0,
-                    entry.threshold_ms * 1000.0,
+                    threshold * 1000.0,
                     entry.mean_ms * 1000.0,
                     status
                 );
