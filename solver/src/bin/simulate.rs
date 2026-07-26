@@ -8,8 +8,8 @@ use yatzy::simulation::{
     simulate_batch_with_recording, ThetaTable, POLICY_CONFIGS,
 };
 use yatzy::storage::{
-    load_all_state_values, load_oracle, load_state_values_standalone, state_file_path,
-    ORACLE_FILE_PATH,
+    load_all_state_values, load_oracle, load_state_values_standalone, max_policy_file_path,
+    state_file_path, ORACLE_FILE_PATH,
 };
 use yatzy::types::YatzyContext;
 
@@ -435,7 +435,7 @@ fn main() {
     let tables_ms = t1.elapsed().as_secs_f64() * 1000.0;
 
     let state_file = if max_policy {
-        "data/strategy_tables/all_states_max.bin".to_string()
+        max_policy_file_path()
     } else {
         state_file_path(theta)
     };

@@ -25,7 +25,9 @@ use crate::batched_solver::{
     BatchedBuffers, ExpScores,
 };
 use crate::constants::*;
-use crate::storage::{load_all_state_values, save_all_state_values, state_file_path};
+use crate::storage::{
+    load_all_state_values, max_policy_file_path, save_all_state_values, state_file_path,
+};
 use crate::types::{PolicyOracle, YatzyContext};
 
 /// Progress tracker for the Phase 2 computation loop.
@@ -167,7 +169,7 @@ fn compute_all_state_values_impl(
     // Try to load consolidated file first (skipped for benchmarks)
     if !skip_cache {
         let consolidated_file = if ctx.max_policy {
-            "data/all_states_max.bin".to_string()
+            max_policy_file_path()
         } else {
             state_file_path(ctx.theta)
         };
@@ -400,7 +402,7 @@ fn compute_all_state_values_impl(
 
     if save_result {
         let save_file = if ctx.max_policy {
-            "data/all_states_max.bin".to_string()
+            max_policy_file_path()
         } else {
             state_file_path(ctx.theta)
         };

@@ -41,6 +41,12 @@ pub fn state_file_path(theta: f32) -> String {
     }
 }
 
+/// Return the state file path for the max-policy table (chance nodes use max, not EV).
+/// Companion to `state_file_path`, which covers every θ-indexed table.
+pub fn max_policy_file_path() -> String {
+    "data/strategy_tables/all_states_max.bin".to_string()
+}
+
 /// Return the mean-table file path for a given θ value (companion to `state_file_path`).
 /// θ=0.0 has no mean table (Neutral reuses `all_states.bin` directly; `V_π0 = V*`).
 /// Other θ values use `data/strategy_tables/all_states_mean_theta_{theta:.3}.bin`.
